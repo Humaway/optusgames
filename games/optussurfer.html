@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Optus Surfers</title>
     <style>
-        /* CSS Reset & UI Polish */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         body {
             background-color: #05161A;
@@ -21,7 +20,6 @@
         }
         canvas { display: block; width: 100%; height: 100%; }
 
-        /* UI Layer */
         #uiLayer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
         
         #scoreBoard {
@@ -34,7 +32,6 @@
         }
         .score-pulse { transform: scale(1.1); color: #F2A900; }
 
-        /* Game Over Panel */
         #gameOverPanel {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 10, 12, 0.75);
@@ -93,7 +90,7 @@
 
 <script>
 /**
- * OPTUS SURFERS - V4 (Camera Zoom & Edge Pop Fix)
+ * OPTUS SURFERS - The "Actually Fixed" Edition
  */
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d', { alpha: false });
@@ -111,10 +108,9 @@ resize();
 const OPTUS_YELLOW = '#F2A900';
 const OPTUS_TEAL = '#00A3AD';
 const LANES = [-140, 0, 140]; 
-const CAMERA_Y = 280;         
-const CAMERA_Z = -650;        
-// FOV reduced significantly to act as a camera zoom, cropping out the edges
-const FOV = 500;              
+const CAMERA_Y = 300;         
+const CAMERA_Z = -800;        // Camera is far back
+const FOV = 800;              // Restored natural cinematic FOV
 
 let gameState = 'START'; 
 let lastTime = 0;
@@ -142,7 +138,7 @@ const player = {
 };
 
 const chaser = {
-    z: -1000,
+    z: -1200, // Starts completely off screen
     currentX: 0,
     lane: 1
 };
@@ -204,7 +200,7 @@ document.getElementById('restartBtn').addEventListener('click', initGame);
 // --- Math & Projection ---
 function project(x, y, z) {
     const relativeZ = z - CAMERA_Z;
-    if (relativeZ < 1) return null; 
+    if (relativeZ < 1) return null; // Avoid rendering behind the lens
     const scale = FOV / relativeZ;
     const projectedX = width / 2 + x * scale;
     const projectedY = horizon + (CAMERA_Y - y) * scale;
@@ -417,16 +413,17 @@ function update(dt) {
     distance += speed * dt;
     floorOffset += speed * dt; 
 
+    // Tighter, crisp lane changing
     const targetX = LANES[player.lane];
     const dx = targetX - player.currentX;
     
-    player.currentX += dx * 14 * dt;
+    player.currentX += dx * 20 * dt; // Increased lerp speed for faster snap
     
-    if (Math.abs(dx) < 1) {
+    if (Math.abs(dx) < 2) {
         player.currentX = targetX;
     }
     
-    player.tilt = dx * -0.0035; 
+    player.tilt = dx * -0.003; 
 
     // Physics
     if (player.isJumping) {
@@ -444,7 +441,7 @@ function update(dt) {
     }
 
     // Stumble & Chaser AI
-    let targetChaserZ = -1000; 
+    let targetChaserZ = -1200; // Far behind
     if (player.stumbleTimer > 0) {
         player.stumbleTimer -= dt;
         targetChaserZ = player.z - 220; 
@@ -497,7 +494,8 @@ function update(dt) {
             }
         }
         
-        if (obj.z < CAMERA_Z - 100 || (obj.hit && obj.type === 'coin')) objects.splice(i, 1);
+        // Let objects travel completely behind the camera before deleting
+        if (obj.z < CAMERA_Z - 200 || (obj.hit && obj.type === 'coin')) objects.splice(i, 1);
     }
 }
 
@@ -514,9 +512,11 @@ function draw() {
     ctx.fillStyle = floorGrad; 
     ctx.fillRect(0, horizon, width, height - horizon);
 
+    // Floor lines math fixed to recycle behind camera
     ctx.lineWidth = 1;
-    for (let i = 0; i < 45; i++) {
-        let lineZ = 9000 - ((i * 200 + floorOffset) % 9000);
+    for (let i = 0; i < 50; i++) {
+        // modulo 10000 ensures it passes the -800 camera safely before snapping back to 9000
+        let lineZ = 9000 - ((i * 200 + floorOffset) % 10000); 
         let p = project(0, 0, lineZ);
         if (p) {
             ctx.beginPath();
@@ -531,10 +531,11 @@ function draw() {
     const dividersX = [-70, 70];
     dividersX.forEach(x => {
         ctx.beginPath();
-        for (let z = 0; z < 9000; z += 150) {
-            let p = project(x, 0, z);
+        for (let z = -800; z < 9000; z += 150) { // Draw lines starting from behind camera
+            let actualZ = z + (floorOffset % 150);
+            let p = project(x, 0, actualZ);
             if (p) {
-                if (z === 0) ctx.moveTo(p.x, p.y);
+                if (z === -800) ctx.moveTo(p.x, p.y);
                 else ctx.lineTo(p.x, p.y);
             }
         }
@@ -548,14 +549,15 @@ function draw() {
 
     let renderList = [];
 
-    // Walls pushed further outward to X: ±500 (previously ±420) 
-    // Combined with the narrowed FOV, they slide cleanly off screen without vanishing
-    for (let z = 0; z < 9000; z += 600) {
-        let wallZ = 9000 - ((z + floorOffset) % 9000); 
-        let pL = project(-500, 0, wallZ);
+    // WALL MATH FIXED! Modulo is now 10000 so the wall goes down to -1000 Z before looping back.
+    // Since camera is at -800, they gracefully slide entirely past the screen.
+    for (let z = 0; z < 10000; z += 600) {
+        let wallZ = 9000 - ((z + floorOffset) % 10000); 
+        
+        let pL = project(-400, 0, wallZ); // Brought walls back to natural 400 spacing
         if (pL) renderList.push({ drawType: 'wall', z: wallZ, px: pL.x, py: pL.y, scale: pL.scale });
         
-        let pR = project(500, 0, wallZ);
+        let pR = project(400, 0, wallZ);
         if (pR) renderList.push({ drawType: 'wall', z: wallZ, px: pR.x, py: pR.y, scale: pR.scale });
     }
 
@@ -570,7 +572,7 @@ function draw() {
         renderList.push({ drawType: 'player', z: player.z, px: pPlayer.x, py: pPlayer.y, shadowY: pShadow.y, scale: pPlayer.scale });
     }
 
-    if (chaser.z > CAMERA_Z) {
+    if (chaser.z > CAMERA_Z + 10) {
         let pChaserShadow = project(chaser.currentX, 0, chaser.z);
         let pChaser = project(chaser.currentX, 0, chaser.z);
         if (pChaser) {
