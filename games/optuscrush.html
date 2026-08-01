@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Optus Crush</title>
+    <style>
+        :root {
+            --optus-yellow: #FFD600;
+            --optus-teal: #00A389;
+            --optus-black: #000000;
+            --optus-white: #FFFFFF;
+            --board-size: 92vmin; 
+            --max-board-size: 550px;
+            --cell-size: calc(100% / 8);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: radial-gradient(circle at 50% 0%, #e0f2f0 0%, #a8e0d6 100%);
+            color: var(--optus-black);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            min-height: 100dvh; 
+            overflow: hidden;
+            touch-action: none; 
+        }
+
+        header {
+            width: 100%;
+            max-width: var(--max-board-size);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-bottom: 5px solid var(--optus-yellow);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+            border-radius: 24px;
+            margin-bottom: 12px;
+            z-index: 10;
+        }
+
+        .brand h1 {
+            margin: 0;
+            font-size: clamp(20px, 6vw, 28px);
+            font-weight: 900;
+            letter-spacing: -1px;
+            color: var(--optus-teal);
+            text-shadow: 1px 1px 0px rgba(255,255,255,1);
+        }
+        
+        .brand span { color: var(--optus-black); }
+
+        .stats {
+            display: flex;
+            gap: 10px;
+        }
+
+        .stat-box {
+            background: var(--optus-white);
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: clamp(10px, 3vw, 13px);
+            font-weight: 800;
+            text-transform: uppercase;
+            color: #888;
+            box-shadow: inset 0 3px 6px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        .stat-box span {
+            display: block;
+            font-size: clamp(18px, 5vw, 22px);
+            color: var(--optus-teal);
+            line-height: 1.1;
+        }
+
+        .info-strip {
+            width: 100%;
+            max-width: var(--max-board-size);
+            display: flex;
+            justify-content: space-between;
+            padding: 0 15px 12px;
+            font-size: clamp(13px, 4vw, 15px);
+            font-weight: 800;
+            color: #4a7d74;
+            text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: var(--board-size);
+            height: var(--board-size);
+            max-width: var(--max-board-size);
+            max-height: var(--max-board-size);
+            border-radius: 20px;
+            background: linear-gradient(145deg, #00b497, #00927a);
+            padding: 8px;
+            box-shadow: 
+                0 20px 40px rgba(0,163,137,0.4), 
+                inset 0 4px 0 rgba(255,255,255,0.2),
+                inset 0 -6px 0 rgba(0,0,0,0.2);
+            flex-shrink: 0;
+        }
+
+        #board {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.1);
+            border-radius: 14px;
+            overflow: hidden;
+            background-image: 
+                linear-gradient(45deg, rgba(255,255,255,0.03) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.03) 75%, rgba(255,255,255,0.03)),
+                linear-gradient(45deg, rgba(255,255,255,0.03) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.03) 75%, rgba(255,255,255,0.03));
+            background-size: 25% 25%;
+            background-position: 0 0, 12.5% 12.5%;
+            touch-action: none;
+        }
+
+        .gem {
+            position: absolute;
+            top: 0; left: 0;
+            width: var(--cell-size);
+            height: var(--cell-size);
+            padding: 6px;
+            transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+            cursor: pointer;
+            z-index: 10;
+            will-change: transform;
+            touch-action: none;
+        }
+
+        .gem-inner {
+            width: 100%;
+            height: 100%;
+            background-size: 90%;
+            background-position: center;
+            background-repeat: no-repeat;
+            filter: drop-shadow(0px 4px 3px rgba(0, 0, 0, 0.3));
+            transition: transform 0.1s, filter 0.1s;
+        }
+
+        .gem:active .gem-inner {
+            transform: scale(0.85);
+            filter: drop-shadow(0px 2px 2px rgba(0, 0, 0, 0.2));
+        }
+
+        .gem.popping .gem-inner {
+            animation: pop 0.2s forwards;
+        }
+
+        .gem.is-bomb .gem-inner {
+            filter: drop-shadow(0px 0px 12px var(--optus-yellow)) brightness(1.2);
+            animation: pulseBomb 1s infinite alternate;
+        }
+        
+        .gem.is-bomb::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 120%; height: 120%;
+            transform: translate(-50%, -50%);
+            border: 4px solid rgba(255, 214, 0, 0.8);
+            border-radius: 50%;
+            box-shadow: 0 0 15px var(--optus-yellow), inset 0 0 10px var(--optus-yellow);
+            animation: ringSpin 2s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes pulseBomb {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.15); }
+        }
+
+        @keyframes ringSpin {
+            0% { transform: translate(-50%, -50%) rotate(0deg) scale(0.9); opacity: 0.8; }
+            50% { transform: translate(-50%, -50%) rotate(180deg) scale(1.1); opacity: 1; }
+            100% { transform: translate(-50%, -50%) rotate(360deg) scale(0.9); opacity: 0.8; }
+        }
+
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.4); filter: brightness(1.5); }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        #particle-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,20,15,0.8);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .overlay-content {
+            background: var(--optus-white);
+            padding: 30px;
+            border-radius: 24px;
+            text-align: center;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+            transform: scale(0.8) translateY(20px);
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            width: 80%;
+            max-width: 300px;
+        }
+
+        .overlay.active .overlay-content {
+            transform: scale(1) translateY(0);
+        }
+
+        .overlay h2 {
+            margin-top: 0;
+            color: var(--optus-teal);
+            font-size: 28px;
+            font-weight: 900;
+        }
+
+        .btn {
+            background: linear-gradient(180deg, #FFe033, var(--optus-yellow));
+            color: var(--optus-black);
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            font-weight: 900;
+            border-radius: 40px;
+            cursor: pointer;
+            box-shadow: 0 6px 0 #ccab00, 0 10px 20px rgba(255,214,0,0.4);
+            transition: transform 0.1s, box-shadow 0.1s;
+            margin-top: 15px;
+            text-transform: uppercase;
+            width: 100%;
+        }
+
+        .btn:active {
+            transform: translateY(6px);
+            box-shadow: 0 0px 0 #ccab00, 0 4px 10px rgba(255,214,0,0.4);
+        }
+
+        #streak-container {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        .streak-msg {
+            font-size: clamp(32px, 8vw, 48px);
+            font-weight: 900;
+            color: var(--optus-yellow);
+            -webkit-text-stroke: 1px var(--optus-black);
+            text-shadow: 0 8px 15px rgba(0,0,0,0.5);
+            opacity: 0;
+            position: absolute;
+            white-space: nowrap;
+            animation: floatUp 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translate(-50%, 40px) scale(0.5) rotate(-5deg); opacity: 0; }
+            20% { transform: translate(-50%, 0) scale(1.1) rotate(3deg); opacity: 1; }
+            80% { transform: translate(-50%, -20px) scale(1) rotate(0deg); opacity: 1; }
+            100% { transform: translate(-50%, -40px) scale(0.9); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <h1>Optus<span>Crush</span></h1>
+        </div>
+        <div class="stats">
+            <div class="stat-box">Moves <span id="ui-moves">20</span></div>
+            <div class="stat-box">Score <span id="ui-score">0</span></div>
+        </div>
+    </header>
+
+    <div class="info-strip">
+        <div>Level <span id="ui-level">1</span></div>
+        <div>Target: <span id="ui-target">1000</span></div>
+        <div>Best: <span id="ui-highscore">0</span></div>
+    </div>
+
+    <div id="game-wrapper">
+        <div id="board"></div>
+        <canvas id="particle-canvas"></canvas>
+        <div id="streak-container"></div>
+        
+        <div id="overlay" class="overlay">
+            <div class="overlay-content">
+                <h2 id="overlay-title">Cleared!</h2>
+                <p id="overlay-desc" style="font-size: 16px; color: #555; font-weight: bold;">Incredible connection.</p>
+                <button id="overlay-btn" class="btn" onclick="nextLevel()">Next Level</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const rawSVGs = [
+            `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M50 10 Q 30 30 15 50 A 35 35 0 1 0 85 50 Q 70 30 50 10 Z" fill="#FFD600"/><ellipse cx="50" cy="60" rx="28" ry="18" fill="white"/><circle cx="38" cy="60" r="5" fill="black"/><circle cx="62" cy="60" r="5" fill="black"/></svg>`,
+            `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><polygon points="50,5 95,30 95,70 50,95 5,70 5,30" fill="#FFB300" stroke="#795548" stroke-width="4"/><polygon points="50,20 80,40 80,60 50,80 20,60 20,40" fill="#FFD600" stroke="#795548" stroke-width="4"/><line x1="35" y1="55" x2="45" y2="45" stroke="#FFF" stroke-width="5" stroke-linecap="round"/><line x1="35" y1="65" x2="55" y2="45" stroke="#FFF" stroke-width="5" stroke-linecap="round"/></svg>`,
+            `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#F0F8F7" stroke="#00A389" stroke-width="12"/><text x="50" y="72" font-family="Arial, sans-serif" font-size="64" font-weight="bold" fill="#00A389" text-anchor="middle">C</text></svg>`,
+            `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="none" stroke="#5C6BC0" stroke-width="8" stroke-dasharray="40 10"/><circle cx="50" cy="50" r="28" fill="none" stroke="#5C6BC0" stroke-width="6" stroke-dasharray="8 8"/><circle cx="50" cy="50" r="14" fill="#5C6BC0"/><circle cx="50" cy="50" r="5" fill="white"/></svg>`,
+            `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="#00A389"/><circle cx="50" cy="50" r="35" fill="none" stroke="#FFF" stroke-width="2" stroke-dasharray="4 6"/><circle cx="50" cy="50" r="28" fill="#FFD600"/><path d="M 35 50 L 45 60 L 65 35" fill="none" stroke="#00A389" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+        ];
+        const GEM_ASSETS = rawSVGs.map(svg => `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`);
+        const ASSET_COLORS = ['#FFD600', '#FFB300', '#00A389', '#5C6BC0', '#00A389'];
+
+        const ROWS = 8;
+        const COLS = 8;
+        const ANIM_MS = 200; 
+        
+        let board = [], domElements = [], domPool = [];
+        let currentScore = 0, currentMoves = 20, currentLevel = 1, targetScore = 1500, highScore = 0;
+        let isProcessing = false, comboMultiplier = 0;
+        
+        let dragStart = null, startX = 0, startY = 0, activePointerId = null;
+
+        const boardEl = document.getElementById('board');
+        const uiElements = {
+            score: document.getElementById('ui-score'),
+            moves: document.getElementById('ui-moves'),
+            level: document.getElementById('ui-level'),
+            target: document.getElementById('ui-target'),
+            highscore: document.getElementById('ui-highscore')
+        };
+        const overlay = document.getElementById('overlay');
+        const streakContainer = document.getElementById('streak-container');
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = boardEl.offsetWidth;
+            canvas.height = boardEl.offsetHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        function initGame() {
+            resizeCanvas();
+            loadProgress();
+            updateUI();
+            buildBoard();
+            attachInput();
+            requestAnimationFrame(renderParticles);
+        }
+
+        function loadProgress() {
+            try {
+                const saved = localStorage.getItem('optus_crush_save');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    currentLevel = data.level || 1;
+                    highScore = data.highScore || 0;
+                }
+            } catch (e) {
+                console.log("Saving disabled (Incognito mode).");
+            }
+            setupLevelParameters();
+        }
+
+        function saveProgress() {
+            if (currentScore > highScore) highScore = currentScore;
+            try {
+                localStorage.setItem('optus_crush_save', JSON.stringify({
+                    level: currentLevel,
+                    highScore: highScore
+                }));
+            } catch (e) { /* Ignore */ }
+            uiElements.highscore.innerText = highScore;
+        }
+
+        function setupLevelParameters() {
+            currentScore = 0;
+            targetScore = 1000 + (currentLevel - 1) * 800;
+            currentMoves = Math.max(12, 25 - Math.floor((currentLevel - 1) * 1.5));
+            updateUI();
+        }
+
+        function updateUI() {
+            uiElements.score.innerText = currentScore;
+            uiElements.moves.innerText = currentMoves;
+            uiElements.level.innerText = currentLevel;
+            uiElements.target.innerText = targetScore;
+            uiElements.highscore.innerText = highScore;
+        }
+
+        function getGemFromPool() {
+            if (domPool.length > 0) {
+                let el = domPool.pop();
+                el.classList.remove('popping', 'is-bomb');
+                el.style.transform = '';
+                return el;
+            }
+            const wrapper = document.createElement('div');
+            wrapper.className = 'gem';
+            const inner = document.createElement('div');
+            inner.className = 'gem-inner';
+            wrapper.appendChild(inner);
+            return wrapper;
+        }
+
+        function buildBoard() {
+            // Safely push old elements to pool before wiping
+            if (boardEl.children.length > 0) domPool.push(...Array.from(boardEl.children));
+            boardEl.innerHTML = '';
+            board = []; domElements = [];
+
+            for (let r = 0; r < ROWS; r++) {
+                board[r] = []; domElements[r] = [];
+                for (let c = 0; c < COLS; c++) {
+                    let type;
+                    do { type = Math.floor(Math.random() * GEM_ASSETS.length); } 
+                    while ((r>=2 && board[r-1][c]?.type === type && board[r-2][c]?.type === type) ||
+                           (c>=2 && board[r][c-1]?.type === type && board[r][c-2]?.type === type));
+
+                    let isBomb = Math.random() < 0.05;
+                    board[r][c] = { type, isBomb };
+                    
+                    let el = getGemFromPool();
+                    setupGemDOM(el, r, c, board[r][c]);
+                    el.style.transform = `translate(${c * 100}%, ${r * 100}%)`;
+                    domElements[r][c] = el;
+                }
+            }
+        }
+
+        function setupGemDOM(el, r, c, data) {
+            el.dataset.r = r; el.dataset.c = c;
+            el.firstChild.style.backgroundImage = GEM_ASSETS[data.type];
+            if (data.isBomb) el.classList.add('is-bomb'); else el.classList.remove('is-bomb');
+            if (el.parentNode !== boardEl) boardEl.appendChild(el);
+        }
+
+        function attachInput() {
+            boardEl.addEventListener('pointerdown', handlePointerDown);
+            // Window listener ensures we track drag even if the finger leaves the board boundaries
+            window.addEventListener('pointermove', handlePointerMove, {passive: false});
+            window.addEventListener('pointerup', handlePointerUp);
+            window.addEventListener('pointercancel', handlePointerUp);
+        }
+
+        function handlePointerDown(e) {
+            if (isProcessing) return;
+            const target = e.target.closest('.gem');
+            if (!target) return;
+            
+            dragStart = { r: parseInt(target.dataset.r), c: parseInt(target.dataset.c) };
+            startX = e.clientX; 
+            startY = e.clientY;
+            activePointerId = e.pointerId;
+            // Removed buggy setPointerCapture API to prevent interaction deadlocks
+        }
+
+        function handlePointerMove(e) {
+            if (!dragStart || isProcessing || e.pointerId !== activePointerId) return;
+            e.preventDefault(); 
+
+            const diffX = e.clientX - startX;
+            const diffY = e.clientY - startY;
+
+            if (Math.abs(diffX) > 30 || Math.abs(diffY) > 30) {
+                let tr = dragStart.r, tc = dragStart.c;
+                
+                if (Math.abs(diffX) > Math.abs(diffY)) {
+                    tc += (diffX > 0) ? 1 : -1;
+                } else {
+                    tr += (diffY > 0) ? 1 : -1;
+                }
+
+                // If swipe is valid, process it. Then instantly reset tracker.
+                if (tr >= 0 && tr < ROWS && tc >= 0 && tc < COLS) {
+                    processSwap(dragStart.r, dragStart.c, tr, tc);
+                }
+                
+                dragStart = null;
+                activePointerId = null;
+            }
+        }
+
+        function handlePointerUp(e) {
+            if (e.pointerId === activePointerId) {
+                dragStart = null;
+                activePointerId = null;
+            }
+        }
+
+        async function processSwap(r1, c1, r2, c2) {
+            isProcessing = true; comboMultiplier = 0;
+            await swapVisuals(r1, c1, r2, c2);
+            
+            let temp = board[r1][c1];
+            board[r1][c1] = board[r2][c2];
+            board[r2][c2] = temp;
+
+            let matches = findMatches();
+            if (matches.length > 0) {
+                currentMoves--; updateUI();
+                await resolveMatches(matches);
+                let isGameOver = checkWin();
+                if (!isGameOver) isProcessing = false;
+            } else {
+                board[r2][c2] = board[r1][c1];
+                board[r1][c1] = temp;
+                await swapVisuals(r1, c1, r2, c2);
+                isProcessing = false;
+            }
+        }
+
+        async function swapVisuals(r1, c1, r2, c2) {
+            const el1 = domElements[r1][c1];
+            const el2 = domElements[r2][c2];
+
+            el1.style.transform = `translate(${c2 * 100}%, ${r2 * 100}%)`;
+            el1.dataset.r = r2; el1.dataset.c = c2;
+
+            el2.style.transform = `translate(${c1 * 100}%, ${r1 * 100}%)`;
+            el2.dataset.r = r1; el2.dataset.c = c1;
+
+            domElements[r1][c1] = el2;
+            domElements[r2][c2] = el1;
+
+            await sleep(ANIM_MS);
+        }
+
+        function findMatches() {
+            let matched = new Set();
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 2; c++) {
+                    let type = board[r][c]?.type;
+                    if (type == null) continue;
+                    if (board[r][c+1]?.type === type && board[r][c+2]?.type === type) {
+                        matched.add(`${r},${c}`); matched.add(`${r},${c+1}`); matched.add(`${r},${c+2}`);
+                        let k = c + 3; while(k < COLS && board[r][k]?.type === type) { matched.add(`${r},${k}`); k++; }
+                    }
+                }
+            }
+            for (let c = 0; c < COLS; c++) {
+                for (let r = 0; r < ROWS - 2; r++) {
+                    let type = board[r][c]?.type;
+                    if (type == null) continue;
+                    if (board[r+1][c]?.type === type && board[r+2][c]?.type === type) {
+                        matched.add(`${r},${c}`); matched.add(`${r+1},${c}`); matched.add(`${r+2},${c}`);
+                        let k = r + 3; while(k < ROWS && board[k][c]?.type === type) { matched.add(`${k},${c}`); k++; }
+                    }
+                }
+            }
+            return Array.from(matched).map(s => { let p = s.split(','); return {r: parseInt(p[0]), c: parseInt(p[1])}; });
+        }
+
+        async function resolveMatches(initialMatches) {
+            comboMultiplier++;
+            if (comboMultiplier > 1) showStreak(comboMultiplier);
+
+            let toDestroy = new Set();
+            let queue = [...initialMatches];
+            let cellW = canvas.width / COLS;
+            let cellH = canvas.height / ROWS;
+
+            while(queue.length > 0) {
+                let m = queue.shift();
+                let key = `${m.r},${m.c}`;
+                if (!toDestroy.has(key)) {
+                    toDestroy.add(key);
+                    
+                    let cellData = board[m.r][m.c];
+                    if (cellData && cellData.isBomb) {
+                        spawnExplosion((m.c + 0.5) * cellW, (m.r + 0.5) * cellH, '#FFD600', 40);
+                        for(let dr = -1; dr <= 1; dr++) {
+                            for(let dc = -1; dc <= 1; dc++) {
+                                let nr = m.r + dr, nc = m.c + dc;
+                                if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+                                    if (!toDestroy.has(`${nr},${nc}`) && board[nr][nc]) {
+                                        queue.push({r: nr, c: nc});
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            let matches = Array.from(toDestroy).map(s => { let p = s.split(','); return {r: parseInt(p[0]), c: parseInt(p[1])}; });
+
+            currentScore += matches.length * 15 * comboMultiplier;
+            updateUI();
+
+            matches.forEach(m => {
+                let el = domElements[m.r][m.c];
+                let type = board[m.r][m.c].type;
+                spawnExplosion((m.c + 0.5) * cellW, (m.r + 0.5) * cellH, ASSET_COLORS[type], 10);
+                
+                el.classList.add('popping');
+                board[m.r][m.c] = null;
+            });
+
+            await sleep(ANIM_MS);
+
+            matches.forEach(m => {
+                let el = domElements[m.r][m.c];
+                if(el) { domPool.push(el); el.remove(); }
+                domElements[m.r][m.c] = null;
+            });
+
+            await applyGravity();
+            
+            let newMatches = findMatches();
+            if (newMatches.length > 0) await resolveMatches(newMatches);
+        }
+
+        async function applyGravity() {
+            let moved = false;
+            for (let c = 0; c < COLS; c++) {
+                let empty = 0;
+                for (let r = ROWS - 1; r >= 0; r--) {
+                    if (board[r][c] === null) empty++;
+                    else if (empty > 0) {
+                        board[r + empty][c] = board[r][c]; board[r][c] = null;
+                        let el = domElements[r][c];
+                        domElements[r + empty][c] = el; domElements[r][c] = null;
+                        el.style.transform = `translate(${c * 100}%, ${(r + empty) * 100}%)`;
+                        el.dataset.r = r + empty;
+                        moved = true;
+                    }
+                }
+            }
+            if (moved) await sleep(ANIM_MS);
+
+            moved = false;
+            for (let c = 0; c < COLS; c++) {
+                for (let r = 0; r < ROWS; r++) {
+                    if (board[r][c] === null) {
+                        let type = Math.floor(Math.random() * GEM_ASSETS.length);
+                        let isBomb = Math.random() < 0.05;
+                        board[r][c] = { type, isBomb };
+                        
+                        let el = getGemFromPool();
+                        setupGemDOM(el, r, c, board[r][c]);
+                        
+                        // Set start position OUTSIDE viewport so drop animates correctly
+                        el.style.transition = 'none'; 
+                        el.style.transform = `translate(${c * 100}%, ${(r - ROWS) * 100}%)`;
+                        domElements[r][c] = el;
+                        
+                        // Force a style recalculation then animate to final spot
+                        void el.offsetWidth;
+                        el.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                        el.style.transform = `translate(${c * 100}%, ${r * 100}%)`;
+                        moved = true;
+                    }
+                }
+            }
+            if (moved) await sleep(ANIM_MS);
+        }
+
+        function checkWin() {
+            saveProgress(); 
+            if (currentScore >= targetScore) {
+                showModal("Level Cleared!", "YES! Target Reached.", "Next Level", () => {
+                    currentLevel++; saveProgress(); setupLevelParameters(); buildBoard();
+                    overlay.classList.remove('active'); 
+                    isProcessing = false;
+                });
+                return true;
+            } else if (currentMoves <= 0) {
+                showModal("Out of Moves!", "Keep connecting and try again.", "Retry Level", () => {
+                    setupLevelParameters(); buildBoard();
+                    overlay.classList.remove('active'); 
+                    isProcessing = false;
+                });
+                return true;
+            }
+            return false;
+        }
+
+        function showStreak(combo) {
+            const txts = ["YES!", "Awesome!", "Connected!", "Unstoppable!"];
+            const msg = document.createElement('div');
+            msg.className = 'streak-msg';
+            msg.innerText = `${txts[(combo-2) % txts.length]} x${combo}`;
+            streakContainer.appendChild(msg);
+            setTimeout(() => msg.remove(), 1000);
+        }
+
+        function showModal(t, d, b, act) {
+            document.getElementById('overlay-title').innerText = t;
+            document.getElementById('overlay-desc').innerText = d;
+            let btn = document.getElementById('overlay-btn');
+            btn.innerText = b; btn.onclick = act;
+            overlay.classList.add('active');
+        }
+
+        function spawnExplosion(x, y, color, count=15) {
+            for(let i=0; i<count; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 12,
+                    vy: (Math.random() - 0.5) * 12,
+                    size: Math.random() * 8 + 4,
+                    color: color,
+                    life: 1,
+                    decay: Math.random() * 0.05 + 0.02
+                });
+            }
+        }
+
+        function renderParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for(let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx; p.y += p.vy;
+                p.vy += 0.3; // gravity
+                p.life -= p.decay;
+                
+                if(p.life <= 0) { particles.splice(i, 1); continue; }
+                
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+            requestAnimationFrame(renderParticles);
+        }
+
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        
+        initGame();
+    </script>
+</body>
+</html>
