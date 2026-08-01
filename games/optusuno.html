@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optus UNO</title>
+    <style>
+        :root {
+            --optus-teal: #00A3A6;
+            --optus-yellow: #FFD100;
+            --optus-dark: #12151C;
+            --optus-red: #E0301E;
+            --optus-blue: #005A9C;
+            --optus-green: #2AAA46;
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: linear-gradient(-45deg, #0f172a, #1e1b4b, #004d4f, #002b36);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            font-family: 'Open Sans', sans-serif;
+            color: white; height: 100vh; overflow: hidden; display: flex;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .screen {
+            display: none; width: 100%; height: 100%;
+            flex-direction: column; align-items: center; justify-content: center;
+            animation: screenFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+        }
+        .screen.active { display: flex; }
+
+        @keyframes screenFadeIn {
+            from { opacity: 0; transform: scale(0.95) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .logo-wrapper {
+            background: rgba(255, 255, 255, 0.95); padding: 20px 40px;
+            border-radius: 24px; margin-bottom: 2.5rem; backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.4); animation: floatLogo 6s ease-in-out infinite;
+        }
+        
+        @keyframes floatLogo {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .text-logo {
+            font-size: 3.5rem; font-weight: 900; text-transform: uppercase;
+            color: var(--optus-teal); -webkit-text-stroke: 3px var(--optus-yellow);
+            margin: 0; letter-spacing: 2px; text-align: center; line-height: 1.1;
+            animation: neonPulse 1.5s infinite alternate ease-in-out;
+        }
+        .top-bar .text-logo { font-size: 1.8rem; -webkit-text-stroke: 2px var(--optus-yellow); }
+
+        @keyframes neonPulse {
+            0% { transform: scale(0.98); text-shadow: 0 0 10px rgba(255, 209, 0, 0.5); }
+            100% { transform: scale(1.05); text-shadow: 0 0 25px rgba(255, 209, 0, 1), 0 0 45px rgba(0, 163, 166, 0.6); }
+        }
+
+        h1, h2, h3 { margin-bottom: 1rem; text-align: center; font-weight: 800; }
+
+        .glass-panel {
+            background: var(--glass-bg); backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border); border-radius: 20px;
+            padding: 30px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        input[type="text"] {
+            padding: 16px 24px; border-radius: 30px; border: 2px solid transparent;
+            font-size: 16px; margin-bottom: 15px; text-align: center;
+            outline: none; color: var(--optus-dark); width: 280px; transition: all 0.3s;
+        }
+        input[type="text"]:focus { border-color: var(--optus-teal); transform: scale(1.02); }
+
+        button {
+            background: linear-gradient(135deg, #FFD100, #ffb700); color: var(--optus-dark);
+            border: none; padding: 16px 35px; border-radius: 30px; font-size: 16px; font-weight: 800;
+            text-transform: uppercase; cursor: pointer; transition: all 0.3s; width: 280px;
+        }
+        button:hover { transform: translateY(-3px) scale(1.05); box-shadow: 0 12px 20px rgba(255, 209, 0, 0.4); }
+        button:active { transform: translateY(1px) scale(0.98); }
+        
+        .danger-btn { background: linear-gradient(135deg, var(--optus-red), #b02315); color: white; }
+        .divider { margin: 20px 0; font-weight: bold; opacity: 0.6; font-size: 14px; }
+
+        .top-bar {
+            position: absolute; top: 20px; left: 20px; right: 20px;
+            display: flex; justify-content: space-between; align-items: center; z-index: 50;
+        }
+        .top-bar .logo-wrapper { margin: 0; padding: 10px 20px; border-radius: 12px; animation: none; }
+        .top-bar button { width: auto; padding: 10px 25px; }
+
+        #lobby-players { list-style: none; font-size: 18px; width: 100%; }
+        #lobby-players li {
+            padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex; justify-content: space-between; background: rgba(0,0,0,0.2);
+            margin-bottom: 8px; border-radius: 10px; transition: 0.2s;
+        }
+        
+        /* HOST PANEL OPTIONS */
+        .host-panel {
+            background: rgba(0,0,0,0.4); padding: 15px; border-radius: 12px;
+            margin-top: 15px; text-align: left; width: 100%; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .host-panel label { display: flex; align-items: center; margin-top: 10px; font-size: 14px; cursor: pointer; }
+        .host-panel select { flex: 1; padding: 8px; border-radius: 8px; margin-left: 10px; font-weight: bold; }
+        .host-panel input[type="checkbox"] { margin-right: 10px; transform: scale(1.2); }
+
+        #game-screen { flex-direction: row; }
+        
+        .game-board { flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 85px 20px 10px 20px; }
+
+        .chat-panel {
+            width: 340px; background: rgba(18, 21, 28, 0.85); backdrop-filter: blur(15px);
+            border-left: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column;
+        }
+
+        .hand-area {
+            display: flex; justify-content: center; align-items: flex-end;
+            height: 220px; padding: 10px 40px; width: 100%; max-width: 1100px; margin: 0 auto;
+        }
+
+        .card {
+            width: 100px; height: 150px; border-radius: 14px; border: 6px solid white;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 900; font-size: 36px; color: white;
+            text-shadow: 2px 2px 0px rgba(0,0,0,0.3); box-shadow: -4px 8px 15px rgba(0,0,0,0.4);
+            cursor: pointer; user-select: none; position: relative;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s, border-color 0.3s;
+            transform-origin: bottom center; margin-left: -35px; flex-shrink: 0; z-index: 10;
+        }
+        
+        /* HOVER BUG FIX: Prevents mouse leaving bounding box when translated upwards */
+        .card::after {
+            content: ''; position: absolute;
+            bottom: -80px; left: 0; width: 100%; height: 80px;
+            background: transparent;
+        }
+
+        .hand-area .card:first-child { margin-left: 0; }
+        .hand-area .card:hover { transform: translateY(-30px) scale(1.12); z-index: 100 !important; }
+
+        .playable-card {
+            transform: translateY(-20px) !important;
+            box-shadow: 0 0 30px var(--optus-yellow) !important; border-color: var(--optus-yellow) !important;
+        }
+        .hand-area .playable-card:hover { transform: translateY(-65px) scale(1.2) !important; z-index: 200 !important; }
+        
+        .card.dragging { opacity: 0.2; transform: scale(0.9) !important; }
+
+        .card.red { background: linear-gradient(135deg, var(--optus-red), #b51f10); }
+        .card.blue { background: linear-gradient(135deg, var(--optus-blue), #003d6b); }
+        .card.green { background: linear-gradient(135deg, var(--optus-green), #1d7a31); }
+        .card.yellow { background: linear-gradient(135deg, var(--optus-yellow), #e0b600); }
+        .card.wild { background: linear-gradient(135deg, #333, #000); }
+
+        .card-inner {
+            width: 85%; height: 85%; border-radius: 50% / 15%; background: rgba(255,255,255,0.18);
+            display: flex; align-items: center; justify-content: center; text-align: center;
+            transform: rotate(-10deg); border: 1px solid rgba(255,255,255,0.2); pointer-events: none;
+        }
+
+        .mini-card-back {
+            width: 32px; height: 48px; border-radius: 5px; background: repeating-linear-gradient(45deg, var(--optus-teal), var(--optus-teal) 3px, #008f91 3px, #008f91 6px);
+            border: 2px solid white; box-shadow: -2px 2px 6px rgba(0,0,0,0.4); margin-left: -18px; display: inline-block;
+        }
+        .mini-card-back:first-child { margin-left: 0; }
+
+        #opponents-area { display: flex; justify-content: center; gap: 20px; padding-bottom: 10px; }
+        .opponent-box { background: var(--glass-bg); backdrop-filter: blur(8px); padding: 12px 20px; border-radius: 20px; text-align: center; display: flex; flex-direction: column; align-items: center; min-width: 160px; }
+        .opponent-box.active-turn { border: 2px solid var(--optus-yellow); box-shadow: 0 0 25px rgba(255, 209, 0, 0.4); transform: scale(1.05); }
+
+        .center-area { display: flex; justify-content: center; align-items: center; flex-direction: column; gap: 20px; flex: 1; border-radius: 30px; transition: background 0.3s; }
+        .center-area.drag-over { background: rgba(255,255,255,0.1); border: 2px dashed rgba(255,255,255,0.3); }
+
+        .piles { display: flex; gap: 50px; align-items: center; position: relative; }
+        
+        .deck {
+            width: 100px; height: 150px; border-radius: 14px;
+            background: repeating-linear-gradient(45deg, var(--optus-teal), var(--optus-teal) 10px, #008f91 10px, #008f91 20px);
+            border: 6px solid white; display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 900; font-size: 20px; cursor: pointer; text-shadow: 1px 1px 4px rgba(0,0,0,0.6); transition: 0.25s;
+        }
+        .deck:hover { transform: scale(1.05) translateY(-5px); }
+
+        #turn-indicator { font-size: 24px; font-weight: 900; padding: 8px 25px; border-radius: 30px; background: rgba(0,0,0,0.3); }
+        #current-color-indicator { font-weight: bold; background: rgba(0,0,0,0.4); padding: 6px 20px; border-radius: 20px; }
+        #penalty-indicator { color: var(--optus-yellow); font-size: 20px; font-weight: 900; letter-spacing: 2px; text-shadow: 0 0 10px rgba(255,0,0,0.8); display: none; }
+
+        .chat-header { padding: 18px; background: rgba(0,0,0,0.4); font-weight: 800; text-align: center; }
+        .chat-messages { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+        .msg { background: rgba(255,255,255,0.1); padding: 10px 14px; border-radius: 18px; border-bottom-left-radius: 4px; font-size: 14px; max-width: 85%; align-self: flex-start; }
+        .msg.me { background: linear-gradient(135deg, var(--optus-teal), #007a7c); align-self: flex-end; border-bottom-left-radius: 18px; border-bottom-right-radius: 4px; }
+        .chat-input-area { padding: 15px; display: flex; gap: 10px; background: rgba(0,0,0,0.3); }
+        .chat-input-area input { flex: 1; border-radius: 20px; padding: 10px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: white; }
+        .chat-input-area button { padding: 10px 20px; border-radius: 20px; width: auto; }
+
+        .modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 25, 47, 0.88); backdrop-filter: blur(10px); align-items: center; justify-content: center; flex-direction: column; z-index: 300; }
+        .colors { display: flex; gap: 25px; margin-top: 35px; }
+        .color-btn { width: 75px; height: 75px; border-radius: 50%; cursor: pointer; border: 5px solid white; transition: 0.3s; }
+        .color-btn:hover { transform: scale(1.2); }
+        .color-btn.red { background: var(--optus-red); } .color-btn.blue { background: var(--optus-blue); } .color-btn.green { background: var(--optus-green); } .color-btn.yellow { background: var(--optus-yellow); }
+
+        #powerup-layer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; align-items: center; justify-content: center; z-index: 9999; }
+        .powerup-text { font-size: 7rem; font-weight: 900; color: white; text-shadow: 0 10px 40px rgba(0,0,0,0.8), 0 0 25px var(--optus-yellow); opacity: 0; transform: scale(0.5); }
+        .animate-powerup { animation: explodeText 1.4s forwards; }
+        @keyframes explodeText { 0% { opacity: 0; transform: scale(0.2) rotate(-10deg); } 25% { opacity: 1; transform: scale(1.15) rotate(4deg); } 75% { opacity: 1; transform: scale(1.2) rotate(0deg); } 100% { opacity: 0; transform: scale(1.8) translateY(-80px); filter: blur(10px); } }
+        .flying-card { position: fixed; z-index: 9000; transition: all 0.45s cubic-bezier(0.25, 1, 0.5, 1); pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <!-- AUTH SCREEN -->
+    <div id="auth-screen" class="screen active">
+        <div class="glass-panel">
+            <div class="logo-wrapper"><h1 class="text-logo">OPTUS<br>UNO</h1></div>
+            <input type="text" id="username-input" placeholder="Enter Your Name" autocomplete="off" />
+            <button id="login-btn">Enter Hub</button>
+        </div>
+    </div>
+
+    <!-- MENU SCREEN -->
+    <div id="menu-screen" class="screen">
+        <div class="glass-panel">
+            <div class="logo-wrapper" style="padding: 15px 30px; margin-bottom: 2rem;"><h1 class="text-logo" style="font-size: 2.5rem;">OPTUS UNO</h1></div>
+            <button id="create-room-btn">Create New Room</button>
+            <div class="divider">OR JOIN EXISTING</div>
+            <input type="text" id="room-code-input" placeholder="Enter Room Code" autocomplete="off" />
+            <button id="join-room-btn">Join Room</button>
+        </div>
+    </div>
+
+    <!-- LOBBY SCREEN -->
+    <div id="lobby-screen" class="screen">
+        <div class="top-bar">
+            <div class="logo-wrapper"><h1 class="text-logo">OPTUS UNO</h1></div>
+            <button id="leave-lobby-btn" class="danger-btn">Leave Room</button>
+        </div>
+        
+        <div class="glass-panel" style="width: 440px;">
+            <h2 style="font-size: 2rem;">Room: <span id="lobby-room-code" style="color: var(--optus-yellow);"></span></h2>
+            <div class="divider">PLAYERS IN LOBBY</div>
+            <ul id="lobby-players"></ul>
+            
+            <!-- Host Options -->
+            <div id="host-options" class="host-panel">
+                <div class="divider" style="margin:5px 0;">HOST SETTINGS</div>
+                <label><input type="checkbox" id="setting-stacking" checked> Enable Card Stacking (+2, +4, etc)</label>
+                <label>Deck Mode:
+                    <select id="setting-mode">
+                        <option value="standard">Standard</option>
+                        <option value="crazy">Crazy (Adds +8, +12, Chaos)</option>
+                    </select>
+                </label>
+            </div>
+
+            <button id="start-game-btn" style="display: none; margin-top: 30px; width: 100%;">Start Game</button>
+            <p id="waiting-msg" style="margin-top: 25px; opacity: 0.8; font-style: italic;">Waiting for host to start...</p>
+        </div>
+    </div>
+
+    <!-- GAME SCREEN -->
+    <div id="game-screen" class="screen">
+        <div class="top-bar">
+            <div class="logo-wrapper"><h1 class="text-logo">OPTUS UNO</h1></div>
+            <button id="leave-game-btn" class="danger-btn">Leave Game</button>
+        </div>
+
+        <div class="game-board">
+            <div id="opponents-area"></div>
+            
+            <div class="center-area" id="center-drop-zone">
+                <div id="turn-indicator">Waiting...</div>
+                <div id="penalty-indicator"></div>
+                <div class="piles">
+                    <div class="deck" id="draw-pile" title="Draw Card">
+                        <div>OPTUS</div>
+                    </div>
+                    <div id="discard-pile" class="card">
+                        <div class="card-inner"></div>
+                    </div>
+                </div>
+                <div id="current-color-indicator">Color: None</div>
+            </div>
+            
+            <div id="my-hand" class="hand-area"></div>
+
+            <div id="wild-color-picker" class="modal">
+                <h2>Choose Wild Color</h2>
+                <div class="colors">
+                    <div class="color-btn red" data-color="red"></div>
+                    <div class="color-btn blue" data-color="blue"></div>
+                    <div class="color-btn green" data-color="green"></div>
+                    <div class="color-btn yellow" data-color="yellow"></div>
+                </div>
+            </div>
+
+            <!-- Pick up / Put down Modal -->
+            <div id="decision-modal" class="modal">
+                <h2 style="font-size: 2rem;">Play Drawn Card?</h2>
+                <div id="drawn-card-preview" class="card" style="margin: 30px; transform: scale(1.5);"></div>
+                <div style="display:flex; gap:15px; margin-top:30px;">
+                    <button id="btn-play-drawn">Play It</button>
+                    <button id="btn-keep-drawn" class="danger-btn">Keep It</button>
+                </div>
+            </div>
+
+            <div id="winner-modal" class="modal">
+                <h1 id="winner-name" style="font-size: 3.5rem; color: var(--optus-yellow);"></h1>
+                <button id="back-to-lobby-btn" style="margin-top: 35px;">Return to Lobby</button>
+            </div>
+        </div>
+
+        <div class="chat-panel">
+            <div class="chat-header">LIVE CHAT</div>
+            <div class="chat-messages" id="chat-messages"></div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off" />
+                <button id="send-chat-btn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="powerup-layer"><div id="powerup-text" class="powerup-text"></div></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, get, onValue, update, onDisconnect, push, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+              apiKey: "AIzaSyAMNEE_l1ccxWgMRqe71oZiYtKF026WPvU",
+              authDomain: "optusuno.firebaseapp.com",
+              databaseURL: "https://optusuno-default-rtdb.asia-southeast1.firebasedatabase.app",
+              projectId: "optusuno",
+              storageBucket: "optusuno.firebasestorage.app",
+              messagingSenderId: "1075048716550",
+              appId: "1:1075048716550:web:b09c5e2398a19c02556687",
+              measurementId: "G-HXPPETVDDY"
+        };
+
+        let db;
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getDatabase(app);
+        } catch(e) { console.warn("Firebase configuration needed for multiplayer."); }
+
+        let playerId = "player_" + Math.random().toString(36).substr(2, 9);
+        let playerName = "";
+        let roomId = "";
+        let localState = null;
+        let pendingCardIndex = -1;
+        let lastSeenEventTime = 0;
+        let previousDiscardCount = 0;
+        let previousCardCounts = {}; 
+
+        const screens = {
+            auth: document.getElementById('auth-screen'),
+            menu: document.getElementById('menu-screen'),
+            lobby: document.getElementById('lobby-screen'),
+            game: document.getElementById('game-screen')
+        };
+
+        function showScreen(screenName) {
+            Object.values(screens).forEach(s => s.classList.remove('active'));
+            screens[screenName].classList.add('active');
+        }
+
+        document.getElementById('login-btn').addEventListener('click', () => {
+            let name = document.getElementById('username-input').value.trim();
+            if (name) { playerName = name; showScreen('menu'); }
+        });
+
+        document.getElementById('create-room-btn').addEventListener('click', async () => {
+            roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+            await set(ref(db, `rooms/${roomId}`), {
+                state: 'lobby', host: playerId,
+                players: { [playerId]: { name: playerName, isOnline: true } },
+                playerOrder: [playerId], chat: {}
+            });
+            setupRoomListener();
+        });
+
+        document.getElementById('join-room-btn').addEventListener('click', () => {
+            let code = document.getElementById('room-code-input').value.trim().toUpperCase();
+            if (code) {
+                roomId = code;
+                runTransaction(ref(db, `rooms/${roomId}`), (state) => {
+                    if (state === null) return state;
+                    if (!state.players) state.players = {};
+                    state.players[playerId] = { name: playerName, isOnline: true };
+                    if (!state.playerOrder) state.playerOrder = [];
+                    if (!state.playerOrder.includes(playerId)) state.playerOrder.push(playerId);
+                    return state;
+                }).then(({ committed, snapshot }) => {
+                    if (committed && snapshot.exists()) setupRoomListener();
+                    else alert("Room not found!");
+                });
+            }
+        });
+
+        const leaveRoomFunc = async () => {
+            if(!roomId || !db) return;
+            await update(ref(db, `rooms/${roomId}/players/${playerId}`), { isOnline: false });
+            roomId = ""; localState = null; showScreen('menu');
+        };
+        document.getElementById('leave-lobby-btn').addEventListener('click', leaveRoomFunc);
+        document.getElementById('leave-game-btn').addEventListener('click', leaveRoomFunc);
+
+        function generateDeck(mode = 'standard') {
+            const colors = ['red', 'blue', 'green', 'yellow'];
+            let deck = [];
+            colors.forEach(color => {
+                deck.push({ color, value: '0' });
+                for (let i = 1; i <= 9; i++) {
+                    deck.push({ color, value: i.toString() }, { color, value: i.toString() });
+                }
+                for (let i = 0; i < 2; i++) {
+                    deck.push({ color, value: 'Skip' }, { color, value: 'Rev' }, { color, value: '+2' });
+                }
+            });
+            for (let i = 0; i < 4; i++) {
+                deck.push({ color: 'wild', value: 'Wild' }, { color: 'wild', value: '+4' });
+            }
+            
+            // CRAZY MODE EXTENSIONS
+            if (mode === 'crazy') {
+                for (let i = 0; i < 4; i++) {
+                    deck.push({ color: 'wild', value: '+8' });
+                    deck.push({ color: 'wild', value: '+12' });
+                }
+                colors.forEach(color => {
+                    deck.push({ color, value: '+4' }); // Colored +4s!
+                });
+            }
+            
+            return deck.sort(() => Math.random() - 0.5);
+        }
+
+        document.getElementById('start-game-btn').addEventListener('click', async () => {
+            let rules = {
+                stacking: document.getElementById('setting-stacking').checked,
+                mode: document.getElementById('setting-mode').value
+            };
+            
+            let deck = generateDeck(rules.mode);
+            let playersSnap = await get(ref(db, `rooms/${roomId}/players`));
+            let orderSnap = await get(ref(db, `rooms/${roomId}/playerOrder`));
+            let players = playersSnap.val();
+            let order = orderSnap.val().filter(id => players[id].isOnline);
+
+            previousCardCounts = {}; previousDiscardCount = 0;
+            order.forEach(id => { players[id].cards = deck.splice(0, 7); });
+
+            let firstCard = deck.shift();
+            while (['wild', 'Skip', 'Rev'].includes(firstCard.value) || firstCard.value.includes('+')) { 
+                deck.push(firstCard); firstCard = deck.shift();
+            }
+
+            await update(ref(db, `rooms/${roomId}`), {
+                state: 'playing', players: players, playerOrder: order, rules: rules,
+                deck: deck, discard: [firstCard], currentColor: firstCard.color,
+                turnIndex: 0, direction: 1, winner: null, gameEvent: null, lastPlayedBy: null,
+                drawPenalty: 0, pendingDecision: null
+            });
+        });
+
+        // Updated for + stacking validity
+        function isValidPlay(card, topCard, currentColor, drawPenalty = 0) {
+            if (drawPenalty > 0) {
+                return card.value.startsWith('+'); // MUST answer stack with stack!
+            }
+            return card.color === 'wild' || card.color === currentColor || card.value === topCard.value;
+        }
+
+        function triggerPowerUpAnim(text) {
+            let el = document.getElementById('powerup-text');
+            el.innerText = text; el.className = 'powerup-text animate-powerup';
+            setTimeout(() => { el.className = 'powerup-text'; }, 1500);
+        }
+
+        function flyCard(startEl, targetEl, cardObj, callback, isFaceDown = false) {
+            if(!startEl || !targetEl) return callback ? callback() : null;
+            let start = startEl.getBoundingClientRect(); let end = targetEl.getBoundingClientRect();
+            let dummy = document.createElement('div');
+            dummy.style.width = '80px'; dummy.style.height = '120px';
+            
+            if (isFaceDown) {
+                dummy.className = `card flying-card`;
+                dummy.style.background = 'repeating-linear-gradient(45deg, var(--optus-teal), var(--optus-teal) 10px, #008f91 10px, #008f91 20px)';
+            } else {
+                dummy.className = `card ${cardObj.color || 'wild'} flying-card`;
+                dummy.innerHTML = `<div class="card-inner">${cardObj.value || 'OPTUS'}</div>`;
+            }
+            dummy.style.left = start.left + 'px'; dummy.style.top = start.top + 'px';
+            document.body.appendChild(dummy);
+
+            requestAnimationFrame(() => {
+                dummy.style.left = (end.left + end.width/2 - 40) + 'px';
+                dummy.style.top = (end.top + end.height/2 - 60) + 'px';
+                dummy.style.transform = `scale(1) rotate(${Math.random()*30-15}deg)`;
+            });
+
+            setTimeout(() => { dummy.remove(); if(callback) callback(); }, 450);
+        }
+
+        // --- DRAG AND DROP SETUP ---
+        const dropZone = document.getElementById('center-drop-zone');
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+        dropZone.addEventListener('dragleave', (e) => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            let idx = e.dataTransfer.getData("text/plain");
+            if (idx !== "") {
+                let cardEls = document.querySelectorAll('#my-hand .card');
+                let targetEl = cardEls[parseInt(idx)];
+                if (targetEl) window.playCard(parseInt(idx), { currentTarget: targetEl });
+            }
+        });
+
+        window.playCard = function(cardIndex, event, bypassPending = false) {
+            if (localState.playerOrder[localState.turnIndex] !== playerId) return;
+            
+            if (localState.pendingDecision && !bypassPending) {
+                if (localState.pendingDecision.cardIndex !== cardIndex) return; // Cant play other cards while deciding
+            }
+
+            let card = localState.players[playerId].cards[cardIndex];
+            let topDiscard = localState.discard[localState.discard.length - 1];
+
+            if (isValidPlay(card, topDiscard, localState.currentColor, localState.drawPenalty)) {
+                let cardEl = event.currentTarget;
+                if (card.color === 'wild') {
+                    pendingCardIndex = cardIndex; window.pendingCardEl = cardEl; window.pendingCardObj = card;
+                    document.getElementById('wild-color-picker').style.display = 'flex';
+                } else {
+                    executePlayWithAnimation(cardIndex, card, card.color, cardEl);
+                }
+            }
+        };
+
+        document.querySelectorAll('.color-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                let color = e.target.getAttribute('data-color');
+                document.getElementById('wild-color-picker').style.display = 'none';
+                if (pendingCardIndex !== -1) {
+                    let fakeCardObj = { ...window.pendingCardObj, color: color };
+                    executePlayWithAnimation(pendingCardIndex, fakeCardObj, color, window.pendingCardEl);
+                    pendingCardIndex = -1;
+                }
+            });
+        });
+
+        function executePlayWithAnimation(cardIndex, visualCardObj, newColor, cardEl) {
+            let discardEl = document.getElementById('discard-pile');
+            cardEl.style.opacity = '0';
+            flyCard(cardEl, discardEl, visualCardObj, () => { submitPlay(cardIndex, newColor); }, false);
+        }
+
+        function submitPlay(cardIndex, newColor) {
+            runTransaction(ref(db, `rooms/${roomId}`), (state) => {
+                if (state === null || state.playerOrder[state.turnIndex] !== playerId) return state;
+                
+                let card = state.players[playerId].cards.splice(cardIndex, 1)[0];
+                state.discard.push(card);
+                state.currentColor = newColor;
+                state.lastPlayedBy = playerId;
+                state.pendingDecision = null; // Cleared if they just played a drawn card
+                
+                if (state.players[playerId].cards.length === 0) {
+                    state.winner = playerId; state.state = 'ended'; return state;
+                }
+
+                let step = 1, forceDraw = 0, eventText = null;
+
+                if (card.value === 'Skip') { step = 2; eventText = "SKIP!"; }
+                if (card.value === 'Rev') { state.direction *= -1; eventText = "REVERSE!"; }
+                if (state.playerOrder.length === 2 && card.value === 'Rev') step = 2;
+
+                // Stacking vs Standard Plus logic
+                if (card.value.startsWith('+')) {
+                    let plusAmount = parseInt(card.value.replace('+', ''));
+                    if (state.rules?.stacking) {
+                        state.drawPenalty = (state.drawPenalty || 0) + plusAmount;
+                        eventText = `+${state.drawPenalty} STACK!`;
+                        step = 1; // Passes turn to next player to answer the stack
+                    } else {
+                        forceDraw = plusAmount;
+                        eventText = `+${plusAmount} DRAW!`;
+                        step = 2; // Standard immediately skips them
+                    }
+                }
+
+                if(eventText) state.gameEvent = { text: eventText, time: Date.now() };
+
+                // Handle legacy non-stacking immediate draw
+                if (forceDraw > 0 && !state.rules?.stacking) {
+                    let nextIndex = (state.turnIndex + (state.direction * 1)) % state.playerOrder.length;
+                    if (nextIndex < 0) nextIndex += state.playerOrder.length;
+                    let targetId = state.playerOrder[nextIndex];
+                    if (!state.players[targetId].cards) state.players[targetId].cards = [];
+                    
+                    for(let i=0; i<forceDraw; i++) {
+                        if(!state.deck || state.deck.length === 0) {
+                           let top = state.discard.pop();
+                           state.deck = state.discard.sort(() => Math.random() - 0.5);
+                           state.discard = [top];
+                        }
+                        if (state.deck && state.deck.length > 0) {
+                            state.players[targetId].cards.push(state.deck.shift());
+                        }
+                    }
+                }
+
+                let finalIndex = (state.turnIndex + (state.direction * step)) % state.playerOrder.length;
+                if (finalIndex < 0) finalIndex += state.playerOrder.length;
+                state.turnIndex = finalIndex;
+
+                return state;
+            });
+        }
+
+        document.getElementById('draw-pile').addEventListener('click', (e) => {
+            if (localState.playerOrder[localState.turnIndex] !== playerId) return;
+            if (localState.pendingDecision) return; // Prevent double draw while deciding
+            
+            let deckEl = e.currentTarget;
+            let handArea = document.getElementById('my-hand');
+            
+            flyCard(deckEl, handArea, {}, () => {
+                runTransaction(ref(db, `rooms/${roomId}`), (state) => {
+                    if (state === null || state.playerOrder[state.turnIndex] !== playerId) return state;
+                    
+                    // HANDLE STACK PENALTY DRAW
+                    if (state.drawPenalty > 0) {
+                        let toDraw = state.drawPenalty;
+                        for(let i=0; i<toDraw; i++) {
+                            if(!state.deck || state.deck.length === 0) {
+                               let top = state.discard.pop();
+                               state.deck = state.discard.sort(() => Math.random() - 0.5);
+                               state.discard = [top];
+                            }
+                            if (state.deck && state.deck.length > 0) {
+                                state.players[playerId].cards.push(state.deck.shift());
+                            }
+                        }
+                        state.drawPenalty = 0;
+                        state.gameEvent = { text: `DREW ${toDraw}!`, time: Date.now() };
+                        
+                        let finalIndex = (state.turnIndex + (state.direction * 1)) % state.playerOrder.length;
+                        if (finalIndex < 0) finalIndex += state.playerOrder.length;
+                        state.turnIndex = finalIndex;
+                        return state;
+                    }
+
+                    // STANDARD DRAW
+                    if(!state.deck || state.deck.length === 0) {
+                       let top = state.discard.pop();
+                       state.deck = state.discard.sort(() => Math.random() - 0.5);
+                       state.discard = [top];
+                    }
+                    if (state.deck && state.deck.length > 0) {
+                        let drawnCard = state.deck.shift();
+                        if (!state.players[playerId].cards) state.players[playerId].cards = [];
+                        state.players[playerId].cards.push(drawnCard);
+                        
+                        let topCard = state.discard[state.discard.length - 1];
+                        if (isValidPlay(drawnCard, topCard, state.currentColor, 0)) {
+                            // Pick Up Put Down logic
+                            state.pendingDecision = {
+                                player: playerId,
+                                cardIndex: state.players[playerId].cards.length - 1,
+                                card: drawnCard
+                            };
+                            // Do not increment turn yet!
+                        } else {
+                            let finalIndex = (state.turnIndex + (state.direction * 1)) % state.playerOrder.length;
+                            if (finalIndex < 0) finalIndex += state.playerOrder.length;
+                            state.turnIndex = finalIndex;
+                        }
+                    }
+                    return state;
+                });
+            }, true);
+        });
+
+        function setupRoomListener() {
+            const myPlayerRef = ref(db, `rooms/${roomId}/players/${playerId}/isOnline`);
+            onDisconnect(myPlayerRef).set(false);
+
+            onValue(ref(db, `rooms/${roomId}`), (snap) => {
+                let state = snap.val();
+                if (!state) return;
+                
+                if (!state.players[state.host] || !state.players[state.host].isOnline) {
+                    let order = state.playerOrder || [];
+                    let nextHost = order.find(id => state.players[id] && state.players[id].isOnline);
+                    if (nextHost === playerId) update(ref(db, `rooms/${roomId}`), { host: playerId });
+                }
+
+                if (state.state === 'lobby') renderLobby(state);
+                if (state.state === 'playing' || state.state === 'ended') renderGame(state);
+                if (state.chat) renderChat(state.chat);
+
+                if (state.gameEvent && state.gameEvent.time > lastSeenEventTime) {
+                    lastSeenEventTime = state.gameEvent.time;
+                    triggerPowerUpAnim(state.gameEvent.text);
+                }
+            });
+        }
+
+        function renderLobby(state) {
+            showScreen('lobby');
+            document.getElementById('lobby-room-code').innerText = roomId;
+            let isHost = state.host === playerId;
+            
+            document.getElementById('host-options').style.display = isHost ? 'block' : 'none';
+
+            let ul = document.getElementById('lobby-players'); ul.innerHTML = '';
+            let onlineCount = 0;
+            
+            (state.playerOrder || []).forEach(id => {
+                let p = state.players[id];
+                if (p && p.isOnline) {
+                    onlineCount++;
+                    let li = document.createElement('li');
+                    li.innerHTML = `<span>${p.name}</span> <span>${state.host === id ? '👑 Host' : ''}</span>`;
+                    ul.appendChild(li);
+                }
+            });
+
+            let btn = document.getElementById('start-game-btn'), msg = document.getElementById('waiting-msg');
+            if (isHost && onlineCount > 1) {
+                btn.style.display = 'block'; msg.style.display = 'none';
+            } else {
+                btn.style.display = 'none'; msg.style.display = 'block';
+                msg.textContent = isHost ? "Waiting for players to join..." : "Waiting for host to start...";
+            }
+        }
+
+        function renderGame(state) {
+            if(!document.getElementById('game-screen').classList.contains('active')) showScreen('game');
+
+            if (state.discard && state.discard.length > previousDiscardCount) {
+                let topCard = state.discard[state.discard.length - 1];
+                if (state.lastPlayedBy && state.lastPlayedBy !== playerId) {
+                    let oppBox = document.getElementById(`opp-box-${state.lastPlayedBy}`);
+                    let discardEl = document.getElementById('discard-pile');
+                    if (oppBox && discardEl) flyCard(oppBox, discardEl, topCard, null, false);
+                }
+                previousDiscardCount = state.discard.length;
+            }
+
+            localState = state;
+            if (state.state === 'ended') {
+                document.getElementById('winner-modal').style.display = 'flex';
+                document.getElementById('winner-name').innerText = state.players[state.winner].name + " WINS!";
+                return;
+            }
+
+            // Deal with Pick up / Put down Modal
+            let decModal = document.getElementById('decision-modal');
+            if (state.pendingDecision && state.pendingDecision.player === playerId) {
+                decModal.style.display = 'flex';
+                let c = state.pendingDecision.card;
+                let preview = document.getElementById('drawn-card-preview');
+                preview.className = 'card ' + (c.color === 'wild' ? 'wild' : c.color);
+                preview.innerHTML = `<div class="card-inner">${c.value}</div>`;
+                
+                document.getElementById('btn-play-drawn').onclick = () => {
+                    decModal.style.display = 'none';
+                    let cardEls = document.querySelectorAll('#my-hand .card');
+                    if(cardEls[state.pendingDecision.cardIndex]) {
+                        window.playCard(state.pendingDecision.cardIndex, { currentTarget: cardEls[state.pendingDecision.cardIndex] }, true);
+                    }
+                };
+                document.getElementById('btn-keep-drawn').onclick = () => {
+                    decModal.style.display = 'none';
+                    runTransaction(ref(db, `rooms/${roomId}`), (s) => {
+                        if (s === null || !s.pendingDecision) return s;
+                        s.pendingDecision = null;
+                        let finalIndex = (s.turnIndex + s.direction) % s.playerOrder.length;
+                        if (finalIndex < 0) finalIndex += s.playerOrder.length;
+                        s.turnIndex = finalIndex;
+                        return s;
+                    });
+                };
+            } else {
+                decModal.style.display = 'none';
+            }
+
+            // Draw Pile & Penalty Updates
+            let penInd = document.getElementById('penalty-indicator');
+            let drawBtn = document.getElementById('draw-pile');
+            if (state.drawPenalty > 0) {
+                penInd.style.display = 'block'; penInd.innerText = `PENALTY: +${state.drawPenalty}`;
+                drawBtn.innerHTML = `<div style="font-size:32px;">+${state.drawPenalty}</div>`;
+                drawBtn.style.borderColor = 'var(--optus-red)';
+            } else {
+                penInd.style.display = 'none';
+                drawBtn.innerHTML = `<div>OPTUS</div>`;
+                drawBtn.style.borderColor = 'white';
+            }
+
+            let topCard = state.discard[state.discard.length - 1];
+            let discardEl = document.getElementById('discard-pile');
+            let displayColor = topCard.color === 'wild' ? state.currentColor : topCard.color;
+            discardEl.className = 'card ' + displayColor;
+            discardEl.innerHTML = `<div class="card-inner">${topCard.value}</div>`;
+
+            let colorInd = document.getElementById('current-color-indicator');
+            colorInd.innerText = `Current Color: ${state.currentColor.toUpperCase()}`;
+            let hexColor = state.currentColor === 'wild' ? 'white' : `var(--optus-${state.currentColor})`;
+            colorInd.style.borderLeft = `8px solid ${hexColor}`; colorInd.style.color = hexColor;
+
+            let currentPlayer = state.players[state.playerOrder[state.turnIndex]];
+            let turnInd = document.getElementById('turn-indicator');
+            if (state.playerOrder[state.turnIndex] === playerId) {
+                turnInd.innerText = "YOUR TURN"; turnInd.style.color = "var(--optus-yellow)";
+                turnInd.style.boxShadow = "0 0 20px rgba(255, 209, 0, 0.3)";
+            } else {
+                turnInd.innerText = `${currentPlayer.name}'s Turn`; turnInd.style.color = "white";
+                turnInd.style.boxShadow = "none";
+            }
+
+            // Player Hand + Drag Events
+            let myHand = document.getElementById('my-hand'); myHand.innerHTML = '';
+            (state.players[playerId].cards || []).forEach((card, index) => {
+                let cardEl = document.createElement('div');
+                cardEl.className = 'card ' + card.color;
+                cardEl.innerHTML = `<div class="card-inner">${card.value}</div>`;
+                
+                // Only allow drag if it's playable
+                let isPlayableCard = state.playerOrder[state.turnIndex] === playerId && isValidPlay(card, topCard, state.currentColor, state.drawPenalty);
+                
+                // If there's a pending decision, only THAT card glows
+                if (state.pendingDecision && state.pendingDecision.cardIndex !== index) isPlayableCard = false;
+
+                if (isPlayableCard) {
+                    cardEl.classList.add('playable-card');
+                    cardEl.draggable = true;
+                    cardEl.ondragstart = (e) => {
+                        e.dataTransfer.setData('text/plain', index);
+                        cardEl.classList.add('dragging');
+                    };
+                    cardEl.ondragend = () => cardEl.classList.remove('dragging');
+                }
+                
+                cardEl.onclick = (e) => window.playCard(index, e);
+                myHand.appendChild(cardEl);
+            });
+
+            // Render Opponents
+            let oppArea = document.getElementById('opponents-area'); oppArea.innerHTML = '';
+            state.playerOrder.forEach(id => {
+                if (id !== playerId) {
+                    let p = state.players[id];
+                    let numCards = p.cards ? p.cards.length : 0;
+                    
+                    let el = document.createElement('div');
+                    el.className = 'opponent-box ' + (id === state.playerOrder[state.turnIndex] ? 'active-turn' : '');
+                    el.id = `opp-box-${id}`;
+                    
+                    let visualCardsHTML = '';
+                    for (let i = 0; i < Math.min(numCards, 10); i++) visualCardsHTML += `<div class="mini-card-back"></div>`;
+                    if(numCards > 10) visualCardsHTML += `<span style="margin-left:5px;font-size:12px;font-weight:bold;">+${numCards-10}</span>`;
+
+                    el.innerHTML = `
+                        <strong style="font-size:16px;">${p.name}</strong>
+                        <div class="opponent-hand-visual">${visualCardsHTML}</div>
+                        <span style="color:var(--optus-yellow);font-size:12px;font-weight:bold;">${numCards} Cards</span>
+                        ${!p.isOnline ? '<small style="color:var(--optus-red)">(Offline)</small>' : ''}
+                    `;
+                    oppArea.appendChild(el);
+                    
+                    let currentCount = numCards;
+                    let prevCount = previousCardCounts[id] || 0;
+                    if (currentCount > prevCount) {
+                        let drawAmount = currentCount - prevCount;
+                        let deckEl = document.getElementById('draw-pile');
+                        if (deckEl) {
+                            for(let i = 0; i < drawAmount; i++) {
+                                setTimeout(() => flyCard(deckEl, el, {}, null, true), i * 150);
+                            }
+                        }
+                    }
+                    previousCardCounts[id] = currentCount; 
+                }
+            });
+        }
+
+        document.getElementById('back-to-lobby-btn').addEventListener('click', () => {
+            if (localState.host === playerId) {
+                update(ref(db, `rooms/${roomId}`), {
+                    state: 'lobby', winner: null, deck: null, discard: null, turnIndex: null, gameEvent: null, drawPenalty: 0
+                });
+            }
+            document.getElementById('winner-modal').style.display = 'none';
+        });
+
+        // Chat
+        function sendMsg() {
+            let input = document.getElementById('chat-input');
+            if (input.value.trim() === '') return;
+            push(ref(db, `rooms/${roomId}/chat`), { sender: playerName, text: input.value.trim(), timestamp: Date.now() });
+            input.value = '';
+        }
+        document.getElementById('send-chat-btn').addEventListener('click', sendMsg);
+        document.getElementById('chat-input').addEventListener('keypress', (e) => { if(e.key === 'Enter') sendMsg(); });
+
+        function renderChat(chatObj) {
+            let chatBox = document.getElementById('chat-messages'); chatBox.innerHTML = '';
+            let msgs = Object.values(chatObj).sort((a,b) => a.timestamp - b.timestamp);
+            msgs.forEach(m => {
+                let div = document.createElement('div');
+                div.className = 'msg ' + (m.sender === playerName ? 'me' : '');
+                div.innerHTML = `<strong style="font-size:12px;opacity:0.8;">${m.sender}</strong><br/><span>${m.text}</span>`;
+                chatBox.appendChild(div);
+            });
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+</body>
+</html>
