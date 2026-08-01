@@ -93,7 +93,7 @@
 
 <script>
 /**
- * OPTUS SURFERS - V3 (Camera, Animation & Glitch Fixes)
+ * OPTUS SURFERS - V4 (Camera Zoom & Edge Pop Fix)
  */
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d', { alpha: false });
@@ -111,9 +111,10 @@ resize();
 const OPTUS_YELLOW = '#F2A900';
 const OPTUS_TEAL = '#00A3AD';
 const LANES = [-140, 0, 140]; 
-const CAMERA_Y = 280;         // Lowered slightly for better perspective 
-const CAMERA_Z = -650;        // Moved closer to action
-const FOV = 750;              // Narrowed FOV to zoom in and fix edge popping
+const CAMERA_Y = 280;         
+const CAMERA_Z = -650;        
+// FOV reduced significantly to act as a camera zoom, cropping out the edges
+const FOV = 500;              
 
 let gameState = 'START'; 
 let lastTime = 0;
@@ -344,7 +345,7 @@ function spawnObject() {
         type: type,
         lane: laneIdx,
         z: 9000, 
-        y: type === 'high' ? 90 : 0, // Lowered 5G signs to head-height
+        y: type === 'high' ? 90 : 0, 
         hit: false,
         swayOffset: Math.random() * Math.PI * 2 
     });
@@ -416,18 +417,16 @@ function update(dt) {
     distance += speed * dt;
     floorOffset += speed * dt; 
 
-    // Smooth Glitch-Free Player Lane Changing
     const targetX = LANES[player.lane];
     const dx = targetX - player.currentX;
     
     player.currentX += dx * 14 * dt;
     
-    // Snap to lane when extremely close to stop jittering
     if (Math.abs(dx) < 1) {
         player.currentX = targetX;
     }
     
-    player.tilt = dx * -0.0035; // Lean into turns
+    player.tilt = dx * -0.0035; 
 
     // Physics
     if (player.isJumping) {
@@ -503,7 +502,6 @@ function update(dt) {
 }
 
 function draw() {
-    // 1. Sky & Background
     let skyGrad = ctx.createLinearGradient(0, 0, 0, horizon);
     skyGrad.addColorStop(0, '#020b0d');
     skyGrad.addColorStop(1, '#083c45'); 
@@ -516,7 +514,6 @@ function draw() {
     ctx.fillStyle = floorGrad; 
     ctx.fillRect(0, horizon, width, height - horizon);
 
-    // Floor lines
     ctx.lineWidth = 1;
     for (let i = 0; i < 45; i++) {
         let lineZ = 9000 - ((i * 200 + floorOffset) % 9000);
@@ -549,16 +546,16 @@ function draw() {
         ctx.shadowBlur = 0; 
     });
 
-    // 2. Build Render List
     let renderList = [];
 
-    // Walls now generate out to 9000z and sit slightly wider to avoid camera edge clipping
+    // Walls pushed further outward to X: ±500 (previously ±420) 
+    // Combined with the narrowed FOV, they slide cleanly off screen without vanishing
     for (let z = 0; z < 9000; z += 600) {
         let wallZ = 9000 - ((z + floorOffset) % 9000); 
-        let pL = project(-420, 0, wallZ);
+        let pL = project(-500, 0, wallZ);
         if (pL) renderList.push({ drawType: 'wall', z: wallZ, px: pL.x, py: pL.y, scale: pL.scale });
         
-        let pR = project(420, 0, wallZ);
+        let pR = project(500, 0, wallZ);
         if (pR) renderList.push({ drawType: 'wall', z: wallZ, px: pR.x, py: pR.y, scale: pR.scale });
     }
 
@@ -586,13 +583,11 @@ function draw() {
 
     renderList.sort((a, b) => b.z - a.z);
 
-    // 3. Render Routine
     renderList.forEach(item => {
         ctx.save();
         ctx.translate(item.px, item.py);
         const s = item.scale;
         
-        // Proper distance fog rendering prevents pillars from suddenly popping on the edges
         if (item.z > 6500) {
             ctx.globalAlpha = Math.max(0, 1 - ((item.z - 6500) / 2000));
         }
@@ -616,7 +611,6 @@ function draw() {
                 break;
 
             case 'coin':
-                // Slowed down, non-glitchy spin based strictly on time
                 const hoverY = Math.sin((gameTime*3) + item.swayOffset) * 10 * s;
                 const spin = Math.sin(gameTime * 2.5 + item.swayOffset);
                 ctx.translate(0, hoverY - (25*s));
@@ -652,7 +646,6 @@ function draw() {
                 break;
 
             case 'high':
-                // Repositioned physically lower to make ducking visually necessary
                 let swing = Math.sin(gameTime*2 + item.swayOffset) * 0.15;
                 
                 ctx.strokeStyle = '#fff';
