@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Optus Data Clicker - The Rebalance Update</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --optus-teal: #00a3a6;
+    --optus-teal-glow: rgba(0, 163, 166, 0.4);
+    --optus-yellow: #ffcc00;
+    --bg-color: #e6f7f8;
+    --text-dark: #333333;
+    --cost-red: #d9381e;
+    --rebirth-red: #d9381e;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text-dark);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    overflow-x: hidden;
+    
+    /* Cool Scrolling Background */
+    background: repeating-linear-gradient(
+      45deg,
+      #e6f7f8,
+      #e6f7f8 20px,
+      #d4f1f4 20px,
+      #d4f1f4 40px
+    );
+    background-size: 56px 56px;
+    animation: scrollBg 3s linear infinite;
+  }
+
+  @keyframes scrollBg {
+    0% { background-position: 0 0; }
+    100% { background-position: -56px 56px; }
+  }
+
+  /* Screen Shake Animation */
+  .shake {
+    animation: screenShake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+  }
+
+  @keyframes screenShake {
+    10%, 90% { transform: translate3d(-4px, 0, 0); }
+    20%, 80% { transform: translate3d(6px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-10px, 0, 0); }
+    40%, 60% { transform: translate3d(10px, 0, 0); }
+  }
+
+  /* Redundancy Dramatic Overlay */
+  #redundancy-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(217, 56, 30, 0.95);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Nunito', sans-serif;
+    font-size: 4em;
+    font-weight: 900;
+    text-align: center;
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    text-shadow: 0 5px 15px rgba(0,0,0,0.5);
+  }
+
+  .animate-redundancy {
+    animation: dramaticFade 3s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  }
+
+  @keyframes dramaticFade {
+    0% { opacity: 0; transform: scale(0.5); }
+    15% { opacity: 1; transform: scale(1.1); }
+    85% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.5); }
+  }
+
+  header {
+    width: 100%;
+    background-color: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(5px);
+    padding: 20px 0;
+    box-shadow: 0 4px 15px rgba(0, 163, 166, 0.2);
+    text-align: center;
+    margin-bottom: 30px;
+    position: relative;
+    z-index: 10;
+  }
+
+  .text-logo {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    color: var(--optus-teal);
+    font-size: 3.5em;
+    letter-spacing: -2px;
+    margin: 0;
+    text-transform: uppercase;
+    text-shadow: 2px 2px 0px rgba(0,0,0,0.1);
+    animation: floatLogo 4s ease-in-out infinite;
+  }
+
+  @keyframes floatLogo {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+
+  main {
+    display: flex;
+    gap: 40px;
+    max-width: 1000px;
+    width: 90%;
+    justify-content: center;
+    flex-wrap: wrap;
+    padding-bottom: 20px;
+    position: relative;
+    z-index: 5;
+  }
+
+  .click-section, .upgrade-section {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+    flex: 1;
+    min-width: 340px;
+    text-align: center;
+    border-top: 6px solid var(--optus-teal);
+    backdrop-filter: blur(10px);
+  }
+
+  h1, h2 { color: var(--optus-teal); }
+  h1 { font-size: 3.5em; margin: 10px 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.05); }
+
+  .bps-display {
+    color: #555;
+    font-size: 1.4em;
+    margin-bottom: 5px;
+    font-weight: 700;
+    transition: color 0.2s;
+  }
+  
+  .bps-live {
+    color: var(--optus-teal);
+  }
+
+  .multiplier-display {
+    color: var(--rebirth-red);
+    font-size: 1.1em;
+    margin-bottom: 25px;
+    font-weight: bold;
+    display: none;
+    background: rgba(217, 56, 30, 0.1);
+    padding: 5px 15px;
+    border-radius: 20px;
+    display: inline-block;
+  }
+
+  .clicker-container {
+    position: relative;
+    width: 240px;
+    height: 240px;
+    margin: 20px auto;
+    cursor: pointer;
+    animation: pulseIdle 3s infinite ease-in-out; 
+  }
+
+  @keyframes pulseIdle {
+    0% { transform: scale(1); filter: drop-shadow(0 10px 15px rgba(0,163,166,0.2)); }
+    50% { transform: scale(1.04); filter: drop-shadow(0 15px 25px rgba(0,163,166,0.4)); }
+    100% { transform: scale(1); filter: drop-shadow(0 10px 15px rgba(0,163,166,0.2)); }
+  }
+
+  .clicker-btn {
+    width: 100%;
+    height: 100%;
+    transition: transform 0.05s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.1s ease;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+
+  .clicker-container:active .clicker-btn {
+    transform: scale(0.85);
+    filter: brightness(1.2);
+  }
+
+  .particle {
+    position: absolute;
+    pointer-events: none;
+    color: var(--optus-teal);
+    font-weight: 900;
+    font-size: 2em;
+    text-shadow: 2px 2px 0px white, -1px -1px 0px white;
+    animation: floatUp 0.8s ease-out forwards;
+    z-index: 100;
+  }
+
+  @keyframes floatUp {
+    0% { opacity: 1; transform: translateY(0) scale(1) rotate((Math.random() - 0.5) * 20deg); }
+    100% { opacity: 0; transform: translateY(-100px) scale(1.5); }
+  }
+
+  .upgrade-emoji {
+    font-size: 2.5em;
+    margin-right: 15px;
+    width: 60px;
+    text-align: center;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+  }
+
+  .upgrade-btn {
+    background-color: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 12px 15px;
+    width: 100%;
+    margin-bottom: 15px;
+    cursor: pointer;
+    color: var(--text-dark);
+    transition: all 0.2s ease;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Animated glow for affordable buttons */
+  .upgrade-btn.affordable {
+    background-color: white;
+    border-color: var(--optus-yellow);
+    box-shadow: 0 4px 10px rgba(255, 204, 0, 0.2);
+  }
+
+  .upgrade-btn.affordable:hover {
+    background-color: #fff9e6;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(255, 204, 0, 0.4);
+  }
+
+  .upgrade-btn:disabled {
+    background-color: #f1f3f5;
+    color: #adb5bd;
+    cursor: not-allowed;
+    border-color: #e9ecef;
+  }
+  
+  .upgrade-btn:disabled .upgrade-emoji {
+    opacity: 0.3;
+    filter: grayscale(100%);
+  }
+
+  .click-upgrade.affordable {
+    border-color: var(--optus-teal);
+    box-shadow: 0 4px 10px var(--optus-teal-glow);
+  }
+  .click-upgrade.affordable:hover {
+    background-color: #f0fbfc;
+    box-shadow: 0 6px 15px var(--optus-teal-glow);
+  }
+
+  .rebirth-btn {
+    background: #fff0f0;
+    border: 2px solid var(--rebirth-red);
+    margin-top: 30px;
+  }
+  
+  .rebirth-btn.affordable {
+    background: linear-gradient(135deg, #d9381e, #c0392b);
+    color: white;
+    box-shadow: 0 0 15px rgba(217, 56, 30, 0.5);
+    animation: pulseRed 2s infinite;
+  }
+
+  @keyframes pulseRed {
+    0% { box-shadow: 0 0 0 0 rgba(217, 56, 30, 0.7); }
+    70% { box-shadow: 0 0 0 15px rgba(217, 56, 30, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(217, 56, 30, 0); }
+  }
+
+  .rebirth-btn.affordable .upgrade-effect, 
+  .rebirth-btn.affordable .upgrade-title { color: white; }
+  .rebirth-btn.affordable .cost { color: #ffeb3b; }
+
+  .upgrade-info { flex-grow: 1; display: flex; flex-direction: column; z-index: 2; }
+  .upgrade-title { font-weight: 800; font-size: 1.1em; }
+  .upgrade-effect { font-size: 0.85em; color: #666; margin-top: 2px; }
+  .upgrade-stats { display: flex; flex-direction: column; text-align: right; font-size: 0.9em; min-width: 90px; z-index: 2; }
+  .cost { color: var(--cost-red); font-weight: 900; font-size: 1.1em; }
+  .count-badge { background: #eee; padding: 2px 8px; border-radius: 10px; font-size: 0.85em; margin-top: 4px; font-weight: bold; color: #555; }
+
+  .reset-btn {
+    background: white;
+    color: #999;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    padding: 10px 20px;
+    cursor: pointer;
+    margin: 20px 0 40px 0;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    z-index: 5;
+  }
+  .reset-btn:hover { color: white; border-color: var(--cost-red); background: var(--cost-red); }
+
+</style>
+</head>
+<body>
+
+<!-- Dramatic Fullscreen Overlay -->
+<div id="redundancy-overlay">STAFF REDUCED BY 50%</div>
+
+<header>
+  <div class="text-logo">OPTUS CLICKER</div>
+</header>
+
+<main>
+  <!-- Left Side: The Clicker -->
+  <div class="click-section">
+    <h2>Total Data Mined</h2>
+    <h1 id="score-display">0 GB</h1>
+    <div class="bps-display" id="bps-wrapper"><span id="bps-display">0</span> GB / sec</div>
+    <div class="multiplier-display" id="multiplier-display">Efficiency Boost: 1x</div>
+    
+    <div class="clicker-container" id="main-clicker">
+      <img src="moa_icon_1.webp" class="clicker-btn" alt="Yes Button" draggable="false">
+    </div>
+  </div>
+
+  <!-- Right Side: Upgrades -->
+  <div class="upgrade-section">
+    <h2>Upgrades</h2>
+
+    <button class="upgrade-btn click-upgrade" id="btn-clickup" onclick="buyClickUpgrade()">
+      <div class="upgrade-emoji">🖱️</div>
+      <div class="upgrade-info">
+        <span class="upgrade-title">Click Optimization</span>
+        <span class="upgrade-effect">+1 GB per click</span>
+      </div>
+      <span class="upgrade-stats">
+        <span class="cost" id="clickup-cost">50 GB</span>
+        <span class="count-badge" id="clickup-count">Lvl 0</span>
+      </span>
+    </button>
+    
+    <button class="upgrade-btn" id="btn-sales" onclick="buyUpgrade('sales')">
+      <div class="upgrade-emoji">👨‍💼</div>
+      <div class="upgrade-info">
+        <span class="upgrade-title">Hire a Sales Rep</span>
+        <span class="upgrade-effect">+1 GB/s</span>
+      </div>
+      <span class="upgrade-stats">
+        <span class="cost" id="sales-cost">15 GB</span>
+        <span class="count-badge" id="sales-count">0</span>
+      </span>
+    </button>
+
+    <button class="upgrade-btn" id="btn-5g" onclick="buyUpgrade('fiveG')">
+      <div class="upgrade-emoji">⚡</div>
+      <div class="upgrade-info">
+        <span class="upgrade-title">Increase 5G Speeds</span>
+        <span class="upgrade-effect">+10 GB/s</span>
+      </div>
+      <span class="upgrade-stats">
+        <span class="cost" id="fiveG-cost">200 GB</span>
+        <span class="count-badge" id="fiveG-count">0</span>
+      </span>
+    </button>
+    
+    <button class="upgrade-btn" id="btn-satellite" onclick="buyUpgrade('satellite')">
+      <div class="upgrade-emoji">🛰️</div>
+      <div class="upgrade-info">
+        <span class="upgrade-title">Deploy Satellite</span>
+        <span class="upgrade-effect">+50 GB/s</span>
+      </div>
+      <span class="upgrade-stats">
+        <span class="cost" id="satellite-cost">1,200 GB</span>
+        <span class="count-badge" id="satellite-count">0</span>
+      </span>
+    </button>
+
+    <button class="upgrade-btn" id="btn-datacenter" onclick="buyUpgrade('datacenter')">
+      <div class="upgrade-emoji">🏢</div>
+      <div class="upgrade-info">
+        <span class="upgrade-title">Optus AI Data Centre</span>
+        <span class="upgrade-effect">+250 GB/s</span>
+      </div>
+      <span class="upgrade-stats">
+        <span class="cost" id="datacenter-cost">7,500 GB</span>
+        <span class="count-badge" id="datacenter-count">0</span>
+      </span>
+    </button>
+
+    <button class="upgrade-btn" id="btn-overlord" onclick="buyUpgrade('overlord')">
+      <div class="upgrade-emoji">🤖</div>
+      <div class="upgrade-info">
+        <span class="upgrade-title">AI Overlord Network</span>
+        <span class="upgrade-effect">+1,500 GB/s</span>
+      </div>
+      <span class="upgrade-stats">
+        <span class="cost" id="overlord-cost">50,000 GB</span>
+        <span class="count-badge" id="overlord-count">0</span>
+      </span>
+    </button>
+
+    <!-- Redundancy Button -->
+    <button class="upgrade-btn rebirth-btn" id="btn-rebirth" onclick="triggerRebirth()">
+      <div class="upgrade-emoji">✂️</div>
+      <div class="upgrade-info">
+        <span class="upgrade-title">Make Half your Staff Redundant</span>
+        <span class="upgrade-effect">Reset progress for +100% Global Boost</span>
+      </div>
+      <span class="upgrade-stats">
+        <span class="cost" id="rebirth-cost">100,000 GB</span>
+      </span>
+    </button>
+  </div>
+</main>
+
+<button class="reset-btn" onclick="resetSave()">Hard Reset (Wipe Save)</button>
+
+<script>
+  let score = 0;
+  let baseBps = 0; 
+  let rebirthCount = 0;
+  
+  // Array to track timestamps of clicks for live GB/s calculation
+  let clickHistory = [];
+
+  // Click Upgrade scaling
+  let clickUpgrade = { level: 0, cost: 50, baseCost: 50 };
+
+  // Rebalanced Passive Upgrades (Lower tiers are highly cost effective initially)
+  const upgrades = {
+    sales: { baseCost: 15, cost: 15, count: 0, bps: 1, costId: 'sales-cost', countId: 'sales-count', btnId: 'btn-sales' },
+    fiveG: { baseCost: 200, cost: 200, count: 0, bps: 10, costId: 'fiveG-cost', countId: 'fiveG-count', btnId: 'btn-5g' },
+    satellite: { baseCost: 1200, cost: 1200, count: 0, bps: 50, costId: 'satellite-cost', countId: 'satellite-count', btnId: 'btn-satellite' },
+    datacenter: { baseCost: 7500, cost: 7500, count: 0, bps: 250, costId: 'datacenter-cost', countId: 'datacenter-count', btnId: 'btn-datacenter' },
+    overlord: { baseCost: 50000, cost: 50000, count: 0, bps: 1500, costId: 'overlord-cost', countId: 'overlord-count', btnId: 'btn-overlord' }
+  };
+
+  const scoreDisplay = document.getElementById('score-display');
+  const bpsDisplay = document.getElementById('bps-display');
+  const bpsWrapper = document.getElementById('bps-wrapper');
+  const mainClicker = document.getElementById('main-clicker');
+  const multDisplay = document.getElementById('multiplier-display');
+
+  // Math Helpers
+  function getMultiplier() { return 1 + rebirthCount; }
+  function getEffectiveClickPower() { return (1 + clickUpgrade.level) * getMultiplier(); }
+  function getEffectiveBps() { return baseBps * getMultiplier(); }
+  
+  // Format numbers nicely (e.g. 1,000,000)
+  function formatNumber(num) { 
+    return Math.floor(num).toLocaleString('en-US'); 
+  }
+
+  // Calculate Exponential Rebirth Cost
+  function getRebirthCost() {
+    // Base 100k, multiplies by 5 for every rebirth level
+    return 100000 * Math.pow(5, rebirthCount); 
+  }
+
+  // --- SAVE & LOAD SYSTEM (V4) ---
+  function saveGame() {
+    const gameState = {
+      score: score,
+      baseBps: baseBps,
+      rebirthCount: rebirthCount,
+      clickUpgrade: { level: clickUpgrade.level, cost: clickUpgrade.cost },
+      savedUpgrades: {}
+    };
+    for (const key in upgrades) {
+      gameState.savedUpgrades[key] = { count: upgrades[key].count, cost: upgrades[key].cost };
+    }
+    localStorage.setItem('optusClickerSaveV4', JSON.stringify(gameState));
+  }
+
+  function loadGame() {
+    const savedData = localStorage.getItem('optusClickerSaveV4');
+    if (savedData) {
+      const gameState = JSON.parse(savedData);
+      score = gameState.score || 0;
+      baseBps = gameState.baseBps || 0;
+      rebirthCount = gameState.rebirthCount || 0;
+      
+      if(gameState.clickUpgrade) {
+        clickUpgrade.level = gameState.clickUpgrade.level;
+        clickUpgrade.cost = gameState.clickUpgrade.cost;
+      }
+      if(gameState.savedUpgrades) {
+        for (const key in gameState.savedUpgrades) {
+          if (upgrades[key]) {
+            upgrades[key].count = gameState.savedUpgrades[key].count;
+            upgrades[key].cost = gameState.savedUpgrades[key].cost;
+          }
+        }
+      }
+    }
+    updateDisplay();
+  }
+
+  function resetSave() {
+    if(confirm("Are you sure you want to wipe all data?")) {
+      localStorage.removeItem('optusClickerSaveV4');
+      location.reload(); 
+    }
+  }
+
+  // --- REDUNDANCY SYSTEM ---
+  function triggerRebirth() {
+    const currentRebirthCost = getRebirthCost();
+    if (score >= currentRebirthCost) {
+      if(confirm(`Make cuts to the team?\n\nYou will lose ${formatNumber(score)} GB and all upgrades, but gain +100% Efficiency Global Boost!\n\nNext threshold will be much higher.`)) {
+        
+        const overlay = document.getElementById('redundancy-overlay');
+        document.body.classList.add('shake');
+        overlay.classList.add('animate-redundancy');
+
+        setTimeout(() => {
+          document.body.classList.remove('shake');
+          overlay.classList.remove('animate-redundancy');
+        }, 3000);
+
+        rebirthCount++;
+        score = 0;
+        baseBps = 0;
+        clickHistory = [];
+        
+        clickUpgrade.level = 0;
+        clickUpgrade.cost = clickUpgrade.baseCost;
+
+        for (const key in upgrades) {
+          upgrades[key].count = 0;
+          upgrades[key].cost = upgrades[key].baseCost;
+        }
+
+        saveGame();
+        updateDisplay();
+      }
+    }
+  }
+
+  // --- INTERACTION ---
+  function createParticle(x, y) {
+    const particle = document.createElement('div');
+    particle.classList.add('particle');
+    particle.innerText = `+${formatNumber(getEffectiveClickPower())}`;
+    
+    // Add slight random rotation to particles
+    const rot = (Math.random() - 0.5) * 30;
+    particle.style.transform = `rotate(${rot}deg)`;
+    
+    const offsetX = (Math.random() - 0.5) * 60; 
+    particle.style.left = `${x + offsetX}px`;
+    particle.style.top = `${y - 40}px`;
+    
+    document.body.appendChild(particle);
+    setTimeout(() => { particle.remove(); }, 800);
+  }
+
+  mainClicker.addEventListener('click', (e) => {
+    score += getEffectiveClickPower();
+    // Track click timestamp for live GB/s
+    clickHistory.push(Date.now());
+    
+    updateDisplay();
+    createParticle(e.clientX, e.clientY);
+  });
+
+  function buyClickUpgrade() {
+    if (score >= clickUpgrade.cost) {
+      score -= clickUpgrade.cost;
+      clickUpgrade.level++;
+      clickUpgrade.cost = Math.ceil(clickUpgrade.cost * 1.5); // Steep scaling for clicks
+      updateDisplay();
+      saveGame();
+    }
+  }
+
+  function buyUpgrade(type) {
+    const upgrade = upgrades[type];
+    if (score >= upgrade.cost) {
+      score -= upgrade.cost;
+      upgrade.count++;
+      baseBps += upgrade.bps;
+      upgrade.cost = Math.ceil(upgrade.cost * 1.15); // Standard idle scaling
+      updateDisplay();
+      saveGame();
+    }
+  }
+
+  // --- RENDER LOOP ---
+  function updateDisplay() {
+    scoreDisplay.innerText = formatNumber(score) + " GB";
+
+    // Calculate Live CPS (Clicks per second from the last 1000ms)
+    const now = Date.now();
+    clickHistory = clickHistory.filter(timestamp => now - timestamp < 1000);
+    const activeClickBps = clickHistory.length * getEffectiveClickPower();
+    const totalLiveBps = getEffectiveBps() + activeClickBps;
+    
+    bpsDisplay.innerText = formatNumber(totalLiveBps);
+    
+    // Turn GB/s Teal if you are actively clicking
+    if(activeClickBps > 0) {
+      bpsWrapper.classList.add('bps-live');
+    } else {
+      bpsWrapper.classList.remove('bps-live');
+    }
+
+    if (rebirthCount > 0) {
+      multDisplay.style.display = 'inline-block';
+      multDisplay.innerText = `Efficiency Boost: ${getMultiplier()}x`;
+    }
+
+    // Update Click Upgrade UI
+    const clickBtn = document.getElementById('btn-clickup');
+    document.getElementById('clickup-cost').innerText = formatNumber(clickUpgrade.cost) + " GB";
+    document.getElementById('clickup-count').innerText = "Lvl " + clickUpgrade.level;
+    if (score >= clickUpgrade.cost) {
+      clickBtn.disabled = false;
+      clickBtn.classList.add('affordable');
+    } else {
+      clickBtn.disabled = true;
+      clickBtn.classList.remove('affordable');
+    }
+
+    // Update Passive Upgrade UI
+    for (const key in upgrades) {
+      const u = upgrades[key];
+      const btn = document.getElementById(u.btnId);
+      document.getElementById(u.costId).innerText = formatNumber(u.cost) + " GB";
+      document.getElementById(u.countId).innerText = u.count;
+      
+      if (score >= u.cost) {
+        btn.disabled = false;
+        btn.classList.add('affordable');
+      } else {
+        btn.disabled = true;
+        btn.classList.remove('affordable');
+      }
+    }
+
+    // Update Rebirth UI
+    const rebirthBtn = document.getElementById('btn-rebirth');
+    const currentRebirthCost = getRebirthCost();
+    document.getElementById('rebirth-cost').innerText = formatNumber(currentRebirthCost) + " GB";
+    
+    if(score >= currentRebirthCost) {
+      rebirthBtn.disabled = false;
+      rebirthBtn.classList.add('affordable');
+    } else {
+      rebirthBtn.disabled = true;
+      rebirthBtn.classList.remove('affordable');
+    }
+  }
+
+  // Idle Game Generation Loop (10x a second)
+  setInterval(() => {
+    score += getEffectiveBps() / 10;
+    updateDisplay();
+  }, 100);
+
+  // Auto-Save Loop (1x a second)
+  setInterval(() => {
+    saveGame();
+  }, 1000);
+
+  loadGame();
+</script>
+
+</body>
+</html>
