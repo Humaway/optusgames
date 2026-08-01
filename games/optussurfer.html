@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Optus Surfers</title>
+    <style>
+        /* CSS Reset and Game Styling */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            touch-action: none; /* Prevent scroll on mobile */
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #000;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlays */
+        #uiLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let clicks pass through to canvas if needed */
+        }
+
+        #scoreBoard {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 163, 173, 0.85); /* Optus Teal */
+            border: 2px solid #F2A900; /* Optus Yellow */
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+
+        #gameOverPanel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto; /* Re-enable interaction for buttons */
+        }
+
+        .panel-content {
+            background: #ffffff;
+            color: #333;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            border: 5px solid #00A3AD;
+            box-shadow: 0 0 30px #00A3AD;
+        }
+
+        .panel-content h1 {
+            color: #F2A900;
+            font-size: 48px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            -webkit-text-stroke: 1px #333;
+        }
+
+        .panel-content p {
+            font-size: 24px;
+            margin-bottom: 30px;
+        }
+
+        #restartBtn {
+            background: #F2A900;
+            color: #000;
+            border: none;
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 0 #c28700;
+        }
+
+        #restartBtn:hover {
+            background: #ffce00;
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #c28700;
+        }
+
+        #restartBtn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+
+        /* Controls hint overlay */
+        #controlsHint {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="uiLayer">
+        <div id="scoreBoard">Phones: <span id="score">0</span></div>
+        <div id="controlsHint">Use Arrow Keys or WASD to Move • Up to Jump • Down to Slide</div>
+        
+        <div id="gameOverPanel">
+            <div class="panel-content">
+                <h1>Game Over</h1>
+                <p>You collected <strong id="finalScore">0</strong> phones!</p>
+                <button id="restartBtn">Tap to Restart</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * OPTUS SURFERS - HTML5 Canvas Endless Runner
+ * Developed as a single-file game strictly using Vanilla JS, HTML, and CSS.
+ */
+
+// --- Engine & Canvas Setup ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false }); // Optimize for performance
+let width, height;
+
+function resize() {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- Game Constants & Variables ---
+const OPTUS_YELLOW = '#F2A900';
+const OPTUS_TEAL = '#00A3AD';
+const LANES = [-120, 0, 120]; // World X coordinates for Left, Center, Right lanes
+const CAMERA_Y = 150;         // Camera height above the ground
+const CAMERA_Z = -200;        // Camera offset behind the player's 0-point
+const FOV = 400;              // Field of view scalar
+
+let gameState = 'START'; // 'PLAYING', 'GAMEOVER'
+let lastTime = 0;
+let distance = 0;
+let speed = 400; // Units per second
+let baseSpeed = 400;
+let score = 0;
+let objects = [];
+let spawnTimer = 0;
+let floorOffset = 0; // For animating floor tiles
+
+// --- Player State ---
+const player = {
+    lane: 1,      // 0: Left, 1: Center, 2: Right
+    y: 0,         // Vertical position (for jumping)
+    z: 100,       // Fixed distance from camera origin in Z space
+    vy: 0,        // Vertical velocity
+    isJumping: false,
+    isDucking: false,
+    duckTimer: 0,
+    stumbleTimer: 0, // > 0 means the Chaser is visible
+    radius: 20
+};
+
+// --- Input Handling ---
+const keys = { left: false, right: false, up: false, down: false };
+
+document.addEventListener('keydown', (e) => {
+    if (gameState !== 'PLAYING') return;
+    
+    // Prevent default scrolling for arrows and space
+    if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) {
+        e.preventDefault();
+    }
+
+    if ((e.code === 'ArrowLeft' || e.key === 'a' || e.key === 'A') && !keys.left) {
+        if (player.lane > 0) player.lane--;
+        keys.left = true;
+    }
+    if ((e.code === 'ArrowRight' || e.key === 'd' || e.key === 'D') && !keys.right) {
+        if (player.lane < 2) player.lane++;
+        keys.right = true;
+    }
+    if ((e.code === 'ArrowUp' || e.key === 'w' || e.key === 'W') && !player.isJumping && !player.isDucking) {
+        player.isJumping = true;
+        player.vy = 600; // Jump force
+    }
+    if ((e.code === 'ArrowDown' || e.key === 's' || e.key === 'S') && !player.isJumping && !player.isDucking) {
+        player.isDucking = true;
+        player.duckTimer = 0.8; // Duck duration in seconds
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    if (e.code === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+    if (e.code === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+});
+
+// Mobile touch swipe support
+let touchStartX = 0;
+let touchStartY = 0;
+document.addEventListener('touchstart', e => {
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+}, {passive: true});
+
+document.addEventListener('touchend', e => {
+    if (gameState !== 'PLAYING') return;
+    let touchEndX = e.changedTouches[0].screenX;
+    let touchEndY = e.changedTouches[0].screenY;
+    handleSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
+}, {passive: true});
+
+function handleSwipe(startX, startY, endX, endY) {
+    const diffX = endX - startX;
+    const diffY = endY - startY;
+    if (Math.abs(diffX) > Math.abs(diffY)) {
+        // Horizontal swipe
+        if (diffX > 30 && player.lane < 2) player.lane++; // Right
+        else if (diffX < -30 && player.lane > 0) player.lane--; // Left
+    } else {
+        // Vertical swipe
+        if (diffY < -30 && !player.isJumping && !player.isDucking) { // Up
+            player.isJumping = true;
+            player.vy = 600;
+        } else if (diffY > 30 && !player.isJumping && !player.isDucking) { // Down
+            player.isDucking = true;
+            player.duckTimer = 0.8;
+        }
+    }
+}
+
+document.getElementById('restartBtn').addEventListener('click', initGame);
+
+// --- 3D Projection Math ---
+/**
+ * Projects world coordinates (x, y, z) into 2D screen coordinates.
+ */
+function project(x, y, z) {
+    const relativeZ = z - CAMERA_Z;
+    if (relativeZ < 1) return null; // Behind camera
+
+    const scale = FOV / relativeZ;
+    const projectedX = width / 2 + x * scale;
+    // Horizon is set to 35% down the screen
+    const horizon = height * 0.35;
+    const projectedY = horizon + (CAMERA_Y - y) * scale;
+
+    return { x: projectedX, y: projectedY, scale: scale };
+}
+
+// --- Drawing Asset Functions ---
+
+/**
+ * Draws "Ollie" - The Player Mascot
+ * Stylized based on the provided image concept: Yellow sphere with a white visor.
+ */
+function drawPlayerMascot(ctx, px, py, scale, isDucking) {
+    ctx.save();
+    ctx.translate(px, py);
+    
+    // Scale down size based on 3D depth
+    const size = 30 * scale; 
+    
+    if (isDucking) {
+        ctx.scale(1, 0.5); // Flatten character
+        ctx.translate(0, size); // Move down to stick to ground
+    }
+
+    // Body (Yellow Sphere)
+    ctx.beginPath();
+    ctx.arc(0, -size, size, 0, Math.PI * 2);
+    ctx.fillStyle = OPTUS_YELLOW;
+    ctx.fill();
+    // Shading
+    ctx.beginPath();
+    ctx.arc(0, -size, size, 0, Math.PI * 2);
+    let grad = ctx.createRadialGradient(-size*0.3, -size*1.3, size*0.1, 0, -size, size);
+    grad.addColorStop(0, 'rgba(255,255,255,0.4)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.2)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Visor (White rounded shape)
+    ctx.beginPath();
+    ctx.ellipse(size*0.1, -size*1.1, size*0.7, size*0.45, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+
+    // Eyes
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.arc(-size*0.2, -size*1.1, size*0.12, 0, Math.PI * 2);
+    ctx.arc(size*0.4, -size*1.1, size*0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+}
+
+/**
+ * Draws the "Chaser" (Stephen Rue executive figure)
+ */
+function drawChaser(ctx, px, py, scale) {
+    ctx.save();
+    ctx.translate(px, py);
+    const size = 35 * scale;
+    
+    // Slight bobbing animation for running
+    const bob = Math.sin(Date.now() / 100) * 5 * scale;
+    ctx.translate(0, bob);
+
+    // Suit Jacket (Dark Blue/Teal tint)
+    ctx.fillStyle = '#0f2c4c';
+    ctx.beginPath();
+    ctx.moveTo(-size*0.8, -size*0.2);
+    ctx.lineTo(size*0.8, -size*0.2);
+    ctx.lineTo(size*0.9, -size*2);
+    ctx.lineTo(-size*0.9, -size*2);
+    ctx.fill();
+
+    // Light Blue Shirt
+    ctx.fillStyle = '#9bd3f1';
+    ctx.beginPath();
+    ctx.moveTo(-size*0.3, -size*1.8);
+    ctx.lineTo(size*0.3, -size*1.8);
+    ctx.lineTo(0, -size*0.9);
+    ctx.fill();
+
+    // Head (Skin tone)
+    ctx.fillStyle = '#f1c27d';
+    ctx.beginPath();
+    ctx.arc(0, -size*2.3, size*0.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Hair (Grey Executive Hair)
+    ctx.fillStyle = '#d3d3d3';
+    ctx.beginPath();
+    ctx.arc(0, -size*2.4, size*0.62, Math.PI, 0);
+    ctx.fill();
+
+    // Smile / Features
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1 * scale;
+    ctx.beginPath();
+    ctx.arc(0, -size*2.2, size*0.2, 0, Math.PI); // Smile
+    ctx.stroke();
+    
+    ctx.restore();
+}
+
+// --- Environment Drawing ---
+function drawEnvironment() {
+    // 1. Sky/Background (Dark gradient)
+    let skyGrad = ctx.createLinearGradient(0, 0, 0, height * 0.35);
+    skyGrad.addColorStop(0, '#0a0a0a');
+    skyGrad.addColorStop(1, '#1a3a40');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, width, height * 0.35);
+
+    // 2. Floor
+    ctx.fillStyle = '#dedede'; // Polished store floor
+    ctx.fillRect(0, height * 0.35, width, height * 0.65);
+
+    // Draw grid/lanes to create pseudo-3D motion
+    ctx.lineWidth = 2;
+    
+    // Draw moving horizontal lines for speed illusion
+    for (let i = 0; i < 20; i++) {
+        // Calculate z position stretching to infinity
+        let zPos = (i * 200 + floorOffset) % 4000;
+        let p = project(0, 0, zPos);
+        if (p) {
+            ctx.beginPath();
+            ctx.moveTo(0, p.y);
+            ctx.lineTo(width, p.y);
+            // Fade out distant lines
+            ctx.strokeStyle = `rgba(0, 163, 173, ${1 - (zPos / 4000)})`; 
+            ctx.stroke();
+        }
+    }
+
+    // Draw Lane Dividers
+    const dividers = [-60, 60];
+    dividers.forEach(x => {
+        ctx.beginPath();
+        for (let z = 0; z < 4000; z += 100) {
+            let p = project(x, 0, z);
+            if (p) {
+                if (z === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            }
+        }
+        ctx.strokeStyle = OPTUS_YELLOW;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    });
+
+    // Draw Store Aisles (Side walls)
+    drawAisles();
+}
+
+function drawAisles() {
+    const wallXLeft = -300;
+    const wallXRight = 300;
+
+    for (let z = 0; z < 4000; z += 500) {
+        let actualZ = (z + floorOffset) % 4000;
+        let pL = project(wallXLeft, 0, actualZ);
+        let pR = project(wallXRight, 0, actualZ);
+        let pLTop = project(wallXLeft, 300, actualZ);
+        let pRTop = project(wallXRight, 300, actualZ);
+
+        if (pL && pLTop) {
+            ctx.fillStyle = '#00A3AD'; // Optus teal blocks
+            ctx.fillRect(pL.x - (100 * pL.scale), pLTop.y, 100 * pL.scale, pL.y - pLTop.y);
+            // Highlight
+            ctx.fillStyle = '#00c7d4';
+            ctx.fillRect(pL.x - (20 * pL.scale), pLTop.y, 20 * pL.scale, pL.y - pLTop.y);
+        }
+        if (pR && pRTop) {
+            ctx.fillStyle = '#00A3AD';
+            ctx.fillRect(pR.x, pRTop.y, 100 * pR.scale, pR.y - pRTop.y);
+            ctx.fillStyle = '#00c7d4';
+            ctx.fillRect(pR.x, pRTop.y, 20 * pR.scale, pR.y - pRTop.y);
+        }
+    }
+}
+
+// --- Object Spawning & Logic ---
+function spawnObject() {
+    const laneIdx = Math.floor(Math.random() * 3);
+    const rand = Math.random();
+    
+    let type = 'coin';
+    if (rand > 0.9) type = 'solid'; // Kiosk
+    else if (rand > 0.75) type = 'high'; // Hanging Banner
+    else if (rand > 0.6) type = 'low'; // Router Box
+
+    objects.push({
+        type: type,
+        lane: laneIdx,
+        z: 3500, // Spawn far away
+        y: type === 'high' ? 80 : 0, // High obstacles float
+        hit: false
+    });
+}
+
+// --- Main Game Loop ---
+function initGame() {
+    document.getElementById('gameOverPanel').style.display = 'none';
+    score = 0;
+    document.getElementById('score').innerText = score;
+    speed = baseSpeed;
+    objects = [];
+    player.lane = 1;
+    player.y = 0;
+    player.isJumping = false;
+    player.isDucking = false;
+    player.stumbleTimer = 0;
+    gameState = 'PLAYING';
+    lastTime = performance.now();
+    requestAnimationFrame(gameLoop);
+}
+
+function triggerStumble() {
+    if (player.stumbleTimer > 0) {
+        // Already stumbling, Chaser catches you!
+        triggerGameOver();
+    } else {
+        player.stumbleTimer = 3.5; // Chaser appears for 3.5 seconds
+        speed = baseSpeed * 0.7; // Temporary speed penalty
+    }
+}
+
+function triggerGameOver() {
+    gameState = 'GAMEOVER';
+    document.getElementById('gameOverPanel').style.display = 'flex';
+    document.getElementById('finalScore').innerText = score;
+}
+
+function update(dt) {
+    if (gameState !== 'PLAYING') return;
+
+    // Increase speed slowly
+    speed += dt * 5; 
+    distance += speed * dt;
+    floorOffset = (floorOffset - speed * dt) % 200;
+
+    // Player Jump Physics
+    if (player.isJumping) {
+        player.y += player.vy * dt;
+        player.vy -= 1800 * dt; // Gravity
+        if (player.y <= 0) {
+            player.y = 0;
+            player.isJumping = false;
+        }
+    }
+
+    // Player Duck Logic
+    if (player.isDucking) {
+        player.duckTimer -= dt;
+        if (player.duckTimer <= 0) {
+            player.isDucking = false;
+        }
+    }
+
+    // Stumble Recovery
+    if (player.stumbleTimer > 0) {
+        player.stumbleTimer -= dt;
+        if (player.stumbleTimer <= 0) {
+            speed = baseSpeed + (distance * 0.01); // Recover speed based on distance
+        }
+    }
+
+    // Object Spawning
+    spawnTimer -= dt;
+    if (spawnTimer <= 0) {
+        spawnObject();
+        // Spawn faster as speed increases
+        spawnTimer = Math.max(0.4, 1.5 - (speed / 1000));
+    }
+
+    // Update Objects & Collision
+    for (let i = objects.length - 1; i >= 0; i--) {
+        let obj = objects[i];
+        obj.z -= speed * dt;
+
+        // Collision Window (when object is near player's Z plane)
+        const hitZoneFront = player.z + 20;
+        const hitZoneBack = player.z - 20;
+
+        if (obj.z < hitZoneFront && obj.z > hitZoneBack && !obj.hit) {
+            if (obj.lane === player.lane) {
+                // Determine collision based on type and player state
+                if (obj.type === 'coin') {
+                    if (player.y < 50) { // Can't reach coin if jumping too high, but let's be generous
+                        score += 1;
+                        document.getElementById('score').innerText = score;
+                        obj.hit = true;
+                    }
+                } else if (obj.type === 'low') {
+                    // Must jump over
+                    if (player.y < 30) {
+                        obj.hit = true;
+                        triggerStumble();
+                    }
+                } else if (obj.type === 'high') {
+                    // Must slide under
+                    if (!player.isDucking) {
+                        obj.hit = true;
+                        triggerStumble();
+                    }
+                } else if (obj.type === 'solid') {
+                    // Auto catch
+                    obj.hit = true;
+                    triggerGameOver();
+                }
+            }
+        }
+
+        // Cleanup passed objects
+        if (obj.z < -200 || obj.hit && obj.type === 'coin') {
+            objects.splice(i, 1);
+        }
+    }
+}
+
+function draw() {
+    // 1. Clear & Draw static BG
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, width, height);
+    
+    drawEnvironment();
+
+    // 2. Prepare render list for Z-sorting (Painter's Algorithm)
+    let renderList = [];
+
+    // Add obstacles
+    objects.forEach(obj => {
+        let p = project(LANES[obj.lane], obj.y, obj.z);
+        if (p) {
+            renderList.push({ ...obj, px: p.x, py: p.y, scale: p.scale, drawType: obj.type });
+        }
+    });
+
+    // Add Player
+    let pPlayer = project(LANES[player.lane], player.y, player.z);
+    if (pPlayer) {
+        renderList.push({ drawType: 'player', z: player.z, px: pPlayer.x, py: pPlayer.y, scale: pPlayer.scale });
+    }
+
+    // Add Chaser if stumbling
+    if (player.stumbleTimer > 0) {
+        // Chaser approaches from behind
+        let chaserZ = player.z - 60; // Closer to camera (lower Z)
+        let pChaser = project(LANES[player.lane], 0, chaserZ);
+        if (pChaser) {
+            renderList.push({ drawType: 'chaser', z: chaserZ, px: pChaser.x, py: pChaser.y, scale: pChaser.scale });
+        }
+    }
+
+    // Sort far to near (descending Z)
+    renderList.sort((a, b) => b.z - a.z);
+
+    // 3. Render objects in order
+    renderList.forEach(item => {
+        ctx.save();
+        ctx.translate(item.px, item.py);
+        
+        const s = item.scale;
+
+        switch (item.drawType) {
+            case 'coin':
+                // Mobile Phone Collectible
+                ctx.fillStyle = '#222';
+                ctx.beginPath();
+                ctx.roundRect(-10*s, -30*s, 20*s, 40*s, 4*s);
+                ctx.fill();
+                ctx.fillStyle = OPTUS_TEAL; // Phone screen
+                ctx.fillRect(-8*s, -28*s, 16*s, 32*s);
+                // Hover animation based on time and Z
+                ctx.translate(0, Math.sin((Date.now()/200) + item.z) * 5 * s);
+                break;
+                
+            case 'low':
+                // Router Box / Overdue Bill counter
+                ctx.fillStyle = '#ececec';
+                ctx.fillRect(-25*s, -30*s, 50*s, 30*s);
+                ctx.fillStyle = '#333'; // Details
+                ctx.fillRect(-20*s, -20*s, 10*s, 5*s);
+                ctx.fillStyle = OPTUS_YELLOW; // Antenna
+                ctx.fillRect(15*s, -45*s, 3*s, 15*s);
+                break;
+
+            case 'high':
+                // "No Signal" Hanging Banner
+                // Post/Strings
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2 * s;
+                ctx.beginPath();
+                ctx.moveTo(-30*s, -150*s);
+                ctx.lineTo(-30*s, -80*s);
+                ctx.moveTo(30*s, -150*s);
+                ctx.lineTo(30*s, -80*s);
+                ctx.stroke();
+                // Banner
+                ctx.fillStyle = OPTUS_YELLOW;
+                ctx.fillRect(-45*s, -80*s, 90*s, 40*s);
+                ctx.fillStyle = '#000';
+                ctx.font = `bold ${12*s}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.fillText("5G", 0, -55*s);
+                break;
+
+            case 'solid':
+                // 5G Tower / Massive Kiosk
+                ctx.fillStyle = '#444';
+                // Base
+                ctx.fillRect(-35*s, -120*s, 70*s, 120*s);
+                // Top elements
+                ctx.fillStyle = OPTUS_TEAL;
+                ctx.fillRect(-40*s, -130*s, 80*s, 10*s);
+                ctx.fillStyle = OPTUS_YELLOW;
+                ctx.beginPath();
+                ctx.arc(0, -145*s, 10*s, 0, Math.PI*2);
+                ctx.fill();
+                break;
+
+            case 'player':
+                // Pass drawing state to helper function
+                // Undoing translation because helper function handles it
+                ctx.restore(); 
+                drawPlayerMascot(ctx, item.px, item.py, item.scale, player.isDucking);
+                ctx.save(); // Keep balance
+                break;
+                
+            case 'chaser':
+                ctx.restore();
+                drawChaser(ctx, item.px, item.py, item.scale);
+                ctx.save();
+                break;
+        }
+        ctx.restore();
+    });
+    
+    // Draw collision flash if game over just triggered
+    if (gameState === 'GAMEOVER') {
+        ctx.fillStyle = 'rgba(242, 169, 0, 0.3)';
+        ctx.fillRect(0, 0, width, height);
+    }
+}
+
+function gameLoop(timestamp) {
+    if (gameState !== 'PLAYING') return;
+
+    let dt = (timestamp - lastTime) / 1000;
+    if (dt > 0.1) dt = 0.1; // Cap dt to prevent huge jumps if tab is inactive
+    lastTime = timestamp;
+
+    update(dt);
+    draw();
+
+    if (gameState === 'PLAYING') {
+        requestAnimationFrame(gameLoop);
+    } else {
+        // Draw one last frame to show collision
+        draw();
+    }
+}
+
+// Start game initially
+initGame();
+
+</script>
+</body>
+</html>
