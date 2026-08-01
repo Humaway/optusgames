@@ -34,7 +34,7 @@
         }
         .score-pulse { transform: scale(1.1); color: #F2A900; }
 
-        /* Game Over Panel matching image_a5d593.png */
+        /* Game Over Panel */
         #gameOverPanel {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 10, 12, 0.75);
@@ -93,7 +93,7 @@
 
 <script>
 /**
- * OPTUS SURFERS - High Polish Version
+ * OPTUS SURFERS - V3 (Camera, Animation & Glitch Fixes)
  */
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d', { alpha: false });
@@ -107,13 +107,13 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// --- 3D Camera Settings (Telephoto Perspective) ---
+// --- 3D Camera Settings ---
 const OPTUS_YELLOW = '#F2A900';
 const OPTUS_TEAL = '#00A3AD';
-const LANES = [-140, 0, 140]; // Widened lanes slightly
-const CAMERA_Y = 320;         
-const CAMERA_Z = -800;        // Pushed far back to prevent Z-scaling blowup
-const FOV = 900;              // High FOV to compress depth
+const LANES = [-140, 0, 140]; 
+const CAMERA_Y = 280;         // Lowered slightly for better perspective 
+const CAMERA_Z = -650;        // Moved closer to action
+const FOV = 750;              // Narrowed FOV to zoom in and fix edge popping
 
 let gameState = 'START'; 
 let lastTime = 0;
@@ -129,7 +129,7 @@ let floorOffset = 0;
 // --- Entity States ---
 const player = {
     lane: 1,      
-    currentX: 0,  // For smooth lane transitions
+    currentX: 0,  
     y: 0,         
     z: 200,       
     vy: 0,        
@@ -141,7 +141,7 @@ const player = {
 };
 
 const chaser = {
-    z: -1000,     // Hidden behind camera by default
+    z: -1000,
     currentX: 0,
     lane: 1
 };
@@ -163,7 +163,7 @@ document.addEventListener('keydown', (e) => {
     }
     if ((e.code === 'ArrowUp' || e.key === 'w') && !player.isJumping && !player.isDucking) {
         player.isJumping = true;
-        player.vy = 750; // Snappy jump
+        player.vy = 750; 
     }
     if ((e.code === 'ArrowDown' || e.key === 's') && !player.isJumping && !player.isDucking) {
         player.isDucking = true;
@@ -175,7 +175,7 @@ document.addEventListener('keyup', (e) => {
     if (e.code === 'ArrowRight' || e.key === 'd') keys.right = false;
 });
 
-// Mobile Controls (Swipes)
+// Mobile Controls
 let touchStartX = 0, touchStartY = 0;
 document.addEventListener('touchstart', e => {
     touchStartX = e.changedTouches[0].screenX;
@@ -211,21 +211,17 @@ function project(x, y, z) {
 }
 
 // --- Render Helpers ---
-
 function drawPlayerMascot(ctx, px, py, scale, isDucking, time, tilt) {
     ctx.save();
     ctx.translate(px, py); 
     
     const size = 32 * scale; 
-    
-    // Lean into turns
     ctx.rotate(tilt);
 
     if (isDucking) {
         ctx.scale(1, 0.4);
     }
 
-    // Running legs
     if (!isDucking && gameState === 'PLAYING') {
         const stride = Math.sin(time * 20);
         ctx.fillStyle = '#0a0a0a';
@@ -237,16 +233,14 @@ function drawPlayerMascot(ctx, px, py, scale, isDucking, time, tilt) {
         ctx.fill();
     }
 
-    // Body Bounce
     let bounce = 0;
     if (!isDucking && gameState === 'PLAYING' && !player.isJumping) {
         bounce = Math.abs(Math.sin(time * 20)) * 10 * scale;
     }
     ctx.translate(0, -bounce);
 
-    // Body Gradient
     let grad = ctx.createRadialGradient(-size*0.3, -size*1.3, size*0.1, 0, -size, size);
-    grad.addColorStop(0, '#FFE16B'); // Bright yellow top
+    grad.addColorStop(0, '#FFE16B'); 
     grad.addColorStop(0.6, OPTUS_YELLOW);
     grad.addColorStop(1, '#c28700');
     
@@ -255,17 +249,14 @@ function drawPlayerMascot(ctx, px, py, scale, isDucking, time, tilt) {
     ctx.fillStyle = grad;
     ctx.fill();
 
-    // Visor
     ctx.beginPath();
     ctx.ellipse(size*0.1, -size*1.1, size*0.75, size*0.48, 0, 0, Math.PI * 2);
     ctx.fillStyle = '#FFFFFF';
     ctx.fill();
-    // Visor shadow inner
     ctx.strokeStyle = 'rgba(0,0,0,0.1)';
     ctx.lineWidth = 2*scale;
     ctx.stroke();
 
-    // Eyes
     ctx.fillStyle = '#111';
     ctx.beginPath();
     ctx.arc(-size*0.25, -size*1.1, size*0.14, 0, Math.PI * 2);
@@ -278,52 +269,45 @@ function drawPlayerMascot(ctx, px, py, scale, isDucking, time, tilt) {
 function drawChaser(ctx, px, py, scale, time) {
     ctx.save();
     ctx.translate(px, py);
-    const size = 35 * scale; // Properly scaled down to avoid blocking
+    const size = 35 * scale; 
     
-    // Aggressive running bob
     let bob = 0;
     if (gameState === 'PLAYING') bob = Math.abs(Math.sin(time * 18)) * 12 * scale;
     ctx.translate(0, -bob);
-
-    // Dynamic lean forward
     ctx.rotate(0.1);
 
-    // Briefcase (Left arm swinging)
     const armSwing = Math.sin(time * 18);
     ctx.fillStyle = '#222';
     ctx.save();
     ctx.translate(-size*1.2, -size*0.8);
     ctx.rotate(-armSwing * 0.5);
     ctx.fillRect(-size*0.2, 0, size*0.4, size*1.5);
-    ctx.fillStyle = '#111'; // case body
+    ctx.fillStyle = '#111'; 
     ctx.fillRect(-size*0.5, size*1.2, size, size*0.8);
     ctx.restore();
 
-    // Suit Jacket 
-    ctx.fillStyle = '#0b2038'; // Darker premium navy
+    ctx.fillStyle = '#0b2038'; 
     ctx.beginPath();
     ctx.moveTo(-size*0.9, -size*0.2);
     ctx.lineTo(size*0.9, -size*0.2);
     ctx.lineTo(size*0.7, -size*2.2);
     ctx.lineTo(-size*0.7, -size*2.2);
     ctx.fill();
-    // Jacket Lapels
+    
     ctx.fillStyle = '#081729';
     ctx.beginPath();
     ctx.moveTo(-size*0.5, -size*2.2); ctx.lineTo(0, -size*1.2); ctx.lineTo(size*0.5, -size*2.2);
     ctx.fill();
 
-    // Shirt & Tie
     ctx.fillStyle = '#e0f2fe';
     ctx.beginPath();
     ctx.moveTo(-size*0.3, -size*2.2); ctx.lineTo(size*0.3, -size*2.2); ctx.lineTo(0, -size*1.4);
     ctx.fill();
-    ctx.fillStyle = OPTUS_TEAL; // Corporate tie
+    ctx.fillStyle = OPTUS_TEAL; 
     ctx.beginPath();
     ctx.moveTo(-size*0.1, -size*2.2); ctx.lineTo(size*0.1, -size*2.2); ctx.lineTo(0, -size*1.5);
     ctx.fill();
 
-    // Head
     let headGrad = ctx.createRadialGradient(0, -size*2.5, size*0.2, 0, -size*2.5, size*0.7);
     headGrad.addColorStop(0, '#fad6a5');
     headGrad.addColorStop(1, '#d8a97b');
@@ -332,13 +316,11 @@ function drawChaser(ctx, px, py, scale, time) {
     ctx.arc(0, -size*2.5, size*0.65, 0, Math.PI * 2);
     ctx.fill();
 
-    // Premium Grey Hair
     ctx.fillStyle = '#cbd5e1';
     ctx.beginPath();
     ctx.arc(0, -size*2.6, size*0.68, Math.PI*1.1, Math.PI*-0.1);
     ctx.fill();
 
-    // Smirk
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 1.5 * scale;
     ctx.beginPath();
@@ -353,18 +335,18 @@ function spawnObject() {
     const laneIdx = Math.floor(Math.random() * 3);
     const rand = Math.random();
     
-    let type = 'coin'; // Foldable Phone Collectible
-    if (rand > 0.9) type = 'solid'; // Tower
-    else if (rand > 0.75) type = 'high'; // Banner
-    else if (rand > 0.6) type = 'low'; // Bill Box
+    let type = 'coin'; 
+    if (rand > 0.9) type = 'solid'; 
+    else if (rand > 0.75) type = 'high'; 
+    else if (rand > 0.6) type = 'low'; 
 
     objects.push({
         type: type,
         lane: laneIdx,
-        z: 8000, // Spawn very far out to match new fog
-        y: type === 'high' ? 140 : 0, 
+        z: 9000, 
+        y: type === 'high' ? 90 : 0, // Lowered 5G signs to head-height
         hit: false,
-        swayOffset: Math.random() * Math.PI * 2 // For organic animations
+        swayOffset: Math.random() * Math.PI * 2 
     });
 }
 
@@ -385,7 +367,7 @@ function initGame() {
     player.isDucking = false;
     player.stumbleTimer = 0;
     
-    chaser.z = CAMERA_Z - 500; // Start way behind
+    chaser.z = CAMERA_Z - 500; 
     chaser.currentX = player.currentX;
     
     gameState = 'PLAYING';
@@ -399,8 +381,8 @@ function triggerStumble() {
     if (player.stumbleTimer > 0) {
         triggerGameOver();
     } else {
-        player.stumbleTimer = 4.0; // Stumble lasts 4 seconds
-        speed = baseSpeed * 0.6; // Harsh speed drop
+        player.stumbleTimer = 4.0; 
+        speed = baseSpeed * 0.6; 
     }
 }
 
@@ -422,28 +404,35 @@ function updateScore() {
 
 function update(dt) {
     if (gameState !== 'PLAYING') {
-        // Even in game over, smooth camera and Chaser settling
         if(gameState === 'GAMEOVER') {
-            chaser.z += ((player.z - 60) - chaser.z) * 5 * dt; // Catches up
+            chaser.z += ((player.z - 60) - chaser.z) * 5 * dt; 
             chaser.currentX += (player.currentX - chaser.currentX) * 10 * dt;
         }
         return;
     }
 
     gameTime += dt;
-    speed += dt * 4; // Gradual speed increase
+    speed += dt * 4; 
     distance += speed * dt;
     floorOffset += speed * dt; 
 
-    // Smooth Player Lane Changing (Lerp X)
+    // Smooth Glitch-Free Player Lane Changing
     const targetX = LANES[player.lane];
-    player.currentX += (targetX - player.currentX) * 12 * dt;
-    player.tilt = (player.currentX - targetX) * -0.04; // Tilt based on momentum
+    const dx = targetX - player.currentX;
+    
+    player.currentX += dx * 14 * dt;
+    
+    // Snap to lane when extremely close to stop jittering
+    if (Math.abs(dx) < 1) {
+        player.currentX = targetX;
+    }
+    
+    player.tilt = dx * -0.0035; // Lean into turns
 
     // Physics
     if (player.isJumping) {
         player.y += player.vy * dt;
-        player.vy -= 2200 * dt; // Gravity
+        player.vy -= 2200 * dt; 
         if (player.y <= 0) {
             player.y = 0;
             player.isJumping = false;
@@ -456,21 +445,17 @@ function update(dt) {
     }
 
     // Stumble & Chaser AI
-    let targetChaserZ = -1000; // Far behind default
+    let targetChaserZ = -1000; 
     if (player.stumbleTimer > 0) {
         player.stumbleTimer -= dt;
-        // Chaser creeps up aggressively but stays far enough back not to clip
         targetChaserZ = player.z - 220; 
         
         if (player.stumbleTimer <= 0) {
-            speed = baseSpeed + (distance * 0.008); // Speed recovers
+            speed = baseSpeed + (distance * 0.008); 
         }
     }
     
-    // Smooth Chaser Movement
-    chaser.z += (targetChaserZ - chaser.z) * 2.5 * dt; // Animates forward/backward
-    
-    // Chaser mimics lane changes but with a slight delay
+    chaser.z += (targetChaserZ - chaser.z) * 2.5 * dt; 
     let targetChaserLaneX = LANES[player.lane];
     chaser.currentX += (targetChaserLaneX - chaser.currentX) * 4 * dt; 
 
@@ -488,8 +473,6 @@ function update(dt) {
 
         const hitZoneFront = player.z + 25;
         const hitZoneBack = player.z - 25;
-
-        // X-axis collision (since we use smooth X now, check proximity instead of strict lane)
         const inLane = Math.abs(LANES[obj.lane] - player.currentX) < 40;
 
         if (obj.z < hitZoneFront && obj.z > hitZoneBack && !obj.hit && inLane) {
@@ -515,89 +498,81 @@ function update(dt) {
             }
         }
         
-        // Cleanup passed objects
         if (obj.z < CAMERA_Z - 100 || (obj.hit && obj.type === 'coin')) objects.splice(i, 1);
     }
 }
 
 function draw() {
-    // 1. Sky Gradient & Background
+    // 1. Sky & Background
     let skyGrad = ctx.createLinearGradient(0, 0, 0, horizon);
     skyGrad.addColorStop(0, '#020b0d');
-    skyGrad.addColorStop(1, '#083c45'); // Deep Teal Horizon
+    skyGrad.addColorStop(1, '#083c45'); 
     ctx.fillStyle = skyGrad;
     ctx.fillRect(0, 0, width, horizon);
 
-    // Floor (Lighter polished tech floor)
     let floorGrad = ctx.createLinearGradient(0, horizon, 0, height);
-    floorGrad.addColorStop(0, '#b0c4de'); // Horizon fade
+    floorGrad.addColorStop(0, '#b0c4de'); 
     floorGrad.addColorStop(1, '#e2e8f0');
     ctx.fillStyle = floorGrad; 
     ctx.fillRect(0, horizon, width, height - horizon);
 
-    // Grid Floor Illusion
+    // Floor lines
     ctx.lineWidth = 1;
-    for (let i = 0; i < 40; i++) {
-        let lineZ = 8000 - ((i * 200 + floorOffset) % 8000);
+    for (let i = 0; i < 45; i++) {
+        let lineZ = 9000 - ((i * 200 + floorOffset) % 9000);
         let p = project(0, 0, lineZ);
         if (p) {
             ctx.beginPath();
             ctx.moveTo(0, p.y);
             ctx.lineTo(width, p.y);
-            // Alpha fades into the distance
-            let alpha = Math.max(0, 1 - (lineZ / 7000));
+            let alpha = Math.max(0, 1 - (lineZ / 8000));
             ctx.strokeStyle = `rgba(0, 163, 173, ${alpha * 0.4})`; 
             ctx.stroke();
         }
     }
     
-    // Smooth glowing lane lines
     const dividersX = [-70, 70];
     dividersX.forEach(x => {
         ctx.beginPath();
-        for (let z = 0; z < 8000; z += 150) {
+        for (let z = 0; z < 9000; z += 150) {
             let p = project(x, 0, z);
             if (p) {
                 if (z === 0) ctx.moveTo(p.x, p.y);
                 else ctx.lineTo(p.x, p.y);
             }
         }
-        // Glow effect
         ctx.shadowBlur = 10;
         ctx.shadowColor = OPTUS_YELLOW;
         ctx.strokeStyle = OPTUS_YELLOW;
         ctx.lineWidth = 3;
         ctx.stroke();
-        ctx.shadowBlur = 0; // Reset
+        ctx.shadowBlur = 0; 
     });
 
-    // 2. Build Render List (Z-Sorting)
+    // 2. Build Render List
     let renderList = [];
 
-    // Environmental Walls
-    for (let z = 0; z < 8400; z += 600) {
-        let wallZ = 8400 - ((z + floorOffset) % 8400); 
-        let pL = project(-400, 0, wallZ);
+    // Walls now generate out to 9000z and sit slightly wider to avoid camera edge clipping
+    for (let z = 0; z < 9000; z += 600) {
+        let wallZ = 9000 - ((z + floorOffset) % 9000); 
+        let pL = project(-420, 0, wallZ);
         if (pL) renderList.push({ drawType: 'wall', z: wallZ, px: pL.x, py: pL.y, scale: pL.scale });
         
-        let pR = project(400, 0, wallZ);
+        let pR = project(420, 0, wallZ);
         if (pR) renderList.push({ drawType: 'wall', z: wallZ, px: pR.x, py: pR.y, scale: pR.scale });
     }
 
-    // Objects
     objects.forEach(obj => {
         let p = project(LANES[obj.lane], obj.y, obj.z);
         if (p) renderList.push({ ...obj, px: p.x, py: p.y, scale: p.scale, drawType: obj.type });
     });
 
-    // Player
     let pShadow = project(player.currentX, 0, player.z);
     let pPlayer = project(player.currentX, player.y, player.z);
     if (pPlayer && pShadow) {
         renderList.push({ drawType: 'player', z: player.z, px: pPlayer.x, py: pPlayer.y, shadowY: pShadow.y, scale: pPlayer.scale });
     }
 
-    // Chaser
     if (chaser.z > CAMERA_Z) {
         let pChaserShadow = project(chaser.currentX, 0, chaser.z);
         let pChaser = project(chaser.currentX, 0, chaser.z);
@@ -609,7 +584,6 @@ function draw() {
         }
     }
 
-    // Sort descending Z
     renderList.sort((a, b) => b.z - a.z);
 
     // 3. Render Routine
@@ -618,98 +592,89 @@ function draw() {
         ctx.translate(item.px, item.py);
         const s = item.scale;
         
-        // Distance fading for far objects
-        if (item.z > 5000) {
-            ctx.globalAlpha = Math.max(0, 1 - ((item.z - 5000) / 3000));
+        // Proper distance fog rendering prevents pillars from suddenly popping on the edges
+        if (item.z > 6500) {
+            ctx.globalAlpha = Math.max(0, 1 - ((item.z - 6500) / 2000));
         }
 
         switch (item.drawType) {
             case 'wall':
                 let w = 140 * s;
                 let h = 500 * s; 
-                // Base shadow
                 ctx.fillStyle = 'rgba(0,10,15,0.15)';
                 ctx.beginPath();
                 ctx.ellipse(0, 0, w*0.7, w*0.2, 0, 0, Math.PI*2);
                 ctx.fill();
                 
-                // Tech Pillar Structure
                 let pillarGrad = ctx.createLinearGradient(0, -h, 0, 0);
-                pillarGrad.addColorStop(0, '#005b63'); // Dark teal top
-                pillarGrad.addColorStop(1, OPTUS_TEAL); // Bright base
+                pillarGrad.addColorStop(0, '#005b63'); 
+                pillarGrad.addColorStop(1, OPTUS_TEAL); 
                 ctx.fillStyle = pillarGrad;
                 ctx.fillRect(-w/2, -h, w, h);
-                // Edge Highlight
                 ctx.fillStyle = '#00e3f2';
                 ctx.fillRect(-w/2, -h, w*0.1, h); 
                 break;
 
             case 'coin':
-                // Foldable Phone Collectible Style
+                // Slowed down, non-glitchy spin based strictly on time
                 const hoverY = Math.sin((gameTime*3) + item.swayOffset) * 10 * s;
-                const spin = Math.sin(gameTime*2 + item.z);
+                const spin = Math.sin(gameTime * 2.5 + item.swayOffset);
                 ctx.translate(0, hoverY - (25*s));
                 
-                // Add glow
                 ctx.shadowBlur = 15 * s;
                 ctx.shadowColor = 'rgba(0, 163, 173, 0.8)';
                 
-                // Draw Two panels mimicking a high-end foldable device
-                ctx.fillStyle = '#111'; // Device body
-                ctx.beginPath(); ctx.roundRect(-18*s + (spin*4*s), -25*s, 16*s, 35*s, 3*s); ctx.fill(); // Left Panel
-                ctx.beginPath(); ctx.roundRect(2*s - (spin*4*s), -25*s, 16*s, 35*s, 3*s); ctx.fill();  // Right Panel
+                ctx.fillStyle = '#111'; 
+                ctx.beginPath(); ctx.roundRect(-18*s + (spin*5*s), -25*s, 16*s, 35*s, 3*s); ctx.fill(); 
+                ctx.beginPath(); ctx.roundRect(2*s - (spin*5*s), -25*s, 16*s, 35*s, 3*s); ctx.fill();  
                 
-                ctx.shadowBlur = 0; // Turn off glow for screens
+                ctx.shadowBlur = 0; 
                 
-                // Glowing screens
                 let screenGrad = ctx.createLinearGradient(0, -25*s, 0, 10*s);
                 screenGrad.addColorStop(0, '#00e3f2');
                 screenGrad.addColorStop(1, OPTUS_YELLOW);
                 ctx.fillStyle = screenGrad;
-                ctx.fillRect(-16*s + (spin*4*s), -23*s, 12*s, 31*s); // Left screen
-                ctx.fillRect(4*s - (spin*4*s), -23*s, 12*s, 31*s);  // Right screen
+                ctx.fillRect(-16*s + (spin*5*s), -23*s, 12*s, 31*s); 
+                ctx.fillRect(4*s - (spin*5*s), -23*s, 12*s, 31*s);  
                 break;
                 
             case 'low':
-                // Overdue Bill / Box
-                ctx.fillStyle = 'rgba(0,0,0,0.2)'; // Shadow
+                ctx.fillStyle = 'rgba(0,0,0,0.2)'; 
                 ctx.beginPath(); ctx.ellipse(0, 0, 30*s, 10*s, 0, 0, Math.PI*2); ctx.fill();
 
                 ctx.fillStyle = '#f8f9fa';
                 ctx.beginPath(); ctx.roundRect(-28*s, -35*s, 56*s, 35*s, 4*s); ctx.fill();
                 
-                // Red "Warning" accent tape
                 ctx.fillStyle = '#e63946'; 
                 ctx.fillRect(-28*s, -15*s, 56*s, 6*s);
                 ctx.fillStyle = '#333'; 
-                ctx.fillRect(-15*s, -25*s, 20*s, 4*s); // text line
+                ctx.fillRect(-15*s, -25*s, 20*s, 4*s); 
                 break;
 
             case 'high':
-                // Swinging 5G Banner
+                // Repositioned physically lower to make ducking visually necessary
                 let swing = Math.sin(gameTime*2 + item.swayOffset) * 0.15;
                 
                 ctx.strokeStyle = '#fff';
                 ctx.lineWidth = 2 * s;
                 ctx.beginPath();
-                ctx.moveTo(-35*s, -160*s); ctx.lineTo(-35*s + (swing*30*s), -90*s);
-                ctx.moveTo(35*s, -160*s); ctx.lineTo(35*s + (swing*30*s), -90*s);
+                ctx.moveTo(-35*s, -130*s); ctx.lineTo(-35*s + (swing*20*s), -60*s);
+                ctx.moveTo(35*s, -130*s); ctx.lineTo(35*s + (swing*20*s), -60*s);
                 ctx.stroke();
                 
-                ctx.translate(swing*30*s, 0); // Translate the banner board
+                ctx.translate(swing*20*s, 0); 
                 ctx.fillStyle = OPTUS_YELLOW;
                 ctx.shadowBlur = 10*s; ctx.shadowColor = 'rgba(242, 169, 0, 0.4)';
-                ctx.beginPath(); ctx.roundRect(-50*s, -90*s, 100*s, 45*s, 4*s); ctx.fill();
+                ctx.beginPath(); ctx.roundRect(-45*s, -60*s, 90*s, 40*s, 4*s); ctx.fill();
                 ctx.shadowBlur = 0;
                 
                 ctx.fillStyle = '#111';
                 ctx.font = `900 ${18*s}px 'Segoe UI'`;
                 ctx.textAlign = 'center';
-                ctx.fillText("5G", 0, -60*s);
+                ctx.fillText("5G", 0, -32*s);
                 break;
 
             case 'solid':
-                // Massive Kiosk / Server Rack
                 ctx.fillStyle = 'rgba(0,0,0,0.3)';
                 ctx.beginPath(); ctx.ellipse(0, 0, 45*s, 15*s, 0, 0, Math.PI*2); ctx.fill();
 
@@ -720,7 +685,6 @@ function draw() {
                 ctx.fillStyle = rackGrad;
                 ctx.beginPath(); ctx.roundRect(-45*s, -150*s, 90*s, 150*s, 8*s); ctx.fill();
                 
-                // Neon Accents
                 ctx.fillStyle = OPTUS_TEAL;
                 ctx.fillRect(-45*s, -140*s, 90*s, 12*s);
                 ctx.fillStyle = OPTUS_YELLOW;
@@ -731,7 +695,6 @@ function draw() {
                 break;
 
             case 'player':
-                // Dynamic scale shadow matching floor
                 ctx.fillStyle = 'rgba(0,20,30,0.2)';
                 ctx.beginPath();
                 let shadowScale = Math.max(0.2, 1 - (player.y / 350)); 
@@ -757,7 +720,6 @@ function draw() {
         ctx.restore();
     });
     
-    // Impact Flash
     if (gameState === 'GAMEOVER') {
         ctx.fillStyle = 'rgba(242, 169, 0, 0.15)';
         ctx.fillRect(0, 0, width, height);
@@ -766,7 +728,7 @@ function draw() {
 
 function gameLoop(timestamp) {
     let dt = (timestamp - lastTime) / 1000;
-    if (dt > 0.1) dt = 0.1; // Clamp lag spikes
+    if (dt > 0.1) dt = 0.1; 
     lastTime = timestamp;
 
     update(dt);
@@ -777,7 +739,6 @@ function gameLoop(timestamp) {
     }
 }
 
-// Kickoff
 initGame();
 </script>
 </body>
