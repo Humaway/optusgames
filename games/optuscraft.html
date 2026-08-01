@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>OptusCraft</title>
+  <style>
+    body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: sans-serif; user-select: none; }
+    
+    #crosshair {
+      position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; 
+      border: 3px solid #FDCC08; transform: translate(-50%, -50%); 
+      border-radius: 50%; pointer-events: none; display: none; z-index: 5;
+    }
+
+    #ui {
+      position: absolute; top: 20px; right: 20px; color: #333; 
+      font-weight: bold; text-shadow: 1px 1px 2px #fff; pointer-events: none; display: none; text-align: right; z-index: 5;
+    }
+    
+    /* Hotbar */
+    #hotbarContainer {
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      display: none; gap: 8px; background: rgba(0, 0, 0, 0.5); padding: 10px;
+      border-radius: 10px; z-index: 10;
+    }
+    .slot {
+      width: 45px; height: 45px; border: 3px solid #555; border-radius: 5px; cursor: pointer;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.5); transition: 0.1s;
+      display: flex; flex-direction: column; justify-content: flex-end; align-items: center; 
+      color: white; font-size: 10px; font-weight: bold; text-shadow: 1px 1px 1px #000; padding-bottom: 2px; box-sizing: border-box; overflow: hidden;
+    }
+    .slot.active { border: 4px solid #FDCC08; transform: scale(1.1); box-shadow: 0 0 15px #FDCC08; }
+    
+    /* Chat UI */
+    #chatUI {
+      position: absolute; bottom: 80px; left: 20px; display: none; z-index: 20;
+      background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; width: 300px;
+    }
+    #chatInput {
+      width: 100%; padding: 8px; font-size: 14px; border: none; border-radius: 3px; box-sizing: border-box; outline: none;
+    }
+
+    /* Creative Inventory */
+    #inventoryUI {
+      position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+      background-color: rgba(0, 0, 0, 0.8); z-index: 30; display: none;
+      flex-direction: column; justify-content: center; align-items: center;
+    }
+    .inv-box {
+      background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px);
+      padding: 30px; border-radius: 15px; border: 2px solid #00828E; width: 90%; max-width: 700px;
+    }
+    .inv-box h2 { color: #FDCC08; margin-top: 0; text-align: center; }
+    #colorGrid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-height: 60vh; overflow-y: auto; padding: 10px; }
+    .inv-color {
+      width: 60px; height: 60px; border-radius: 8px; cursor: pointer; border: 2px solid transparent;
+      transition: transform 0.2s; display: flex; justify-content: center; align-items: flex-end;
+      color: white; font-size: 11px; font-weight: bold; text-shadow: 1px 1px 2px #000; padding-bottom: 4px; box-sizing: border-box;
+    }
+    .inv-color:hover { transform: scale(1.1); border: 2px solid white; }
+    .close-btn {
+      margin-top: 20px; background-color: #00828E; color: white; border: none; 
+      padding: 10px 20px; font-size: 16px; border-radius: 5px; cursor: pointer; width: 100%;
+    }
+
+    #logo { position: absolute; top: 20px; left: 20px; width: 150px; pointer-events: none; z-index: 10; }
+
+    /* Start Menu Lobby */
+    #startMenu {
+      position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+      background-color: rgba(0, 130, 142, 0.9); z-index: 40;
+      display: flex; flex-direction: column; justify-content: center; align-items: center; color: white;
+    }
+    .menu-box {
+      background: white; padding: 40px; border-radius: 10px; text-align: center; color: #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 320px;
+    }
+    .menu-box h1 { color: #00828E; margin-top: 0; font-size: 36px; }
+    .input-group { margin-bottom: 15px; text-align: left; }
+    .input-group label { display: block; font-weight: bold; margin-bottom: 5px; color: #00828E; font-size: 14px;}
+    .input-group input[type="text"], .input-group input[type="color"], .input-group select { 
+      width: 100%; padding: 8px; font-size: 14px; border: 2px solid #ccc; border-radius: 5px; box-sizing: border-box;
+    }
+    .input-group input[type="color"] { height: 40px; padding: 2px; cursor: pointer; }
+    #startBtn {
+      background-color: #FDCC08; color: #333; border: none; padding: 15px; 
+      font-size: 18px; font-weight: bold; border-radius: 5px; cursor: pointer; width: 100%; transition: 0.2s; margin-top: 10px;
+    }
+    #startBtn:hover { background-color: #e5b800; }
+  </style>
+  
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.154.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.154.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body oncontextmenu="return false;">
+  <img id="logo" src="OPTUS_Teal_sRGB_RELEASE_03_310316-002.webp" alt="Optus Logo">
+  
+  <div id="startMenu">
+    <div class="menu-box">
+      <h1>OptusCraft</h1>
+      <div class="input-group"><label>Username</label><input type="text" id="usernameInput" placeholder="Enter name..." maxlength="12" value="Builder"></div>
+      <div class="input-group"><label>Avatar Color</label><input type="color" id="colorInput" value="#FDCC08"></div>
+      <div class="input-group">
+        <label>Hat</label>
+        <select id="hatInput">
+          <option value="none">None</option>
+          <option value="tophat">Top Hat</option>
+          <option value="crown">Crown</option>
+          <option value="cap">Cap</option>
+          <option value="wizard">Wizard Hat</option>
+          <option value="bunny">Bunny Ears</option>
+          <option value="santa">Santa Hat</option>
+          <option value="pirate">Pirate Hat</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label>Graphics Quality</label>
+        <select id="graphicsInput">
+          <option value="low">Low (Maximum FPS - No Shadows)</option>
+          <option value="medium" selected>Medium (Balanced)</option>
+          <option value="high">High (Max Fidelity + Radius Outlines)</option>
+        </select>
+      </div>
+      <button id="startBtn">Join Game</button>
+    </div>
+  </div>
+
+  <div id="crosshair" style="display: none;"></div>
+  <div id="ui">WASD: Move | SPACE: Jump | T: Chat<br>L-Click: Mine | R-Click: Place<br>E: Inventory</div>
+  
+  <div id="chatUI"><input type="text" id="chatInput" placeholder="Type message and press Enter..." maxlength="40"></div>
+
+  <div id="hotbarContainer"></div>
+
+  <div id="inventoryUI">
+    <div class="inv-box">
+      <h2>Creative Inventory</h2>
+      <div id="colorGrid"></div>
+      <button class="close-btn" id="closeInvBtn">Close Inventory</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
+    import { getDatabase, ref, onChildAdded, onChildChanged, onChildRemoved, set, remove, onDisconnect } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+    import * as THREE from 'three';
+    import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+    // --- FIREBASE SETUP ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyClzVbBjaPF9AzFTcRXNEecmgCrsjM22TQ",
+        authDomain: "optuscraft.firebaseapp.com",
+        databaseURL: "https://optuscraft-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "optuscraft",
+        storageBucket: "optuscraft.firebasestorage.app",
+        messagingSenderId: "406362886338",
+        appId: "1:406362886338:web:8fcc7a375189fb73e82b5b",
+        measurementId: "G-Y7FQ0WDKX4"
+    };
+
+    let db = null, blocksRef = null, playersRef = null;
+    const myPlayerId = Math.random().toString(36).substring(2, 10);
+    let myName = "Builder", myColor = "#FDCC08", myHat = "none", myMsg = "", myMsgTime = 0;
+    let isGameStarted = false, inventoryOpen = false, chatOpen = false, isHighGraphics = false;
+
+    // --- ITEM DEFINITIONS ---
+    const items = [
+      { id: 'grass', type: 'block', color: '#4C8E29', label: 'Grass' },
+      { id: 'dirt', type: 'block', color: '#5C3A21', label: 'Dirt' },
+      { id: 'stone', type: 'block', color: '#333333', label: 'Stone' },
+      { id: 'sand', type: 'block', color: '#EEDD99', label: 'Sand' },
+      { id: 'wood', type: 'block', color: '#8B4513', label: 'Wood' },
+      { id: 'leaves', type: 'block', color: '#228B22', label: 'Leaves' },
+      { id: 'bricks', type: 'block', color: '#B22222', label: 'Bricks' },
+      { id: 'stonebrick', type: 'block', color: '#555555', label: 'S-Brick' },
+      { id: 'obsidian', type: 'block', color: '#1A0B2E', label: 'Obsidian' },
+      { id: 'diamond', type: 'block', color: '#00FFFF', label: 'Diamond' },
+      { id: 'gold', type: 'block', color: '#FFD700', label: 'Gold' },
+      { id: 'glass', type: 'block', color: '#E0FFFF', label: 'Glass', transparent: true, opacity: 0.4 },
+      { id: 'water', type: 'block', color: '#0000FF', label: 'Water', transparent: true, opacity: 0.6 },
+      { id: 'lava', type: 'block', color: '#FF4500', label: 'Lava' },
+      { id: 'teal', type: 'block', color: '#00828E', label: 'Teal' },
+      { id: 'darkteal', type: 'block', color: '#005F68', label: 'D-Teal' },
+      { id: 'yellow', type: 'block', color: '#FDCC08', label: 'Yellow' },
+      { id: 'white', type: 'block', color: '#FFFFFF', label: 'White' },
+      { id: 'pink', type: 'block', color: '#FF0066', label: 'Pink' },
+      { id: 'red', type: 'block', color: '#FF0000', label: 'Red' },
+      { id: 'door', type: 'door', color: '#654321', label: 'Door' },
+      { id: 'fence', type: 'fence', color: '#A0522D', label: 'Fence' },
+      { id: 'torch', type: 'torch', color: '#FFD700', label: 'Torch' }
+    ];
+    let hotbar = [items[0], items[4], items[2], items[9], items[11], items[20], items[21], items[22]];
+    let currentPaletteIndex = 0;
+
+    const hotbarContainer = document.getElementById('hotbarContainer');
+    const colorGrid = document.getElementById('colorGrid');
+    
+    function renderHotbar() {
+      hotbarContainer.innerHTML = '';
+      hotbar.forEach((item, i) => {
+        const slot = document.createElement('div');
+        slot.className = `slot ${i === currentPaletteIndex ? 'active' : ''}`;
+        slot.style.backgroundColor = item.type === 'block' ? item.color : '#444';
+        slot.innerHTML = `<span>${i+1}</span><span>${item.label}</span>`;
+        slot.onclick = (e) => { e.stopPropagation(); updateHotbar(i); };
+        hotbarContainer.appendChild(slot);
+      });
+    }
+
+    function updateHotbar(index) {
+      currentPaletteIndex = index;
+      Array.from(hotbarContainer.children).forEach((slot, i) => {
+        slot.className = `slot ${i === currentPaletteIndex ? 'active' : ''}`;
+      });
+    }
+
+    items.forEach(item => {
+      const btn = document.createElement('div');
+      btn.className = 'inv-color'; 
+      btn.style.backgroundColor = item.type === 'block' ? item.color : '#444';
+      btn.innerHTML = item.label;
+      btn.onclick = () => { hotbar[currentPaletteIndex] = item; renderHotbar(); toggleInventory(false); };
+      colorGrid.appendChild(btn);
+    });
+    renderHotbar();
+
+    try {
+      if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+        const app = initializeApp(firebaseConfig); db = getDatabase(app);
+        blocksRef = ref(db, 'blocks'); playersRef = ref(db, 'players');
+        onDisconnect(ref(db, `players/${myPlayerId}`)).remove();
+      }
+    } catch (error) { console.error("Firebase Error:", error); }
+
+    // --- THREE.JS ENGINE SETUP ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87CEEB); 
+    scene.fog = new THREE.FogExp2(0x87CEEB, 0.005); 
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1500);
+    const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" }); 
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new PointerLockControls(camera, document.body);
+    
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+    hemiLight.position.set(0, 200, 0); scene.add(hemiLight);
+    scene.add(new THREE.AmbientLight(0x404040, 0.4));
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    dirLight.position.set(200, 300, 200);
+    const d = 300;
+    dirLight.shadow.camera.left = -d; dirLight.shadow.camera.right = d;
+    dirLight.shadow.camera.top = d; dirLight.shadow.camera.bottom = -d;
+    dirLight.shadow.camera.near = 0.5; dirLight.shadow.camera.far = 1000;
+    scene.add(dirLight);
+
+    const outlineGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.01, 1.01, 1.01));
+    const outlineMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2 });
+    const outlineMesh = new THREE.LineSegments(outlineGeo, outlineMat);
+    outlineMesh.visible = false; scene.add(outlineMesh);
+
+    // --- HIGH FIDELITY NEARBY BLOCK OUTLINES ---
+    const maxNearbyOutlines = 2000;
+    const nearbyOutlineGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.002, 1.002, 1.002));
+    const nearbyOutlineMat = new THREE.LineBasicMaterial({ color: 0x000000, opacity: 0.5, transparent: true });
+    const nearbyOutlinesMesh = new THREE.InstancedMesh(nearbyOutlineGeo, nearbyOutlineMat, maxNearbyOutlines);
+    nearbyOutlinesMesh.visible = false;
+    scene.add(nearbyOutlinesMesh);
+    
+    // --- GRAPHICS OPTIMIZATION INJECTION ---
+    document.getElementById('startBtn').addEventListener('click', () => {
+      myName = document.getElementById('usernameInput').value || "Builder";
+      myColor = document.getElementById('colorInput').value;
+      myHat = document.getElementById('hatInput').value;
+      const graphicsQuality = document.getElementById('graphicsInput').value;
+
+      if (graphicsQuality === 'low') {
+         renderer.setPixelRatio(0.5); 
+         renderer.shadowMap.enabled = false;
+         dirLight.castShadow = false;
+         scene.fog.density = 0.012;
+         camera.far = 150;
+      } else if (graphicsQuality === 'medium') {
+         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 0.8));
+         renderer.shadowMap.enabled = true;
+         dirLight.castShadow = true;
+         dirLight.shadow.mapSize.width = 1024; dirLight.shadow.mapSize.height = 1024;
+         scene.fog.density = 0.005;
+         camera.far = 300;
+      } else {
+         isHighGraphics = true;
+         nearbyOutlinesMesh.visible = true;
+         renderer.setPixelRatio(window.devicePixelRatio); 
+         renderer.shadowMap.enabled = true;
+         dirLight.castShadow = true;
+         dirLight.shadow.mapSize.width = 2048; dirLight.shadow.mapSize.height = 2048;
+         scene.fog.density = 0.003;
+         camera.far = 800;
+      }
+      camera.updateProjectionMatrix();
+
+      document.getElementById('startMenu').style.display = 'none';
+      document.getElementById('crosshair').style.display = 'flex';
+      document.getElementById('ui').style.display = 'block';
+      document.getElementById('hotbarContainer').style.display = 'flex';
+      
+      isGameStarted = true; controls.lock();
+    });
+
+    function toggleInventory(forceClose = false) {
+      inventoryOpen = forceClose ? false : !inventoryOpen;
+      document.getElementById('inventoryUI').style.display = inventoryOpen ? 'flex' : 'none';
+      if (inventoryOpen) { controls.unlock(); chatOpen = false; document.getElementById('chatUI').style.display = 'none'; } 
+      else controls.lock();
+    }
+    document.getElementById('closeInvBtn').onclick = () => toggleInventory(true);
+
+    function toggleChat() {
+      chatOpen = true; controls.unlock();
+      const chatUI = document.getElementById('chatUI');
+      const chatInput = document.getElementById('chatInput');
+      chatUI.style.display = 'block';
+      setTimeout(() => chatInput.focus(), 10);
+    }
+
+    document.getElementById('chatInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        myMsg = e.target.value.trim();
+        if (myMsg.length > 0) myMsgTime = Date.now();
+        e.target.value = '';
+        chatOpen = false;
+        document.getElementById('chatUI').style.display = 'none';
+        controls.lock();
+      } else if (e.key === 'Escape') {
+        chatOpen = false; document.getElementById('chatUI').style.display = 'none'; controls.lock();
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if(isGameStarted && !inventoryOpen && !chatOpen && !controls.isLocked && e.target.className.indexOf('slot') === -1 && e.target.id !== 'chatInput') {
+        controls.lock();
+      }
+    });
+
+    // --- SMART VOXEL CULLING WORLD GENERATION ---
+    const blockGeo = new THREE.BoxGeometry(1, 1, 1);
+    const materialsCache = {};
+    const blockRegistry = new Map(); 
+    const instancedMeshes = {};
+    const imCounts = {}; 
+    const dummyMatrix = new THREE.Matrix4();
+    const zeroMatrix = new THREE.Matrix4().scale(new THREE.Vector3(0,0,0));
+
+    function getMaterial(itemData) {
+      const color = itemData.color || itemData;
+      const isTrans = itemData.transparent || false;
+      const opac = itemData.opacity || 1.0;
+      const key = color + '_' + opac;
+      if (!materialsCache[key]) {
+        materialsCache[key] = new THREE.MeshLambertMaterial({ color: color, transparent: isTrans, opacity: opac });
+      }
+      return materialsCache[key];
+    }
+
+    // Increased max limits to prevent rendering cut-offs in holes
+    const maxInstances = {
+        '#4C8E29': 150000,   // Grass 
+        '#5C3A21': 150000,   // Dirt 
+        '#333333': 250000,   // Underground Stone Core
+        '#704214': 50000,    // Tree Trunks (Dedicated)
+        '#228B22': 100000,   // Tree Leaves
+        '#FFFFFF': 5000,     // Tower White
+        '#FF0000': 5000      // Tower Red
+    };
+
+    Object.keys(maxInstances).forEach(color => {
+      const im = new THREE.InstancedMesh(blockGeo, getMaterial(color), maxInstances[color]);
+      im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      
+      if (color === '#228B22' || color === '#704214' || color === '#FFFFFF' || color === '#FF0000') {
+          im.castShadow = true; 
+      }
+      im.receiveShadow = true;
+      
+      im.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 2000); 
+      scene.add(im); instancedMeshes[color] = im; imCounts[color] = 0;
+    });
+
+    function getElevation(x, z) {
+      let elevation = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 8;
+      elevation += Math.sin(x * 0.1 + z * 0.1) * 3;
+      return Math.round(elevation);
+    }
+
+    const mapSize = 160; 
+    for (let x = -mapSize; x <= mapSize; x++) {
+      for (let z = -mapSize; z <= mapSize; z++) {
+        const y = getElevation(x, z);
+        const hN = getElevation(x, z - 1);
+        const hS = getElevation(x, z + 1);
+        const hE = getElevation(x + 1, z);
+        const hW = getElevation(x - 1, z);
+        
+        for (let depth = 0; depth <= 12; depth++) {
+            const blockY = y - depth;
+            
+            // Removed memory-hogging bottom floor render - it will only unhide if dug down to
+            const isVisible = (depth <= 2) || 
+                              (blockY > hN) || (blockY > hS) || 
+                              (blockY > hE) || (blockY > hW) ||
+                              x === -mapSize || x === mapSize || 
+                              z === -mapSize || z === mapSize;
+                              
+            if (isVisible) {
+                let c = '#333333'; // Stone Core
+                if (depth === 0) c = '#4C8E29'; 
+                else if (depth === 1) c = '#5C3A21'; 
+                
+                const count = imCounts[c]; 
+                dummyMatrix.makeTranslation(x, blockY, z);
+                instancedMeshes[c].setMatrixAt(count, dummyMatrix);
+                blockRegistry.set(`${x}_${blockY}_${z}`, { type: 'instanced', color: c, id: count, pos: new THREE.Vector3(x, blockY, z) });
+                imCounts[c]++;
+            } else {
+                blockRegistry.set(`${x}_${blockY}_${z}`, { type: 'hidden' });
+            }
+        }
+
+        // Trees 
+        const n = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
+        if ((n - Math.floor(n)) > 0.997) {
+          for (let t = 1; t <= 3; t++) {
+            const count = imCounts['#704214']; dummyMatrix.makeTranslation(x, y + t, z);
+            instancedMeshes['#704214'].setMatrixAt(count, dummyMatrix);
+            blockRegistry.set(`${x}_${y+t}_${z}`, { type: 'instanced', color: '#704214', id: count, pos: new THREE.Vector3(x, y + t, z) }); 
+            imCounts['#704214']++;
+          }
+          for (let lx = -1; lx <= 1; lx++) {
+            for (let lz = -1; lz <= 1; lz++) {
+              const count = imCounts['#228B22']; dummyMatrix.makeTranslation(x + lx, y + 4, z + lz);
+              instancedMeshes['#228B22'].setMatrixAt(count, dummyMatrix);
+              blockRegistry.set(`${x+lx}_${y+4}_${z+lz}`, { type: 'instanced', color: '#228B22', id: count, pos: new THREE.Vector3(x + lx, y + 4, z + lz) }); 
+              imCounts['#228B22']++;
+            }
+          }
+        }
+      }
+    }
+
+    const towerLocs = [[40, 40], [-80, 20], [120, -100], [-130, -110]];
+    towerLocs.forEach(loc => {
+       const [cx, cz] = loc;
+       const cy = getElevation(cx, cz) + 1; 
+       const addTowerBlock = (x, y, z, c) => {
+          const count = imCounts[c]; dummyMatrix.makeTranslation(x, y, z);
+          instancedMeshes[c].setMatrixAt(count, dummyMatrix);
+          blockRegistry.set(`${x}_${y}_${z}`, { type: 'instanced', color: c, id: count, pos: new THREE.Vector3(x, y, z) });
+          imCounts[c]++;
+       };
+       for(let ty=0; ty<=4; ty++) { for(let dx=-3; dx<=3; dx++) { for(let dz=-3; dz<=3; dz++) { if (Math.abs(dx)===3 || Math.abs(dz)===3) addTowerBlock(cx+dx, cy+ty, cz+dz, '#FF0000'); } } }
+       for(let ty=5; ty<=9; ty++) { for(let dx=-2; dx<=2; dx++) { for(let dz=-2; dz<=2; dz++) { if (Math.abs(dx)===2 || Math.abs(dz)===2) addTowerBlock(cx+dx, cy+ty, cz+dz, '#FFFFFF'); } } }
+       for(let ty=10; ty<=14; ty++) { for(let dx=-1; dx<=1; dx++) { for(let dz=-1; dz<=1; dz++) { if (Math.abs(dx)===1 || Math.abs(dz)===1) addTowerBlock(cx+dx, cy+ty, cz+dz, '#FF0000'); } } }
+       for(let ty=15; ty<=19; addTowerBlock(cx, cy+ty, cz, '#FFFFFF'), ty++);
+       for(let ty=20; ty<=24; addTowerBlock(cx, cy+ty, cz, '#FF0000'), ty++);
+       for(let ty=25; ty<=27; addTowerBlock(cx, cy+ty, cz, '#FFFFFF'), ty++);
+       for(let ty=28; ty<=30; addTowerBlock(cx, cy+ty, cz, '#FF0000'), ty++);
+    });
+
+    Object.keys(instancedMeshes).forEach(color => { instancedMeshes[color].count = imCounts[color]; });
+
+    // --- DYNAMIC UN-CULLING ENGINE ---
+    function unhideBlock(x, y, z) {
+      const key = `${x}_${y}_${z}`;
+      const b = blockRegistry.get(key);
+      if (b && b.type === 'hidden') {
+        const surfaceY = getElevation(x, z);
+        const depth = surfaceY - y;
+        let color = '#333333'; // Stone Core
+        if (depth === 0) color = '#4C8E29';
+        else if (depth === 1) color = '#5C3A21';
+        
+        const mesh = new THREE.Mesh(blockGeo, getMaterial(color));
+        mesh.position.set(x, y, z);
+        mesh.userData = { gridX: x, gridY: y, gridZ: z };
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+        blockRegistry.set(key, { type: 'mesh', mesh: mesh, pos: new THREE.Vector3(x, y, z) });
+      }
+    }
+
+    // --- SPECIAL BLOCKS & PLACEMENT ---
+    function createPlayerBlock(x, y, z, itemData, yaw = 0, isLocal = false) {
+      const key = `${x}_${y}_${z}`;
+      if (blockRegistry.has(key) && blockRegistry.get(key).type !== 'hidden') return; 
+      
+      let mesh;
+      if (itemData.type === 'door') {
+        mesh = new THREE.Mesh(blockGeo, getMaterial(itemData));
+        mesh.scale.set(1, 2, 0.15); mesh.position.set(x, y + 0.5, z); mesh.rotation.y = yaw;
+      } else if (itemData.type === 'fence') {
+        mesh = new THREE.Mesh(blockGeo, getMaterial(itemData));
+        mesh.scale.set(0.3, 1, 0.3); mesh.position.set(x, y, z);
+      } else if (itemData.type === 'torch') {
+        mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.5), new THREE.MeshBasicMaterial({ color: itemData.color }));
+        mesh.position.set(x, y - 0.2, z);
+        const light = new THREE.PointLight(0xFFCC00, 1.5, 10); light.position.set(0, 0.3, 0); mesh.add(light);
+      } else {
+        mesh = new THREE.Mesh(blockGeo, getMaterial(itemData)); mesh.position.set(x, y, z);
+      }
+      
+      mesh.userData = { gridX: x, gridY: y, gridZ: z };
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      scene.add(mesh); 
+      blockRegistry.set(key, { type: 'mesh', mesh: mesh, pos: new THREE.Vector3(x, y, z) });
+      if (isLocal && db) set(ref(db, `blocks/${key}`), { x, y, z, item: itemData, ry: yaw });
+    }
+
+    function removeBlock(x, y, z, isLocal = false) {
+      const key = `${x}_${y}_${z}`;
+      const block = blockRegistry.get(key);
+      if (block) {
+        if (block.type === 'mesh') scene.remove(block.mesh);
+        else if (block.type === 'instanced') {
+          instancedMeshes[block.color].setMatrixAt(block.id, zeroMatrix);
+          instancedMeshes[block.color].instanceMatrix.needsUpdate = true;
+        }
+        blockRegistry.delete(key);
+        if (isLocal && db) set(ref(db, `blocks/${key}`), { x, y, z, removed: true });
+
+        // Materialize adjacent hidden underground blocks so digging reveals new layers
+        const neighbors = [
+          [x+1, y, z], [x-1, y, z],
+          [x, y+1, z], [x, y-1, z],
+          [x, y, z+1], [x, y, z-1]
+        ];
+        neighbors.forEach(([nx, ny, nz]) => unhideBlock(nx, ny, nz));
+      }
+    }
+
+    // --- PLAYER AVATARS & ANIMATIONS ---
+    function createTextSprite(text, isChat = false) {
+      const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 128;
+      const ctx = canvas.getContext('2d'); 
+      if (isChat) {
+         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)'; ctx.roundRect(50, 20, 412, 80, 10); ctx.fill();
+      }
+      ctx.fillStyle = 'white'; ctx.font = isChat ? '28px sans-serif' : 'bold 32px sans-serif'; 
+      ctx.textAlign = 'center'; ctx.fillText(text, 256, 75);
+      const tex = new THREE.CanvasTexture(canvas); const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+      sprite.scale.set(isChat ? 3 : 2, isChat ? 0.75 : 0.5, 1); return sprite;
+    }
+
+    const otherPlayers = {};
+    
+    function buildPlayerModel(data) {
+      const pGroup = new THREE.Group();
+      const torsoGroup = new THREE.Group();
+      
+      const bodyMat = new THREE.MeshLambertMaterial({ color: data.color || '#FDCC08' });
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 12), bodyMat);
+      body.scale.set(1, 0.9, 1); body.position.y = 0.2; body.castShadow = true; torsoGroup.add(body);
+
+      const face = new THREE.Mesh(new THREE.SphereGeometry(0.48, 16, 12), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+      face.scale.set(1, 0.65, 0.4); face.position.set(0, 0.2, 0.42); torsoGroup.add(face);
+
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+      const rightEye = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), eyeMat); rightEye.position.set(-0.18, 0.2, 0.59); torsoGroup.add(rightEye);
+      const leftEye = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), eyeMat); leftEye.position.set(0.18, 0.2, 0.59); torsoGroup.add(leftEye);
+
+      const legMat = new THREE.MeshLambertMaterial({ color: 0x000000 });
+      const leftLeg = new THREE.Group(); leftLeg.position.set(-0.15, -0.1, 0);
+      const leftLegMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 6), legMat); leftLegMesh.position.y = -0.3; leftLegMesh.castShadow = true; leftLeg.add(leftLegMesh);
+      const leftFoot = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.25), legMat); leftFoot.position.set(0, -0.6, 0.06); leftFoot.castShadow = true; leftLeg.add(leftFoot);
+      
+      const rightLeg = new THREE.Group(); rightLeg.position.set(0.15, -0.1, 0);
+      const rightLegMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 6), legMat); rightLegMesh.position.y = -0.3; rightLegMesh.castShadow = true; rightLeg.add(rightLegMesh);
+      const rightFoot = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.25), legMat); rightFoot.position.set(0, -0.6, 0.06); rightFoot.castShadow = true; rightLeg.add(rightFoot);
+
+      if (data.hat === 'tophat') {
+        const hatGroup = new THREE.Group();
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.05, 16), legMat); hatGroup.add(brim);
+        const top = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.6, 16), legMat); top.position.y = 0.3; hatGroup.add(top);
+        hatGroup.position.y = 0.75; hatGroup.rotation.x = -0.1; torsoGroup.add(hatGroup);
+      } else if (data.hat === 'crown') {
+        const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.4, 0.3, 8), new THREE.MeshLambertMaterial({ color: 0xFFD700 }));
+        crown.position.y = 0.8; crown.rotation.x = -0.1; torsoGroup.add(crown);
+      } else if (data.hat === 'cap') {
+        const capGroup = new THREE.Group();
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 8, 0, Math.PI*2, 0, Math.PI/2), new THREE.MeshLambertMaterial({ color: 0xFF0000 })); capGroup.add(dome);
+        const brim = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.05, 0.5), new THREE.MeshLambertMaterial({ color: 0xFF0000 })); brim.position.set(0, 0, 0.4); capGroup.add(brim);
+        capGroup.position.y = 0.6; capGroup.rotation.x = -0.1; torsoGroup.add(capGroup);
+      } else if (data.hat === 'wizard') {
+        const hatGroup = new THREE.Group();
+        const mat = new THREE.MeshLambertMaterial({color: 0x1E90FF});
+        const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.05, 16), mat);
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.8, 16), mat); cone.position.y = 0.4;
+        hatGroup.add(brim); hatGroup.add(cone); hatGroup.position.y = 0.75; hatGroup.rotation.x = -0.1; torsoGroup.add(hatGroup);
+      } else if (data.hat === 'bunny') {
+        const hatGroup = new THREE.Group();
+        const mat = new THREE.MeshLambertMaterial({color: 0xFFFFFF});
+        const ear1 = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.6, 0.1), mat); ear1.position.set(-0.2, 0.3, 0); ear1.rotation.z = 0.2;
+        const ear2 = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.6, 0.1), mat); ear2.position.set(0.2, 0.3, 0); ear2.rotation.z = -0.2;
+        hatGroup.add(ear1); hatGroup.add(ear2); hatGroup.position.y = 0.6; torsoGroup.add(hatGroup);
+      } else if (data.hat === 'pirate') {
+        const hatGroup = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.6, 3), new THREE.MeshLambertMaterial({color: 0x222222}));
+        base.rotation.x = Math.PI/2; base.rotation.y = Math.PI/2; hatGroup.add(base);
+        hatGroup.position.set(0, 0.75, 0.1); torsoGroup.add(hatGroup);
+      } else if (data.hat === 'santa') {
+        const hatGroup = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.1, 16), new THREE.MeshLambertMaterial({color: 0xFFFFFF}));
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.6, 16), new THREE.MeshLambertMaterial({color: 0xFF0000})); cone.position.y = 0.3;
+        const ball = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8), new THREE.MeshLambertMaterial({color: 0xFFFFFF})); ball.position.set(0, 0.6, 0);
+        hatGroup.add(base); hatGroup.add(cone); hatGroup.add(ball); hatGroup.position.y = 0.7; hatGroup.rotation.x = -0.2; torsoGroup.add(hatGroup);
+      } else {
+        const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.3, 8), bodyMat); tuft.position.set(-0.1, 0.75, 0); tuft.rotation.z = Math.PI/8; torsoGroup.add(tuft);
+      }
+
+      const nameSprite = createTextSprite(data.name || 'Player'); nameSprite.position.y = 1.4; torsoGroup.add(nameSprite);
+      const chatSprite = createTextSprite("", true); chatSprite.position.y = 1.9; chatSprite.visible = false; torsoGroup.add(chatSprite);
+      
+      const modelOffset = new THREE.Group();
+      modelOffset.position.y = 0.74; 
+      modelOffset.add(torsoGroup); modelOffset.add(leftLeg); modelOffset.add(rightLeg);
+      pGroup.add(modelOffset); 
+      
+      pGroup.userData = { parts: { leftLeg, rightLeg, torsoGroup }, chatSprite: chatSprite, lastMsgTime: 0, targetSpeed: 0, isJumping: false, legSwing: 0 };
+      return pGroup;
+    }
+
+    if (db) {
+      onChildAdded(blocksRef, (s) => { const d = s.val(); if(d.removed) removeBlock(d.x, d.y, d.z, false); else createPlayerBlock(d.x, d.y, d.z, d.item || {type:'block', color: d.colorType}, d.ry || 0, false); });
+      onChildChanged(blocksRef, (s) => { const d = s.val(); if(d.removed) removeBlock(d.x, d.y, d.z, false); });
+      onChildRemoved(blocksRef, (s) => { const d = s.val(); removeBlock(d.x, d.y, d.z, false); });
+      
+      onChildAdded(playersRef, (s) => {
+        if (s.key === myPlayerId) return;
+        const pm = buildPlayerModel(s.val()); pm.position.set(s.val().x, s.val().y, s.val().z); scene.add(pm); otherPlayers[s.key] = pm;
+      });
+      onChildChanged(playersRef, (s) => {
+        if (s.key === myPlayerId || !otherPlayers[s.key]) return;
+        const pm = otherPlayers[s.key]; const data = s.val();
+        
+        const dist = pm.position.distanceTo(new THREE.Vector3(data.x, data.y, data.z));
+        pm.userData.targetSpeed = dist / 0.05; 
+        pm.userData.isJumping = Math.abs(data.y - pm.position.y) > 0.1;
+
+        pm.position.set(data.x, data.y, data.z); pm.rotation.y = data.ry; 
+        
+        if (data.msgTime && data.msgTime !== pm.userData.lastMsgTime) {
+           pm.userData.lastMsgTime = data.msgTime;
+           const newSprite = createTextSprite(data.msg, true);
+           pm.userData.chatSprite.material.map = newSprite.material.map;
+           pm.userData.chatSprite.visible = true;
+        }
+      });
+      onChildRemoved(playersRef, (s) => { if (otherPlayers[s.key]) { scene.remove(otherPlayers[s.key]); delete otherPlayers[s.key]; } });
+    }
+
+    // --- OPTIMIZED VOXEL RAYCASTER ---
+    const rayDir = new THREE.Vector3();
+    const rayPos = new THREE.Vector3();
+    function raycastVoxel(cam, maxDist) {
+        cam.getWorldDirection(rayDir); rayPos.copy(cam.position);
+        const step = 0.1; let lastG = null;
+        for (let d = 0; d < maxDist; d += step) {
+            rayPos.addScaledVector(rayDir, step);
+            const gx = Math.round(rayPos.x); const gy = Math.round(rayPos.y); const gz = Math.round(rayPos.z);
+            const key = `${gx}_${gy}_${gz}`;
+            if (blockRegistry.has(key) && blockRegistry.get(key).type !== 'hidden') {
+                let nx = 0, ny = 1, nz = 0;
+                if (lastG) { nx = lastG.x - gx; ny = lastG.y - gy; nz = lastG.z - gz; }
+                return { hit: true, x: gx, y: gy, z: gz, nx: nx, ny: ny, nz: nz };
+            }
+            lastG = { x: gx, y: gy, z: gz };
+        }
+        return { hit: false };
+    }
+
+    camera.position.set(0, 30, 0);
+    const move = { forward: false, backward: false, left: false, right: false };
+    let velocityY = 0, canJump = false;
+    const gravity = 25.0, jumpStrength = 10.0, playerHeight = 1.8;
+
+    document.addEventListener('keydown', (e) => {
+      if (!isGameStarted || chatOpen) return;
+      if (e.code === 'KeyE') { toggleInventory(); return; }
+      if (e.code === 'KeyT') { toggleChat(); e.preventDefault(); return; }
+      if (inventoryOpen) return;
+      
+      if (e.code === 'KeyW') move.forward = true; if (e.code === 'KeyS') move.backward = true;
+      if (e.code === 'KeyA') move.left = true; if (e.code === 'KeyD') move.right = true;
+      if (e.code === 'Space' && canJump && controls.isLocked) { velocityY = jumpStrength; canJump = false; }
+      if (controls.isLocked && e.code.startsWith('Digit')) {
+         const num = parseInt(e.code.replace('Digit', '')) - 1;
+         if (num >= 0 && num < 8) updateHotbar(num);
+      }
+    });
+    
+    document.addEventListener('keyup', (e) => {
+      if (e.code === 'KeyW') move.forward = false; if (e.code === 'KeyS') move.backward = false;
+      if (e.code === 'KeyA') move.left = false; if (e.code === 'KeyD') move.right = false;
+    });
+
+    document.addEventListener('mousedown', (e) => {
+      if (!controls.isLocked || inventoryOpen || chatOpen) return;
+      const hitData = raycastVoxel(camera, 8);
+      if (hitData.hit) {
+        if (e.button === 0) { 
+          removeBlock(hitData.x, hitData.y, hitData.z, true);
+        } else if (e.button === 2) { 
+          camera.getWorldDirection(rayDir);
+          const yaw = Math.round(Math.atan2(rayDir.x, rayDir.z) / (Math.PI/2)) * (Math.PI/2); 
+          createPlayerBlock(Math.round(hitData.x + hitData.nx), Math.round(hitData.y + hitData.ny), Math.round(hitData.z + hitData.nz), hotbar[currentPaletteIndex], yaw, true); 
+        }
+      }
+    });
+
+    // --- GAME LOOP ---
+    const clock = new THREE.Clock();
+    let lastNetworkUpdate = 0;
+    
+    function animate() {
+      requestAnimationFrame(animate);
+      if (!isGameStarted) return renderer.render(scene, camera);
+
+      const delta = Math.min(clock.getDelta(), 0.1); const time = clock.getElapsedTime();
+      
+      if (controls.isLocked) {
+        const hitData = raycastVoxel(camera, 8);
+        if (hitData.hit) {
+           outlineMesh.position.set(hitData.x, hitData.y, hitData.z); outlineMesh.visible = true;
+        } else outlineMesh.visible = false;
+
+        // High Fidelity Radius Outlines Processing
+        if (isHighGraphics) {
+           const px = Math.round(camera.position.x);
+           const py = Math.round(camera.position.y);
+           const pz = Math.round(camera.position.z);
+           const rad = 5;
+           let outlineCount = 0;
+           for (let ox = -rad; ox <= rad; ox++) {
+             for (let oy = -rad; oy <= rad; oy++) {
+               for (let oz = -rad; oz <= rad; oz++) {
+                 if (ox*ox + oy*oy + oz*oz <= rad*rad) {
+                   const key = `${px+ox}_${py+oy}_${pz+oz}`;
+                   const b = blockRegistry.get(key);
+                   if (b && b.type !== 'hidden') {
+                     if (outlineCount < maxNearbyOutlines) {
+                       dummyMatrix.makeTranslation(px+ox, py+oy, pz+oz);
+                       nearbyOutlinesMesh.setMatrixAt(outlineCount, dummyMatrix);
+                       outlineCount++;
+                     }
+                   }
+                 }
+               }
+             }
+           }
+           nearbyOutlinesMesh.count = outlineCount;
+           nearbyOutlinesMesh.instanceMatrix.needsUpdate = true;
+        }
+
+        const speed = 10 * delta; 
+        const oldX = camera.position.x; const oldZ = camera.position.z;
+        if (move.forward) controls.moveForward(speed); if (move.backward) controls.moveForward(-speed);
+        if (move.left) controls.moveRight(-speed); if (move.right) controls.moveRight(speed);
+
+        const px = Math.round(camera.position.x); const pz = Math.round(camera.position.z);
+        const footY = Math.round(camera.position.y - playerHeight + 0.1); 
+        const headY = Math.round(camera.position.y - playerHeight + 1.1); 
+        
+        if (blockRegistry.has(`${px}_${footY}_${pz}`) || blockRegistry.has(`${px}_${headY}_${pz}`)) {
+            camera.position.x = oldX; camera.position.z = oldZ;
+        }
+
+        velocityY -= gravity * delta; camera.position.y += velocityY * delta;
+
+        const newPx = Math.round(camera.position.x); const newPz = Math.round(camera.position.z);
+        let highestBlockY = -999;
+        for(let oy = Math.floor(camera.position.y); oy >= Math.floor(camera.position.y) - 3; oy--) {
+           if (blockRegistry.has(`${newPx}_${oy}_${newPz}`)) { if (oy > highestBlockY) highestBlockY = oy; }
+        }
+
+        if (camera.position.y < -40) { 
+          camera.position.set(0, 40, 0); velocityY = 0; canJump = false;
+          const damageFlash = document.createElement('div');
+          damageFlash.style.position = 'absolute'; damageFlash.style.top = '0'; damageFlash.style.left = '0';
+          damageFlash.style.width = '100vw'; damageFlash.style.height = '100vh'; damageFlash.style.backgroundColor = 'red';
+          damageFlash.style.opacity = '0.5'; damageFlash.style.pointerEvents = 'none'; damageFlash.style.transition = 'opacity 0.4s ease-out'; damageFlash.style.zIndex = '100';
+          document.body.appendChild(damageFlash);
+          setTimeout(() => damageFlash.style.opacity = '0', 50); setTimeout(() => damageFlash.remove(), 500);
+        }
+
+        if (highestBlockY !== -999) {
+          const groundLevel = highestBlockY + 0.5 + playerHeight;
+          if (camera.position.y <= groundLevel) { camera.position.y = groundLevel; velocityY = 0; canJump = true; }
+        }
+
+        camera.getWorldDirection(rayDir);
+        const yaw = Math.atan2(rayDir.x, rayDir.z);
+
+        if (db && time - lastNetworkUpdate > 0.05) {
+          set(ref(db, `players/${myPlayerId}`), {
+            name: myName, color: myColor, hat: myHat, msg: myMsg, msgTime: myMsgTime,
+            x: camera.position.x, y: camera.position.y - playerHeight, z: camera.position.z, ry: yaw 
+          });
+          lastNetworkUpdate = time;
+        }
+      }
+      
+      Object.values(otherPlayers).forEach(pm => {
+         if (pm.userData.chatSprite.visible && Date.now() - pm.userData.lastMsgTime > 5000) {
+             pm.userData.chatSprite.visible = false;
+         }
+         
+         pm.userData.targetSpeed = THREE.MathUtils.lerp(pm.userData.targetSpeed || 0, 0, delta * 5); 
+         const speed = pm.userData.targetSpeed;
+         const parts = pm.userData.parts;
+         
+         if (pm.userData.isJumping) {
+              parts.leftLeg.rotation.x = -0.5; parts.rightLeg.rotation.x = 0.2; parts.torsoGroup.position.y = 0.0;
+         } else if (speed > 2.0) {
+              pm.userData.legSwing += delta * 15;
+              parts.leftLeg.rotation.x = Math.sin(pm.userData.legSwing) * 0.8;
+              parts.rightLeg.rotation.x = -Math.sin(pm.userData.legSwing) * 0.8;
+              parts.torsoGroup.position.y = Math.abs(Math.sin(pm.userData.legSwing)) * 0.1;
+         } else {
+              parts.leftLeg.rotation.x = 0; parts.rightLeg.rotation.x = 0; parts.torsoGroup.position.y = 0.0;
+         }
+      });
+      
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
