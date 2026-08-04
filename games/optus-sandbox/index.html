@@ -30,7 +30,7 @@
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             z-index: 10;
-            pointer-events: none; /* Let clicks pass to 3D by default */
+            pointer-events: none; 
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -39,27 +39,26 @@
         .panel {
             pointer-events: auto;
             background: rgba(255, 255, 255, 0.95);
-            padding: 20px;
+            padding: 25px;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-
-        /* Lobby System */
-        #lobby-ui {
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            text-align: center;
             width: 300px;
+            text-align: center;
         }
-        #lobby-ui h1 { color: var(--optus-teal); margin-top: 0; }
+
+        h1 { color: var(--optus-teal); margin-top: 0; }
+        
         input, button {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             margin: 8px 0;
             border: 1px solid #ccc;
             border-radius: 4px;
             box-sizing: border-box;
+            font-size: 14px;
         }
         button {
             background-color: var(--optus-yellow);
@@ -67,15 +66,19 @@
             font-weight: bold;
             border: none;
             cursor: pointer;
+            transition: 0.2s;
         }
         button:hover { filter: brightness(0.9); }
+        .secondary-btn { background-color: #e0e0e0; }
+        
+        .error-text { color: red; font-size: 12px; margin-top: 5px; min-height: 15px;}
+
+        /* Hide Lobby and HUD initially */
+        #lobby-ui, #hud-ui { display: none; }
 
         /* In-Game HUD & Builder Tools */
         #hud-ui {
-            display: none; /* Hidden until joined */
-            width: 100%;
-            height: 100%;
-            position: relative;
+            width: 100%; height: 100%; position: relative;
         }
         #top-bar {
             position: absolute; top: 10px; left: 10px;
@@ -104,29 +107,41 @@
                 "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
                 "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
                 "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-                "firebase/database": "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js",
-                "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
+                "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
+                "firebase/database": "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js"
             }
         }
     </script>
 </head>
 <body>
     <div id="ui-layer">
+        
+        <!-- Authentication Interface -->
+        <div id="auth-ui" class="panel">
+            <h1>Optus Sandbox</h1>
+            <p>Sign in to play</p>
+            <input type="email" id="auth-email" placeholder="Email Address">
+            <input type="password" id="auth-password" placeholder="Password">
+            <button id="login-btn">Log In</button>
+            <button id="register-btn" class="secondary-btn">Create Account</button>
+            <div id="auth-error" class="error-text"></div>
+        </div>
+
         <!-- Lobby Interface -->
         <div id="lobby-ui" class="panel">
-            <h1>Optus Sandbox</h1>
-            <p>Enter a destination</p>
+            <h1>Welcome Back</h1>
+            <p id="user-display-name"></p>
             <input type="text" id="session-id" value="Vision_Hub" placeholder="Room ID">
             <button id="join-btn">Join Session</button>
+            <button id="logout-btn" class="secondary-btn">Log Out</button>
         </div>
 
         <!-- In-Game HUD -->
         <div id="hud-ui">
-            <div id="top-bar">Connected: <span id="room-name"></span> | <span id="player-id"></span></div>
+            <div id="top-bar">Room: <span id="room-name"></span> | User: <span id="player-id"></span></div>
             <div id="builder-toolbar">
                 <button class="tool-btn" id="tool-move" title="Move Mode">🏃</button>
                 <button class="tool-btn" id="tool-build" title="Build Mode">🧱</button>
-                <button class="tool-btn" id="tool-logic" title="Blockly Logic">⚙️</button>
             </div>
         </div>
     </div>
