@@ -1,0 +1,3281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#05070A">
+<title>Optus Smash: Remastered</title>
+<style>
+:root{
+  --yellow:#FECD03; --teal:#00A3AD; --mint:#7CF3D0; --danger:#FF4C4C;
+  --deep:#05070A; --panel:#0C1015; --panel-2:#12171E; --line:#1E262F;
+  --ink:#E8EDF2; --ink-dim:#8D99A6;
+  --display:'Arial Black',Impact,'Haettenschweiler',sans-serif;
+  --ui:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+  --r:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--deep);color:var(--ink);font-family:var(--ui);overflow:hidden;
+  -webkit-user-select:none;user-select:none;touch-action:none;-webkit-tap-highlight-color:transparent}
+button,select,input{font-family:inherit}
+
+#stage-wrap{position:fixed;inset:0;display:grid;place-items:center;background:
+  radial-gradient(120% 90% at 50% 0%,#0B1219 0%,#05070A 70%)}
+#frame{position:relative;width:100vw;max-width:min(100vw,177.78vh);aspect-ratio:16/9;
+  background:#000;overflow:hidden;box-shadow:0 0 0 1px #18202A,0 30px 90px rgba(0,0,0,.8),0 0 120px rgba(0,163,173,.16)}
+#game{display:block;width:100%;height:100%}
+
+/* ---- overlay chrome ---------------------------------------------------- */
+#overlay{position:absolute;inset:0;display:none;z-index:20}
+#overlay.on{display:block}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;padding:clamp(10px,2.2vw,26px);
+  background:
+    repeating-linear-gradient(-45deg,rgba(4,6,9,.93) 0 26px,rgba(14,20,26,.95) 26px 52px);
+  animation:fade .18s ease}
+.screen.on{display:flex}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+
+.bar{display:flex;align-items:center;gap:14px;margin-bottom:clamp(8px,1.4vw,16px);flex:0 0 auto}
+.bar h2{font-family:var(--display);font-style:italic;letter-spacing:.06em;font-size:clamp(14px,1.6vw,20px);
+  margin:0;color:var(--yellow);text-transform:uppercase}
+.bar .spacer{flex:1}
+
+.panel{background:linear-gradient(180deg,rgba(18,23,30,.96),rgba(9,12,16,.96));
+  border:1px solid var(--line);border-radius:var(--r);padding:clamp(10px,1.4vw,18px);min-height:0}
+
+/* ---- buttons ------------------------------------------------------------ */
+.btn{background:var(--teal);color:#04191B;border:0;border-radius:10px;padding:11px 20px;
+  font-weight:800;font-size:clamp(12px,1.15vw,15px);letter-spacing:.03em;cursor:pointer;
+  transition:transform .12s cubic-bezier(.34,1.4,.64,1),filter .12s,box-shadow .12s;
+  box-shadow:0 3px 0 #00636A}
+.btn:hover{filter:brightness(1.12);transform:translateY(-2px);box-shadow:0 5px 0 #00636A}
+.btn:active{transform:translateY(2px);box-shadow:0 0 0 #00636A}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);box-shadow:none}
+.btn.ghost:hover{border-color:var(--teal);color:var(--mint)}
+.btn.primary{background:var(--yellow);color:#231C00;box-shadow:0 3px 0 #9A7C00}
+.btn.primary:hover{box-shadow:0 5px 0 #9A7C00}
+.btn.danger{background:var(--danger);color:#2A0000;box-shadow:0 3px 0 #8E1414}
+.btn.off{opacity:.35;pointer-events:none;filter:grayscale(1)}
+.btn.big{font-size:clamp(15px,1.8vw,22px);padding:15px 30px;font-family:var(--display);font-style:italic;
+  letter-spacing:.08em;text-transform:uppercase}
+
+input[type=text],select{background:#0A0E13;color:var(--ink);border:1px solid var(--line);border-radius:9px;
+  padding:10px 12px;font-size:14px;font-weight:700;outline:none}
+input[type=text]:focus,select:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(0,163,173,.18)}
+input::placeholder{color:#55606C;font-weight:600}
+
+/* ---- title -------------------------------------------------------------- */
+#screen-title{justify-content:center;align-items:center;text-align:center}
+.logo{font-family:var(--display);font-style:italic;text-transform:uppercase;line-height:.86;
+  font-size:clamp(40px,8.2vw,116px);letter-spacing:-.01em;margin:0;
+  color:#fff;-webkit-text-stroke:clamp(2px,.35vw,4px) var(--yellow);
+  text-shadow:6px 7px 0 var(--teal),0 0 60px rgba(0,163,173,.5)}
+.logo small{display:block;font-family:var(--ui);font-style:normal;-webkit-text-stroke:0;text-shadow:none;
+  color:var(--ink-dim);font-size:clamp(10px,1.2vw,14px);letter-spacing:.42em;margin-top:14px;font-weight:700}
+.modes{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:clamp(20px,3.4vw,42px)}
+.mode{background:rgba(12,16,21,.9);border:1px solid var(--line);border-radius:var(--r);
+  padding:clamp(12px,1.6vw,20px) clamp(16px,2vw,26px);cursor:pointer;color:var(--ink);
+  min-width:clamp(130px,15vw,190px);text-align:left;transition:.16s}
+.mode:hover{border-color:var(--teal);transform:translateY(-3px);background:rgba(0,163,173,.10)}
+.mode b{display:block;font-family:var(--display);font-style:italic;font-size:clamp(14px,1.5vw,19px);
+  text-transform:uppercase;letter-spacing:.04em;color:var(--yellow)}
+.mode span{display:block;color:var(--ink-dim);font-size:clamp(10px,1vw,12.5px);margin-top:5px;line-height:1.45}
+.keyline{margin-top:clamp(16px,2.4vw,30px);color:var(--ink-dim);font-size:clamp(10px,1vw,12.5px);line-height:2}
+kbd{background:#141A21;border:1px solid #263039;border-bottom-width:2px;border-radius:5px;
+  padding:2px 7px;font-family:var(--ui);font-weight:800;color:var(--ink);font-size:.92em}
+
+/* ---- setup -------------------------------------------------------------- */
+#screen-setup .cols{flex:1;display:grid;grid-template-columns:minmax(0,2.05fr) minmax(0,1fr);
+  gap:clamp(8px,1.2vw,16px);min-height:0}
+#roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(clamp(96px,9vw,124px),1fr));
+  gap:clamp(6px,.8vw,10px);overflow:auto;align-content:start;height:100%;padding-right:4px}
+.fighter{position:relative;background:#0A0E13;border:2px solid #1B232C;border-radius:12px;
+  padding:6px 4px 8px;cursor:pointer;color:var(--ink-dim);display:flex;flex-direction:column;align-items:center;
+  transition:transform .18s cubic-bezier(.34,1.5,.64,1),border-color .18s,background .18s}
+.fighter canvas{width:100%;height:auto;aspect-ratio:1;pointer-events:none}
+.fighter .fname{font-weight:800;font-size:clamp(9px,.9vw,12px);color:var(--ink);text-align:center;line-height:1.2}
+.fighter .fblurb{display:none}
+.fighter:hover{border-color:#39454F;transform:translateY(-4px);background:#0E141B}
+.fighter.sel{border-color:var(--yellow);background:rgba(254,205,3,.10);transform:translateY(-6px) scale(1.04);
+  box-shadow:0 10px 26px rgba(254,205,3,.22)}
+.fighter.sel .fname{color:var(--yellow)}
+
+.side{display:flex;flex-direction:column;gap:clamp(6px,.9vw,12px);min-height:0}
+#char-name{font-family:var(--display);font-style:italic;text-transform:uppercase;letter-spacing:.03em;
+  font-size:clamp(15px,1.9vw,26px);margin:0 0 8px}
+.stat{display:grid;grid-template-columns:52px 1fr;align-items:center;gap:8px;margin-bottom:5px}
+.stat i{font-style:normal;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);font-weight:800}
+.stat b{display:block;height:7px;background:#151C24;border-radius:4px;overflow:hidden}
+.stat s{display:block;height:100%;background:linear-gradient(90deg,var(--teal),var(--mint));text-decoration:none}
+
+#slots{display:flex;flex-direction:column;gap:6px;flex:1;min-height:0;overflow:auto}
+.slot{display:grid;grid-template-columns:26px 1fr auto;align-items:center;gap:8px;
+  background:#0A0E13;border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;
+  padding:8px 10px;opacity:.5;cursor:pointer;transition:.15s}
+.slot.on{opacity:1}
+.slot.active{border-color:var(--yellow);background:rgba(254,205,3,.07)}
+.slot b{font-family:var(--display);font-style:italic;color:var(--c);font-size:13px}
+.slot span{font-size:11.5px;color:var(--ink-dim);font-weight:700;grid-column:2/-1}
+.slot select{padding:5px 8px;font-size:11.5px;border-radius:7px}
+.slot.me{box-shadow:inset 0 0 0 1px rgba(254,205,3,.35)}
+
+.tray{flex:0 0 auto;display:flex;gap:clamp(8px,1.2vw,16px);align-items:flex-end;margin-top:clamp(8px,1.2vw,14px)}
+#stages{display:flex;gap:8px;overflow-x:auto;flex:1;padding-bottom:2px}
+.stage{flex:0 0 auto;width:clamp(112px,12vw,164px);background:#0A0E13;border:2px solid #1B232C;border-radius:11px;
+  padding:5px;cursor:pointer;color:var(--ink-dim);text-align:left;transition:.15s}
+.stage canvas{width:100%;height:auto;display:block;border-radius:7px;background:#0A0D12}
+.stage span{display:block;font-weight:800;font-size:11.5px;color:var(--ink);margin-top:5px}
+.stage small{display:block;font-size:9.5px;line-height:1.35;margin-top:1px}
+.stage:hover{border-color:#39454F}
+.stage.sel{border-color:var(--yellow);background:rgba(254,205,3,.08)}
+.rules{display:flex;flex-direction:column;gap:6px}
+.rules label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);font-weight:800}
+#setup-hint{color:var(--ink-dim);font-size:11.5px;min-height:14px;margin-top:6px}
+#char-blurb{color:var(--ink-dim);font-size:11.5px;margin:-4px 0 10px;line-height:1.5}
+.slot i{font-style:normal;font-size:10px;color:var(--ink-dim);grid-column:2/-1;letter-spacing:.04em}
+
+/* ---- online -------------------------------------------------------------- */
+#online-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:14px;flex:1;min-height:0}
+#online-body.dim{opacity:.45;pointer-events:none}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.field label{font-size:10px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-dim);font-weight:800}
+#rooms{display:flex;flex-direction:column;gap:7px;overflow:auto;max-height:100%}
+.room{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;
+  background:#0A0E13;border:1px solid var(--line);border-left:4px solid var(--teal);border-radius:10px;
+  padding:11px 13px;cursor:pointer;color:var(--ink);text-align:left;transition:.14s}
+.room:hover{background:rgba(0,163,173,.12);transform:translateX(4px)}
+.room b{font-size:13px}
+.room span{grid-column:1;grid-row:2;color:var(--ink-dim);font-size:11px}
+.room i{font-style:normal;color:var(--mint);font-weight:800;font-size:12px}
+.room code{color:var(--ink-dim);font-size:11px;letter-spacing:.14em}
+.empty{color:var(--ink-dim);font-size:12.5px;text-align:center;padding:26px}
+#net-error{color:var(--danger);font-size:12px;min-height:15px;font-weight:700}
+#net-status{color:var(--ink-dim);font-size:11.5px;font-weight:700}
+
+/* ---- results ------------------------------------------------------------- */
+#screen-results{justify-content:center;align-items:center}
+#results-title{font-family:var(--display);font-style:italic;text-transform:uppercase;
+  font-size:clamp(24px,4.6vw,64px);margin:0 0 clamp(12px,2vw,26px);color:#fff;
+  -webkit-text-stroke:2px var(--yellow);text-shadow:5px 5px 0 var(--teal)}
+#results-list{list-style:none;margin:0 0 clamp(14px,2.4vw,28px);padding:0;width:min(560px,92%)}
+#results-list li{display:grid;grid-template-columns:34px 1fr auto auto;align-items:center;gap:12px;
+  background:#0A0E13;border:1px solid var(--line);border-left:5px solid var(--c);border-radius:11px;
+  padding:11px 14px;margin-bottom:7px}
+#results-list b{font-family:var(--display);font-style:italic;color:var(--c);font-size:19px}
+#results-list .rn{font-weight:800;font-size:13.5px}
+#results-list .rc{color:var(--ink-dim);font-size:11px;grid-column:2;grid-row:2}
+#results-list .rk{color:var(--mint);font-weight:800;font-size:12px}
+#results-list .rf{color:var(--ink-dim);font-size:11.5px}
+
+/* ---- in-match chrome ------------------------------------------------------ */
+#hud-quit{position:absolute;top:12px;right:12px;z-index:30;display:none}
+#pause{position:absolute;inset:0;z-index:40;display:none;place-items:center;
+  background:rgba(4,6,9,.86);backdrop-filter:blur(6px)}
+#pause.on{display:grid}
+#pause .panel{text-align:center;min-width:min(340px,86%)}
+#pause h3{font-family:var(--display);font-style:italic;text-transform:uppercase;color:var(--yellow);margin:0 0 16px}
+#pause .btn{display:block;width:100%;margin-bottom:9px}
+#pause .tip{color:var(--ink-dim);font-size:11px;margin-top:10px;line-height:1.7}
+
+/* ---- touch --------------------------------------------------------------- */
+#touch{position:absolute;inset:0;z-index:25;display:none;pointer-events:none}
+#touch.on{display:block}
+.tbtn{position:absolute;pointer-events:auto;display:grid;place-items:center;border-radius:50%;
+  background:rgba(232,237,242,.13);border:2px solid rgba(232,237,242,.30);color:#fff;
+  font-weight:900;font-size:13px;backdrop-filter:blur(4px);transition:transform .06s,background .06s}
+.tbtn.down{background:rgba(254,205,3,.45);transform:scale(.92)}
+.dpad{width:15%;max-width:74px;aspect-ratio:1}
+.act{width:17%;max-width:86px;aspect-ratio:1}
+[data-act=left]{left:3.5%;bottom:15%} [data-act=right]{left:20%;bottom:15%}
+[data-act=up]{left:11.5%;bottom:31%}  [data-act=down]{left:11.5%;bottom:2%}
+[data-act=atk]{right:4%;bottom:14%;background:rgba(254,205,3,.24)}
+[data-act=spec]{right:20%;bottom:24%;background:rgba(255,76,76,.24)}
+[data-act=shield]{right:20%;bottom:3%;background:rgba(0,163,173,.28)}
+
+@media (max-width:820px){
+  #screen-setup .cols{grid-template-columns:1fr;grid-template-rows:minmax(0,1.3fr) minmax(0,1fr)}
+  #online-body{grid-template-columns:1fr}
+  .tray{flex-wrap:wrap}
+}
+@media (prefers-reduced-motion:reduce){ .screen{animation:none} .btn,.mode,.fighter{transition:none} }
+</style>
+</head>
+<body>
+<div id="stage-wrap"><div id="frame">
+  <canvas id="game" width="1280" height="720"></canvas>
+  <button id="hud-quit" class="btn danger">Quit match</button>
+
+  <div id="touch">
+    <div class="tbtn dpad" data-act="left">◀</div>
+    <div class="tbtn dpad" data-act="right">▶</div>
+    <div class="tbtn dpad" data-act="up">▲</div>
+    <div class="tbtn dpad" data-act="down">▼</div>
+    <div class="tbtn act" data-act="atk">ATK</div>
+    <div class="tbtn act" data-act="spec">SPC</div>
+    <div class="tbtn act" data-act="shield">SHLD</div>
+  </div>
+
+  <div id="pause">
+    <div class="panel">
+      <h3>Paused</h3>
+      <button id="btn-resume" class="btn primary">Resume</button>
+      <button id="btn-restart" class="btn">Restart match</button>
+      <button id="btn-pquit" class="btn ghost">Back to setup</button>
+      <p class="tip"><kbd>Esc</kbd> resume · <kbd>H</kbd> show hitboxes</p>
+    </div>
+  </div>
+
+  <div id="overlay">
+    <!-- title -->
+    <section id="screen-title" class="screen">
+      <h1 class="logo">Optus<br>Smash<small>ARENA EDITION</small></h1>
+      <div class="modes">
+        <button class="mode" id="btn-solo"><b>Solo</b><span>Fight CPUs across nine levels.</span></button>
+        <button class="mode" id="btn-local"><b>Local versus</b><span>Up to four on one screen, keyboard or gamepad.</span></button>
+        <button class="mode" id="btn-online"><b>Online</b><span>Create a room or join with a code.</span></button>
+        <button class="mode" id="btn-training"><b>Training</b><span>No stock loss. Toggle hitboxes and frame data.</span></button>
+      </div>
+      <p class="keyline">
+        <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &amp; jump ·
+        <kbd>J</kbd> attack · <kbd>K</kbd> special · <kbd>L</kbd>/<kbd>Shift</kbd> shield<br>
+        Tap a direction with attack for a smash · hold to charge · shield the instant a hit lands to parry
+      </p>
+    </section>
+
+    <!-- online lobby -->
+    <section id="screen-online" class="screen">
+      <div class="bar">
+        <h2>Online</h2><span id="net-status"></span><span class="spacer"></span>
+        <button class="btn ghost" data-back>Back</button>
+      </div>
+      <div id="online-body">
+        <div class="panel">
+          <div class="field"><label for="username">Your name</label>
+            <input type="text" id="username" maxlength="12" placeholder="e.g. ALEX"></div>
+          <button id="btn-create" class="btn primary" style="width:100%">Create a room</button>
+          <div class="field" style="margin-top:16px"><label for="roomcode">Or join with a code</label>
+            <input type="text" id="roomcode" maxlength="4" placeholder="ABCD"></div>
+          <button id="btn-join" class="btn" style="width:100%">Join room</button>
+          <p id="net-error"></p>
+        </div>
+        <div class="panel" style="display:flex;flex-direction:column;min-height:0">
+          <h2 style="font-family:var(--display);font-style:italic;color:var(--yellow);font-size:15px;margin:0 0 10px">Open rooms</h2>
+          <div id="rooms"><p class="empty">Looking for rooms…</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- setup -->
+    <section id="screen-setup" class="screen">
+      <div class="bar">
+        <h2 id="setup-mode">Solo</h2><span class="spacer"></span>
+        <button id="btn-sound" class="btn ghost">Sound on</button>
+        <button class="btn ghost" data-back>Back</button>
+      </div>
+      <div class="cols">
+        <div class="panel" style="display:flex;min-height:0"><div id="roster"></div></div>
+        <div class="side">
+          <div class="panel"><h3 id="char-name">Ollie</h3><p id="char-blurb"></p><div id="char-stats"></div></div>
+          <div class="panel" style="display:flex;flex-direction:column;min-height:0;flex:1">
+            <div id="slots"></div>
+          </div>
+        </div>
+      </div>
+      <div class="tray">
+        <div id="stages"></div>
+        <div class="rules">
+          <label for="stocks">Stocks</label>
+          <select id="stocks"><option>1</option><option selected>3</option><option>5</option></select>
+          <label for="timer">Time limit</label>
+          <select id="timer"><option value="0" selected>None</option><option value="120">2 min</option><option value="180">3 min</option></select>
+        </div>
+        <button id="btn-fight" class="btn primary big">Fight</button>
+      </div>
+      <p id="setup-hint"></p>
+    </section>
+
+    <!-- results -->
+    <section id="screen-results" class="screen">
+      <h2 id="results-title">Winner</h2>
+      <ol id="results-list"></ol>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+        <button id="btn-rematch" class="btn primary big">Rematch</button>
+        <button id="btn-rechar" class="btn">Change fighters</button>
+        <button id="btn-rtitle" class="btn ghost">Main menu</button>
+      </div>
+    </section>
+  </div>
+</div></div>
+
+<script type="module">
+/* ============================================================================
+   OPTUS SMASH — v3 "ARENA"
+   Single file. No build step. Vanilla JS + Canvas 2D + WebAudio.
+   Firebase is loaded dynamically and is entirely optional.
+
+   ARCHITECTURE MAP
+     1. CORE      — constants, math, fixed-timestep clock
+     2. AUDIO     — procedural SFX (no asset files, all synthesised)
+     3. INPUT     — keyboard (2 local schemes), gamepads, touch -> Pad objects
+     4. ROSTER    — character stats + frame-data movesets
+     5. STAGES    — geometry, soft platforms, ledges, per-stage blast zones
+     6. FX        — particles, sparks, damage popups, camera
+     7. FIGHTER   — physics + state machine + hit resolution
+     8. AI        — CPU controller that emits a Pad, so CPUs use the real rules
+     9. RENDER    — character art, stages, HUD
+    10. NET       — optional online play w/ snapshot interpolation
+    11. MATCH     — game loop, countdown, KO cinematics, results
+    12. UI        — menus and wiring
+   ========================================================================== */
+
+/* ============================ 1. CORE ==================================== */
+
+const VIEW_W = 1280, VIEW_H = 720;
+const TWO_PI = Math.PI * 2;
+const DEG = Math.PI / 180;
+
+/* Every gameplay number lives here so the game can be re-tuned without
+   hunting through logic. All values are per 1/60s tick. */
+const CFG = {
+  fps: 60,
+  gravity: 0.62,
+  maxFall: 15.5,
+  fastFallMul: 1.75,
+  groundAccel: 1.45,
+  groundFriction: 0.80,
+  airAccel: 0.52,
+  airDrag: 0.955,
+  jumpSquat: 4,          // frames crouched before leaving the ground
+  shortHopMul: 0.60,     // jump held < shortHopWindow -> short hop
+  shortHopWindow: 7,
+  landLag: 3,
+  hitstopBase: 3,        // freeze frames on contact, both fighters
+  hitstopPerDmg: 0.62,
+  hitstunPerKb: 2.3,
+  tumbleKb: 14,
+  knockbackDecay: 0.96,  // drag applied while in hitstun (governs kill power)
+  diStrength: 20 * DEG,  // max launch-angle rotation from directional influence
+  shieldMax: 100,
+  shieldRegen: 0.30,
+  shieldDrain: 0.40,
+  shieldStunPerDmg: 0.9,
+  shieldPushback: 0.55,
+  parryWindow: 4,        // shield pressed within N frames of the hit = parry
+  parryFreeze: 26,       // attacker is frozen this long on a parry
+  rollFrames: 22,
+  rollSpeed: 13,
+  rollInvuln: [3, 16],
+  spotDodgeFrames: 20,
+  spotDodgeInvuln: [2, 13],
+  airDodgeFrames: 30,
+  airDodgeInvuln: [2, 18],
+  airDodgeSpeed: 12,
+  ledgeCooldown: 40,     // frames before the same fighter may regrab a ledge
+  ledgeInvuln: 24,
+  respawnInvuln: 150,
+  smashChargeMax: 60,    // frames of charge -> up to +40% damage & knockback
+  koFreeze: 26,
+  netInterpDelay: 110,   // ms of buffer used to smooth remote fighters
+};
+
+const PAL = {
+  yellow: '#FECD03', teal: '#00A3AD', deep: '#05070A',
+  ink: '#E8EDF2', danger: '#FF4C4C', mint: '#7CF3D0',
+};
+
+const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[(Math.random() * arr.length) | 0];
+const approach = (v, target, step) => v < target ? Math.min(v + step, target) : Math.max(v - step, target);
+const easeOutCubic = x => 1 - Math.pow(1 - x, 3);
+const easeOutBack = x => 1 + 2.7 * Math.pow(x - 1, 3) + 1.7 * Math.pow(x - 1, 2);
+
+/* ============================ 2. AUDIO ==================================
+   Everything is synthesised at runtime: oscillators for tones, a noise
+   buffer for impacts. Keeps the game a genuinely single file. */
+
+const Audio_ = (() => {
+  let ctx = null, master = null, noiseBuf = null;
+  let enabled = true, ready = false;
+
+  function boot() {
+    if (ready) return;
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      master = ctx.createGain();
+      master.gain.value = 0.55;
+      master.connect(ctx.destination);
+      // one second of white noise, reused for every impact
+      noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      ready = true;
+    } catch (e) { enabled = false; }
+  }
+
+  function env(node, t, peak, attack, decay) {
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak), t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
+    node.connect(g); g.connect(master);
+    return g;
+  }
+
+  function tone(freq, dur, type = 'square', vol = 0.2, bend = 1, delay = 0) {
+    if (!enabled || !ready) return;
+    const t = ctx.currentTime + delay;
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    if (bend !== 1) o.frequency.exponentialRampToValueAtTime(Math.max(20, freq * bend), t + dur);
+    env(o, t, vol, 0.006, dur);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+
+  function noise(dur, vol = 0.3, hp = 300, lp = 6000, delay = 0) {
+    if (!enabled || !ready) return;
+    const t = ctx.currentTime + delay;
+    const s = ctx.createBufferSource(); s.buffer = noiseBuf;
+    const f1 = ctx.createBiquadFilter(); f1.type = 'highpass'; f1.frequency.value = hp;
+    const f2 = ctx.createBiquadFilter(); f2.type = 'lowpass'; f2.frequency.value = lp;
+    f2.frequency.exponentialRampToValueAtTime(Math.max(200, lp * 0.25), t + dur);
+    s.connect(f1); f1.connect(f2);
+    env(f2, t, vol, 0.004, dur);
+    s.start(t); s.stop(t + dur + 0.05);
+  }
+
+  const S = {
+    jump:   () => tone(340, 0.10, 'square', 0.10, 2.0),
+    dbljump:() => { tone(420, 0.10, 'square', 0.09, 2.2); noise(0.08, 0.10, 1200); },
+    land:   () => noise(0.07, 0.16, 200, 2200),
+    whiff:  () => noise(0.09, 0.07, 900, 4500),
+    hitL:   () => { noise(0.09, 0.30, 400, 5000); tone(180, 0.07, 'square', 0.16, 0.5); },
+    hitM:   () => { noise(0.14, 0.40, 250, 4200); tone(120, 0.11, 'square', 0.22, 0.4); },
+    hitH:   () => { noise(0.22, 0.50, 140, 3200); tone(80, 0.18, 'sawtooth', 0.26, 0.35); },
+    shield: () => { tone(600, 0.10, 'sine', 0.14, 0.7); noise(0.06, 0.10, 1800); },
+    parry:  () => { tone(1250, 0.09, 'sine', 0.22, 1.6); tone(1900, 0.14, 'triangle', 0.14, 1.3, 0.03); },
+    break_: () => { noise(0.35, 0.42, 300, 7000); tone(900, 0.4, 'sawtooth', 0.18, 0.2); },
+    dodge:  () => noise(0.10, 0.10, 2200, 9000),
+    ledge:  () => tone(520, 0.08, 'triangle', 0.12, 1.4),
+    proj:   () => { tone(700, 0.10, 'sawtooth', 0.10, 0.35); noise(0.06, 0.08, 900); },
+    ko:     () => { noise(0.6, 0.5, 60, 4000); tone(150, 0.5, 'sawtooth', 0.3, 0.15);
+                    tone(70, 0.7, 'sine', 0.3, 0.4, 0.02); },
+    count:  () => tone(660, 0.13, 'square', 0.18, 1),
+    go:     () => { tone(880, 0.30, 'square', 0.22, 1.5); tone(1320, 0.30, 'triangle', 0.14, 1.5, 0.04); },
+    ui:     () => tone(880, 0.05, 'square', 0.08, 1.2),
+    select: () => { tone(660, 0.06, 'square', 0.10, 1.3); tone(990, 0.09, 'square', 0.09, 1.2, 0.05); },
+    win:    () => [0, 4, 7, 12].forEach((s, i) => tone(440 * Math.pow(2, s / 12), 0.35, 'square', 0.16, 1, i * 0.12)),
+  };
+
+  return {
+    boot,
+    play(name) { if (!enabled) return; boot(); if (S[name]) S[name](); },
+    /* one call site for hits so volume tracks how hard the blow was */
+    hit(dmg) { if (dmg >= 13) this.play('hitH'); else if (dmg >= 7) this.play('hitM'); else this.play('hitL'); },
+    toggle() { enabled = !enabled; if (enabled) boot(); return enabled; },
+    get on() { return enabled; },
+    volume(v) { boot(); if (master) master.gain.value = v; },
+  };
+})();
+/* ============================ 3. INPUT ==================================
+   Every controller — keyboard, gamepad, touchscreen, and the CPU — produces
+   the same Pad shape. The fighter code therefore never knows or cares who is
+   driving it, which is why CPUs obey exactly the same rules as humans. */
+
+const BTNS = ['jump', 'atk', 'spec', 'shield'];
+
+class Pad {
+  constructor() {
+    this.x = 0; this.y = 0;              // digital axes, -1..1
+    this.held = {}; this.pressed = {}; this.released = {};
+    for (const b of BTNS) { this.held[b] = false; this.pressed[b] = false; this.released[b] = false; }
+    this.buf = {};                       // frames since each press, for input buffering
+    for (const b of BTNS) this.buf[b] = 999;
+    this.dirBuf = { x: 999, y: 999 };    // frames since a direction was tapped from neutral
+    this.lastX = 0; this.lastY = 0;
+    this.jumpHeld = 0;                   // how long jump has been held (short hops)
+  }
+
+  /* raw = {x,y,jump,atk,spec,shield} of currently-held state */
+  update(raw) {
+    for (const b of BTNS) {
+      const was = this.held[b];
+      this.held[b] = !!raw[b];
+      this.pressed[b] = this.held[b] && !was;
+      this.released[b] = !this.held[b] && was;
+      this.buf[b] = this.pressed[b] ? 0 : Math.min(999, this.buf[b] + 1);
+    }
+    const nx = raw.x | 0, ny = raw.y | 0;
+    // a direction "tap" is any transition from neutral, used to detect smash inputs
+    this.dirBuf.x = (nx !== 0 && this.lastX === 0) ? 0 : Math.min(999, this.dirBuf.x + 1);
+    this.dirBuf.y = (ny !== 0 && this.lastY === 0) ? 0 : Math.min(999, this.dirBuf.y + 1);
+    this.lastX = nx; this.lastY = ny;
+    this.x = nx; this.y = ny;
+    this.jumpHeld = this.held.jump ? this.jumpHeld + 1 : 0;
+  }
+
+  /* True if the button was pressed within the last `f` frames and not yet used. */
+  buffered(b, f = 6) { return this.buf[b] <= f; }
+  consume(b) { this.buf[b] = 999; }
+  /* A "smash" is attack + a freshly tapped direction. */
+  smashX(f = 6) { return this.dirBuf.x <= f && this.x !== 0; }
+  smashY(f = 6) { return this.dirBuf.y <= f && this.y !== 0; }
+  clear() { this.update({ x: 0, y: 0 }); }
+}
+
+/* ---- keyboard ---------------------------------------------------------- */
+const rawKeys = Object.create(null);
+window.addEventListener('keydown', e => {
+  rawKeys[e.code] = true;
+  // stop arrows/space scrolling the page mid-match
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+    if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+    e.preventDefault();
+  }
+});
+window.addEventListener('keyup', e => { rawKeys[e.code] = false; });
+window.addEventListener('blur', () => { for (const k in rawKeys) rawKeys[k] = false; });
+
+const KEY_SCHEMES = {
+  p1: { left: ['KeyA'], right: ['KeyD'], up: ['KeyW'], down: ['KeyS'],
+        jump: ['KeyW', 'Space'], atk: ['KeyJ'], spec: ['KeyK'], shield: ['ShiftLeft', 'KeyL'],
+        label: 'W A S D · J · K · L-Shift' },
+  p2: { left: ['ArrowLeft'], right: ['ArrowRight'], up: ['ArrowUp'], down: ['ArrowDown'],
+        jump: ['ArrowUp', 'Numpad0'], atk: ['Numpad1', 'Period'], spec: ['Numpad2', 'Slash'],
+        shield: ['ShiftRight', 'Numpad3'], label: 'Arrows · Num1 · Num2 · R-Shift' },
+};
+
+function anyKey(list) { for (const k of list) if (rawKeys[k]) return true; return false; }
+
+function readKeyboard(scheme) {
+  const s = KEY_SCHEMES[scheme];
+  return {
+    x: (anyKey(s.right) ? 1 : 0) - (anyKey(s.left) ? 1 : 0),
+    y: (anyKey(s.down) ? 1 : 0) - (anyKey(s.up) ? 1 : 0),
+    jump: anyKey(s.jump), atk: anyKey(s.atk), spec: anyKey(s.spec), shield: anyKey(s.shield),
+  };
+}
+
+/* ---- gamepad ----------------------------------------------------------- */
+function readGamepad(index) {
+  const gp = (navigator.getGamepads ? navigator.getGamepads() : [])[index];
+  if (!gp) return { x: 0, y: 0 };
+  const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0, DZ = 0.42;
+  const b = i => gp.buttons[i] && gp.buttons[i].pressed;
+  const x = (ax > DZ || b(15) ? 1 : 0) - (ax < -DZ || b(14) ? 1 : 0);
+  const y = (ay > DZ || b(13) ? 1 : 0) - (ay < -DZ || b(12) ? 1 : 0);
+  return {
+    x, y,
+    jump: b(0) || b(3) || y === -1,
+    atk: b(2) || b(1),
+    spec: b(7) || b(5),
+    shield: b(6) || b(4),
+  };
+}
+function gamepadCount() {
+  const list = navigator.getGamepads ? navigator.getGamepads() : [];
+  let n = 0; for (const g of list) if (g) n++; return n;
+}
+
+/* ---- touch ------------------------------------------------------------- */
+const touchRaw = { x: 0, y: 0, jump: false, atk: false, spec: false, shield: false };
+const IS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+function bindTouchControls(root) {
+  const held = new Map();                     // pointerId -> button element
+  const apply = () => {
+    touchRaw.x = 0; touchRaw.y = 0;
+    for (const b of BTNS) touchRaw[b] = false;
+    for (const el of held.values()) {
+      const a = el.dataset.act;
+      if (a === 'left') touchRaw.x = -1; else if (a === 'right') touchRaw.x = 1;
+      else if (a === 'up') { touchRaw.y = -1; touchRaw.jump = true; }
+      else if (a === 'down') touchRaw.y = 1;
+      else touchRaw[a] = true;
+    }
+  };
+  root.querySelectorAll('[data-act]').forEach(el => {
+    const on = e => { e.preventDefault(); held.set(e.pointerId, el); el.classList.add('down'); apply(); };
+    const off = e => {
+      const prev = held.get(e.pointerId); if (prev) prev.classList.remove('down');
+      held.delete(e.pointerId); apply();
+    };
+    el.addEventListener('pointerdown', on);
+    el.addEventListener('pointerup', off);
+    el.addEventListener('pointercancel', off);
+    // sliding a thumb off one button and onto another should re-target, like a real d-pad
+    el.addEventListener('pointerenter', e => { if (e.buttons) on(e); });
+    el.addEventListener('pointerleave', off);
+  });
+}
+
+/* ---- source dispatch --------------------------------------------------- */
+function readSource(src) {
+  if (!src) return { x: 0, y: 0 };
+  if (src.kind === 'key') return readKeyboard(src.scheme);
+  if (src.kind === 'pad') return readGamepad(src.index);
+  if (src.kind === 'touch') return touchRaw;
+  return { x: 0, y: 0 };                       // 'cpu' and 'net' are driven elsewhere
+}
+/* ============================ 4. ROSTER =================================
+   Every move is real frame data: startup, active, recovery. That single
+   change is what makes attacks feel committed rather than instant, and it
+   gives the CPU something meaningful to punish. */
+
+/* mv(startup, active, recovery, damage, baseKB, kbGrowth, angleDeg, box, opts)
+   box  = [offsetX, offsetY, width, height], offsetX mirrors with facing
+   angle: 0 = straight forward, 90 = straight up, negative = spike */
+const mv = (s, a, r, d, kb, kg, ang, box, opts = {}) =>
+  Object.assign({ s, a, r, d, kb, kg, ang, bx: box[0], by: box[1], bw: box[2], bh: box[3] }, opts);
+
+/* The reference fighter. Characters below only state where they differ,
+   which keeps 9 rosters readable instead of 144 copy-pasted blocks. */
+const BASE_MOVES = {
+  jab:    mv(4, 3, 9, 3, 5.0, 0.30, 45, [34, -2, 44, 34], { rapid: true }),
+  ftilt:  mv(7, 4, 13, 8, 6.5, 0.60, 20, [46, -4, 56, 36]),
+  utilt:  mv(6, 5, 12, 7, 6.0, 0.66, 88, [6, -48, 60, 52]),
+  dtilt:  mv(6, 4, 11, 6, 5.5, 0.55, 28, [40, 30, 54, 28]),
+  fsmash: mv(14, 4, 26, 15, 9.0, 0.98, 32, [56, -2, 66, 50], { smash: true }),
+  usmash: mv(12, 5, 24, 14, 8.5, 1.00, 90, [2, -56, 58, 72], { smash: true }),
+  dsmash: mv(11, 4, 24, 13, 8.2, 0.92, 12, [0, 32, 106, 34], { smash: true, both: true }),
+  nair:   mv(5, 8, 10, 7, 5.8, 0.52, 45, [0, 0, 86, 76], { air: true }),
+  fair:   mv(9, 4, 14, 10, 6.8, 0.78, 35, [48, -6, 54, 52], { air: true }),
+  bair:   mv(8, 4, 13, 11, 7.2, 0.82, 12, [-48, -2, 54, 46], { air: true, back: true }),
+  uair:   mv(7, 5, 12, 9, 6.4, 0.76, 88, [4, -50, 58, 58], { air: true }),
+  dair:   mv(11, 5, 18, 12, 6.0, 0.62, -78, [0, 42, 54, 52], { air: true, spike: true }),
+  nspec:  mv(12, 4, 20, 6, 6.0, 0.55, 25, [40, 0, 40, 40],
+             { proj: { vx: 13, vy: 0, grav: 0, life: 70, w: 30, h: 30, art: 'orb' } }),
+  sspec:  mv(10, 12, 22, 9, 7.0, 0.70, 22, [40, 0, 60, 50], { lunge: 11 }),
+  uspec:  mv(6, 10, 26, 8, 6.4, 0.62, 82, [4, -34, 62, 76], { recovery: 16.5, air: true }),
+  dspec:  mv(9, 5, 22, 10, 7.4, 0.70, -60, [0, 34, 70, 48], { air: true, spike: true, stall: true }),
+};
+
+const makeMoves = over => {
+  const out = {};
+  for (const k in BASE_MOVES) out[k] = Object.assign({}, BASE_MOVES[k], over[k] || {});
+  return out;
+};
+
+/* stats: weight (KB resistance), run/air speed, fall speed multiplier,
+   jump force, extra jumps, gravity multiplier */
+const ROSTER = {
+  ollie: {
+    name: 'Ollie', tag: 'OLLIE', color: PAL.yellow, blurb: 'All-rounder · fast spin dash',
+    weight: 96, run: 9.2, air: 7.0, fall: 1.00, jump: 15.4, djump: 14.6, jumps: 2, grav: 1.00,
+    moves: makeMoves({
+      sspec: mv(8, 17, 16, 11, 7.6, 0.72, 24, [26, 0, 62, 62], { lunge: 13, hold: true, spin: true }),
+      uspec: mv(5, 12, 24, 9, 7.0, 0.70, 84, [4, -38, 66, 84], { recovery: 18, air: true, spin: true }),
+      nspec: mv(10, 4, 18, 7, 6.2, 0.60, 30, [40, 0, 42, 42],
+                { proj: { vx: 15, vy: 0, grav: 0, life: 60, w: 30, h: 30, art: 'ring' } }),
+    }),
+  },
+  jarrad: {
+    name: 'Jarrad Gaunt', tag: 'JARRAD', color: '#4FC3F7', blurb: 'Zoner · arcing projectile',
+    weight: 92, run: 8.6, air: 7.2, fall: 0.94, jump: 15.2, djump: 14.4, jumps: 2, grav: 0.96,
+    moves: makeMoves({
+      nspec: mv(11, 4, 19, 6, 5.6, 0.58, 40, [40, -6, 34, 34],
+                { proj: { vx: 15, vy: -4.2, grav: 0.28, life: 90, w: 24, h: 24, art: 'plane' } }),
+      fair: mv(8, 4, 12, 9, 6.4, 0.80, 38, [50, -8, 56, 50], { air: true }),
+      uspec: mv(6, 10, 24, 7, 6.2, 0.62, 86, [4, -36, 58, 80], { recovery: 17.5, air: true }),
+    }),
+  },
+  stephen: {
+    name: 'Stephen Rue', tag: 'STEPHEN', color: '#C9A227', blurb: 'Heavyweight · briefcase KO power',
+    weight: 122, run: 7.0, air: 5.6, fall: 1.16, jump: 14.2, djump: 13.2, jumps: 2, grav: 1.10,
+    moves: makeMoves({
+      fsmash: mv(19, 5, 32, 22, 10.4, 1.16, 34, [64, -2, 84, 58], { smash: true, heavy: true }),
+      ftilt:  mv(9, 5, 16, 11, 7.2, 0.70, 18, [54, -4, 68, 40]),
+      dair:   mv(14, 6, 22, 16, 6.4, 0.66, -82, [0, 44, 58, 58], { air: true, spike: true }),
+      uspec:  mv(7, 9, 30, 7, 6.0, 0.58, 80, [4, -32, 58, 70], { recovery: 15.4, air: true }),
+      sspec:  mv(14, 8, 26, 14, 8.4, 0.86, 20, [46, 0, 70, 54], { lunge: 9, heavy: true }),
+    }),
+  },
+  muzz: {
+    name: 'The Muzz', tag: 'MUZZ', color: '#FF5A3C', blurb: 'Brawler · fireball pressure',
+    weight: 108, run: 8.6, air: 6.4, fall: 1.06, jump: 14.8, djump: 14.0, jumps: 2, grav: 1.04,
+    moves: makeMoves({
+      nspec: mv(13, 4, 21, 8, 6.4, 0.62, 20, [44, 2, 40, 40],
+                { proj: { vx: 12.5, vy: 0, grav: 0.06, life: 80, w: 34, h: 34, art: 'fire' } }),
+      sspec: mv(12, 5, 24, 12, 8.0, 0.82, 26, [50, 0, 66, 52], { lunge: 12 }),
+      dsmash: mv(12, 5, 26, 15, 8.6, 0.96, 14, [0, 32, 116, 38], { smash: true, both: true }),
+    }),
+  },
+  iphone: {
+    name: 'iPhone', tag: 'IPHONE', color: '#FF8C42', blurb: 'Floaty · EMP burst zoning',
+    weight: 84, run: 8.2, air: 7.6, fall: 0.80, jump: 15.8, djump: 15.2, jumps: 2, grav: 0.84,
+    moves: makeMoves({
+      nspec: mv(16, 10, 26, 12, 7.6, 0.74, 60, [0, 0, 210, 210], { emp: true, centered: true }),
+      uair:  mv(6, 6, 11, 8, 6.2, 0.80, 88, [4, -54, 62, 64], { air: true }),
+      uspec: mv(5, 12, 22, 6, 5.6, 0.58, 86, [4, -40, 54, 88], { recovery: 19, air: true }),
+    }),
+  },
+  samsung: {
+    name: 'Galaxy Fold', tag: 'FOLD', color: '#8E9BFF', blurb: 'Long reach · unfolding disjoints',
+    weight: 104, run: 8.0, air: 6.4, fall: 1.02, jump: 14.9, djump: 14.1, jumps: 2, grav: 1.00,
+    moves: makeMoves({
+      ftilt:  mv(8, 5, 14, 9, 6.8, 0.66, 18, [58, -4, 78, 40], { unfold: true }),
+      fsmash: mv(16, 5, 28, 17, 9.2, 1.02, 30, [70, -2, 92, 52], { smash: true, unfold: true }),
+      fair:   mv(10, 5, 15, 11, 7.0, 0.80, 34, [58, -6, 74, 50], { air: true, unfold: true }),
+      usmash: mv(13, 6, 26, 15, 8.6, 1.02, 90, [2, -62, 62, 84], { smash: true, unfold: true }),
+    }),
+  },
+  pixel: {
+    name: 'Pixel 9 Pro Fold', tag: 'PIXEL', color: '#AAB6FF', blurb: 'Speedster · fast, low KO power',
+    weight: 86, run: 10.2, air: 7.8, fall: 0.96, jump: 15.6, djump: 14.8, jumps: 2, grav: 0.98,
+    moves: makeMoves({
+      jab:    mv(3, 3, 7, 3, 4.6, 0.26, 45, [34, -2, 42, 34], { rapid: true }),
+      ftilt:  mv(5, 4, 10, 6, 5.8, 0.52, 20, [48, -4, 60, 38], { unfold: true }),
+      nair:   mv(4, 8, 8, 6, 5.4, 0.46, 45, [0, 0, 84, 74], { air: true }),
+      fsmash: mv(12, 4, 24, 13, 8.4, 0.90, 32, [60, -2, 76, 50], { smash: true, unfold: true }),
+      sspec:  mv(8, 10, 18, 8, 6.6, 0.62, 22, [44, 0, 62, 50], { lunge: 14 }),
+    }),
+  },
+  yes: {
+    name: 'The "Yes"', tag: 'YES', color: PAL.teal, blurb: 'Triple jump · stretchy disjoints',
+    weight: 90, run: 8.4, air: 7.4, fall: 0.90, jump: 15.0, djump: 13.8, jumps: 3, grav: 0.92,
+    moves: makeMoves({
+      ftilt:  mv(7, 5, 13, 8, 6.6, 0.64, 18, [62, -4, 92, 42], { stretch: 'x' }),
+      utilt:  mv(6, 6, 12, 8, 6.2, 0.72, 88, [6, -58, 56, 80], { stretch: 'y' }),
+      fair:   mv(8, 5, 13, 10, 6.8, 0.78, 34, [60, -6, 86, 46], { air: true, stretch: 'x' }),
+      uair:   mv(6, 6, 11, 9, 6.4, 0.80, 88, [4, -60, 54, 80], { air: true, stretch: 'y' }),
+      uspec:  mv(5, 11, 22, 7, 6.0, 0.60, 88, [4, -44, 54, 94], { recovery: 18.5, air: true, stretch: 'y' }),
+    }),
+  },
+  telstra: {
+    name: 'Telstra', tag: 'TELSTRA', color: '#2F6BFF', blurb: 'Rival · spin pressure + T shot',
+    weight: 100, run: 8.8, air: 6.8, fall: 1.02, jump: 15.0, djump: 14.2, jumps: 2, grav: 1.00,
+    moves: makeMoves({
+      nspec: mv(12, 4, 20, 7, 6.2, 0.62, 22, [44, 0, 40, 40],
+                { proj: { vx: 13.5, vy: 0, grav: 0, life: 72, w: 32, h: 32, art: 'tee' } }),
+      sspec: mv(9, 15, 20, 10, 7.2, 0.72, 24, [30, 0, 74, 62], { lunge: 12, hold: true, spin: true }),
+      dsmash: mv(10, 6, 24, 13, 8.4, 0.94, 12, [0, 30, 112, 40], { smash: true, both: true, spin: true }),
+    }),
+  },
+};
+
+const ROSTER_IDS = Object.keys(ROSTER);
+const charOf = id => ROSTER[id] || ROSTER.ollie;
+
+/* Knockback model. Damage already taken matters more than the hit itself,
+   which is what produces the classic "you live until you don't" curve. */
+function knockbackOf(move, victimPercent, weight, chargeMul = 1) {
+  const dmg = move.d * chargeMul;
+  const raw = (move.kb + (victimPercent * 0.125 + dmg * 0.55) * move.kg * chargeMul) * (100 / weight);
+  return raw;
+}
+/* ============================ 5. STAGES =================================
+   Platforms now have a type. `soft` platforms can be jumped through from
+   below and dropped through with down+jump — the single biggest change to
+   how the stages actually play. Ledges are explicit grab points, and each
+   stage owns its blast zones instead of sharing one global rectangle. */
+
+function plat(x, y, w, h, soft = false) { return { x, y, w, h, soft }; }
+
+const STAGES = {
+  store: {
+    name: 'Optus Store', sub: 'Retail floor · tight blast zones',
+    plats: [plat(180, 560, 920, 40), plat(300, 400, 220, 14, true),
+            plat(760, 400, 220, 14, true), plat(530, 262, 220, 14, true)],
+    ledges: [{ x: 180, y: 560, dir: -1 }, { x: 1100, y: 560, dir: 1 }],
+    blast: { l: -340, r: 1620, t: -440, b: 1160 },
+    spawns: [[330, 380], [640, 200], [950, 380], [640, 420]],
+  },
+  tower: {
+    name: 'Cell Tower', sub: 'Vertical · wall-jumpable mast',
+    plats: [plat(390, 600, 500, 40), plat(615, 300, 50, 210),
+            plat(240, 452, 200, 14, true), plat(840, 452, 200, 14, true),
+            plat(545, 170, 190, 14, true)],
+    ledges: [{ x: 390, y: 600, dir: -1 }, { x: 890, y: 600, dir: 1 }],
+    blast: { l: -300, r: 1580, t: -560, b: 1220 },
+    spawns: [[460, 420], [640, 90], [820, 420], [640, 460]],
+  },
+  grid: {
+    name: 'Network Grid', sub: 'Neutral · even ground',
+    plats: [plat(230, 590, 820, 40), plat(150, 420, 210, 14, true),
+            plat(920, 420, 210, 14, true), plat(535, 272, 210, 14, true)],
+    ledges: [{ x: 230, y: 590, dir: -1 }, { x: 1050, y: 590, dir: 1 }],
+    blast: { l: -360, r: 1640, t: -480, b: 1180 },
+    spawns: [[380, 400], [640, 200], [900, 400], [640, 440]],
+  },
+  server: {
+    name: 'Server Room', sub: 'Walled in · wall jumps rewarded',
+    plats: [plat(200, 620, 880, 40), plat(52, 300, 92, 330), plat(1136, 300, 92, 330),
+            plat(430, 440, 190, 14, true), plat(660, 440, 190, 14, true),
+            plat(545, 290, 190, 14, true)],
+    ledges: [{ x: 200, y: 620, dir: -1 }, { x: 1080, y: 620, dir: 1 }],
+    blast: { l: -280, r: 1560, t: -430, b: 1200 },
+    spawns: [[360, 420], [640, 220], [920, 420], [640, 470]],
+  },
+  orbit: {
+    name: 'Low Orbit', sub: 'Wide open · survive longer',
+    plats: [plat(300, 600, 680, 40), plat(160, 430, 190, 14, true),
+            plat(930, 430, 190, 14, true), plat(545, 280, 190, 14, true)],
+    ledges: [{ x: 300, y: 600, dir: -1 }, { x: 980, y: 600, dir: 1 }],
+    blast: { l: -520, r: 1800, t: -640, b: 1340 },
+    spawns: [[420, 400], [640, 190], [860, 400], [640, 450]],
+  },
+};
+const STAGE_IDS = Object.keys(STAGES);
+
+/* ---- pre-rendered detail tiles -----------------------------------------
+   The original redrew hundreds of randomised rack LEDs every single frame.
+   Building each tile once and scrolling it costs almost nothing and, more
+   importantly, stops the backgrounds from strobing. */
+const tileCache = {};
+
+function makeTile(key, w, h, paint) {
+  if (tileCache[key]) return tileCache[key];
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  paint(c.getContext('2d'), w, h);
+  tileCache[key] = c;
+  return c;
+}
+
+function scrollTile(ctx, tile, offX, offY, alpha = 1) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const sx = ((offX % tile.width) + tile.width) % tile.width;
+  const sy = ((offY % tile.height) + tile.height) % tile.height;
+  for (let x = -sx; x < VIEW_W; x += tile.width)
+    for (let y = -sy; y < VIEW_H; y += tile.height)
+      ctx.drawImage(tile, x, y);
+  ctx.restore();
+}
+
+/* Backgrounds are drawn in SCREEN space with parallax derived from the
+   camera. Far cheaper than filling a 5000px world rect every frame. */
+function drawBackground(ctx, id, cam, t) {
+  const px = -cam.x * 0.22, py = -cam.y * 0.16;
+
+  if (id === 'store') {
+    ctx.fillStyle = '#141519'; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    const tile = makeTile('storeTile', 320, 320, (c) => {
+      c.fillStyle = '#191A1F'; c.fillRect(0, 0, 320, 320);
+      c.fillStyle = '#1F2128';
+      for (let y = 0; y < 320; y += 80) c.fillRect(0, y, 320, 34);
+      c.fillStyle = 'rgba(254,205,3,0.10)';
+      for (let y = 24; y < 320; y += 80) for (let x = 12; x < 320; x += 54) c.fillRect(x, y, 30, 8);
+    });
+    scrollTile(ctx, tile, -px, -py, 0.85);
+    // slow diagonal light sweep, the one animated element
+    const sweep = (t * 0.03) % 1700 - 300;
+    const g = ctx.createLinearGradient(sweep, 0, sweep + 300, VIEW_H);
+    g.addColorStop(0, 'rgba(254,205,3,0)'); g.addColorStop(0.5, 'rgba(254,205,3,0.07)');
+    g.addColorStop(1, 'rgba(254,205,3,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+  } else if (id === 'tower') {
+    const g = ctx.createLinearGradient(0, 0, 0, VIEW_H);
+    g.addColorStop(0, '#031A2E'); g.addColorStop(0.6, '#064E63'); g.addColorStop(1, '#00A3AD');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    for (let i = 0; i < 6; i++) {
+      const cx = ((t * 0.012 * (i + 1) + i * 430) % 1900) - 300 + px * 0.5;
+      ctx.beginPath(); ctx.ellipse(cx, 110 + i * 108 + py * 0.4, 190 + i * 30, 46, 0, 0, TWO_PI); ctx.fill();
+    }
+    const pulse = 0.25 + Math.abs(Math.sin(t * 0.002)) * 0.35;
+    ctx.fillStyle = `rgba(0,163,173,${pulse})`;
+    ctx.fillRect(VIEW_W / 2 - 6 - cam.x * 0.02, 0, 12, VIEW_H);
+
+  } else if (id === 'grid') {
+    ctx.fillStyle = '#04080D'; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    const step = 72, ox = ((px * 0.9) % step + step) % step, oy = ((py * 0.9) % step + step) % step;
+    ctx.strokeStyle = 'rgba(0,163,173,0.20)'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let x = -ox; x < VIEW_W + step; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, VIEW_H); }
+    for (let y = -oy; y < VIEW_H + step; y += step) { ctx.moveTo(0, y); ctx.lineTo(VIEW_W, y); }
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(124,243,208,0.75)';
+    for (let i = 0; i < 14; i++) {
+      const p = ((t * 0.14 + i * 260) % 1600) - 160;
+      ctx.fillRect(p, ((i * 137) % VIEW_H), 26, 2);
+      ctx.fillRect(((i * 191) % VIEW_W), VIEW_H - (p * 0.6 % VIEW_H), 2, 22);
+    }
+
+  } else if (id === 'server') {
+    ctx.fillStyle = '#06060E'; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    const tile = makeTile('rackTile', 260, 720, (c) => {
+      c.fillStyle = '#0C0C16'; c.fillRect(0, 0, 260, 720);
+      c.fillStyle = '#12121F'; c.fillRect(24, 0, 96, 720); c.fillRect(150, 0, 96, 720);
+      // deterministic LED pattern baked in once
+      let seed = 7;
+      const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+      for (let x of [24, 150]) for (let y = 10; y < 720; y += 22) {
+        const r = rnd();
+        c.fillStyle = r > 0.86 ? '#00E5FF' : r > 0.76 ? '#FF3DCB' : '#1B1B2E';
+        c.fillRect(x + 12, y, 6, 5); c.fillRect(x + 26, y, 6, 5);
+        c.fillStyle = '#15152A'; c.fillRect(x + 44, y, 40, 5);
+      }
+    });
+    scrollTile(ctx, tile, -px * 0.7, -py * 0.5, 0.9);
+    // a handful of live blinkers on top, deterministic so it reads as data flow
+    ctx.fillStyle = '#00E5FF';
+    for (let i = 0; i < 18; i++) {
+      if (((t * 0.004 + i * 0.7) | 0) % 3 === 0) continue;
+      ctx.fillRect((i * 149 + 40) % VIEW_W, (i * 233 + 30) % VIEW_H, 6, 5);
+    }
+
+  } else if (id === 'orbit') {
+    ctx.fillStyle = '#01010A'; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    const stars = makeTile('starTile', 640, 720, (c) => {
+      let seed = 42;
+      const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+      for (let i = 0; i < 420; i++) {
+        const a = 0.25 + rnd() * 0.75, s = rnd() > 0.93 ? 3 : 1.6;
+        c.fillStyle = `rgba(255,255,255,${a})`;
+        c.fillRect(rnd() * 640, rnd() * 720, s, s);
+      }
+    });
+    scrollTile(ctx, stars, -px * 0.35, -py * 0.25);
+    scrollTile(ctx, stars, -px * 0.8 + 210, -py * 0.6 + 90, 0.45);
+    const ex = VIEW_W / 2 - cam.x * 0.10, ey = VIEW_H + 720 - cam.y * 0.10;
+    const eg = ctx.createRadialGradient(ex, ey, 200, ex, ey, 900);
+    eg.addColorStop(0, '#12C7D4'); eg.addColorStop(0.55, '#065E7E'); eg.addColorStop(1, '#01142A');
+    ctx.fillStyle = eg; ctx.beginPath(); ctx.arc(ex, ey, 900, 0, TWO_PI); ctx.fill();
+    ctx.strokeStyle = 'rgba(124,243,208,0.35)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(ex, ey, 902, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
+  }
+}
+
+function drawPlatforms(ctx, id) {
+  const st = STAGES[id] || STAGES.store;
+  const accent = id === 'store' ? PAL.yellow : id === 'grid' ? PAL.teal
+    : id === 'orbit' ? PAL.mint : id === 'server' ? '#6A7480' : '#5A6470';
+  for (const p of st.plats) {
+    if (p.soft) {
+      // soft platforms read as thin, glowing, obviously pass-through
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.beginPath(); ctx.roundRect(p.x, p.y + 2, p.w, p.h + 4, 7); ctx.fill();
+      ctx.fillStyle = accent;
+      ctx.beginPath(); ctx.roundRect(p.x, p.y, p.w, p.h, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.fillRect(p.x + 6, p.y + 2, p.w - 12, 2);
+    } else {
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.beginPath(); ctx.roundRect(p.x - 5, p.y - 5, p.w + 10, p.h + 12, 10); ctx.fill();
+      const g = ctx.createLinearGradient(0, p.y, 0, p.y + p.h);
+      g.addColorStop(0, '#2A3038'); g.addColorStop(1, '#12161B');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.roundRect(p.x, p.y, p.w, p.h, 8); ctx.fill();
+      ctx.fillStyle = accent;
+      ctx.beginPath(); ctx.roundRect(p.x, p.y, p.w, 7, 4); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.10)';
+      for (let x = p.x + 14; x < p.x + p.w - 10; x += 46) ctx.fillRect(x, p.y + 14, 22, 3);
+    }
+  }
+  // ledge markers — players need to see where the grab points are
+  for (const L of st.ledges) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.30)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(L.x, L.y + 2, 13, 0, TWO_PI); ctx.stroke();
+  }
+}
+/* ============================ 6. FX =====================================
+   Hit feedback is most of what "game feel" means in a fighter. Sparks are
+   emitted along the knockback vector rather than in a random puff, so a
+   hit visibly reads as pushing the opponent somewhere. */
+
+const FX = {
+  parts: [], rings: [], pops: [], stars: [],
+
+  spark(x, y, angle, power, color) {
+    const n = clamp(6 + power | 0, 6, 26);
+    for (let i = 0; i < n; i++) {
+      const a = angle + rand(-0.6, 0.6);
+      const sp = rand(3, 5 + power * 0.6);
+      this.parts.push({ kind: 'spark', x, y, vx: Math.cos(a) * sp, vy: -Math.sin(a) * sp,
+        life: rand(12, 26), max: 26, color, g: 0.16, len: rand(6, 16) });
+    }
+  },
+  dust(x, y, dir = 0, n = 6, color = 'rgba(220,230,240,0.7)') {
+    for (let i = 0; i < n; i++)
+      this.parts.push({ kind: 'dust', x: x + rand(-8, 8), y, vx: rand(-1.6, 1.6) + dir * 1.8,
+        vy: rand(-2.4, -0.3), life: rand(14, 26), max: 26, color, g: 0.06, r: rand(3, 7) });
+  },
+  ember(x, y, color, n = 10) {
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, TWO_PI), sp = rand(1, 6);
+      this.parts.push({ kind: 'dust', x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1,
+        life: rand(16, 34), max: 34, color, g: 0.12, r: rand(2, 5) });
+    }
+  },
+  ring(x, y, color, maxR = 120, life = 22, width = 6) {
+    this.rings.push({ x, y, color, r: 6, maxR, life, max: life, width });
+  },
+  pop(x, y, text, color, big = false) {
+    this.pops.push({ x, y, text, color, life: big ? 52 : 38, max: big ? 52 : 38, big, vy: -1.4 });
+  },
+  koStars(x, y, color) {
+    for (let i = 0; i < 26; i++) {
+      const a = rand(0, TWO_PI), sp = rand(6, 22);
+      this.stars.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: rand(30, 60),
+        max: 60, color, rot: rand(0, TWO_PI), spin: rand(-0.4, 0.4), size: rand(7, 16) });
+    }
+    this.ring(x, y, '#FFFFFF', 460, 34, 14);
+    this.ring(x, y, color, 340, 28, 10);
+  },
+
+  step() {
+    for (let i = this.parts.length - 1; i >= 0; i--) {
+      const p = this.parts[i];
+      p.x += p.vx; p.y += p.vy; p.vy += p.g; p.vx *= 0.985; p.life--;
+      if (p.life <= 0) this.parts.splice(i, 1);
+    }
+    for (let i = this.rings.length - 1; i >= 0; i--) {
+      const r = this.rings[i];
+      r.r += (r.maxR - r.r) * 0.22; r.life--;
+      if (r.life <= 0) this.rings.splice(i, 1);
+    }
+    for (let i = this.pops.length - 1; i >= 0; i--) {
+      const p = this.pops[i];
+      p.y += p.vy; p.vy *= 0.92; p.life--;
+      if (p.life <= 0) this.pops.splice(i, 1);
+    }
+    for (let i = this.stars.length - 1; i >= 0; i--) {
+      const s = this.stars[i];
+      s.x += s.vx; s.y += s.vy; s.vx *= 0.96; s.vy = s.vy * 0.96 + 0.25;
+      s.rot += s.spin; s.life--;
+      if (s.life <= 0) this.stars.splice(i, 1);
+    }
+  },
+
+  draw(ctx) {
+    for (const p of this.parts) {
+      const a = clamp(p.life / p.max, 0, 1);
+      ctx.globalAlpha = a;
+      if (p.kind === 'spark') {
+        ctx.strokeStyle = p.color; ctx.lineWidth = 3; ctx.lineCap = 'round';
+        const m = Math.hypot(p.vx, p.vy) || 1;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - p.vx / m * p.len, p.y - p.vy / m * p.len); ctx.stroke();
+      } else {
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * a, 0, TWO_PI); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+    for (const r of this.rings) {
+      const a = clamp(r.life / r.max, 0, 1);
+      ctx.globalAlpha = a * 0.9; ctx.strokeStyle = r.color; ctx.lineWidth = r.width * a;
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, TWO_PI); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    for (const s of this.stars) {
+      const a = clamp(s.life / s.max, 0, 1);
+      ctx.save(); ctx.globalAlpha = a; ctx.translate(s.x, s.y); ctx.rotate(s.rot);
+      ctx.fillStyle = s.color; ctx.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const o = (i / 5) * TWO_PI - Math.PI / 2;
+        ctx.lineTo(Math.cos(o) * s.size, Math.sin(o) * s.size);
+        ctx.lineTo(Math.cos(o + TWO_PI / 10) * s.size * 0.44, Math.sin(o + TWO_PI / 10) * s.size * 0.44);
+      }
+      ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const p of this.pops) {
+      const t = 1 - p.life / p.max, a = clamp(p.life / p.max * 1.6, 0, 1);
+      const sc = p.big ? 1 + easeOutBack(clamp(t * 3, 0, 1)) * 0.5 : 1 + t * 0.2;
+      ctx.save(); ctx.globalAlpha = a; ctx.translate(p.x, p.y); ctx.scale(sc, sc);
+      ctx.font = `italic 900 ${p.big ? 34 : 24}px "Arial Black", Impact, sans-serif`;
+      ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+      ctx.strokeText(p.text, 0, 0); ctx.fillStyle = p.color; ctx.fillText(p.text, 0, 0);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  },
+
+  clear() { this.parts.length = 0; this.rings.length = 0; this.pops.length = 0; this.stars.length = 0; },
+};
+
+/* ---- camera ------------------------------------------------------------
+   Frames the action, punches in on KOs, and never lets a fighter leave the
+   screen without warning. Shake decays per tick, not per rendered frame, so
+   it behaves identically at 60Hz and 144Hz. */
+const Cam = {
+  x: 640, y: 360, zoom: 1, shake: 0, punch: 0,
+  focus: null, focusT: 0, flash: 0,
+
+  reset(stage) {
+    const st = STAGES[stage] || STAGES.store;
+    const m = st.plats[0];
+    this.x = m.x + m.w / 2; this.y = m.y - 140; this.zoom = 0.9;
+    this.shake = 0; this.punch = 0; this.focus = null; this.focusT = 0; this.flash = 0;
+  },
+
+  step(fighters, stage) {
+    if (this.focusT > 0) {                       // KO close-up takes priority
+      this.focusT--;
+      if (this.focus) {
+        this.x = lerp(this.x, this.focus.x, 0.30);
+        this.y = lerp(this.y, this.focus.y, 0.30);
+        this.zoom = lerp(this.zoom, 1.6, 0.22);
+      }
+    } else {
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, n = 0;
+      for (const f of fighters) {
+        if (!f.alive || f.state === 'respawnWait') continue;
+        minX = Math.min(minX, f.cx); maxX = Math.max(maxX, f.cx);
+        minY = Math.min(minY, f.cy); maxY = Math.max(maxY, f.cy); n++;
+      }
+      if (n === 0) { const st = STAGES[stage] || STAGES.store, m = st.plats[0];
+        minX = maxX = m.x + m.w / 2; minY = maxY = m.y - 120; }
+      const tx = (minX + maxX) / 2, ty = (minY + maxY) / 2 - 40;
+      const spanX = Math.max(760, maxX - minX + 460);
+      const spanY = Math.max(430, maxY - minY + 340);
+      let tz = Math.min(VIEW_W / spanX, VIEW_H / spanY, 1.15);
+      tz = Math.max(tz, 0.42);
+      this.x = lerp(this.x, tx, 0.085);
+      this.y = lerp(this.y, ty, 0.085);
+      this.zoom = lerp(this.zoom, tz, 0.06);
+    }
+    this.shake *= 0.86; if (this.shake < 0.3) this.shake = 0;
+    this.punch *= 0.88; if (this.punch < 0.002) this.punch = 0;
+    this.flash *= 0.82; if (this.flash < 0.01) this.flash = 0;
+  },
+
+  kick(amount, punch = 0) { this.shake = Math.min(34, this.shake + amount); this.punch += punch; },
+  koFocus(x, y) { this.focus = { x, y }; this.focusT = 46; this.flash = 1; },
+
+  apply(ctx) {
+    ctx.translate(VIEW_W / 2, VIEW_H / 2);
+    const z = this.zoom * (1 + this.punch);
+    ctx.scale(z, z);
+    ctx.translate(-this.x, -this.y);
+    if (this.shake > 0) ctx.translate(rand(-this.shake, this.shake), rand(-this.shake, this.shake));
+  },
+
+  toScreen(wx, wy) {
+    const z = this.zoom * (1 + this.punch);
+    return { x: (wx - this.x) * z + VIEW_W / 2, y: (wy - this.y) * z + VIEW_H / 2 };
+  },
+};
+/* ============================ 7. FIGHTER ================================ */
+
+const BODY_W = 56, BODY_H = 78;
+
+class Projectile {
+  constructor(owner, move) {
+    const p = move.proj;
+    this.owner = owner; this.move = move; this.art = p.art;
+    this.w = p.w; this.h = p.h;
+    this.x = owner.cx + owner.facing * 46 - p.w / 2;
+    this.y = owner.cy - p.h / 2 + (move.by || 0) * 0.4;
+    this.vx = p.vx * owner.facing; this.vy = p.vy || 0;
+    this.grav = p.grav || 0; this.life = p.life; this.dead = false;
+    this.spin = 0;
+  }
+  step(world) {
+    this.x += this.vx; this.y += this.vy; this.vy += this.grav;
+    this.spin += 0.3; this.life--;
+    const b = (STAGES[world.stage] || STAGES.store).blast;
+    if (this.life <= 0 || this.x < b.l || this.x > b.r || this.y > b.b) this.dead = true;
+    // projectiles are stopped by solid ground so they don't tunnel the stage
+    for (const p of (STAGES[world.stage] || STAGES.store).plats) {
+      if (p.soft) continue;
+      if (this.x + this.w > p.x && this.x < p.x + p.w && this.y + this.h > p.y && this.y < p.y + p.h) {
+        this.dead = true;
+        FX.ember(this.x + this.w / 2, this.y + this.h / 2, this.owner.char.color, 8);
+      }
+    }
+  }
+  rect() { return { x: this.x, y: this.y, w: this.w, h: this.h }; }
+}
+
+class Fighter {
+  constructor(id, opts) {
+    this.id = id;
+    this.name = opts.name || 'FIGHTER';
+    this.charId = opts.charId || 'ollie';
+    this.char = charOf(this.charId);
+    this.slot = opts.slot || 0;
+    this.control = opts.control || { kind: 'key', scheme: 'p1' };
+    this.pad = new Pad();
+    this.cpu = null;
+
+    this.w = BODY_W; this.h = BODY_H;
+    this.x = 0; this.y = 0; this.vx = 0; this.vy = 0;
+    this.prevY = 0;
+    this.facing = 1;
+    this.percent = 0;
+    this.stocks = opts.stocks || 3;
+    this.alive = true;
+    this.kos = 0; this.falls = 0;
+
+    this.state = 'air'; this.stateT = 0;
+    this.jumpsLeft = this.char.jumps;
+    this.grounded = false; this.onWall = 0; this.groundPlat = null;
+    this.hitstop = 0; this.invuln = 0; this.hitstun = 0;
+    this.shield = CFG.shieldMax; this.shieldT = 0; this.shieldStun = 0;
+    this.move = null; this.moveKey = ''; this.moveT = 0; this.charge = 0;
+    this.hitList = new Set(); this.rehitT = 0;
+    this.fastFall = false; this.dropT = 0; this.ledgeCd = 0; this.ledge = null; this.rollDir = 1;
+    this.landLag = 0; this.usedUpSpecial = false;
+    this.combo = 0; this.comboT = 0; this.lastHitBy = null;
+    this.trail = []; this.flash = 0; this.squash = 1; this.parryFx = 0;
+    this.respawnT = 0;
+  }
+
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+  get shielding() { return this.state === 'shield'; }
+  get busy() { return ['attack', 'roll', 'spotdodge', 'airdodge', 'hitstun', 'tumble',
+                       'shieldbreak', 'jumpsquat', 'ledgeGetup', 'respawnWait'].includes(this.state); }
+  get actionable() { return !this.busy && this.hitstop <= 0 && this.landLag <= 0 && this.state !== 'dead'; }
+
+  setState(s) { this.state = s; this.stateT = 0; }
+
+  spawn(stage, index) {
+    const st = STAGES[stage] || STAGES.store;
+    const sp = st.spawns[index % st.spawns.length];
+    this.x = sp[0] - this.w / 2; this.y = sp[1];
+    this.vx = 0; this.vy = 0; this.facing = sp[0] < 640 ? 1 : -1;
+    this.setState('air'); this.jumpsLeft = this.char.jumps;
+    this.invuln = 90; this.hitstun = 0; this.hitstop = 0;
+    this.shield = CFG.shieldMax; this.move = null; this.trail.length = 0;
+  }
+
+  /* ---------------------------------------------------------------- tick */
+  update(world) {
+    if (this.state === 'dead') return;
+
+    // Counters are decremented toward zero and clamped. A fractional hitstop
+    // that decayed to -0.04 used to fail an `=== 0` test and lock the fighter
+    // out of every action for the rest of the match.
+    if (this.hitstop > 0) { this.hitstop = Math.max(0, this.hitstop - 1); this.stateT++; return; }
+
+    if (this.invuln > 0) this.invuln--;
+    if (this.ledgeCd > 0) this.ledgeCd--;
+    if (this.comboT > 0) { this.comboT--; if (this.comboT === 0) this.combo = 0; }
+    if (this.flash > 0) this.flash--;
+    if (this.parryFx > 0) this.parryFx--;
+    if (this.dropT > 0) this.dropT--;
+    this.squash = lerp(this.squash, 1, 0.2);
+    this.stateT++;
+
+    if (this.state === 'respawnWait') { this.respawnTick(world); return; }
+
+    const pad = this.pad;
+
+    if (this.landLag > 0) { this.landLag--; this.vx *= CFG.groundFriction; }
+    if (this.shieldStun > 0) this.shieldStun = Math.max(0, this.shieldStun - 1);
+
+    if (this.state === 'hitstun' || this.state === 'tumble') {
+      this.hitstun--;
+      // Directional influence is applied continuously, so holding a direction
+      // during launch genuinely changes where you end up.
+      if (pad.x || pad.y) {
+        const sp = Math.hypot(this.vx, this.vy);
+        if (sp > 1) {
+          const ang = Math.atan2(-this.vy, this.vx);
+          const sx = pad.x, sy = -pad.y, sm = Math.hypot(sx, sy) || 1;
+          const cross = (Math.cos(ang) * (sy / sm) - Math.sin(ang) * (sx / sm));
+          const na = ang + cross * CFG.diStrength * 0.09;
+          this.vx = Math.cos(na) * sp; this.vy = -Math.sin(na) * sp;
+        }
+      }
+      if (this.hitstun <= 0) this.setState(this.grounded ? 'idle' : 'air');
+    }
+
+    if (this.state === 'ledge') { this.ledgeTick(world); return; }
+    if (this.state === 'ledgeGetup') { this.ledgeGetupTick(); return; }
+    if (this.state === 'shieldbreak') {
+      if (this.stateT > 150) this.setState(this.grounded ? 'idle' : 'air');
+    }
+
+    if (this.state === 'attack') this.attackTick(world);
+    if (this.state === 'jumpsquat') this.jumpSquatTick();
+    if (this.state === 'roll' || this.state === 'spotdodge') this.dodgeTick();
+    if (this.state === 'airdodge') this.airDodgeTick();
+
+    if (this.actionable) this.handleInput(world);
+
+    this.physics(world);
+    this.collide(world);
+    this.tryLedge(world);
+    this.blastCheck(world);
+
+    // motion trail while being launched — sells the speed of a KO hit
+    if (this.state === 'tumble' || Math.hypot(this.vx, this.vy) > 15) {
+      this.trail.push({ x: this.cx, y: this.cy, a: 1 });
+      if (this.trail.length > 10) this.trail.shift();
+    } else if (this.trail.length) this.trail.shift();
+    for (const t of this.trail) t.a *= 0.86;
+  }
+
+  /* -------------------------------------------------------------- inputs */
+  handleInput(world) {
+    const pad = this.pad;
+
+    // shield / dodges
+    if (pad.held.shield && this.shieldStun === 0) {
+      if (this.grounded) {
+        if (this.shield > 0) {
+          if (pad.pressed.shield || this.state !== 'shield') {
+            if (this.state !== 'shield') { this.setState('shield'); this.shieldT = 0; }
+          }
+          if (this.state === 'shield') {
+            this.shieldT++;
+            this.shield -= CFG.shieldDrain;
+            this.vx *= 0.6;
+            if (pad.x !== 0 && pad.dirBuf.x <= 4) return this.startRoll(pad.x);
+            if (pad.y > 0 && pad.dirBuf.y <= 4) return this.startSpotDodge();
+            if (this.shield <= 0) return this.breakShield();
+            return;
+          }
+        }
+      } else if (pad.pressed.shield) {
+        return this.startAirDodge(pad.x, pad.y);
+      }
+    } else if (this.state === 'shield') {
+      this.setState('idle');
+    }
+    if (this.state !== 'shield' && this.shield < CFG.shieldMax) this.shield = Math.min(CFG.shieldMax, this.shield + CFG.shieldRegen);
+
+    // attacks
+    if (pad.buffered('atk', 5)) { pad.consume('atk'); return this.chooseAttack(false, world); }
+    if (pad.buffered('spec', 5)) { pad.consume('spec'); return this.chooseAttack(true, world); }
+
+    // jump / drop-through
+    if (pad.buffered('jump', 6)) {
+      if (this.grounded && pad.y > 0 && this.groundPlat && this.groundPlat.soft) {
+        pad.consume('jump'); this.dropT = 12; this.grounded = false; this.y += 4; this.vy = 2;
+        this.setState('air'); Audio_.play('dodge'); return;
+      }
+      if (this.grounded) { pad.consume('jump'); this.setState('jumpsquat'); return; }
+      if (this.onWall !== 0) {                       // wall jump
+        pad.consume('jump');
+        this.vy = this.char.jump * -0.95; this.vx = -this.onWall * 11;
+        this.facing = -this.onWall; this.jumpsLeft = Math.max(this.jumpsLeft, 1);
+        this.usedUpSpecial = false; this.setState('air');
+        FX.dust(this.cx + this.onWall * 24, this.cy, -this.onWall, 8);
+        Audio_.play('dbljump'); return;
+      }
+      if (this.jumpsLeft > 0) {
+        pad.consume('jump'); this.jumpsLeft--;
+        this.vy = -this.char.djump; this.fastFall = false;
+        if (pad.x) this.facing = pad.x;
+        this.squash = 1.22; this.setState('air');
+        FX.ring(this.cx, this.cy + 24, 'rgba(255,255,255,0.5)', 54, 14, 4);
+        Audio_.play('dbljump'); return;
+      }
+    }
+
+    // ground movement
+    if (this.grounded) {
+      if (pad.x !== 0) {
+        this.facing = pad.x;
+        const top = this.char.run;
+        this.vx = approach(this.vx, top * pad.x, CFG.groundAccel);
+        this.setState(Math.abs(this.vx) > top * 0.55 ? 'run' : 'walk');
+        if (this.stateT % 9 === 0 && Math.abs(this.vx) > top * 0.6)
+          FX.dust(this.cx - this.facing * 16, this.y + this.h, -this.facing, 2, 'rgba(200,210,225,0.5)');
+      } else {
+        this.vx *= CFG.groundFriction;
+        if (this.state === 'run' || this.state === 'walk') this.setState('idle');
+      }
+    } else {
+      if (pad.x !== 0) {
+        this.vx = approach(this.vx, this.char.air * pad.x, CFG.airAccel);
+        if (this.state !== 'attack') this.facing = pad.x;
+      }
+      if (pad.y > 0 && pad.dirBuf.y <= 3 && this.vy > 0) this.fastFall = true;
+      if (this.state !== 'attack' && this.state !== 'airdodge') this.setState('air');
+    }
+  }
+
+  /* Jumpsquat resolves into a short or full hop depending on how long the
+     button was held. This must be a state tick, not part of handleInput:
+     'jumpsquat' counts as busy, so handleInput never runs during it and the
+     fighter could enter jumpsquat and never leave. */
+  jumpSquatTick() {
+    this.vx *= 0.85;
+    if (this.stateT < CFG.jumpSquat) return;
+    const pad = this.pad;
+    const short = !pad.held.jump || pad.jumpHeld < CFG.shortHopWindow;
+    this.vy = -this.char.jump * (short ? CFG.shortHopMul : 1);
+    this.grounded = false; this.fastFall = false; this.squash = 1.28;
+    this.setState('air');
+    FX.dust(this.cx, this.y + this.h, 0, 6);
+    Audio_.play('jump');
+  }
+
+  /* ------------------------------------------------------------- attacks */
+  chooseAttack(special, world) {
+    const pad = this.pad, air = !this.grounded;
+    let key;
+    if (special) {
+      key = pad.y < 0 ? 'uspec' : pad.y > 0 ? 'dspec' : pad.x !== 0 ? 'sspec' : 'nspec';
+      if (key === 'uspec' && air && this.usedUpSpecial) return;      // one recovery per airtime
+    } else if (air) {
+      key = pad.y < 0 ? 'uair' : pad.y > 0 ? 'dair'
+        : pad.x === this.facing && pad.x !== 0 ? 'fair'
+          : pad.x === -this.facing && pad.x !== 0 ? 'bair' : 'nair';
+    } else {
+      if (pad.x !== 0 && pad.smashX(6)) key = 'fsmash';
+      else if (pad.y < 0 && pad.smashY(6)) key = 'usmash';
+      else if (pad.y > 0 && pad.smashY(6)) key = 'dsmash';
+      else if (pad.x !== 0) key = 'ftilt';
+      else if (pad.y < 0) key = 'utilt';
+      else if (pad.y > 0) key = 'dtilt';
+      else key = 'jab';
+    }
+    this.startMove(key, world);
+  }
+
+  startMove(key, world) {
+    const m = this.char.moves[key];
+    if (!m) return;
+    if (this.pad.x !== 0 && !m.back && key !== 'bair') this.facing = this.pad.x || this.facing;
+    this.move = m; this.moveKey = key; this.moveT = 0; this.charge = 0;
+    this.hitList.clear(); this.rehitT = 0;
+    this.setState('attack');
+    if (m.recovery) {                              // up-special launch
+      this.vy = -m.recovery; this.usedUpSpecial = true;
+      this.jumpsLeft = Math.max(0, this.jumpsLeft - 0);
+      FX.ring(this.cx, this.cy + 20, this.char.color, 70, 16, 5);
+    }
+    if (m.lunge) { this.vx = this.facing * m.lunge; if (!this.grounded) this.vy *= 0.4; }
+    if (m.stall && !this.grounded) { this.vy = -3; }
+    Audio_.play('whiff');
+  }
+
+  attackTick(world) {
+    const m = this.move; if (!m) { this.setState('idle'); return; }
+    const startEnd = m.s, activeEnd = m.s + m.a, total = m.s + m.a + m.r;
+
+    // smash charge: hold the button during startup to bank power
+    if (m.smash && this.moveT === startEnd - 1 && this.pad.held.atk && this.charge < CFG.smashChargeMax) {
+      this.charge++;
+      if (this.charge % 5 === 0) FX.ember(this.cx, this.cy, this.char.color, 3);
+      this.vx *= 0.7;
+      return;
+    }
+
+    // The lunge only drives while there is ground under you (plus a short grace
+    // so it still works off a ledge). Otherwise a dash special launched near an
+    // edge carried the fighter clean past the blast zone with no way to act.
+    if (m.lunge && this.moveT < activeEnd && (this.grounded || this.moveT < m.s + 8)) {
+      this.vx = approach(this.vx, this.facing * m.lunge, 1.6);
+      if (m.spin && this.moveT % 4 === 0) FX.ember(this.cx, this.cy + 20, this.char.color, 2);
+    } else if (this.grounded) {
+      // Ground friction used to live only in handleInput, which does not run
+      // while attacking — so starting a jab at a full sprint slid you 200px
+      // and straight off the stage. Non-lunging attacks now root you.
+      this.vx *= CFG.groundFriction;
+    }
+
+    if (this.moveT === startEnd) {
+      if (m.proj) { world.projectiles.push(new Projectile(this, m)); Audio_.play('proj'); }
+      else if (m.emp) { FX.ring(this.cx, this.cy, '#00E5FF', m.bw * 0.55, 26, 9);
+        FX.ring(this.cx, this.cy, '#FF3DCB', m.bw * 0.42, 22, 6); }
+    }
+
+    if (this.moveT >= startEnd && this.moveT < activeEnd && !m.proj) {
+      if (m.hold && this.rehitT-- <= 0) { this.hitList.clear(); this.rehitT = 13; }
+      this.checkHits(world);
+    }
+
+    this.moveT++;
+    if (this.moveT >= total) {
+      this.move = null; this.moveKey = ''; this.charge = 0;
+      this.setState(this.grounded ? 'idle' : 'air');
+    }
+  }
+
+  hitRect() {
+    const m = this.move; if (!m) return null;
+    const cx = this.cx + (m.centered ? 0 : this.facing * m.bx);
+    const cy = this.cy + m.by;
+    return { x: cx - m.bw / 2, y: cy - m.bh / 2, w: m.bw, h: m.bh };
+  }
+
+  checkHits(world) {
+    // Snapshot the move and charge: resolving a hit can interrupt this attack
+    // mid-loop (a parry cancels it outright), and a 2-target hitbox would
+    // otherwise dereference a move that no longer exists.
+    const m = this.move, r = this.hitRect();
+    if (!m || !r) return;
+    const chargeMul = 1 + (this.charge / CFG.smashChargeMax) * 0.4;
+    for (const f of world.fighters) {
+      if (f === this || !f.alive || f.state === 'dead' || f.state === 'respawnWait') continue;
+      if (this.hitList.has(f.id)) continue;
+      if (!overlap(r, { x: f.x, y: f.y, w: f.w, h: f.h })) continue;
+      this.hitList.add(f.id);
+      world.resolveHit(this, f, m, chargeMul);
+      if (this.move !== m) break;              // this attack was interrupted
+    }
+  }
+
+  /* ------------------------------------------------------------- defence */
+  startRoll(dir) {
+    this.setState('roll'); this.facing = -dir;   // roll turns you around, like the original
+    this.vx = dir * CFG.rollSpeed; this.invuln = 0; this.rollDir = dir;
+    Audio_.play('dodge'); FX.dust(this.cx, this.y + this.h, dir, 8);
+  }
+  startSpotDodge() { this.setState('spotdodge'); this.vx = 0; Audio_.play('dodge'); }
+  startAirDodge(x, y) {
+    this.setState('airdodge');
+    const m = Math.hypot(x, y);
+    if (m > 0) { this.vx = (x / m) * CFG.airDodgeSpeed; this.vy = (y / m) * CFG.airDodgeSpeed; }
+    else { this.vx *= 0.3; this.vy = -1; }
+    Audio_.play('dodge');
+    FX.ring(this.cx, this.cy, 'rgba(180,230,255,0.7)', 60, 14, 4);
+  }
+  dodgeTick() {
+    const w = this.state === 'roll' ? CFG.rollInvuln : CFG.spotDodgeInvuln;
+    const total = this.state === 'roll' ? CFG.rollFrames : CFG.spotDodgeFrames;
+    this.invuln = (this.stateT >= w[0] && this.stateT <= w[1]) ? 2 : this.invuln;
+    if (this.state === 'roll') this.vx *= 0.90; else this.vx *= 0.6;
+    if (this.stateT >= total) this.setState(this.grounded ? 'idle' : 'air');
+  }
+  airDodgeTick() {
+    this.invuln = (this.stateT >= CFG.airDodgeInvuln[0] && this.stateT <= CFG.airDodgeInvuln[1]) ? 2 : this.invuln;
+    this.vx *= 0.93; this.vy = this.vy * 0.93;
+    if (this.stateT >= CFG.airDodgeFrames || this.grounded) {
+      this.setState(this.grounded ? 'idle' : 'air');
+      if (this.grounded) this.landLag = 6;
+    }
+  }
+  breakShield() {
+    this.setState('shieldbreak'); this.shield = 0; this.vy = -9; this.vx = 0;
+    Audio_.play('break_'); Cam.kick(16, 0.04);
+    FX.ring(this.cx, this.cy, '#00E5FF', 180, 30, 10);
+    FX.ember(this.cx, this.cy, '#8FE9FF', 26);
+    FX.pop(this.cx, this.y - 26, 'SHIELD BREAK', '#8FE9FF', true);
+  }
+
+  /* ------------------------------------------------------------- physics */
+  physics(world) {
+    const g = CFG.gravity * this.char.grav;
+    // While grounded we keep a 1px downward bias. Without it the fighter rests
+    // exactly on the surface, the overlap test reads false, and `grounded`
+    // flickers on alternate frames — which breaks jumps, friction and attacks.
+    if (this.grounded) this.vy = 1;
+    if (!this.grounded) {
+      this.vy += g;
+      const cap = CFG.maxFall * this.char.fall * (this.fastFall ? CFG.fastFallMul : 1);
+      if (this.vy > cap) this.vy = cap;
+      if (this.state === 'hitstun' || this.state === 'tumble') {
+        this.vx *= CFG.knockbackDecay; this.vy *= 0.995;
+      } else if (this.state !== 'airdodge') {
+        this.vx *= CFG.airDrag;
+      }
+      if (this.onWall !== 0 && this.vy > 1.5 && this.state !== 'hitstun' && this.state !== 'tumble') {
+        this.vy *= 0.72;                                        // wall slide
+        if (this.stateT % 6 === 0) FX.dust(this.cx + this.onWall * 24, this.cy + 10, -this.onWall, 1);
+      }
+    } else if (this.state === 'hitstun' || this.state === 'tumble') {
+      this.vx *= 0.93;
+    }
+    this.prevY = this.y;
+    this.x += this.vx;
+    this.y += this.vy;
+  }
+
+  collide(world) {
+    const st = STAGES[world.stage] || STAGES.store;
+    const wasGrounded = this.grounded;
+    this.grounded = false; this.onWall = 0; this.groundPlat = null;
+
+    for (const p of st.plats) {
+      if (p.soft) continue;
+      if (!overlap({ x: this.x, y: this.y, w: this.w, h: this.h }, p)) continue;
+      // resolve on the shallowest axis so corners don't fling the fighter
+      const ox = (this.cx < p.x + p.w / 2) ? (p.x - (this.x + this.w)) : (p.x + p.w - this.x);
+      const oy = (this.cy < p.y + p.h / 2) ? (p.y - (this.y + this.h)) : (p.y + p.h - this.y);
+      if (Math.abs(ox) < Math.abs(oy)) {
+        this.x += ox; this.onWall = ox > 0 ? -1 : 1;
+        if (this.state === 'hitstun' || this.state === 'tumble') { this.vx *= -0.42; this.bonk(); }
+        else this.vx = 0;
+      } else {
+        this.y += oy;
+        if (oy < 0) this.land(p); else { this.vy = Math.max(0, this.vy); }
+      }
+    }
+    // soft platforms only stop a fighter that is falling onto them
+    if (this.dropT === 0 && this.vy >= 0) {
+      for (const p of st.plats) {
+        if (!p.soft) continue;
+        const feet = this.y + this.h, prevFeet = this.prevY + this.h;
+        if (this.x + this.w > p.x && this.x < p.x + p.w &&
+            prevFeet <= p.y + 2 && feet >= p.y) { this.y = p.y - this.h; this.land(p); }
+      }
+    }
+    if (this.grounded) {
+      this.fastFall = false;
+      this.jumpsLeft = this.char.jumps;
+      this.usedUpSpecial = false;
+      if (!wasGrounded) {
+        this.squash = 0.76;
+        const hard = this.vy > 9;
+        FX.dust(this.cx, this.y + this.h, 0, hard ? 12 : 5);
+        Audio_.play('land');
+        if (this.state === 'attack' && this.move && this.move.air) {
+          this.landLag = CFG.landLag + 4; this.move = null; this.setState('idle');
+        } else if (this.state === 'air') this.setState('idle');
+        if (this.state === 'tumble' && this.hitstun > 6) { this.hitstun = 6; }
+      }
+      this.vy = 0;
+    }
+  }
+  land(p) { this.grounded = true; this.groundPlat = p; this.vy = 0; }
+  bonk() { Cam.kick(6); FX.ember(this.cx, this.cy, '#FFF', 8); Audio_.play('hitL'); }
+
+  /* --------------------------------------------------------------- ledge */
+  tryLedge(world) {
+    if (this.grounded || this.ledgeCd > 0 || this.state === 'ledge') return;
+    if (['attack', 'airdodge', 'roll', 'spotdodge'].includes(this.state)) {
+      if (!(this.state === 'attack' && this.move && this.move.recovery)) return;
+    }
+    if (this.hitstun > 0) return;
+    if (this.vy < -1.5) return;
+    const st = STAGES[world.stage] || STAGES.store;
+    for (const L of st.ledges) {
+      const outside = L.dir === -1 ? this.cx < L.x : this.cx > L.x;
+      if (!outside) continue;
+      if (Math.abs(this.cx - L.x) > 62) continue;
+      if (this.cy < L.y - 74 || this.cy > L.y + 78) continue;
+      this.ledge = L; this.setState('ledge');
+      this.x = L.x - this.w / 2 + L.dir * 26; this.y = L.y + 6;
+      this.vx = 0; this.vy = 0; this.facing = -L.dir;
+      this.invuln = CFG.ledgeInvuln; this.jumpsLeft = this.char.jumps;
+      this.usedUpSpecial = false; this.move = null;
+      Audio_.play('ledge'); FX.dust(L.x, L.y, 0, 4);
+      return;
+    }
+  }
+
+  ledgeTick(world) {
+    const pad = this.pad, L = this.ledge;
+    const inward = -L.dir;
+    if (pad.buffered('jump', 5)) {
+      pad.consume('jump'); this.vy = -this.char.jump * 1.02; this.vx = inward * 4;
+      this.setState('air'); this.ledgeCd = CFG.ledgeCooldown; this.invuln = 12;
+      Audio_.play('jump'); return;
+    }
+    if (pad.x === inward || pad.y < 0) {           // climb up
+      this.setState('ledgeGetup'); this.invuln = 14; return;
+    }
+    if (pad.x === L.dir || pad.y > 0) {            // let go
+      this.setState('air'); this.ledgeCd = CFG.ledgeCooldown; this.vy = 1; return;
+    }
+    if (pad.buffered('atk', 5) || pad.buffered('spec', 5)) {
+      pad.consume('atk'); pad.consume('spec');
+      this.setState('ledgeGetup'); this.invuln = 14; return;
+    }
+    if (this.stateT > 480) { this.setState('air'); this.ledgeCd = CFG.ledgeCooldown; }
+  }
+
+  /* Climbing back onto the stage. Scripted for 20 frames, then control returns.
+     Without this the fighter entered ledgeGetup and never left it. */
+  ledgeGetupTick() {
+    const L = this.ledge; if (!L) { this.setState('air'); return; }
+    const inward = -L.dir, T = 20;
+    const k = easeOutCubic(clamp(this.stateT / T, 0, 1));
+    this.x = lerp(L.x - this.w / 2 + L.dir * 26, L.x + inward * 42 - this.w / 2, k);
+    this.y = lerp(L.y + 6, L.y - this.h, k);
+    this.vx = 0; this.vy = 0;
+    if (this.stateT >= T) {
+      this.setState('idle'); this.grounded = true;
+      this.ledgeCd = 14; this.invuln = 6; this.jumpsLeft = this.char.jumps;
+      FX.dust(this.cx, this.y + this.h, 0, 4);
+    }
+  }
+
+  /* ------------------------------------------------------------ recovery */
+  blastCheck(world) {
+    const b = (STAGES[world.stage] || STAGES.store).blast;
+    if (this.x + this.w < b.l || this.x > b.r || this.y + this.h < b.t || this.y > b.b) {
+      world.koFighter(this);
+    }
+  }
+
+  respawnTick(world) {
+    this.respawnT--;
+    const st = STAGES[world.stage] || STAGES.store;
+    const m = st.plats[0];
+    this.x = m.x + m.w / 2 - this.w / 2; this.y = m.y - 300;
+    this.vx = 0; this.vy = 0;
+    if (this.respawnT <= 0 || this.pad.pressed.jump || this.pad.pressed.atk) {
+      this.setState('air'); this.invuln = CFG.respawnInvuln;
+      this.percent = 0; this.hitstun = 0; this.shield = CFG.shieldMax;
+      this.jumpsLeft = this.char.jumps; this.usedUpSpecial = false; this.vy = 1;
+    }
+  }
+}
+
+function overlap(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+/* ============================ 8. AI =====================================
+   The CPU writes to a Pad and nothing else. It has no special access to
+   physics, cannot ignore startup frames, and can be shield-broken exactly
+   like a human. Levels change reaction time and risk appetite, not rules. */
+
+class CPU {
+  constructor(fighter, level = 5) {
+    this.f = fighter;
+    this.level = clamp(level, 1, 9);
+    this.raw = { x: 0, y: 0, jump: false, atk: false, spec: false, shield: false };
+    this.timer = 0; this.holdJump = 0; this.holdAtk = 0; this.holdSpec = 0; this.holdShield = 0;
+    this.lastX = 0; this.lastY = 0;
+  }
+
+  get reaction() { return Math.max(3, 20 - this.level * 2); }
+  get aggression() { return 0.20 + this.level * 0.072; }
+  get defence() { return this.level * 0.075; }
+
+  think(world) {
+    const f = this.f, r = this.raw;
+    r.x = 0; r.y = 0;
+    // buttons are held a few frames so the Pad sees a clean press edge
+    r.jump = this.holdJump-- > 0;
+    r.atk = this.holdAtk-- > 0;
+    r.spec = this.holdSpec-- > 0;
+    r.shield = this.holdShield-- > 0;
+    if (!f.alive || f.state === 'dead') return r;
+
+    const main = (STAGES[world.stage] || STAGES.store).plats[0];
+    const left = main.x, right = main.x + main.w, centre = main.x + main.w / 2;
+
+    /* --- survival DI while being launched ------------------------------- */
+    if (f.state === 'hitstun' || f.state === 'tumble') {
+      if (Math.abs(f.vx) > Math.abs(f.vy)) r.y = -1;          // launched sideways: DI up
+      else r.x = f.cx < centre ? 1 : -1;                      // launched up: DI inward
+      if (this.level >= 6 && f.hitstun < 6 && !f.grounded) this.holdShield = 2;  // air dodge out
+      return r;
+    }
+
+    /* --- on the ledge: climb back on, don't hop into the void ------------ */
+    if (f.state === 'ledge') {
+      if (f.stateT > 6 + (9 - this.level) * 4) r.x = -f.ledge.dir;   // hold inward = getup
+      return r;
+    }
+    if (f.state === 'ledgeGetup' || f.state === 'shieldbreak' || f.state === 'respawnWait') {
+      if (f.state === 'respawnWait' && f.respawnT < 60) this.holdJump = 2;
+      return r;
+    }
+
+    /* --- recovery outranks everything else ------------------------------- */
+    const offstage = f.cx < left - 8 || f.cx > right + 8;
+    const belowStage = f.y + f.h > main.y + 20;
+    if (!f.grounded && (offstage || belowStage)) {
+      r.x = f.cx < centre ? 1 : -1;
+      const needHeight = f.cy > main.y - 60;
+      if (f.vy > 0.5 && f.jumpsLeft > 0 && needHeight) this.holdJump = 3;
+      // burn the up-special while there is still height to spare, not at the last moment
+      if (f.jumpsLeft === 0 && !f.usedUpSpecial && (f.vy > 0.5 || f.cy > main.y - 20)) { r.y = -1; this.holdSpec = 3; }
+      // low levels genuinely fumble the recovery; that is the difficulty knob
+      if (Math.random() < (9 - this.level) * 0.035) r.x = 0;
+      return r;
+    }
+
+    const foe = this.nearestFoe(world);
+    if (!foe) return r;
+    const dx = foe.cx - f.cx, dy = foe.cy - f.cy;
+    const gap = Math.abs(dx), vgap = Math.abs(dy);
+
+    /* Already committed to something. Queuing another attack here is what made
+       high-level bots WORSE than low-level ones: they kept the attack buffer
+       permanently full, so they re-attacked the instant they became actionable
+       and could never move, shield or dodge. Steer only. */
+    if (['attack', 'roll', 'spotdodge', 'airdodge'].includes(f.state)) {
+      if (!f.grounded) r.x = Math.sign(centre - f.cx) || 0;   // drift home during endlag
+      return this.keepOnStage(r, f, left, right);
+    }
+
+    /* --- edgeguard, but only from a safe footing ------------------------- */
+    const foeOff = foe.cx < left - 30 || foe.cx > right + 30 || foe.state === 'ledge';
+    const selfSafe = f.grounded && f.cx > left + 40 && f.cx < right - 40;
+    if (this.level >= 5 && foeOff && selfSafe && foe.cy > main.y - 240) {
+      const post = foe.cx < centre ? left + 105 : right - 105;
+      r.x = Math.abs(post - f.cx) > 24 ? Math.sign(post - f.cx) : 0;
+      if (r.x === 0 && this.timer-- <= 0) {
+        this.timer = this.reaction + 14;
+        if (f.char.moves.nspec.proj) { this.holdSpec = 3; }
+        else { r.x = Math.sign(dx); this.holdAtk = 3; }
+      }
+      return this.keepOnStage(r, f, left, right);
+    }
+
+    /* --- respect an incoming attack --------------------------------------- */
+    const foeSwinging = foe.state === 'attack' && foe.move && foe.moveT <= foe.move.s + foe.move.a;
+    if (foeSwinging && gap < 150 && vgap < 100 && f.grounded && this.timer <= 0) {
+      // A low shield is worse than no shield: breaking it hands the opponent a
+      // free KO, so bots roll out instead of holding. If they decide not to
+      // defend at all, fall through to normal play rather than standing still.
+      if (f.shield < 38) {
+        this.timer = this.reaction + 8; r.x = -Math.sign(dx) || 1; this.holdShield = 4;
+        return this.keepOnStage(r, f, left, right);
+      }
+      if (Math.random() < this.defence) {
+        this.holdShield = 8; this.timer = this.reaction + 6;
+        return this.keepOnStage(r, f, left, right);
+      }
+    }
+
+    /* --- punish recovery frames -------------------------------------------- */
+    const foeLagging = foe.state === 'attack' && foe.move && foe.moveT > foe.move.s + foe.move.a;
+    if (this.level >= 5 && foeLagging && gap < 170) {
+      r.x = Math.sign(dx);
+      if (this.timer-- <= 0) { this.timer = 12; this.holdAtk = 4; }
+      return this.keepOnStage(r, f, left, right);
+    }
+
+    /* --- neutral ------------------------------------------------------------ */
+    if (this.timer-- > 0) {
+      r.x = this.lastX; r.y = this.lastY;
+      return this.keepOnStage(r, f, left, right);
+    }
+    this.timer = this.reaction;
+
+    const inRange = gap < 150 && vgap < 140;
+
+    const foeIsOff = foe.cx < left || foe.cx > right;
+    if (!inRange) {
+      // don't chase an offstage opponent into the void, but do take the ledge
+      const goal = foeIsOff ? (foe.cx < centre ? left + 105 : right - 105) : foe.cx;
+      r.x = Math.abs(goal - f.cx) > 26 ? (Math.sign(goal - f.cx) || 0) : 0;
+      // Closing the VERTICAL gap matters as much as the horizontal one. Without
+      // this, two bots stack on a platform and a soft platform above it, sit
+      // directly in line, and neither ever reaches the other.
+      const overStage = f.cx > left + 40 && f.cx < right - 40;
+      if (dy < -70 && f.grounded && overStage) this.holdJump = 3;               // chase upward
+      if (dy < -60 && !f.grounded && f.jumpsLeft > 0 && f.vy > 2) this.holdJump = 3;
+      if (dy > 70 && f.grounded && f.groundPlat && f.groundPlat.soft && overStage) {
+        r.y = 1; this.holdJump = 3;                                             // drop through to them
+      }
+      // zone with a projectile when there is room to use one
+      if (gap > 300 && vgap < 90 && f.grounded && f.char.moves.nspec.proj && Math.random() < this.aggression * 0.6) {
+        this.holdSpec = 3; r.x = 0;
+      }
+    } else if (vgap > 90 && f.grounded && dy > 70 && f.groundPlat && f.groundPlat.soft
+               && f.cx > left + 40 && f.cx < right - 40) {
+      r.y = 1; this.holdJump = 3;                       // drop onto them
+    } else if (vgap > 90 && f.grounded && dy < -70 && f.cx > left + 40 && f.cx < right - 40) {
+      this.holdJump = 3;                                // hop up to them
+    } else if (Math.random() < this.aggression && !this.overTheVoid(f, left, right)) {
+      if (Math.sign(dx) !== 0 && Math.sign(dx) !== f.facing) r.x = Math.sign(dx);
+      if (dy < -50) { r.y = -1; this.holdAtk = 3; }                     // foe above
+      else if (dy > 50 && !f.grounded) { r.y = 1; this.holdAtk = 3; }   // foe below
+      else if (foe.percent > 80 && f.grounded && this.level >= 4 && Math.random() < 0.5) {
+        r.x = Math.sign(dx); this.holdAtk = 5;                          // tapped dir -> smash
+      } else if (Math.random() < 0.28 && this.level >= 3 && this.safeToCommit(f, left, right)
+                 && this.lungeFits(f, Math.sign(dx) || f.facing, left, right)) {
+        r.x = Math.sign(dx); this.holdSpec = 3;
+      } else {
+        this.holdAtk = 3;
+        if (Math.random() < 0.45) r.x = Math.sign(dx);
+      }
+    } else {
+      r.x = Math.sign(dx) || 0;
+    }
+
+    if (this.holdAtk > 0 || this.holdSpec > 0) this.timer = this.reaction + 10;
+    if (f.grounded && Math.random() < 0.004 * this.level) this.holdJump = 3;
+    this.lastX = r.x; this.lastY = r.y;
+    return this.keepOnStage(r, f, left, right);
+  }
+
+  /* The original CPU happily walked off the edge and then lived on the ledge.
+     Grounded bots now refuse to step past the last 55px of the platform. */
+  /* The single biggest cause of CPUs killing themselves was chasing an
+     opponent straight off the platform. Bots now refuse to steer outward near
+     the edge — in the air as well as on the ground — and walk back if they
+     are already past the safe band. Deliberate recovery and edgeguarding
+     return before this is applied. */
+  keepOnStage(r, f, left, right) {
+    // Staying on the stage is a skill, so weak bots sometimes fail at it.
+    // Previously Lv1 never self-destructed purely because it was too slow to
+    // jump, which made it beat Lv9 outright — the difficulty scale inverted.
+    if (Math.random() < (9 - this.level) * 0.03) return r;
+    if (f.grounded) {
+      // Use the platform actually underfoot, not the main stage. Side platforms
+      // sit outside the main platform's span, and measuring against the main
+      // stage made bots standing on one walk straight off it into the void.
+      const p = f.groundPlat;
+      const pl = p ? p.x : left, pr = p ? p.x + p.w : right;
+      const m = Math.min(78, (pr - pl) * 0.3);
+      if (r.x < 0 && f.cx < pl + m) r.x = 0;
+      if (r.x > 0 && f.cx > pr - m) r.x = 0;
+      if (f.cx < pl + m * 0.6) r.x = 1;
+      if (f.cx > pr - m * 0.6) r.x = -1;
+    } else {
+      if (r.x < 0 && f.cx < left + 60) r.x = 0;
+      if (r.x > 0 && f.cx > right - 60) r.x = 0;
+      if (f.cx < left + 20) r.x = 1;
+      if (f.cx > right - 20) r.x = -1;
+    }
+    return r;
+  }
+
+  /* Lunging specials carry you a long way and cannot be cancelled, so only
+     throw one out with room to spare behind the opponent. */
+  safeToCommit(f, left, right) {
+    return f.grounded && f.cx > left + 150 && f.cx < right - 150;
+  }
+
+  /* A dash special covers ~300px and cannot be cancelled, so check the landing
+     point rather than just the starting point. */
+  lungeFits(f, dir, left, right) {
+    const end = f.cx + dir * 320;
+    return end > left + 50 && end < right - 50;
+  }
+
+  /* Airborne and outside the platform: getting home beats any attack. */
+  overTheVoid(f, left, right) {
+    return !f.grounded && (f.cx < left + 30 || f.cx > right - 30);
+  }
+
+  nearestFoe(world) {
+    let best = null, bd = Infinity;
+    for (const o of world.fighters) {
+      if (o === this.f || !o.alive || o.state === 'dead' || o.state === 'respawnWait') continue;
+      const d = Math.hypot(o.cx - this.f.cx, o.cy - this.f.cy);
+      if (d < bd) { bd = d; best = o; }
+    }
+    return best;
+  }
+}
+/* ============================ 9a. CHARACTER ART =========================
+   The silhouettes are the originals — that identity is the point. What is
+   new is that every limb is driven by where the move actually is in its
+   startup/active/recovery window, so you can read an attack coming. */
+
+const gradCache = {};
+function grad(ctx, key, build) {
+  if (!gradCache[key]) gradCache[key] = build(ctx);
+  return gradCache[key];
+}
+
+/* swing: -0.35 while winding up, ~1.15 on the active frames, eased back to
+   0 through recovery. One number drives every character's limbs. */
+function swingOf(f) {
+  const m = f.move; if (!m || f.state !== 'attack') return 0;
+  const t = f.moveT;
+  if (t < m.s) return -0.35 * easeOutCubic(t / Math.max(1, m.s));
+  if (t < m.s + m.a) return lerp(-0.35, 1.15, easeOutCubic(clamp((t - m.s) / 2, 0, 1)));
+  return 1.15 * (1 - easeOutCubic(clamp((t - m.s - m.a) / Math.max(1, m.r), 0, 1)));
+}
+function dirOf(f) {
+  const k = f.moveKey || '';
+  if (k.includes('u')) return 'up';
+  if (k.startsWith('d') || k === 'dair') return 'down';
+  return 'fwd';
+}
+
+const ART = {
+  ollie(ctx, f, sw, dir, spin) {
+    if (spin) {
+      ctx.save(); ctx.translate(30, 40); ctx.rotate(f.stateT * 0.55); ctx.translate(-30, -40);
+      ctx.fillStyle = grad(ctx, 'ollieBody', c => { const g = c.createRadialGradient(24, 24, 5, 30, 40, 42);
+        g.addColorStop(0, '#FFEB8A'); g.addColorStop(1, '#E0A800'); return g; });
+      ctx.beginPath(); ctx.arc(30, 40, 31, 0, TWO_PI); ctx.fill();
+      ctx.fillStyle = '#121212'; ctx.beginPath(); ctx.arc(30, 40, 19, 0, TWO_PI); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(30, 40, 25, 0.4, 2.2); ctx.stroke();
+      ctx.restore(); return;
+    }
+    ctx.fillStyle = '#111'; ctx.fillRect(20, 70, 7, 16); ctx.fillRect(35, 70, 7, 16);
+    ctx.fillStyle = grad(ctx, 'ollieBody', c => { const g = c.createRadialGradient(24, 24, 5, 30, 40, 42);
+      g.addColorStop(0, '#FFEB8A'); g.addColorStop(1, '#E0A800'); return g; });
+    ctx.beginPath(); ctx.arc(30, 40, 33, 0, TWO_PI); ctx.fill();
+    ctx.fillStyle = grad(ctx, 'ollieVis', c => { const g = c.createLinearGradient(14, 10, 46, 48);
+      g.addColorStop(0, '#FFF'); g.addColorStop(1, '#D6DDE4'); return g; });
+    ctx.beginPath(); ctx.arc(34, 30, 21, 1.2 * Math.PI, 2.8 * Math.PI); ctx.fill();
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(26, 27, 4, 0, TWO_PI); ctx.arc(45, 27, 4, 0, TWO_PI); ctx.fill();
+    if (sw !== 0) {
+      const e = Math.max(0, sw) * 38;
+      ctx.fillStyle = '#111';
+      if (dir === 'up') { ctx.fillRect(25, 8 - e, 10, e + 30);
+        ctx.fillStyle = '#E0A800'; ctx.beginPath(); ctx.arc(30, 8 - e, 14, 0, TWO_PI); ctx.fill(); }
+      else if (dir === 'down') { ctx.fillRect(25, 62, 10, e + 12);
+        ctx.fillStyle = '#E0A800'; ctx.beginPath(); ctx.arc(30, 74 + e, 14, 0, TWO_PI); ctx.fill(); }
+      else { ctx.fillRect(38, 36, 22 + e, 9);
+        ctx.fillStyle = '#E0A800'; ctx.beginPath(); ctx.arc(60 + e, 40, 11, 0, TWO_PI); ctx.fill(); }
+    }
+  },
+
+  jarrad(ctx, f, sw, dir) {
+    ctx.fillStyle = '#0B2340'; ctx.fillRect(18, 70, 9, 16); ctx.fillRect(34, 70, 9, 16);
+    ctx.fillStyle = grad(ctx, 'jarradBody', c => { const g = c.createLinearGradient(0, 18, 0, 80);
+      g.addColorStop(0, '#00305F'); g.addColorStop(1, '#00A3AD'); return g; });
+    ctx.beginPath(); ctx.roundRect(10, 20, 40, 58, 9); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath(); ctx.moveTo(30, 20); ctx.lineTo(23, 42); ctx.lineTo(37, 42); ctx.fill();
+    ctx.fillStyle = '#FFC8A2'; ctx.beginPath(); ctx.arc(30, 10, 16, 0, TWO_PI); ctx.fill();
+    ctx.fillStyle = '#2A211B'; ctx.beginPath(); ctx.arc(30, 6, 15, Math.PI, TWO_PI); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.beginPath();
+    ctx.arc(25, 11, 2.4, 0, TWO_PI); ctx.arc(36, 11, 2.4, 0, TWO_PI); ctx.fill();
+    ARM(ctx, sw, dir, '#FFC8A2');
+  },
+
+  stephen(ctx, f, sw, dir) {
+    ctx.fillStyle = '#15181C'; ctx.fillRect(18, 70, 9, 16); ctx.fillRect(34, 70, 9, 16);
+    ctx.fillStyle = grad(ctx, 'stephenBody', c => { const g = c.createLinearGradient(8, 18, 52, 80);
+      g.addColorStop(0, '#3A3F46'); g.addColorStop(1, '#111417'); return g; });
+    ctx.beginPath(); ctx.roundRect(8, 20, 44, 58, 7); ctx.fill();
+    ctx.fillStyle = '#FFF'; ctx.beginPath(); ctx.moveTo(30, 20); ctx.lineTo(20, 44); ctx.lineTo(40, 44); ctx.fill();
+    ctx.fillStyle = '#D9232E'; ctx.fillRect(28, 28, 5, 18);
+    ctx.fillStyle = '#FFD0B4'; ctx.beginPath(); ctx.arc(30, 10, 15, 0, TWO_PI); ctx.fill();
+    ctx.fillStyle = '#B9BEC4'; ctx.beginPath(); ctx.arc(30, 5, 15, Math.PI, TWO_PI); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.beginPath();
+    ctx.arc(25, 11, 2.2, 0, TWO_PI); ctx.arc(36, 11, 2.2, 0, TWO_PI); ctx.fill();
+    if (sw !== 0) {
+      // the briefcase is the read — it arcs visibly before it connects
+      const a = lerp(-0.5, dir === 'up' ? -2.4 : dir === 'down' ? 1.5 : 0.75, (sw + 0.35) / 1.5);
+      ctx.save(); ctx.translate(40, 46); ctx.rotate(a);
+      ctx.fillStyle = '#15181C'; ctx.fillRect(0, -3, 24, 7);
+      ctx.fillStyle = grad(ctx, 'stephenCase', c => { const g = c.createLinearGradient(20, -14, 48, 8);
+        g.addColorStop(0, '#7A5A2E'); g.addColorStop(1, '#3A2408'); return g; });
+      ctx.beginPath(); ctx.roundRect(20, -14, 30, 22, 4); ctx.fill();
+      ctx.fillStyle = '#D9A441'; ctx.fillRect(30, -16, 12, 4);
+      ctx.restore();
+    }
+  },
+
+  muzz(ctx, f, sw, dir) {
+    ctx.fillStyle = '#1B1B1B'; ctx.fillRect(18, 70, 9, 16); ctx.fillRect(34, 70, 9, 16);
+    ctx.fillStyle = '#141414'; ctx.beginPath(); ctx.roundRect(10, 20, 40, 58, 6); ctx.fill();
+    ctx.fillStyle = '#FF5A3C'; ctx.font = 'italic 900 13px "Arial Black", Impact, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillText('BOSS', 30, 52);
+    ctx.fillStyle = '#FAD6B1'; ctx.beginPath(); ctx.arc(30, 6, 14, 0, TWO_PI); ctx.fill();
+    ctx.fillStyle = '#B23A12';
+    ctx.beginPath(); ctx.arc(30, 1, 15, Math.PI, TWO_PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(30, 12, 16, 0, Math.PI); ctx.fill();
+    ctx.fillStyle = '#111'; ctx.beginPath();
+    ctx.arc(25, 7, 2.4, 0, TWO_PI); ctx.arc(36, 7, 2.4, 0, TWO_PI); ctx.fill();
+    ARM(ctx, sw, dir, '#FAD6B1');
+  },
+
+  iphone(ctx, f, sw, dir) {
+    ctx.fillStyle = grad(ctx, 'iphoneBody', c => { const g = c.createLinearGradient(0, 0, 60, 80);
+      g.addColorStop(0, '#FFA35C'); g.addColorStop(1, '#B84200'); return g; });
+    ctx.beginPath(); ctx.roundRect(8, 1, 44, 78, 11); ctx.fill();
+    ctx.fillStyle = grad(ctx, 'iphoneScr', c => { const g = c.createLinearGradient(12, 4, 48, 76);
+      g.addColorStop(0, '#2A2A31'); g.addColorStop(0.5, '#4A4A55'); g.addColorStop(1, '#08080C'); return g; });
+    ctx.beginPath(); ctx.roundRect(12, 5, 36, 70, 7); ctx.fill();
+    ctx.fillStyle = '#0B0B0F'; ctx.beginPath(); ctx.roundRect(23, 8, 14, 6, 3); ctx.fill();
+    // a face on the screen so it reads as a fighter, not furniture
+    const blink = (Math.sin(f.stateT * 0.06) > 0.96) ? 1 : 5;
+    ctx.fillStyle = '#7CF3D0';
+    ctx.fillRect(21, 30, 5, blink); ctx.fillRect(34, 30, 5, blink);
+    ctx.fillRect(24, 44 + Math.max(0, sw) * 3, 12, 3);
+    if (sw > 0 && dir === 'fwd') {
+      ctx.strokeStyle = `rgba(124,243,208,${sw})`; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(52, 40, 12 + sw * 20, -0.9, 0.9); ctx.stroke();
+    }
+  },
+
+  fold(ctx, f, sw, dir, tint) {
+    const g = grad(ctx, tint === 'pixel' ? 'pixelBody' : 'samsungBody', c => {
+      const gg = c.createLinearGradient(0, 0, 60, 80);
+      if (tint === 'pixel') { gg.addColorStop(0, '#C3CCFF'); gg.addColorStop(1, '#6E80DE'); }
+      else { gg.addColorStop(0, '#3A3C42'); gg.addColorStop(1, '#151517'); }
+      return gg;
+    });
+    ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(6, 4, 24, 72, 5); ctx.fill();
+    ctx.fillStyle = '#08080C'; ctx.fillRect(9, 8, 18, 64);
+    ctx.fillStyle = '#7CF3D0'; ctx.fillRect(13, 28, 4, 5); ctx.fillRect(21, 28, 4, 5);
+    const open = clamp(Math.max(0, sw), 0, 1);
+    ctx.save(); ctx.translate(30, 4);
+    ctx.transform(Math.max(0.02, open), 0, 0, 1, 0, 0);            // the flap swings open on the active frames
+    ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(0, 0, 26, 72, 5); ctx.fill();
+    ctx.fillStyle = '#08080C'; ctx.fillRect(3, 4, 20, 64);
+    if (open > 0.15) {
+      ctx.fillStyle = `rgba(124,243,208,${open})`;
+      for (let i = 0; i < 4; i++) ctx.fillRect(6, 12 + i * 14, 14, 3);
+    }
+    ctx.restore();
+    if (open > 0.2) {
+      ctx.fillStyle = `rgba(124,243,208,${open * 0.55})`;
+      ctx.beginPath(); ctx.roundRect(30, 12, 30 + open * 26, 52, 8); ctx.fill();
+    }
+  },
+
+  yes(ctx, f, sw, dir) {
+    ctx.fillStyle = '#00A3AD'; ctx.beginPath(); ctx.roundRect(1, 10, 58, 60, 16); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.beginPath(); ctx.roundRect(6, 14, 48, 16, 9); ctx.fill();
+    ctx.save(); ctx.translate(30, 44); ctx.rotate(-0.14);
+    ctx.fillStyle = PAL.yellow;
+    ctx.font = '31px "Brush Script MT", "Segoe Script", "Comic Sans MS", cursive';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('Yes', 0, 0);
+    ctx.restore();
+    if (sw > 0) {
+      ctx.fillStyle = `rgba(0,163,173,${0.85})`;
+      if (dir === 'up') { ctx.beginPath(); ctx.roundRect(14, 10 - sw * 46, 32, sw * 46, 10); ctx.fill(); }
+      else if (dir === 'down') { ctx.beginPath(); ctx.roundRect(14, 68, 32, sw * 46, 10); ctx.fill(); }
+      else { ctx.beginPath(); ctx.roundRect(56, 22, sw * 54, 34, 10); ctx.fill(); }
+    }
+  },
+
+  telstra(ctx, f, sw, dir, spin) {
+    ctx.save();
+    if (spin) { ctx.translate(30, 40); ctx.rotate(f.stateT * 0.5); ctx.translate(-30, -40); }
+    ctx.fillStyle = '#FF6B00';
+    ctx.beginPath(); ctx.ellipse(30, 44, 28, 14, -Math.PI / 4.5, 0, TWO_PI); ctx.fill();
+    ctx.fillStyle = '#0033E6'; ctx.beginPath();
+    ctx.moveTo(8, 12); ctx.lineTo(55, 12); ctx.lineTo(50, 25); ctx.lineTo(38, 25);
+    ctx.lineTo(28, 66); ctx.lineTo(14, 66); ctx.lineTo(24, 25); ctx.lineTo(4, 25);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    if (sw > 0 && !spin) {
+      ctx.strokeStyle = `rgba(255,107,0,${sw})`; ctx.lineWidth = 6;
+      ctx.beginPath();
+      if (dir === 'up') ctx.arc(30, 40, 42, Math.PI, TWO_PI);
+      else if (dir === 'down') ctx.arc(30, 40, 42, 0, Math.PI);
+      else ctx.arc(30, 40, 40, -1.1, 1.1);
+      ctx.stroke();
+    }
+  },
+};
+
+/* shared arm used by the humanoid characters */
+function ARM(ctx, sw, dir, skin) {
+  if (sw === 0) { ctx.fillStyle = skin; ctx.beginPath(); ctx.roundRect(44, 30, 10, 26, 5); ctx.fill(); return; }
+  const target = dir === 'up' ? -2.2 : dir === 'down' ? 1.5 : 0.1;
+  const a = lerp(-0.9, target, (sw + 0.35) / 1.5);
+  ctx.save(); ctx.translate(30, 26); ctx.rotate(a);
+  ctx.fillStyle = skin; ctx.beginPath(); ctx.roundRect(-5, -6, 38, 12, 6); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.roundRect(-5, 0, 38, 6, 3); ctx.fill();
+  ctx.restore();
+}
+
+const SLOT_COLORS = ['#FECD03', '#4FC3F7', '#FF5A3C', '#7CF3D0'];
+
+function drawFighter(ctx, f, thumb = false) {
+  if (f.state === 'dead') return;
+  const sw = swingOf(f), dir = dirOf(f);
+  const spin = !!(f.move && f.move.spin && f.state === 'attack' && f.moveT >= f.move.s);
+
+  // ground shadow anchors the fighter in space — cheap, huge readability win
+  if (!thumb && f.grounded) {
+    ctx.save(); ctx.globalAlpha = 0.35; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(f.cx, f.y + f.h + 3, 26, 7, 0, 0, TWO_PI); ctx.fill(); ctx.restore();
+  }
+  // launch trail
+  if (!thumb && f.trail.length > 1) {
+    ctx.save(); ctx.strokeStyle = f.char.color; ctx.lineCap = 'round';
+    for (let i = 1; i < f.trail.length; i++) {
+      const a = f.trail[i].a * 0.5;
+      ctx.globalAlpha = a; ctx.lineWidth = 16 * a;
+      ctx.beginPath(); ctx.moveTo(f.trail[i - 1].x, f.trail[i - 1].y);
+      ctx.lineTo(f.trail[i].x, f.trail[i].y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(f.cx, f.cy);
+
+  // squash & stretch on jumps, landings and launches
+  let sx = f.squash, sy = 2 - f.squash;
+  if (f.state === 'tumble') { const r = Math.atan2(f.vy, f.vx); ctx.rotate(r * 0.35); }
+  if (f.state === 'shieldbreak') ctx.rotate(Math.sin(f.stateT * 0.4) * 0.15);
+  if (f.state === 'roll') ctx.rotate(f.stateT / CFG.rollFrames * TWO_PI * (f.rollDir || 1));
+  ctx.scale(f.charId === 'telstra' ? 1 : f.facing, 1);
+  ctx.scale(sx, sy);
+  if (f.invuln > 0 && !thumb) ctx.globalAlpha = 0.45 + Math.sin(f.stateT * 0.5) * 0.25;
+  if (f.state === 'airdodge') ctx.globalAlpha = 0.5;
+  ctx.translate(-30, -40);
+
+  const id = f.charId;
+  if (id === 'ollie') ART.ollie(ctx, f, sw, dir, spin);
+  else if (id === 'jarrad') ART.jarrad(ctx, f, sw, dir);
+  else if (id === 'stephen') ART.stephen(ctx, f, sw, dir);
+  else if (id === 'muzz') ART.muzz(ctx, f, sw, dir);
+  else if (id === 'iphone') ART.iphone(ctx, f, sw, dir);
+  else if (id === 'pixel' || id === 'samsung') ART.fold(ctx, f, sw, dir, id);
+  else if (id === 'yes') ART.yes(ctx, f, sw, dir);
+  else if (id === 'telstra') ART.telstra(ctx, f, sw, dir, spin);
+  ctx.restore();
+
+  if (thumb) return;
+
+  // impact flash
+  if (f.flash > 0) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = f.flash / 8 * 0.5;
+    ctx.fillStyle = '#FFF'; ctx.beginPath(); ctx.ellipse(f.cx, f.cy, 34, 44, 0, 0, TWO_PI); ctx.fill();
+    ctx.restore();
+  }
+  // smash charge glow
+  if (f.charge > 0) {
+    const c = f.charge / CFG.smashChargeMax;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.25 + c * 0.5;
+    ctx.fillStyle = f.char.color;
+    ctx.beginPath(); ctx.arc(f.cx, f.cy, 34 + c * 16 + Math.sin(f.stateT) * 2, 0, TWO_PI); ctx.fill();
+    ctx.restore();
+  }
+  // shield
+  if (f.state === 'shield') {
+    const s = f.shield / CFG.shieldMax, r = 26 + s * 26;
+    ctx.save();
+    ctx.fillStyle = `rgba(0,163,173,${0.18 + s * 0.30})`;
+    ctx.strokeStyle = `rgba(124,243,208,${0.5 + s * 0.4})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(f.cx, f.cy, r, 0, TWO_PI); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  if (f.parryFx > 0) {
+    ctx.save(); ctx.globalAlpha = f.parryFx / 16;
+    ctx.strokeStyle = '#FFF'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(f.cx, f.cy, 40 + (16 - f.parryFx) * 3, 0, TWO_PI); ctx.stroke();
+    ctx.restore();
+  }
+  if (f.state === 'shieldbreak') {
+    ctx.fillStyle = PAL.yellow;
+    for (let i = 0; i < 3; i++) {
+      const a = f.stateT * 0.09 + i * TWO_PI / 3;
+      ctx.beginPath(); ctx.arc(f.cx + Math.cos(a) * 26, f.y - 12 + Math.sin(a) * 9, 4.5, 0, TWO_PI); ctx.fill();
+    }
+  }
+
+  // slot marker + name, so 4-player games stay readable
+  const col = SLOT_COLORS[f.slot % 4];
+  ctx.save();
+  ctx.fillStyle = col; ctx.beginPath();
+  ctx.moveTo(f.cx, f.y - 14); ctx.lineTo(f.cx - 8, f.y - 26); ctx.lineTo(f.cx + 8, f.y - 26); ctx.fill();
+  ctx.font = '900 13px "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+  ctx.strokeText(f.name, f.cx, f.y - 30); ctx.fillStyle = '#EEF3F8';
+  ctx.fillText(f.name, f.cx, f.y - 30);
+  ctx.restore();
+}
+
+function drawProjectile(ctx, p) {
+  const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
+  ctx.save();
+  if (p.art === 'plane') {
+    ctx.translate(cx, cy); ctx.rotate(Math.atan2(p.vy, p.vx) * (p.vx < 0 ? -1 : 1));
+    ctx.scale(p.vx < 0 ? -1 : 1, 1);
+    ctx.fillStyle = '#FFF'; ctx.beginPath();
+    ctx.moveTo(14, 0); ctx.lineTo(-12, -9); ctx.lineTo(-6, 0); ctx.lineTo(-12, 9); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#1B3550'; ctx.lineWidth = 1.6; ctx.stroke();
+  } else if (p.art === 'fire') {
+    ctx.translate(cx, cy);
+    const s = 1 + Math.sin(p.spin * 2) * 0.12;
+    ctx.scale(s, s);
+    ctx.fillStyle = '#FF6600'; ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, TWO_PI); ctx.fill();
+    ctx.fillStyle = '#FFD34D'; ctx.beginPath(); ctx.arc(0, 0, p.w / 3.4, 0, TWO_PI); ctx.fill();
+    ctx.fillStyle = 'rgba(255,102,0,0.55)';
+    ctx.beginPath(); ctx.moveTo(-p.vx * 1.6, 0); ctx.lineTo(0, -8); ctx.lineTo(0, 8); ctx.fill();
+  } else if (p.art === 'tee') {
+    ctx.translate(cx, cy); ctx.rotate(p.spin);
+    ctx.fillStyle = '#0033E6'; ctx.font = 'italic 900 34px "Arial Black", Impact, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('T', 0, 1);
+    ctx.strokeStyle = '#FF6B00'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, TWO_PI); ctx.stroke();
+  } else if (p.art === 'ring') {
+    ctx.translate(cx, cy);
+    ctx.strokeStyle = PAL.yellow; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(0, 0, p.w / 2, p.spin, p.spin + 4.8); ctx.stroke();
+    ctx.strokeStyle = 'rgba(254,205,3,0.4)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, p.w / 2 + 5, 0, TWO_PI); ctx.stroke();
+  } else {
+    ctx.translate(cx, cy);
+    ctx.fillStyle = p.owner.char.color; ctx.beginPath(); ctx.arc(0, 0, p.w / 2, 0, TWO_PI); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.arc(-2, -2, p.w / 4, 0, TWO_PI); ctx.fill();
+  }
+  ctx.restore();
+}
+/* ============================ 10. WORLD & MATCH ========================= */
+
+const World = {
+  stage: 'store',
+  fighters: [], projectiles: [],
+  phase: 'idle',        // idle | countdown | fight | ko | over
+  freeze: 0,            // global pause frames, used for KO punctuation
+  frame: 0, countdown: 0,
+  stocks: 3, timeLimit: 0, clock: 0,
+  slowmo: 0, hitboxDebug: false, training: false,
+  onEnd: null, onHitNet: null,
+
+  start(opts) {
+    this.stage = opts.stage; this.stocks = opts.stocks;
+    this.timeLimit = opts.timeLimit || 0;
+    this.clock = this.timeLimit * 60;
+    this.training = !!opts.training;
+    this.fighters = opts.fighters;
+    this.projectiles = [];
+    this.frame = 0; this.freeze = 0; this.slowmo = 0;
+    this.phase = 'countdown'; this.countdown = 200;
+    FX.clear(); Cam.reset(this.stage);
+    this.fighters.forEach((f, i) => { f.stocks = this.stocks; f.percent = 0; f.kos = 0; f.falls = 0; f.alive = true; f.spawn(this.stage, i); });
+  },
+
+  /* ------------------------------------------------------------ one tick */
+  tick() {
+    if (this.phase === 'idle' || this.phase === 'over') return;
+    if (this.freeze > 0) { this.freeze--; Cam.step(this.fighters, this.stage); FX.step(); return; }
+
+    // sample every controller once per simulation tick
+    for (const f of this.fighters) {
+      if (f.control.kind === 'cpu') f.pad.update(f.cpu.think(this));
+      else if (f.control.kind === 'net') f.pad.update(f.netRaw || { x: 0, y: 0 });
+      else f.pad.update(readSource(f.control));
+    }
+
+    if (this.phase === 'countdown') {
+      this.countdown--;
+      for (const f of this.fighters) { f.pad.clear(); f.physics(this); f.collide(this); }
+      if (this.countdown === 150) Audio_.play('count');
+      if (this.countdown === 100) Audio_.play('count');
+      if (this.countdown === 50) Audio_.play('count');
+      if (this.countdown <= 0) { this.phase = 'fight'; Audio_.play('go'); Cam.kick(6, 0.03); }
+      Cam.step(this.fighters, this.stage);
+      return;
+    }
+
+    this.frame++;
+    if (this.timeLimit > 0) { this.clock--; if (this.clock <= 0) return this.endMatch('time'); }
+
+    for (const f of this.fighters) f.update(this);
+
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const p = this.projectiles[i];
+      p.step(this);
+      if (!p.dead) {
+        for (const f of this.fighters) {
+          if (f === p.owner || !f.alive || f.state === 'dead' || f.state === 'respawnWait') continue;
+          if (overlap(p.rect(), { x: f.x, y: f.y, w: f.w, h: f.h })) {
+            this.resolveHit(p.owner, f, p.move, 1, p);
+            p.dead = true; break;
+          }
+        }
+      }
+      if (p.dead) this.projectiles.splice(i, 1);
+    }
+
+    FX.step();
+    Cam.step(this.fighters, this.stage);
+    this.checkEnd();
+  },
+
+  /* ---------------------------------------------------------- hit resolve */
+  resolveHit(att, vic, move, chargeMul = 1, proj = null) {
+    if (!move || !vic || vic.state === 'dead') return;
+    if (vic.invuln > 0) { FX.ember(vic.cx, vic.cy, '#9AA6B2', 4); return; }
+
+    const dmg = move.d * chargeMul;
+    const srcX = proj ? proj.x + proj.w / 2 : att.cx;
+    const dirX = (move.both || move.centered || proj) ? (Math.sign(vic.cx - srcX) || att.facing) : att.facing;
+    const px = (srcX + vic.cx) / 2, py = (proj ? proj.y + proj.h / 2 : att.cy + move.by * 0.5 + vic.cy) / 2;
+
+    /* --- shield ---------------------------------------------------------- */
+    if (vic.shielding) {
+      if (vic.shieldT <= CFG.parryWindow) {          // parry: perfect timing is rewarded
+        vic.parryFx = 16; vic.shieldStun = 0;
+        att.hitstop = CFG.parryFreeze; att.charge = 0; att.move = null; att.setState('idle');
+        Audio_.play('parry'); Cam.kick(8, 0.03); Cam.flash = 0.5;
+        FX.ring(vic.cx, vic.cy, '#FFFFFF', 130, 20, 8);
+        FX.pop(vic.cx, vic.y - 20, 'PARRY!', '#FFFFFF', true);
+        return;
+      }
+      vic.shield -= dmg * 2.3;
+      vic.shieldStun = Math.ceil(dmg * CFG.shieldStunPerDmg) + 4;
+      vic.vx += dirX * dmg * CFG.shieldPushback * 0.2;
+      att.vx -= dirX * dmg * CFG.shieldPushback * 0.3;
+      att.hitstop = vic.hitstop = Math.round(Math.min(12, 2 + dmg * 0.4));
+      Audio_.play('shield');
+      FX.ember(vic.cx + dirX * 24, vic.cy, '#7CF3D0', 8);
+      if (vic.shield <= 0) vic.breakShield();
+      return;
+    }
+
+    /* --- clean hit -------------------------------------------------------- */
+    vic.percent = Math.min(999, vic.percent + dmg);
+    const kb = knockbackOf(move, vic.percent, vic.char.weight, chargeMul);
+    let ang = move.ang * DEG;
+    if (move.spike) ang = -Math.abs(ang);
+
+    vic.vx = Math.cos(ang) * kb * dirX;
+    vic.vy = -Math.sin(ang) * kb;
+    vic.hitstun = Math.ceil(kb * CFG.hitstunPerKb);
+    vic.setState(kb > CFG.tumbleKb ? 'tumble' : 'hitstun');
+    vic.grounded = false; vic.move = null; vic.charge = 0;
+    vic.fastFall = false; vic.hitList.clear();
+    vic.flash = 8; vic.squash = 1.3;
+    vic.lastHitBy = att.id;
+    vic.combo++; vic.comboT = 110;
+
+    const stop = Math.round(Math.min(22, CFG.hitstopBase + dmg * CFG.hitstopPerDmg));
+    att.hitstop = stop; vic.hitstop = stop + 2;
+    att.combo = 0;
+
+    Audio_.hit(dmg);
+    Cam.kick(3 + kb * 0.45, kb * 0.0022);
+    FX.spark(px, py, Math.atan2(-vic.vy, vic.vx), dmg * 0.9, dmg >= 12 ? '#FFF4B0' : '#FFFFFF');
+    FX.ring(px, py, dmg >= 12 ? PAL.yellow : 'rgba(255,255,255,0.9)', 40 + dmg * 6, 16, 5);
+    FX.pop(px, py - 20, `${Math.round(dmg)}`, dmg >= 12 ? PAL.yellow : '#FFFFFF', dmg >= 12);
+    if (vic.combo >= 3) FX.pop(vic.cx, vic.y - 44, `${vic.combo} HIT`, PAL.mint);
+    if (move.spike && !vic.grounded) FX.pop(vic.cx, vic.cy + 30, 'SPIKE', PAL.danger, true);
+
+    if (this.onHitNet) this.onHitNet(att, vic, move, chargeMul, dirX);
+  },
+
+  /* ---------------------------------------------------------------- KO */
+  koFighter(f) {
+    if (!f.alive || f.state === 'dead' || f.state === 'respawnWait') return;
+    const b = (STAGES[this.stage] || STAGES.store).blast;
+    const kx = clamp(f.cx, b.l + 60, b.r - 60), ky = clamp(f.cy, b.t + 60, b.b - 60);
+
+    f.falls++; f.combo = 0;
+    const killer = this.fighters.find(o => o.id === f.lastHitBy);
+    if (killer && killer !== f) killer.kos++;
+    if (!this.training) f.stocks--;
+
+    FX.koStars(kx, ky, f.char.color);
+    FX.pop(kx, ky - 40, 'K.O.!', '#FFFFFF', true);
+    Audio_.play('ko');
+    Cam.koFocus(kx, ky); Cam.kick(26, 0.06);
+    this.freeze = CFG.koFreeze;
+    f.trail.length = 0;
+
+    if (f.stocks <= 0 && !this.training) {
+      f.alive = false; f.setState('dead'); f.x = -99999; f.y = -99999;
+    } else {
+      f.setState('respawnWait'); f.respawnT = 90;
+      f.percent = 0; f.vx = 0; f.vy = 0; f.hitstun = 0; f.hitstop = 0;
+      f.shield = CFG.shieldMax; f.lastHitBy = null;
+    }
+  },
+
+  checkEnd() {
+    if (this.training) return;
+    const alive = this.fighters.filter(f => f.stocks > 0);
+    if (this.fighters.length > 1 && alive.length <= 1) this.endMatch('stocks');
+    else if (this.fighters.length === 1 && alive.length === 0) this.endMatch('stocks');
+  },
+
+  endMatch(reason) {
+    if (this.phase === 'over') return;
+    this.phase = 'over';
+    const rank = [...this.fighters].sort((a, b) =>
+      (b.stocks - a.stocks) || (b.kos - a.kos) || (a.falls - b.falls) || (a.percent - b.percent));
+    Audio_.play('win');
+    if (this.onEnd) this.onEnd(rank, reason);
+  },
+
+  /* ------------------------------------------------------------- render */
+  render(ctx) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, VIEW_W, VIEW_H);
+    drawBackground(ctx, this.stage, Cam, performance.now());
+
+    ctx.save();
+    Cam.apply(ctx);
+    drawPlatforms(ctx, this.stage);
+
+    // respawn platforms
+    for (const f of this.fighters) {
+      if (f.state !== 'respawnWait') continue;
+      ctx.fillStyle = 'rgba(0,163,173,0.35)';
+      ctx.beginPath(); ctx.roundRect(f.cx - 52, f.y + f.h, 104, 10, 5); ctx.fill();
+      ctx.strokeStyle = 'rgba(124,243,208,0.8)'; ctx.lineWidth = 2; ctx.stroke();
+    }
+
+    for (const p of this.projectiles) drawProjectile(ctx, p);
+    for (const f of this.fighters) drawFighter(ctx, f);
+    FX.draw(ctx);
+
+    if (this.hitboxDebug) {
+      for (const f of this.fighters) {
+        ctx.strokeStyle = 'rgba(80,255,140,0.9)'; ctx.lineWidth = 2;
+        ctx.strokeRect(f.x, f.y, f.w, f.h);
+        if (f.state === 'attack' && f.move && f.moveT >= f.move.s && f.moveT < f.move.s + f.move.a) {
+          const r = f.hitRect();
+          ctx.strokeStyle = 'rgba(255,70,70,0.95)'; ctx.fillStyle = 'rgba(255,70,70,0.18)';
+          ctx.fillRect(r.x, r.y, r.w, r.h); ctx.strokeRect(r.x, r.y, r.w, r.h);
+        }
+      }
+    }
+    ctx.restore();
+
+    if (Cam.flash > 0.01) {
+      ctx.fillStyle = `rgba(255,255,255,${Cam.flash * 0.75})`;
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    }
+
+    this.drawOffscreen(ctx);
+    this.drawHUD(ctx);
+    if (this.phase === 'countdown') this.drawCountdown(ctx);
+  },
+
+  drawOffscreen(ctx) {
+    for (const f of this.fighters) {
+      if (!f.alive || f.state === 'dead' || f.state === 'respawnWait') continue;
+      const s = Cam.toScreen(f.cx, f.cy);
+      const pad = 46;
+      if (s.x > pad && s.x < VIEW_W - pad && s.y > pad && s.y < VIEW_H - pad) continue;
+      const x = clamp(s.x, pad, VIEW_W - pad), y = clamp(s.y, pad, VIEW_H - pad);
+      const b = (STAGES[this.stage] || STAGES.store).blast;
+      const near = clamp(Math.max(
+        1 - (f.cx - b.l) / 300, 1 - (b.r - f.cx) / 300,
+        1 - (f.cy - b.t) / 300, 1 - (b.b - f.cy) / 300), 0, 1);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = 'rgba(6,8,12,0.86)';
+      ctx.beginPath(); ctx.arc(0, 0, 26, 0, TWO_PI); ctx.fill();
+      ctx.strokeStyle = near > 0.55 ? PAL.danger : SLOT_COLORS[f.slot % 4];
+      ctx.lineWidth = 3 + near * 3; ctx.stroke();
+      ctx.fillStyle = '#EEF3F8';
+      ctx.font = '900 12px "Segoe UI", system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(f.char.tag.slice(0, 4), 0, 1);
+      const ang = Math.atan2(s.y - VIEW_H / 2, s.x - VIEW_W / 2);
+      ctx.rotate(ang); ctx.fillStyle = ctx.strokeStyle;
+      ctx.beginPath(); ctx.moveTo(34, 0); ctx.lineTo(24, -8); ctx.lineTo(24, 8); ctx.fill();
+      ctx.restore();
+    }
+  },
+
+  drawHUD(ctx) {
+    const n = this.fighters.length;
+    const cardW = Math.min(240, 1080 / n), gap = 16;
+    const totalW = n * cardW + (n - 1) * gap;
+    let x = (VIEW_W - totalW) / 2;
+    const y = VIEW_H - 104;
+
+    for (const f of this.fighters) {
+      const col = SLOT_COLORS[f.slot % 4];
+      const out = f.stocks <= 0 && !this.training;
+      ctx.save();
+      ctx.globalAlpha = out ? 0.32 : 1;
+      // angled card, matching the arcade panel language of the menus
+      ctx.beginPath();
+      ctx.moveTo(x + 14, y); ctx.lineTo(x + cardW, y);
+      ctx.lineTo(x + cardW - 14, y + 88); ctx.lineTo(x, y + 88); ctx.closePath();
+      ctx.fillStyle = 'rgba(8,10,14,0.88)'; ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.stroke();
+      ctx.fillStyle = col; ctx.fillRect(x + 12, y + 2, cardW - 26, 4);
+
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.font = '900 13px "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = '#9BA7B4';
+      ctx.fillText(f.char.tag, x + 16, y + 12);
+      ctx.fillStyle = '#E8EDF2';
+      ctx.fillText(f.name.slice(0, 12), x + 16, y + 28);
+
+      // percent, colour-ramped and scaled by how close to death you are
+      const pct = Math.floor(f.percent);
+      const dangerT = clamp(pct / 150, 0, 1);
+      const pc = pct >= 120 ? '#FF4C4C' : pct >= 70 ? '#FF9A3C' : pct >= 35 ? PAL.yellow : '#FFFFFF';
+      const shake = f.flash > 0 ? f.flash * 0.6 : 0;
+      ctx.save();
+      ctx.translate(x + cardW - 24 + rand(-shake, shake), y + 46 + rand(-shake, shake));
+      ctx.font = `italic 900 ${34 + dangerT * 10}px "Arial Black", Impact, sans-serif`;
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+      ctx.strokeText(pct + '%', 0, 0);
+      ctx.fillStyle = pc; ctx.fillText(pct + '%', 0, 0);
+      ctx.restore();
+
+      // stocks
+      for (let i = 0; i < Math.max(0, f.stocks); i++) {
+        ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(x + 20 + i * 15, y + 74, 5.5, 0, TWO_PI); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+      }
+      // shield meter
+      const sw = cardW - 90;
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillRect(x + cardW - 26 - sw, y + 70, sw, 6);
+      ctx.fillStyle = f.shield > 30 ? PAL.teal : PAL.danger;
+      ctx.fillRect(x + cardW - 26 - sw, y + 70, sw * (f.shield / CFG.shieldMax), 6);
+      ctx.restore();
+      x += cardW + gap;
+    }
+
+    if (this.timeLimit > 0) {
+      const s = Math.max(0, Math.ceil(this.clock / 60));
+      ctx.font = 'italic 900 34px "Arial Black", Impact, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+      const txt = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+      ctx.strokeText(txt, VIEW_W / 2, 18);
+      ctx.fillStyle = s <= 10 ? PAL.danger : '#E8EDF2';
+      ctx.fillText(txt, VIEW_W / 2, 18);
+    }
+  },
+
+  drawCountdown(ctx) {
+    const t = this.countdown;
+    let label = null, sub = null;
+    if (t > 150) { label = '3'; } else if (t > 100) { label = '2'; }
+    else if (t > 50) { label = '1'; } else { label = 'FIGHT!'; sub = true; }
+    const seg = sub ? (50 - t) / 50 : ((t % 50) / 50);
+    const pop = sub ? easeOutBack(clamp((50 - t) / 14, 0, 1)) : easeOutBack(clamp(1 - seg, 0, 1));
+    ctx.save();
+    ctx.translate(VIEW_W / 2, VIEW_H / 2 - 40);
+    ctx.scale(pop * 1.1, pop * 1.1);
+    ctx.font = `italic 900 ${sub ? 96 : 130}px "Arial Black", Impact, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 12; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.strokeText(label, 0, 0);
+    ctx.fillStyle = sub ? PAL.yellow : '#FFFFFF'; ctx.fillText(label, 0, 0);
+    ctx.restore();
+    ctx.font = '900 15px "Segoe UI", system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(232,237,242,0.55)';
+    ctx.fillText((STAGES[this.stage] || STAGES.store).name.toUpperCase(), VIEW_W / 2, VIEW_H / 2 + 70);
+  },
+};
+/* ============================ 11. NETWORK ===============================
+   Firebase is imported dynamically inside a try/catch, so a blocked CDN or
+   an offline laptop degrades to local play instead of a blank screen.
+   Remote fighters are rendered from a small snapshot buffer ~110ms in the
+   past and interpolated, which removes the 25Hz stutter of the original. */
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBpZobZLNhYvoDcGovyG1gCRWn8_eaQZJY",
+  authDomain: "superoptusbros.firebaseapp.com",
+  databaseURL: "https://superoptusbros-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "superoptusbros",
+  storageBucket: "superoptusbros.firebasestorage.app",
+  messagingSenderId: "931164256258",
+  appId: "1:931164256258:web:fbe51deaac48f6f5f0cf1b"
+};
+
+const Net = {
+  ok: false, api: null, db: null,
+  roomId: null, myId: 'P_' + Math.random().toString(36).slice(2, 7).toUpperCase(),
+  isHost: false, username: 'PLAYER',
+  players: {}, roomState: null,
+  unsub: null, unsubRooms: null,
+  onRooms: null, onRoom: null, onStart: null, onLobbyReturn: null,
+  lastSend: 0, sendEvery: 45,
+  buffers: {},           // netId -> [{t, snap}]
+  seenHit: 0,
+
+  async connect() {
+    if (this.ok) return true;
+    try {
+      const [appMod, dbMod] = await Promise.all([
+        import("https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js"),
+        import("https://www.gstatic.com/firebasejs/10.4.0/firebase-database.js"),
+      ]);
+      this.api = dbMod;
+      this.db = dbMod.getDatabase(appMod.initializeApp(FIREBASE_CONFIG));
+      this.ok = true;
+      return true;
+    } catch (e) {
+      console.warn('[net] offline —', e && e.message);
+      this.ok = false;
+      return false;
+    }
+  },
+
+  r(path) { return this.api.ref(this.db, path); },
+
+  watchRooms(cb) {
+    if (!this.ok) return;
+    this.onRooms = cb;
+    if (this.unsubRooms) this.unsubRooms();
+    this.unsubRooms = this.api.onValue(this.r('rooms'), snap => {
+      const rooms = snap.val() || {};
+      const list = [];
+      for (const id in rooms) {
+        const r = rooms[id];
+        if (!r.state || r.state.status !== 'lobby') continue;
+        const ps = r.players || {};
+        let host = '—';
+        for (const pid in ps) if (ps[pid].isHost) host = ps[pid].username;
+        list.push({ id, host, count: Object.keys(ps).length, stage: r.state.stage });
+      }
+      cb(list);
+    });
+  },
+
+  async createRoom(username, char) {
+    this.username = username; this.isHost = true;
+    this.roomId = Math.random().toString(36).slice(2, 6).toUpperCase();
+    await this.api.set(this.r(`rooms/${this.roomId}/state`),
+      { status: 'lobby', stage: 'store', stocks: 3, host: this.myId });
+    this.api.onDisconnect(this.r(`rooms/${this.roomId}`)).remove();
+    return this.attach(char);
+  },
+
+  async joinRoom(code, username, char) {
+    this.username = username; this.isHost = false;
+    const snap = await this.api.get(this.r(`rooms/${code}`));
+    if (!snap.exists()) return { error: 'No room with that code.' };
+    const players = snap.val().players || {};
+    if (Object.keys(players).length >= 4) return { error: 'That room is full.' };
+    if (snap.val().state && snap.val().state.status !== 'lobby') return { error: 'That match already started.' };
+    this.roomId = code;
+    return this.attach(char);
+  },
+
+  async attach(char) {
+    const me = this.r(`rooms/${this.roomId}/players/${this.myId}`);
+    await this.api.set(me, {
+      username: this.username, char, isHost: this.isHost,
+      x: 600, y: 200, vx: 0, vy: 0, facing: 1, state: 'air',
+      percent: 0, stocks: 3, shield: 100, moveKey: '', moveT: 0, t: Date.now(),
+    });
+    this.api.onDisconnect(me).remove();
+
+    if (this.unsub) this.unsub();
+    this.unsub = this.api.onValue(this.r(`rooms/${this.roomId}`), snap => {
+      const data = snap.val();
+      if (!data) { if (this.onRoom) this.onRoom(null); return; }
+      this.roomState = data.state || null;
+      this.players = data.players || {};
+
+      // buffer remote snapshots for interpolation
+      const now = performance.now();
+      for (const pid in this.players) {
+        if (pid === this.myId) continue;
+        const p = this.players[pid];
+        (this.buffers[pid] = this.buffers[pid] || []).push({ t: now, s: p });
+        if (this.buffers[pid].length > 24) this.buffers[pid].shift();
+      }
+      const mine = this.players[this.myId];
+      if (mine && mine.lastHit && mine.lastHit.t > this.seenHit) {
+        this.seenHit = mine.lastHit.t;
+        if (this.onIncomingHit) this.onIncomingHit(mine.lastHit);
+      }
+      if (this.onRoom) this.onRoom(data);
+      if (this.roomState && this.roomState.status === 'playing' && this.onStart) this.onStart(this.roomState);
+      if (this.roomState && this.roomState.status === 'lobby' && this.onLobbyReturn) this.onLobbyReturn();
+    });
+    return { ok: true, code: this.roomId };
+  },
+
+  setChar(char) { if (this.roomId) this.api.update(this.r(`rooms/${this.roomId}/players/${this.myId}`), { char }); },
+  setRoomState(patch) { if (this.roomId && this.isHost) this.api.update(this.r(`rooms/${this.roomId}/state`), patch); },
+
+  send(f) {
+    const now = performance.now();
+    if (now - this.lastSend < this.sendEvery) return;
+    this.lastSend = now;
+    if (!this.roomId) return;
+    this.api.update(this.r(`rooms/${this.roomId}/players/${this.myId}`), {
+      x: Math.round(f.x), y: Math.round(f.y),
+      vx: +f.vx.toFixed(1), vy: +f.vy.toFixed(1),
+      facing: f.facing, state: f.state, percent: Math.round(f.percent),
+      stocks: f.stocks, shield: Math.round(f.shield),
+      moveKey: f.moveKey || '', moveT: f.moveT | 0, invuln: f.invuln | 0,
+      char: f.charId, t: Date.now(),
+    });
+  },
+
+  sendHit(netId, move, chargeMul, dirX, attackerChar) {
+    if (!this.roomId) return;
+    this.api.update(this.r(`rooms/${this.roomId}/players/${netId}/lastHit`), {
+      d: move.d * chargeMul, kb: move.kb, kg: move.kg, ang: move.ang,
+      spike: !!move.spike, dirX, from: this.myId, t: Date.now(),
+    });
+  },
+
+  /* position of a remote fighter, ~110ms in the past and interpolated */
+  sample(netId) {
+    const buf = this.buffers[netId];
+    if (!buf || !buf.length) return null;
+    const target = performance.now() - CFG.netInterpDelay;
+    if (buf.length === 1 || buf[0].t >= target) return buf[buf.length - 1].s;
+    let a = buf[0], b = buf[buf.length - 1];
+    for (let i = 0; i < buf.length - 1; i++) {
+      if (buf[i].t <= target && buf[i + 1].t >= target) { a = buf[i]; b = buf[i + 1]; break; }
+    }
+    const span = Math.max(1, b.t - a.t), k = clamp((target - a.t) / span, 0, 1);
+    return {
+      ...b.s,
+      x: lerp(a.s.x ?? 0, b.s.x ?? 0, k),
+      y: lerp(a.s.y ?? 0, b.s.y ?? 0, k),
+    };
+  },
+
+  leave() {
+    try {
+      if (this.unsub) { this.unsub(); this.unsub = null; }
+      if (this.roomId && this.ok) {
+        if (this.isHost) this.api.remove(this.r(`rooms/${this.roomId}`));
+        else this.api.remove(this.r(`rooms/${this.roomId}/players/${this.myId}`));
+      }
+    } catch (e) { /* leaving is best-effort */ }
+    this.roomId = null; this.isHost = false; this.players = {}; this.buffers = {};
+  },
+};
+
+/* Remote fighters are display-only: their transform comes from the network,
+   but they still carry a hurtbox so local attacks can connect. */
+Fighter.prototype.netApply = function () {
+  const s = Net.sample(this.netId);
+  if (!s) return;
+  this.x = lerp(this.x, s.x, 0.5); this.y = lerp(this.y, s.y, 0.5);
+  this.facing = s.facing || 1;
+  this.percent = s.percent || 0;
+  this.stocks = s.stocks ?? this.stocks;
+  this.shield = s.shield ?? CFG.shieldMax;
+  this.invuln = s.invuln || 0;
+  this.state = s.state || 'idle';
+  this.moveKey = s.moveKey || '';
+  this.move = this.moveKey ? this.char.moves[this.moveKey] : null;
+  this.moveT = s.moveT || 0;
+  this.grounded = ['idle', 'walk', 'run', 'shield', 'jumpsquat'].includes(this.state);
+  this.stateT++;
+  this.alive = this.stocks > 0;
+  if (s.char && s.char !== this.charId) { this.charId = s.char; this.char = charOf(s.char); }
+};
+/* ============================ 12. UI & BOOT ============================= */
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d', { alpha: false });
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+
+const Game = {
+  mode: 'menu',            // menu | match | paused
+  flavour: 'solo',         // solo | local | online | training
+  stage: 'store',
+  stocks: 3, timeLimit: 0,
+  slots: [
+    { type: 'p1', char: 'ollie', cpu: 5, name: 'YOU' },
+    { type: 'cpu', char: 'muzz', cpu: 5, name: 'CPU' },
+    { type: 'off', char: 'jarrad', cpu: 4, name: 'CPU 2' },
+    { type: 'off', char: 'yes', cpu: 4, name: 'CPU 3' },
+  ],
+  activeSlot: 0,
+  localFighter: null,
+};
+
+const SLOT_TYPES = [
+  { id: 'off', label: 'Off' },
+  { id: 'p1', label: 'Keyboard 1' },
+  { id: 'p2', label: 'Keyboard 2' },
+  { id: 'pad0', label: 'Gamepad 1' },
+  { id: 'pad1', label: 'Gamepad 2' },
+  { id: 'cpu', label: 'CPU' },
+];
+
+/* ---- screen routing ---------------------------------------------------- */
+const SCREENS = ['title', 'online', 'setup', 'results'];
+function show(name) {
+  SCREENS.forEach(s => $('#screen-' + s).classList.toggle('on', s === name));
+  $('#overlay').classList.toggle('on', !!name);
+  Audio_.play('ui');
+}
+function hideMenus() { SCREENS.forEach(s => $('#screen-' + s).classList.remove('on')); $('#overlay').classList.remove('on'); }
+
+/* ---- character + stage pickers ---------------------------------------- */
+const thumbFighters = {};
+function buildRoster() {
+  const wrap = $('#roster');
+  wrap.innerHTML = '';
+  for (const id of ROSTER_IDS) {
+    const c = ROSTER[id];
+    const el = document.createElement('button');
+    el.className = 'fighter';
+    el.dataset.char = id;
+    el.innerHTML = `<canvas width="120" height="120"></canvas>
+      <span class="fname">${c.name}</span><span class="fblurb">${c.blurb}</span>`;
+    el.onclick = () => {
+      Game.slots[Game.activeSlot].char = id;
+      if (Game.flavour === 'online') Net.setChar(id);
+      Audio_.play('select'); renderSlots(); markRoster();
+    };
+    wrap.appendChild(el);
+    const f = new Fighter('thumb_' + id, { charId: id, name: c.name });
+    f.x = 0; f.y = 0; f.grounded = false;
+    thumbFighters[id] = f;
+  }
+  markRoster();
+}
+function markRoster() {
+  const cur = Game.slots[Game.activeSlot].char;
+  $$('#roster .fighter').forEach(el => {
+    el.classList.toggle('sel', el.dataset.char === cur);
+    const owners = Game.slots.map((s, i) => s.type !== 'off' && s.char === el.dataset.char ? i : -1).filter(i => i >= 0);
+    el.dataset.owners = owners.join(',');
+  });
+  $('#char-name').textContent = charOf(cur).name;
+  $('#char-blurb').textContent = charOf(cur).blurb;
+  $('#char-stats').innerHTML = statBars(charOf(cur));
+}
+function statBars(c) {
+  const rows = [['Power', (c.moves.fsmash.d / 24)], ['Speed', (c.run - 6.5) / 4],
+    ['Weight', (c.weight - 80) / 46], ['Air', (c.jumps > 2 ? 0.95 : (1.1 - c.fall) * 1.6 + 0.25)]];
+  return rows.map(([k, v]) =>
+    `<div class="stat"><i>${k}</i><b><s style="width:${clamp(v, 0.08, 1) * 100}%"></s></b></div>`).join('');
+}
+
+function renderThumbs(t) {
+  $$('#roster .fighter').forEach(el => {
+    const id = el.dataset.char, f = thumbFighters[id];
+    const cv = el.querySelector('canvas');
+    const c = cv.getContext('2d');
+    c.clearRect(0, 0, 120, 120);
+    const sel = el.classList.contains('sel');
+    f.x = 60 - f.w / 2; f.y = 62 - f.h / 2; f.facing = 1; f.stateT = t / 16;
+    if (sel) {
+      const cyc = (t % 1400) / 1400;
+      f.state = 'attack'; f.moveKey = 'ftilt'; f.move = f.char.moves.ftilt;
+      f.moveT = cyc * (f.move.s + f.move.a + f.move.r);
+      f.squash = 1;
+    } else { f.state = 'idle'; f.move = null; f.moveKey = ''; f.moveT = 0; f.squash = 1; }
+    c.save(); c.translate(0, sel ? -4 : 0);
+    drawFighter(c, f, true);
+    c.restore();
+  });
+}
+
+function buildStages() {
+  const wrap = $('#stages'); wrap.innerHTML = '';
+  for (const id of STAGE_IDS) {
+    const s = STAGES[id];
+    const el = document.createElement('button');
+    el.className = 'stage'; el.dataset.stage = id;
+    el.innerHTML = `<canvas width="180" height="102"></canvas><span>${s.name}</span><small>${s.sub}</small>`;
+    el.onclick = () => {
+      if (Game.flavour === 'online' && !Net.isHost) return;
+      Game.stage = id; markStages(); Audio_.play('select');
+      if (Game.flavour === 'online') Net.setRoomState({ stage: id });
+    };
+    wrap.appendChild(el);
+    // tiny schematic of the actual geometry, so picks are informed
+    const c = el.querySelector('canvas').getContext('2d');
+    c.fillStyle = '#0A0D12'; c.fillRect(0, 0, 180, 102);
+    const k = 180 / 1400, ox = 100 * k;
+    for (const p of s.plats) {
+      c.fillStyle = p.soft ? 'rgba(124,243,208,0.75)' : '#8A94A0';
+      c.fillRect(p.x * k + ox, p.y * k * 0.9, Math.max(3, p.w * k), Math.max(2, p.h * k * 0.9));
+    }
+  }
+  markStages();
+}
+function markStages() {
+  $$('#stages .stage').forEach(el => el.classList.toggle('sel', el.dataset.stage === Game.stage));
+}
+
+function renderSlots() {
+  const wrap = $('#slots'); wrap.innerHTML = '';
+  if (Game.flavour === 'online') {
+    const ids = Object.keys(Net.players);
+    ids.forEach((pid, i) => {
+      const p = Net.players[pid];
+      const el = document.createElement('div');
+      el.className = 'slot on' + (pid === Net.myId ? ' me' : '');
+      el.style.setProperty('--c', SLOT_COLORS[i % 4]);
+      el.innerHTML = `<b>${p.username}${p.isHost ? ' · HOST' : ''}</b>
+        <span>${charOf(p.char).name}</span>`;
+      wrap.appendChild(el);
+    });
+    for (let i = ids.length; i < 4; i++) {
+      const el = document.createElement('div');
+      el.className = 'slot'; el.style.setProperty('--c', SLOT_COLORS[i % 4]);
+      el.innerHTML = `<b>Open</b><span>Waiting…</span>`;
+      wrap.appendChild(el);
+    }
+    return;
+  }
+  Game.slots.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'slot' + (s.type !== 'off' ? ' on' : '') + (i === Game.activeSlot ? ' active' : '');
+    el.style.setProperty('--c', SLOT_COLORS[i % 4]);
+    const opts = SLOT_TYPES.map(t => `<option value="${t.id}" ${t.id === s.type ? 'selected' : ''}>${t.label}</option>`).join('');
+    el.innerHTML = `<b>P${i + 1}</b>
+      <select class="slot-type">${opts}</select>
+      ${s.type === 'cpu' ? `<select class="slot-cpu">${[1,2,3,4,5,6,7,8,9].map(n =>
+        `<option value="${n}" ${n === s.cpu ? 'selected' : ''}>Lv ${n}</option>`).join('')}</select>` : ''}
+      <span>${charOf(s.char).name}</span>
+      ${KEY_SCHEMES[s.type] ? `<i>${KEY_SCHEMES[s.type].label}</i>` : ''}`;
+    el.onclick = e => {
+      if (e.target.tagName === 'SELECT') return;
+      Game.activeSlot = i; renderSlots(); markRoster(); Audio_.play('ui');
+    };
+    el.querySelector('.slot-type').onchange = e => {
+      s.type = e.target.value;
+      s.name = s.type === 'cpu' ? `CPU ${i + 1}` : `P${i + 1}`;
+      renderSlots(); validateStart();
+    };
+    const cpuSel = el.querySelector('.slot-cpu');
+    if (cpuSel) cpuSel.onchange = e => { s.cpu = +e.target.value; };
+    wrap.appendChild(el);
+  });
+  validateStart();
+}
+
+function validateStart() {
+  const active = Game.slots.filter(s => s.type !== 'off');
+  const humans = active.filter(s => s.type !== 'cpu');
+  const ok = Game.flavour === 'online' ? Net.isHost
+    : Game.flavour === 'training' ? humans.length >= 1
+      : active.length >= 2 && humans.length >= 1;
+  $('#btn-fight').classList.toggle('off', !ok);
+  $('#setup-hint').textContent = Game.flavour === 'online'
+    ? (Net.isHost ? 'You are the host — pick the stage and start when everyone is in.' : 'Waiting for the host to start.')
+    : ok ? '' : 'Needs at least two fighters, one of them human.';
+}
+
+/* ---- building a match -------------------------------------------------- */
+function controlFor(type) {
+  if (type === 'p1') return IS_TOUCH ? { kind: 'touch' } : { kind: 'key', scheme: 'p1' };
+  if (type === 'p2') return { kind: 'key', scheme: 'p2' };
+  if (type === 'pad0') return { kind: 'pad', index: 0 };
+  if (type === 'pad1') return { kind: 'pad', index: 1 };
+  return { kind: 'cpu' };
+}
+
+function startLocalMatch() {
+  Game.localFighter = null;
+  const fighters = [];
+  let slot = 0;
+  Game.slots.forEach((s, i) => {
+    if (s.type === 'off') return;
+    const f = new Fighter('L' + i, {
+      charId: s.char, name: s.name || `P${i + 1}`, slot: slot++,
+      control: controlFor(s.type), stocks: Game.stocks,
+    });
+    if (s.type === 'cpu') { f.cpu = new CPU(f, s.cpu); f.control = { kind: 'cpu' }; }
+    else if (!Game.localFighter) Game.localFighter = f;
+    fighters.push(f);
+  });
+  World.training = Game.flavour === 'training';
+  World.onHitNet = null;
+  World.start({ stage: Game.stage, stocks: Game.stocks, timeLimit: Game.timeLimit,
+    fighters, training: Game.flavour === 'training' });
+  enterMatch();
+}
+
+function startOnlineMatch(state) {
+  Game.stage = state.stage; Game.stocks = state.stocks;
+  const fighters = [];
+  const ids = Object.keys(Net.players);
+  ids.forEach((pid, i) => {
+    const p = Net.players[pid];
+    const mine = pid === Net.myId;
+    const f = new Fighter(pid, {
+      charId: p.char || 'ollie', name: p.username || 'PLAYER', slot: i,
+      control: mine ? controlFor('p1') : { kind: 'net' }, stocks: state.stocks,
+    });
+    f.remote = !mine; f.netId = pid;
+    if (mine) Game.localFighter = f;
+    fighters.push(f);
+  });
+  World.onHitNet = (att, vic, move, chargeMul, dirX) => {
+    if (vic.remote) Net.sendHit(vic.netId, move, chargeMul, dirX);
+  };
+  Net.onIncomingHit = h => {
+    const me = Game.localFighter; if (!me) return;
+    World.resolveHit({ cx: me.cx - h.dirX * 60, cy: me.cy, facing: h.dirX, id: h.from,
+      char: me.char, combo: 0, hitstop: 0, vx: 0, charge: 0 },
+      me, { d: h.d, kb: h.kb, kg: h.kg, ang: h.ang, spike: h.spike, by: 0 }, 1);
+  };
+  World.start({ stage: state.stage, stocks: state.stocks, timeLimit: 0, fighters });
+  enterMatch();
+}
+
+function enterMatch() {
+  Game.mode = 'match';
+  hideMenus();
+  $('#hud-quit').style.display = 'block';
+  if (IS_TOUCH) $('#touch').classList.add('on');
+}
+
+World.onEnd = (rank, reason) => {
+  setTimeout(() => {
+    Game.mode = 'menu';
+    $('#hud-quit').style.display = 'none';
+    $('#touch').classList.remove('on');
+    const rows = rank.map((f, i) => `
+      <li style="--c:${SLOT_COLORS[f.slot % 4]}">
+        <b>${i + 1}</b>
+        <span class="rn">${f.name}</span>
+        <span class="rc">${f.char.name}</span>
+        <span class="rk">${f.kos} KO</span>
+        <span class="rf">${f.falls} falls</span>
+      </li>`).join('');
+    $('#results-list').innerHTML = rows;
+    $('#results-title').textContent = reason === 'time' ? 'TIME!' : `${rank[0].name} WINS`;
+    show('results');
+  }, 1400);
+};
+
+/* ---- pause -------------------------------------------------------------- */
+function togglePause(force) {
+  if (Game.mode === 'menu' || Game.flavour === 'online') return;
+  const p = force !== undefined ? force : Game.mode !== 'paused';
+  Game.mode = p ? 'paused' : 'match';
+  $('#pause').classList.toggle('on', p);
+}
+window.addEventListener('keydown', e => {
+  if (e.code === 'Escape' || e.code === 'KeyP') { if (Game.mode !== 'menu') togglePause(); }
+  if (e.code === 'KeyH' && Game.mode !== 'menu') World.hitboxDebug = !World.hitboxDebug;
+});
+
+function quitToMenu() {
+  Game.mode = 'menu'; World.phase = 'idle';
+  Game.localFighter = null;
+  $('#hud-quit').style.display = 'none';
+  $('#touch').classList.remove('on');
+  $('#pause').classList.remove('on');
+  if (Game.flavour === 'online') { Net.leave(); show('online'); }
+  else show('setup');
+}
+
+/* ---- main loop ---------------------------------------------------------- */
+const STEP = 1 / 60;
+let acc = 0, last = performance.now();
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.2, (now - last) / 1000);
+  last = now;
+
+  if (Game.mode === 'menu') {
+    if ($('#screen-setup').classList.contains('on')) renderThumbs(now);
+    drawIdleBackdrop(now);
+    return;
+  }
+  if (Game.mode === 'paused') { World.render(ctx); return; }
+
+  acc += dt;
+  let steps = 0;
+  // fixed timestep: the sim now runs identically on 60Hz and 144Hz displays
+  while (acc >= STEP && steps < 5) { World.tick(); acc -= STEP; steps++; }
+  if (steps === 5) acc = 0;
+
+  if (Game.flavour === 'online' && Game.localFighter && World.phase === 'fight') {
+    Net.send(Game.localFighter);
+    for (const f of World.fighters) if (f.remote) f.netApply();
+  }
+  World.render(ctx);
+}
+
+function drawIdleBackdrop(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  drawBackground(ctx, Game.stage, { x: 640 + Math.sin(t / 4000) * 120, y: 360 }, t);
+  ctx.fillStyle = 'rgba(5,7,10,0.55)'; ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+}
+
+/* ---- wiring ------------------------------------------------------------- */
+function wire() {
+  bindTouchControls(document.getElementById('touch'));
+  buildRoster(); buildStages(); renderSlots();
+
+  $('#btn-solo').onclick = () => {
+    Game.flavour = 'solo';
+    Game.slots[0].type = 'p1'; Game.slots[1].type = 'cpu';
+    $('#setup-mode').textContent = 'Solo · vs CPU';
+    renderSlots(); markRoster(); show('setup');
+  };
+  $('#btn-local').onclick = () => {
+    Game.flavour = 'local';
+    Game.slots[0].type = 'p1'; Game.slots[1].type = IS_TOUCH ? 'cpu' : 'p2';
+    $('#setup-mode').textContent = 'Local versus · same device';
+    renderSlots(); markRoster(); show('setup');
+  };
+  $('#btn-training').onclick = () => {
+    Game.flavour = 'training';
+    Game.slots[0].type = 'p1'; Game.slots[1].type = 'cpu'; Game.slots[1].cpu = 1;
+    $('#setup-mode').textContent = 'Training · no stock loss, H toggles hitboxes';
+    renderSlots(); markRoster(); show('setup');
+  };
+  $('#btn-online').onclick = async () => {
+    Game.flavour = 'online';
+    show('online');
+    $('#net-status').textContent = 'Connecting…';
+    const ok = await Net.connect();
+    $('#net-status').textContent = ok ? 'Connected' : 'Offline — online play is unavailable right now.';
+    $('#online-body').classList.toggle('dim', !ok);
+    if (ok) Net.watchRooms(renderRooms);
+  };
+
+  $$('[data-back]').forEach(b => b.onclick = () => {
+    if (Game.flavour === 'online') Net.leave();
+    Game.flavour = 'solo'; show('title');
+  });
+
+  $('#stocks').onchange = e => {
+    Game.stocks = +e.target.value;
+    if (Game.flavour === 'online') Net.setRoomState({ stocks: Game.stocks });
+  };
+  $('#timer').onchange = e => { Game.timeLimit = +e.target.value; };
+
+  $('#btn-fight').onclick = () => {
+    if ($('#btn-fight').classList.contains('off')) return;
+    Audio_.boot();
+    if (Game.flavour === 'online') Net.setRoomState({ status: 'playing', stage: Game.stage, stocks: Game.stocks });
+    else startLocalMatch();
+  };
+
+  $('#hud-quit').onclick = quitToMenu;
+  $('#btn-resume').onclick = () => togglePause(false);
+  $('#btn-restart').onclick = () => { togglePause(false); Game.localFighter = null; startLocalMatch(); };
+  $('#btn-pquit').onclick = quitToMenu;
+  $('#btn-rematch').onclick = () => {
+    Game.localFighter = null;
+    if (Game.flavour === 'online') { show('setup'); }
+    else startLocalMatch();
+  };
+  $('#btn-rechar').onclick = () => show('setup');
+  $('#btn-rtitle').onclick = () => { if (Game.flavour === 'online') Net.leave(); show('title'); };
+
+  $('#btn-sound').onclick = e => {
+    const on = Audio_.toggle();
+    e.target.textContent = on ? 'Sound on' : 'Sound off';
+    e.target.classList.toggle('off', !on);
+  };
+
+  // ---- online lobby
+  $('#btn-create').onclick = async () => {
+    const name = ($('#username').value || '').trim().toUpperCase();
+    if (!name) return netErr('Enter a name first.');
+    netErr('');
+    const res = await Net.createRoom(name, Game.slots[0].char);
+    if (res && res.code) enterOnlineRoom(res.code);
+  };
+  $('#btn-join').onclick = async () => {
+    const name = ($('#username').value || '').trim().toUpperCase();
+    const code = ($('#roomcode').value || '').trim().toUpperCase();
+    if (!name) return netErr('Enter a name first.');
+    if (code.length !== 4) return netErr('Room codes are four characters.');
+    netErr('');
+    const res = await Net.joinRoom(code, name, Game.slots[0].char);
+    if (res.error) return netErr(res.error);
+    enterOnlineRoom(code);
+  };
+
+  Net.onRoom = data => {
+    if (!data) { netErr('The host closed the room.'); Net.leave(); show('online'); return; }
+    if (Game.flavour === 'online') {
+      renderSlots();
+      if (data.state) {
+        Game.stage = data.state.stage || Game.stage;
+        Game.stocks = data.state.stocks || Game.stocks;
+        markStages(); $('#stocks').value = String(Game.stocks);
+      }
+    }
+  };
+  Net.onStart = state => { if (Game.mode === 'menu' && Game.flavour === 'online') startOnlineMatch(state); };
+}
+
+function netErr(msg) { $('#net-error').textContent = msg || ''; }
+
+function enterOnlineRoom(code) {
+  $('#setup-mode').textContent = `Online · room ${code}`;
+  $('#roster').classList.remove('locked');
+  renderSlots(); markRoster(); markStages(); show('setup');
+}
+
+function renderRooms(list) {
+  const el = $('#rooms');
+  if (!list.length) { el.innerHTML = `<p class="empty">No open rooms. Create one and share the code.</p>`; return; }
+  el.innerHTML = list.map(r => `<button class="room" data-code="${r.id}">
+      <b>${r.host}'s room</b><span>${STAGES[r.stage] ? STAGES[r.stage].name : '—'}</span>
+      <i>${r.count}/4</i><code>${r.id}</code></button>`).join('');
+  $$('#rooms .room').forEach(b => b.onclick = () => {
+    $('#roomcode').value = b.dataset.code; $('#btn-join').click();
+  });
+}
+
+wire();
+show('title');
+requestAnimationFrame(frame);
+
+</script>
+</body>
+</html>
