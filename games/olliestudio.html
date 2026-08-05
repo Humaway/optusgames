@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Ollie Studio</title>
+<title>Ollie Studio — Web DAW</title>
 <meta name="description" content="Ollie Studio: a single-file browser digital audio workstation with pattern-based arrangement, built on Tone.js." />
 <style>
 /* ============================================================================
@@ -110,7 +110,10 @@ body::before{
 }
 
 /* ---------------- Menu bar ---------------- */
-.menubar{ display:flex; align-items:center; gap:6px; padding:7px 12px; flex-wrap:wrap; }
+.menubar{
+  display:flex; align-items:center; gap:6px; padding:7px 12px; flex-wrap:wrap;
+  position:relative; z-index:1000;      /* above the transport, workspace, dock and racks */
+}
 .brand{ display:flex; align-items:center; gap:10px; padding-right:10px; }
 .brand-dot{
   width:26px; height:26px; border-radius:50%; flex:none; display:grid; place-items:center;
@@ -119,7 +122,7 @@ body::before{
 .brand-dot i{ width:9px; height:9px; border-radius:50%; background:var(--ink-0); }
 .brand b{ font-size:14px; font-weight:800; letter-spacing:-.01em; }
 
-.menu{ position:relative; }
+.menu{ position:relative; z-index:1; }
 .menu-btn{
   font-family:inherit; font-size:12.5px; font-weight:600; color:var(--muted);
   padding:7px 13px; border-radius:var(--r-sm); cursor:pointer;
@@ -213,6 +216,13 @@ select.mini option{ background:#0F1922; }
   background:rgba(0,0,0,.4); border:1px solid var(--teal-bright); border-radius:var(--r-xs); padding:3px 5px;
 }
 .pat .len{ font-family:var(--mono); font-size:9.5px; color:var(--dim); }
+.pat-ren{
+  font-family:inherit; font-size:11px; line-height:1; color:var(--dim); cursor:pointer;
+  width:20px; height:20px; flex:none; border-radius:6px; opacity:.55;
+  background:rgba(0,0,0,.28); border:1px solid var(--stroke); transition:.14s;
+}
+.pat:hover .pat-ren, .pat.sel .pat-ren{ opacity:1; }
+.pat-ren:hover{ color:var(--yellow); border-color:rgba(255,209,0,.4); }
 .pat-tools{ display:flex; gap:5px; margin-top:10px; }
 .icon-btn{
   font-family:inherit; font-size:12px; font-weight:600; color:var(--muted); cursor:pointer;
@@ -397,11 +407,65 @@ input[type=range]::-moz-range-thumb{ width:15px; height:15px; border-radius:50%;
 input[type=range].y::-webkit-slider-thumb{ background:var(--yellow); box-shadow:0 0 0 1px rgba(255,209,0,.5); }
 input[type=range].y::-moz-range-thumb{ background:var(--yellow); }
 
+/* ---- Rack widgets: knobs, scopes, pads ---- */
+.rack-sec{ margin-bottom:15px; }
+.rack-sec:last-child{ margin-bottom:0; }
+.rack-lbl{
+  display:flex; align-items:center; gap:8px; margin-bottom:9px;
+  font-size:9.5px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--dim);
+}
+.rack-lbl::after{ content:''; flex:1 1 auto; height:1px; background:var(--stroke); }
+.knob-row{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+.knob-row.two{ grid-template-columns:repeat(2, 1fr); }
+.knob-row.four{ grid-template-columns:repeat(4, 1fr); }
+.knob{
+  display:flex; flex-direction:column; align-items:center; gap:2px; padding:3px 2px;
+  cursor:ns-resize; touch-action:none; user-select:none; border-radius:10px; transition:background .14s;
+}
+.knob:hover{ background:rgba(255,255,255,.045); }
+.knob svg{ width:100%; max-width:54px; height:auto; }
+.knob .k-track{ fill:none; stroke:rgba(255,255,255,.13); stroke-width:5; stroke-linecap:round; }
+.knob .k-val{ fill:none; stroke:var(--teal-bright); stroke-width:5; stroke-linecap:round; filter:drop-shadow(0 0 5px rgba(47,211,220,.55)); }
+.knob.y .k-val{ stroke:var(--yellow); filter:drop-shadow(0 0 5px rgba(255,209,0,.5)); }
+.knob .k-body{ fill:#0D1720; stroke:rgba(255,255,255,.15); }
+.knob .k-ptr{ stroke:var(--white); stroke-width:2.4; stroke-linecap:round; }
+.knob .kv{ font-family:var(--mono); font-size:10px; color:var(--yellow); }
+.knob .kl{ font-size:9.5px; color:var(--muted); text-align:center; line-height:1.2; }
+.viz{ background:rgba(0,0,0,.32); border:1px solid var(--stroke); border-radius:10px; padding:7px 9px 3px; margin-bottom:11px; }
+.viz-t{ display:flex; justify-content:space-between; font-size:9px; letter-spacing:.13em; text-transform:uppercase; color:var(--dim); margin-bottom:2px; }
+.viz-t b{ color:var(--teal-bright); font-weight:700; letter-spacing:.06em; }
+.viz svg{ display:block; width:100%; }
+.viz-line{ fill:none; stroke:var(--teal-bright); stroke-width:2; }
+.viz-fill{ fill:rgba(0,163,173,.2); stroke:none; }
+.viz.y .viz-line{ stroke:var(--yellow); }
+.viz.y .viz-fill{ fill:rgba(255,209,0,.15); }
+.viz-line.k{ stroke:#FF9E5B; } .viz-line.s{ stroke:var(--teal-bright); }
+.viz-line.h{ stroke:var(--yellow); } .viz-line.c{ stroke:#B48CFF; }
+.viz-grid{ stroke:rgba(255,255,255,.07); stroke-width:1; }
+.wave-sel{ display:flex; gap:6px; flex-wrap:wrap; }
+.wave-btn{
+  width:46px; height:33px; padding:0; cursor:pointer; border-radius:9px; display:grid; place-items:center;
+  background:rgba(0,0,0,.3); border:1px solid var(--stroke); transition:.14s;
+}
+.wave-btn svg{ width:28px; height:22px; fill:none; stroke:var(--muted); stroke-width:1.8; stroke-linejoin:round; }
+.wave-btn:hover{ border-color:var(--stroke-hi); }
+.wave-btn.on{ background:rgba(0,163,173,.22); border-color:var(--teal-bright); }
+.wave-btn.on svg{ stroke:var(--teal-bright); }
+.pads{ display:grid; grid-template-columns:repeat(4, 1fr); gap:7px; }
+.pad{
+  font-family:inherit; font-size:10.5px; font-weight:700; color:var(--text); cursor:pointer;
+  padding:13px 4px; border-radius:11px; border:1px solid var(--stroke);
+  background:linear-gradient(160deg, rgba(255,255,255,.085), rgba(255,255,255,.025)); transition:.1s;
+}
+.pad:hover{ border-color:var(--stroke-hi); }
+.pad.hit{ background:linear-gradient(160deg, var(--teal-bright), var(--teal)); color:#04191B; border-color:transparent; transform:translateY(1px); }
+.test-btn{ width:100%; justify-content:center; margin-top:4px; }
+
 /* ============================================================================
    FLOATING INSTRUMENT WINDOWS
    ========================================================================== */
 .win{
-  position:fixed; z-index:100; width:340px; max-width:calc(100vw - 20px);
+  position:fixed; z-index:100; width:376px; max-width:calc(100vw - 20px);
   display:none; flex-direction:column; overflow:hidden;
   background:rgba(14,22,30,.93); border:1px solid var(--stroke-hi); border-radius:var(--r-lg);
   box-shadow:var(--shadow-win); backdrop-filter:blur(20px) saturate(140%); -webkit-backdrop-filter:blur(20px) saturate(140%);
@@ -659,12 +723,12 @@ input[type=range].y::-moz-range-thumb{ background:var(--yellow); }
       </div>
     </div>
   </section>
-</div>
 
-<!-- Floating instrument racks -->
+  <!-- Floating instrument racks -->
 <div class="win" id="winDrum"><div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><div><h4>Drum rack</h4><div class="sub">Global source · used by every pattern</div></div><button class="win-close" data-close="drum">×</button></div><div class="win-body" id="bodyDrum"></div></div>
 <div class="win" id="winBass"><div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><div><h4>Subtractive synth</h4><div class="sub">Bass / Lead · global source</div></div><button class="win-close" data-close="bass">×</button></div><div class="win-body" id="bodyBass"></div></div>
 <div class="win" id="winKeys"><div class="win-bar"><span class="dots"><i></i><i></i><i></i></span><div><h4>FM keys</h4><div class="sub">Keys / Bells · global source</div></div><button class="win-close" data-close="keys">×</button></div><div class="win-body" id="bodyKeys"></div></div>
+</div>
 
 <div class="modal-host" id="modalHost">
   <div class="modal">
@@ -1153,12 +1217,23 @@ function picker({ label, options, get, set, onChange, reg = CONTROLS }){
 }
 const pct = v => Math.round(v * 100) + '%';
 const s2  = v => Number(v).toFixed(2);
+const s1  = v => Number(v).toFixed(1);
 const r0  = v => Math.round(v);
 
 /* ============================================================================
    6. FLOATING WINDOWS
    ========================================================================== */
 let zTop = 100;
+/* Racks stack among themselves between 100 and 900 — the menu bar sits at 1000. */
+function raise(w){
+  if (zTop > 890){
+    Object.keys(WINS).map(k => windowEl(k))
+      .sort((a, b) => (parseInt(a.style.zIndex, 10) || 0) - (parseInt(b.style.zIndex, 10) || 0))
+      .forEach((x, i) => { x.style.zIndex = 100 + i; });
+    zTop = 103;
+  }
+  w.style.zIndex = ++zTop;
+}
 const WINS = {
   drum: { elId:'winDrum', bodyId:'bodyDrum' },
   bass: { elId:'winBass', bodyId:'bodyBass' },
@@ -1177,7 +1252,7 @@ function toggleWindow(k, force){
   const open = force === undefined ? !w.classList.contains('open') : force;
   w.classList.toggle('open', open);
   if (open){
-    w.style.zIndex = ++zTop;
+    raise(w);
     if (!w.style.left) tidyWindows();
   }
   markWindowTicks();
@@ -1206,7 +1281,7 @@ function makeDraggable(k){
   bar.addEventListener('pointerdown', e => {
     if (e.target.closest('.win-close')) return;
     e.preventDefault();
-    w.style.zIndex = ++zTop;
+    raise(w);
     const rect = w.getBoundingClientRect();
     const dx = e.clientX - rect.left, dy = e.clientY - rect.top;
     const move = ev => positionWindow(k, ev.clientX - dx, ev.clientY - dy);
@@ -1214,53 +1289,354 @@ function makeDraggable(k){
     document.addEventListener('pointermove', move);
     document.addEventListener('pointerup', up);
   });
-  w.addEventListener('pointerdown', () => { w.style.zIndex = ++zTop; });
+  w.addEventListener('pointerdown', () => raise(w));
 }
 
+/* ---------------------------------------------------------------------------
+   Rack widgets — knobs you can grab, plus little scopes that redraw as you
+   turn them so the effect on the sound is visible, not just numeric.
+   ------------------------------------------------------------------------ */
+const NS = 'http://www.w3.org/2000/svg';
+const svgEl = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
+const polar = (cx, cy, r, deg) => { const a = (deg - 90) * Math.PI / 180; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; };
+function arcPath(cx, cy, r, a0, a1){
+  const [x0, y0] = polar(cx, cy, r, a0), [x1, y1] = polar(cx, cy, r, a1);
+  return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${(a1 - a0) > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+const A0 = 135, SWEEP = 270;      // knob travel: 7 o'clock round to 5 o'clock
+
+/* Rotary control. Drag up/down (shift = fine), scroll, or use the arrow keys;
+   double-click snaps back to the factory value. */
+function knob({ label, min, max, step = 0.01, def, get, set, fmt = v => v, unit = '', curve = 'lin', tone = 'teal', onChange, reg = CONTROLS }){
+  const toNorm = v => curve === 'exp' ? Math.log(v / min) / Math.log(max / min) : (v - min) / (max - min);
+  const fromNorm = t => {
+    const raw = curve === 'exp' ? min * Math.pow(max / min, t) : min + t * (max - min);
+    return clamp(Math.round(raw / step) * step, min, max);
+  };
+  const wrap = el('div', 'knob' + (tone === 'yellow' ? ' y' : ''));
+  wrap.tabIndex = 0;
+  wrap.setAttribute('role', 'slider');
+  wrap.setAttribute('aria-label', label);
+  wrap.title = label + ' — drag, scroll or double-click to reset';
+
+  const svg = svgEl('svg', { viewBox: '0 0 56 56' });
+  const track = svgEl('path', { class:'k-track', d: arcPath(28, 28, 20, A0, A0 + SWEEP) });
+  const val   = svgEl('path', { class:'k-val', d: '' });
+  const body  = svgEl('circle', { class:'k-body', cx:28, cy:28, r:13.5 });
+  const ptr   = svgEl('line', { class:'k-ptr', x1:28, y1:28, x2:28, y2:16 });
+  svg.append(track, val, body, ptr);
+  const vEl = el('div', 'kv'), lEl = el('div', 'kl', label);
+  wrap.append(svg, vEl, lEl);
+
+  const show = () => {
+    const v = get(), t = clamp(toNorm(v), 0, 1), ang = A0 + SWEEP * t;
+    val.setAttribute('d', t > 0.005 ? arcPath(28, 28, 20, A0, ang) : '');
+    const [px, py] = polar(28, 28, 11.5, ang);
+    ptr.setAttribute('x2', px.toFixed(2)); ptr.setAttribute('y2', py.toFixed(2));
+    vEl.textContent = fmt(v) + unit;
+    wrap.setAttribute('aria-valuenow', String(v));
+    wrap.setAttribute('aria-valuetext', fmt(v) + unit);
+  };
+  const apply = t => { set(fromNorm(clamp(t, 0, 1))); show(); if (onChange) onChange(); };
+
+  wrap.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    wrap.setPointerCapture(e.pointerId);
+    const y0 = e.clientY, n0 = clamp(toNorm(get()), 0, 1);
+    const move = ev => apply(n0 + ((y0 - ev.clientY) / 180) * (ev.shiftKey ? 0.25 : 1));
+    const up = () => { wrap.removeEventListener('pointermove', move); wrap.removeEventListener('pointerup', up); };
+    wrap.addEventListener('pointermove', move);
+    wrap.addEventListener('pointerup', up);
+  });
+  wrap.addEventListener('wheel', e => { e.preventDefault(); apply(clamp(toNorm(get()), 0, 1) + (e.deltaY < 0 ? 0.03 : -0.03)); }, { passive:false });
+  wrap.addEventListener('keydown', e => {
+    const n = clamp(toNorm(get()), 0, 1);
+    if (e.key === 'ArrowUp'   || e.key === 'ArrowRight'){ e.preventDefault(); apply(n + 0.02); }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowLeft'){  e.preventDefault(); apply(n - 0.02); }
+  });
+  if (def !== undefined) wrap.addEventListener('dblclick', () => { set(def); show(); if (onChange) onChange(); });
+  show(); reg.push(show);
+  return wrap;
+}
+
+/* Waveform picker drawn as actual waveforms. */
+const WAVE_ICON = {
+  sine:        'M2 12 Q 8 2 14 12 T 26 12',
+  triangle:    'M2 18 L 8 5 L 14 18 L 20 5 L 26 18',
+  square:      'M2 18 L2 5 L9 5 L9 18 L16 18 L16 5 L23 5 L23 18 L26 18',
+  sawtooth:    'M2 18 L 9 5 L 9 18 L 16 5 L 16 18 L 23 5 L 23 18',
+  fatsawtooth: 'M2 18 L 9 5 L 9 18 L 16 5 L 16 18 L 23 5 L 23 18 M5 20 L 12 8 M12 20 L 19 8',
+  pwm:         'M2 18 L2 5 L6 5 L6 18 L14 18 L14 5 L18 5 L18 18 L26 18'
+};
+function waveSelect({ options, get, set, onChange, reg = CONTROLS }){
+  const wrap = el('div', 'wave-sel');
+  const pairs = options.map(o => {
+    const b = el('button', 'wave-btn'); b.type = 'button'; b.title = o;
+    const svg = svgEl('svg', { viewBox:'0 0 28 24' });
+    svg.append(svgEl('path', { d: WAVE_ICON[o] || WAVE_ICON.sine }));
+    b.append(svg);
+    b.addEventListener('click', () => { set(o); show(); if (onChange) onChange(); });
+    wrap.append(b);
+    return [o, b];
+  });
+  const show = () => pairs.forEach(([o, b]) => b.classList.toggle('on', get() === o));
+  show(); reg.push(show);
+  return wrap;
+}
+
+/* Scope shell: a titled box with a stretched 240-wide viewBox. */
+function scope(title, height, yellow){
+  const box = el('div', 'viz' + (yellow ? ' y' : ''));
+  const head = el('div', 'viz-t');
+  const cap = el('b', null, '');
+  head.append(el('span', null, title), cap);
+  const svg = svgEl('svg', { viewBox:`0 0 240 ${height}`, preserveAspectRatio:'none' });
+  svg.style.height = height + 'px';
+  box.append(head, svg);
+  return { box, svg, cap };
+}
+const pathFrom = pts => 'M ' + pts.map(p => p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' L ');
+
+/* Attack / decay / sustain / release, drawn to scale. */
+function adsrScope(get, yellow, reg = CONTROLS){
+  const { box, svg, cap } = scope('Envelope', 58, yellow);
+  const fill = svgEl('path', { class:'viz-fill' });
+  const line = svgEl('path', { class:'viz-line', 'vector-effect':'non-scaling-stroke' });
+  svg.append(fill, line);
+  const draw = () => {
+    const e = get(), W = 240, H = 58, pad = 4;
+    const sum = Math.max(0.02, e.a + e.d + e.r);
+    const span = (W - pad * 2) * 0.68;
+    const xa = pad + span * (e.a / sum);
+    const xd = xa + span * (e.d / sum);
+    const xh = xd + (W - pad * 2) * 0.32;
+    const xr = Math.min(W - pad, xh + span * (e.r / sum));
+    const ys = pad + (H - pad * 2) * (1 - e.s);
+    const d = pathFrom([[pad, H - pad], [xa, pad], [xd, ys], [xh, ys], [xr, H - pad]]);
+    line.setAttribute('d', d);
+    fill.setAttribute('d', d + ` L ${pad} ${H - pad} Z`);
+    cap.textContent = `A ${e.a.toFixed(2)}s · S ${Math.round(e.s * 100)}% · R ${e.r.toFixed(2)}s`;
+  };
+  draw(); reg.push(draw);
+  return box;
+}
+
+/* Low-pass response: the hump is the resonance, the slope is the cutoff. */
+function filterScope(get, reg = CONTROLS){
+  const { box, svg, cap } = scope('Filter response', 58);
+  const fill = svgEl('path', { class:'viz-fill' });
+  const line = svgEl('path', { class:'viz-line', 'vector-effect':'non-scaling-stroke' });
+  svg.append(fill, line);
+  const draw = () => {
+    const { cutoff, q } = get(), W = 240, H = 58, pad = 4, f0 = 30, f1 = 14000;
+    const pts = [];
+    for (let i = 0; i <= 80; i++){
+      const t = i / 80, f = f0 * Math.pow(f1 / f0, t);
+      const roll = 1 / Math.sqrt(1 + Math.pow(f / cutoff, 8));
+      const peak = (q / 20) * Math.exp(-Math.pow(Math.log(f / cutoff) * 2.6, 2));
+      const mag = clamp(roll + peak, 0, 1.55) / 1.55;
+      pts.push([pad + t * (W - pad * 2), H - pad - (H - pad * 2) * mag]);
+    }
+    const d = pathFrom(pts);
+    line.setAttribute('d', d);
+    fill.setAttribute('d', d + ` L ${W - pad} ${H - pad} L ${pad} ${H - pad} Z`);
+    cap.textContent = `${Math.round(cutoff)} Hz · Q ${q.toFixed(1)}`;
+  };
+  draw(); reg.push(draw);
+  return box;
+}
+
+/* One cycle of the actual FM output: harmonicity sets the ripple rate, the
+   modulation index sets how violently it folds. */
+const waveFn = (type, ph) => {
+  const x = ph - Math.floor(ph);
+  if (type === 'square')   return x < 0.5 ? 1 : -1;
+  if (type === 'sawtooth') return 2 * x - 1;
+  if (type === 'triangle') return 4 * Math.abs(x - 0.5) - 1;
+  return Math.sin(2 * Math.PI * x);
+};
+function fmScope(get, reg = CONTROLS){
+  const { box, svg, cap } = scope('FM output', 58, true);
+  const line = svgEl('path', { class:'viz-line', 'vector-effect':'non-scaling-stroke' });
+  const mid = svgEl('line', { class:'viz-grid', x1:4, y1:29, x2:236, y2:29 });
+  svg.append(mid, line);
+  const draw = () => {
+    const { harmonicity, modIndex, wave } = get(), W = 240, H = 58, pad = 4, N = 320;
+    const pts = [];
+    for (let i = 0; i <= N; i++){
+      const t = (i / N) * 2;                                    // two carrier cycles
+      const phase = t + (modIndex / (2 * Math.PI)) * Math.sin(2 * Math.PI * harmonicity * t);
+      const y = waveFn(wave, phase);
+      pts.push([pad + (i / N) * (W - pad * 2), H / 2 - y * (H / 2 - pad)]);
+    }
+    line.setAttribute('d', pathFrom(pts));
+    cap.textContent = `ratio 1 : ${harmonicity.toFixed(2)} · index ${modIndex.toFixed(1)}`;
+  };
+  draw(); reg.push(draw);
+  return box;
+}
+
+/* Modulator ➜ carrier, with the arrow thickening as the index rises. */
+function fmRouting(get, reg = CONTROLS){
+  const { box, svg } = scope('Operators', 62);
+  const mk = (x, label) => {
+    const g = svgEl('g', {});
+    g.append(svgEl('rect', { x, y:14, width:64, height:34, rx:9, fill:'rgba(255,255,255,.06)', stroke:'rgba(255,255,255,.18)' }));
+    const t = svgEl('text', { x:x + 32, y:36, 'text-anchor':'middle', fill:'#E9F4F6', 'font-size':'13', 'font-family':'system-ui' });
+    t.textContent = label;
+    g.append(t);
+    return g;
+  };
+  const arrow = svgEl('line', { x1:76, y1:31, x2:126, y2:31, stroke:'#FFD100', 'stroke-linecap':'round' });
+  const outArr = svgEl('line', { x1:198, y1:31, x2:232, y2:31, stroke:'rgba(47,211,220,.8)', 'stroke-width':2, 'stroke-linecap':'round' });
+  const idxT = svgEl('text', { x:101, y:20, 'text-anchor':'middle', fill:'#FFD100', 'font-size':'10', 'font-family':'ui-monospace, monospace' });
+  svg.append(mk(12, 'MOD'), arrow, idxT, mk(130, 'CAR'), outArr);
+  const draw = () => {
+    const { modIndex } = get();
+    arrow.setAttribute('stroke-width', (1 + modIndex / 5).toFixed(2));
+    idxT.textContent = 'index ' + modIndex.toFixed(1);
+  };
+  draw(); reg.push(draw);
+  return box;
+}
+
+/* All four drum decays overlaid — you can see the hat is short and the kick long. */
+function drumScope(get, reg = CONTROLS){
+  const { box, svg, cap } = scope('Voice decays', 58);
+  const cls = ['k','s','h','c'];
+  const lines = cls.map(c => svgEl('path', { class:'viz-line ' + c, 'vector-effect':'non-scaling-stroke', 'stroke-width':1.6, opacity:0.9 }));
+  lines.forEach(l => svg.append(l));
+  const draw = () => {
+    const d = get(), W = 240, H = 58, pad = 4, maxT = 1.4;
+    [d.kickDecay, d.snareDecay, d.hatDecay, d.clapDecay].forEach((dec, i) => {
+      const pts = [];
+      for (let x = 0; x <= 60; x++){
+        const t = (x / 60) * maxT;
+        const a = Math.exp(-t / Math.max(0.02, dec) * 2.2);
+        pts.push([pad + (x / 60) * (W - pad * 2), H - pad - (H - pad * 2) * a]);
+      }
+      lines[i].setAttribute('d', pathFrom(pts));
+    });
+    cap.textContent = 'kick · snare · hat · clap';
+  };
+  draw(); reg.push(draw);
+  return box;
+}
+
+function rackSection(title, ...kids){
+  const sec = el('div', 'rack-sec');
+  if (title) sec.append(el('div', 'rack-lbl', title));
+  kids.forEach(k => sec.append(k));
+  return sec;
+}
+function knobRow(cols, ...kids){
+  const r = el('div', 'knob-row' + (cols === 2 ? ' two' : cols === 4 ? ' four' : ''));
+  kids.forEach(k => r.append(k));
+  return r;
+}
+
+/* ---------------------------------------------------------------------------
+   The three racks. Every control writes straight into state.inst and calls
+   syncInstruments(), so a turn is audible on the next note — including notes
+   already playing back.
+   ------------------------------------------------------------------------ */
 function buildInstrumentWindows(){
-  const b = () => state.inst.bass, k = () => state.inst.keys, d = () => state.inst.drum;
+  const D = () => state.inst.drum, B = () => state.inst.bass, K = () => state.inst.keys;
+  const REDRAW = [];                                     // scope redraws for this session
+  const touch = () => { syncInstruments(); REDRAW.forEach(f => f()); };
 
+  /* ---------------- drum rack ---------------- */
   const bodyD = $('#bodyDrum'); bodyD.innerHTML = '';
-  const gd = el('div', 'ctl-grid');
-  gd.append(
-    slider({ label:'Kick tune', min:28, max:110, step:1, get:() => d().kickTune, set:v => d().kickTune = v, fmt:r0, unit:' Hz', onChange:syncInstruments }),
-    slider({ label:'Kick drop', min:0.01, max:0.4, step:0.005, get:() => d().kickPitchDecay, set:v => d().kickPitchDecay = v, fmt:s2, unit:' s', onChange:syncInstruments }),
-    slider({ label:'Kick decay', min:0.05, max:1.4, step:0.01, get:() => d().kickDecay, set:v => d().kickDecay = v, fmt:s2, unit:' s', onChange:syncInstruments }),
-    slider({ label:'Snare decay', min:0.03, max:0.8, step:0.01, get:() => d().snareDecay, set:v => d().snareDecay = v, fmt:s2, unit:' s', onChange:syncInstruments }),
-    slider({ label:'Snare tone', min:400, max:5000, step:20, get:() => d().snareTone, set:v => d().snareTone = v, fmt:r0, unit:' Hz', onChange:syncInstruments }),
-    slider({ label:'Hat tune', min:120, max:900, step:5, get:() => d().hatTune, set:v => d().hatTune = v, fmt:r0, unit:' Hz', onChange:syncInstruments, yellow:true }),
-    slider({ label:'Hat decay', min:0.01, max:0.5, step:0.005, get:() => d().hatDecay, set:v => d().hatDecay = v, fmt:s2, unit:' s', onChange:syncInstruments, yellow:true }),
-    slider({ label:'Clap decay', min:0.05, max:0.8, step:0.01, get:() => d().clapDecay, set:v => d().clapDecay = v, fmt:s2, unit:' s', onChange:syncInstruments }),
-    slider({ label:'Clap tone', min:400, max:4000, step:20, get:() => d().clapTone, set:v => d().clapTone = v, fmt:r0, unit:' Hz', onChange:syncInstruments })
+  const pads = el('div', 'pads');
+  DRUM_ROWS.forEach((d, i) => {
+    const b = el('button', 'pad', d.label); b.type = 'button';
+    b.addEventListener('click', () => {
+      previewDrum(i);
+      b.classList.add('hit');
+      setTimeout(() => b.classList.remove('hit'), 130);
+    });
+    pads.append(b);
+  });
+  bodyD.append(
+    rackSection('Tap to audition', pads),
+    drumScope(D, REDRAW),
+    rackSection('Kick', knobRow(3,
+      knob({ label:'Tune', min:28, max:110, step:1, def:52, curve:'exp', get:() => D().kickTune, set:v => D().kickTune = v, fmt:r0, unit:' Hz', onChange:touch }),
+      knob({ label:'Pitch drop', min:0.01, max:0.4, step:0.005, def:0.05, get:() => D().kickPitchDecay, set:v => D().kickPitchDecay = v, fmt:s2, unit:' s', onChange:touch }),
+      knob({ label:'Decay', min:0.05, max:1.4, step:0.01, def:0.42, get:() => D().kickDecay, set:v => D().kickDecay = v, fmt:s2, unit:' s', onChange:touch })
+    )),
+    rackSection('Snare & clap', knobRow(4,
+      knob({ label:'Snare decay', min:0.03, max:0.8, step:0.01, def:0.17, get:() => D().snareDecay, set:v => D().snareDecay = v, fmt:s2, unit:'s', onChange:touch }),
+      knob({ label:'Snare tone', min:400, max:5000, step:20, def:1800, curve:'exp', get:() => D().snareTone, set:v => D().snareTone = v, fmt:r0, unit:'', onChange:touch }),
+      knob({ label:'Clap decay', min:0.05, max:0.8, step:0.01, def:0.24, get:() => D().clapDecay, set:v => D().clapDecay = v, fmt:s2, unit:'s', onChange:touch }),
+      knob({ label:'Clap tone', min:400, max:4000, step:20, def:1300, curve:'exp', get:() => D().clapTone, set:v => D().clapTone = v, fmt:r0, unit:'', onChange:touch })
+    )),
+    rackSection('Hi-hat', knobRow(2,
+      knob({ label:'Tune', min:120, max:900, step:5, def:280, curve:'exp', tone:'yellow', get:() => D().hatTune, set:v => D().hatTune = v, fmt:r0, unit:' Hz', onChange:touch }),
+      knob({ label:'Decay', min:0.01, max:0.5, step:0.005, def:0.055, tone:'yellow', get:() => D().hatDecay, set:v => D().hatDecay = v, fmt:s2, unit:' s', onChange:touch })
+    ))
   );
-  bodyD.append(gd);
 
+  /* ---------------- subtractive synth ---------------- */
   const bodyB = $('#bodyBass'); bodyB.innerHTML = '';
-  const gb = el('div', 'ctl-grid');
-  gb.append(
-    picker({ label:'Waveform', options:['sawtooth','square','triangle','sine','fatsawtooth','pwm'], get:() => b().wave, set:v => b().wave = v, onChange:syncInstruments }),
-    slider({ label:'Cutoff', min:80, max:8000, step:10, get:() => b().cutoff, set:v => b().cutoff = v, fmt:r0, unit:' Hz', onChange:syncInstruments }),
-    slider({ label:'Resonance', min:0.1, max:16, step:0.1, get:() => b().q, set:v => b().q = v, fmt:s2, onChange:syncInstruments, yellow:true }),
-    slider({ label:'Attack',  min:0.001, max:1, step:0.001, get:() => b().attack,  set:v => b().attack = v,  fmt:s2, unit:' s', onChange:syncInstruments }),
-    slider({ label:'Decay',   min:0.01,  max:2, step:0.01,  get:() => b().decay,   set:v => b().decay = v,   fmt:s2, unit:' s', onChange:syncInstruments }),
-    slider({ label:'Sustain', min:0,     max:1, step:0.01,  get:() => b().sustain, set:v => b().sustain = v, fmt:pct,          onChange:syncInstruments }),
-    slider({ label:'Release', min:0.01,  max:3, step:0.01,  get:() => b().release, set:v => b().release = v, fmt:s2, unit:' s', onChange:syncInstruments })
+  const testBass = el('button', 'btn test-btn', 'Play a test note');
+  testBass.addEventListener('click', () => previewNote('bass', 'C3'));
+  bodyB.append(
+    rackSection('Oscillator', waveSelect({
+      options:['sawtooth','square','triangle','sine','fatsawtooth','pwm'],
+      get:() => B().wave, set:v => B().wave = v, onChange:touch
+    })),
+    rackSection('Filter',
+      filterScope(() => ({ cutoff:B().cutoff, q:B().q }), REDRAW),
+      knobRow(2,
+        knob({ label:'Cutoff', min:80, max:8000, step:10, def:900, curve:'exp', get:() => B().cutoff, set:v => B().cutoff = v, fmt:r0, unit:' Hz', onChange:touch }),
+        knob({ label:'Resonance', min:0.1, max:16, step:0.1, def:6, tone:'yellow', get:() => B().q, set:v => B().q = v, fmt:s2, onChange:touch })
+      )
+    ),
+    rackSection('Amp envelope',
+      adsrScope(() => ({ a:B().attack, d:B().decay, s:B().sustain, r:B().release }), false, REDRAW),
+      knobRow(4,
+        knob({ label:'Attack', min:0.001, max:1, step:0.001, def:0.005, get:() => B().attack, set:v => B().attack = v, fmt:s2, unit:'s', onChange:touch }),
+        knob({ label:'Decay', min:0.01, max:2, step:0.01, def:0.18, get:() => B().decay, set:v => B().decay = v, fmt:s2, unit:'s', onChange:touch }),
+        knob({ label:'Sustain', min:0, max:1, step:0.01, def:0.35, get:() => B().sustain, set:v => B().sustain = v, fmt:pct, onChange:touch }),
+        knob({ label:'Release', min:0.01, max:3, step:0.01, def:0.25, get:() => B().release, set:v => B().release = v, fmt:s2, unit:'s', onChange:touch })
+      ),
+      testBass
+    )
   );
-  bodyB.append(gb);
 
+  /* ---------------- FM keys ---------------- */
   const bodyK = $('#bodyKeys'); bodyK.innerHTML = '';
-  const gk = el('div', 'ctl-grid');
-  gk.append(
-    slider({ label:'Harmonicity', min:0.25, max:8, step:0.05, get:() => k().harmonicity, set:v => k().harmonicity = v, fmt:s2, onChange:syncInstruments, yellow:true }),
-    slider({ label:'Mod index', min:0, max:40, step:0.5, get:() => k().modIndex, set:v => k().modIndex = v, fmt:r0, onChange:syncInstruments, yellow:true }),
-    picker({ label:'Carrier', options:['sine','triangle','square','sawtooth'], get:() => k().wave, set:v => k().wave = v, onChange:syncInstruments }),
-    slider({ label:'Mod decay', min:0.02, max:3, step:0.01, get:() => k().modDecay, set:v => k().modDecay = v, fmt:s2, unit:' s', onChange:syncInstruments }),
-    slider({ label:'Attack',  min:0.001, max:1, step:0.001, get:() => k().attack,  set:v => k().attack = v,  fmt:s2, unit:' s', onChange:syncInstruments }),
-    slider({ label:'Decay',   min:0.01,  max:3, step:0.01,  get:() => k().decay,   set:v => k().decay = v,   fmt:s2, unit:' s', onChange:syncInstruments }),
-    slider({ label:'Sustain', min:0,     max:1, step:0.01,  get:() => k().sustain, set:v => k().sustain = v, fmt:pct,          onChange:syncInstruments }),
-    slider({ label:'Release', min:0.02,  max:5, step:0.01,  get:() => k().release, set:v => k().release = v, fmt:s2, unit:' s', onChange:syncInstruments })
+  const testKeys = el('button', 'btn test-btn', 'Play a test chord');
+  testKeys.addEventListener('click', () => {
+    if (!A) return;
+    safe(() => A.keys.triggerAttackRelease(['C4','E4','G4','B4'], 1.4, previewTime(), 0.7));
+  });
+  bodyK.append(
+    rackSection('Routing', fmRouting(K, REDRAW), fmScope(K, REDRAW)),
+    rackSection('Modulator', knobRow(3,
+      knob({ label:'Harmonicity', min:0.25, max:8, step:0.05, def:2.5, tone:'yellow', get:() => K().harmonicity, set:v => K().harmonicity = v, fmt:s2, onChange:touch }),
+      knob({ label:'Mod index', min:0, max:40, step:0.5, def:9, tone:'yellow', get:() => K().modIndex, set:v => K().modIndex = v, fmt:s1, onChange:touch }),
+      knob({ label:'Mod decay', min:0.02, max:3, step:0.01, def:0.4, get:() => K().modDecay, set:v => K().modDecay = v, fmt:s2, unit:'s', onChange:touch })
+    )),
+    rackSection('Carrier', waveSelect({
+      options:['sine','triangle','square','sawtooth'],
+      get:() => K().wave, set:v => K().wave = v, onChange:touch
+    })),
+    rackSection('Amp envelope',
+      adsrScope(() => ({ a:K().attack, d:K().decay, s:K().sustain, r:K().release }), true, REDRAW),
+      knobRow(4,
+        knob({ label:'Attack', min:0.001, max:1, step:0.001, def:0.01, get:() => K().attack, set:v => K().attack = v, fmt:s2, unit:'s', onChange:touch }),
+        knob({ label:'Decay', min:0.01, max:3, step:0.01, def:0.35, get:() => K().decay, set:v => K().decay = v, fmt:s2, unit:'s', onChange:touch }),
+        knob({ label:'Sustain', min:0, max:1, step:0.01, def:0.28, get:() => K().sustain, set:v => K().sustain = v, fmt:pct, onChange:touch }),
+        knob({ label:'Release', min:0.02, max:5, step:0.01, def:1.1, get:() => K().release, set:v => K().release = v, fmt:s2, unit:'s', onChange:touch })
+      ),
+      testKeys
+    )
   );
-  bodyK.append(gk);
+
+  /* scopes refresh after a project load too */
+  CONTROLS.push(() => REDRAW.forEach(f => f()));
 
   Object.keys(WINS).forEach(makeDraggable);
   $$('.win-close').forEach(btn => btn.addEventListener('click', () => toggleWindow(btn.dataset.close, false)));
@@ -1271,44 +1647,82 @@ function buildInstrumentWindows(){
 /* ============================================================================
    7. PATTERN RAIL
    ========================================================================== */
+let patChips = {};                     // id -> { row, nm, len } so selecting never rebuilds the DOM
+
 function buildPatternRail(){
-  const host = $('#patList'); host.innerHTML = '';
+  const host = $('#patList'); host.innerHTML = ''; patChips = {};
   state.patterns.forEach(p => {
-    const row = el('div', 'pat' + (p.id === state.selected ? ' sel' : ''));
+    const row = el('div', 'pat');
     row.tabIndex = 0; row.setAttribute('role', 'button');
     const dot = el('i'); dot.style.background = p.colour;
-    const nm = el('span', 'nm', p.name);
-    row.append(dot, nm, el('span', 'len', p.bars + (p.bars > 1 ? ' bars' : ' bar')));
+    const nm  = el('span', 'nm', p.name);
+    const len = el('span', 'len', '');
+    const ren = el('button', 'pat-ren', '✎');
+    ren.type = 'button'; ren.title = 'Rename pattern';
+
+    row.append(dot, nm, len, ren);
+    patChips[p.id] = { row, nm, len };
+
     row.addEventListener('click', () => selectPattern(p.id));
-    row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); selectPattern(p.id); } });
-    /* double-click renames in place (no blocking prompt dialogs) */
-    row.addEventListener('dblclick', e => {
-      e.preventDefault();
-      const input = el('input', 'nm-input'); input.value = p.name;
-      row.replaceChild(input, nm); input.focus(); input.select();
-      let done = false;
-      const commit = () => {
-        if (done) return; done = true;
-        p.name = (input.value.trim() || 'Pattern').slice(0, 22);
-        buildPatternRail(); paintClips(); updateEditingLabels();
-      };
-      input.addEventListener('keydown', ev => {
-        ev.stopPropagation();
-        if (ev.key === 'Enter') commit();
-        if (ev.key === 'Escape'){ done = true; buildPatternRail(); }
-      });
-      input.addEventListener('blur', commit);
-      input.addEventListener('click', ev => ev.stopPropagation());
+    row.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); selectPattern(p.id); }
+      if (e.key === 'F2'){ e.preventDefault(); startRename(p); }
     });
+    row.addEventListener('dblclick', e => { e.preventDefault(); startRename(p); });
+    ren.addEventListener('click', e => { e.stopPropagation(); startRename(p); });
     host.append(row);
   });
-  $('#patLen').value = String(selectedPattern().bars);
-  $('#selPatPill').textContent = selectedPattern().name;
+  refreshPatternChips();
 }
+
+/* Selection only toggles classes. Rebuilding the list here is what used to
+   swap the DOM node out from under a double-click, so renaming never opened. */
+function refreshPatternChips(){
+  Object.keys(patChips).forEach(id => {
+    const p = patternById(id), c = patChips[id];
+    if (!p) return;
+    c.row.classList.toggle('sel', id === state.selected);
+    if (!c.row.querySelector('.nm-input')) c.nm.textContent = p.name;
+    c.len.textContent = p.bars + (p.bars > 1 ? ' bars' : ' bar');
+  });
+  const sel = selectedPattern();
+  $('#patLen').value = String(sel.bars);
+  $('#selPatPill').textContent = sel.name;
+}
+
+/* Inline rename: swap the label for an input, commit on Enter or blur. */
+function startRename(p){
+  const c = patChips[p.id];
+  if (!c || c.row.querySelector('.nm-input')) return;
+  const input = el('input', 'nm-input');
+  input.value = p.name;
+  input.maxLength = 22;
+  c.row.replaceChild(input, c.nm);
+  input.focus(); input.select();
+
+  let done = false;
+  const finish = save => {
+    if (done) return; done = true;
+    if (save) p.name = (input.value.trim() || 'Pattern').slice(0, 22);
+    c.nm.textContent = p.name;
+    if (input.parentElement === c.row) c.row.replaceChild(c.nm, input);
+    refreshPatternChips(); updateEditingLabels(); paintClips();
+  };
+  input.addEventListener('keydown', e => {
+    e.stopPropagation();                                  // keep Space out of the transport
+    if (e.key === 'Enter'){ e.preventDefault(); finish(true); }
+    if (e.key === 'Escape'){ e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+  ['click','dblclick','pointerdown'].forEach(ev => input.addEventListener(ev, e => e.stopPropagation()));
+}
+
 function selectPattern(id){
+  if (id === state.selected) return;                      // don't disturb an open rename
   state.selected = id;
-  buildPatternRail();
+  refreshPatternChips();
   buildDrumGrid();
+  buildOctavePicker();
   buildRoll();
   updateEditingLabels();
 }
@@ -2048,8 +2462,9 @@ function wireUI(){
   $('#btnNewPat').addEventListener('click', () => {
     const p = newPattern('Pattern ' + (state.patterns.length + 1), 1, state.patterns.length);
     state.patterns.push(p);
+    buildPatternRail();
     selectPattern(p.id);
-    toast('Added ' + p.name, 'ok');
+    toast('Added ' + p.name + ' — click a lane to place it', 'ok');
   });
   $('#btnDupPat').addEventListener('click', () => {
     const src = selectedPattern();
@@ -2058,6 +2473,7 @@ function wireUI(){
     copy.name = src.name + ' copy';
     copy.colour = PAT_COLOURS[state.patterns.length % PAT_COLOURS.length];
     state.patterns.push(copy);
+    buildPatternRail();
     selectPattern(copy.id);
   });
   $('#btnDelPat').addEventListener('click', async () => {
@@ -2075,7 +2491,7 @@ function wireUI(){
   });
   $('#patLen').addEventListener('change', e => {
     setPatternBars(selectedPattern(), parseInt(e.target.value, 10));
-    rebuildIndex(); buildPatternRail(); buildDrumGrid(); buildRoll(); paintClips();
+    rebuildIndex(); refreshPatternChips(); buildDrumGrid(); buildRoll(); paintClips();
   });
 
   /* playlist */
