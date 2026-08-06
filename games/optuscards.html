@@ -66,6 +66,13 @@ body::before{
     radial-gradient(760px 500px at 108% 108%, rgba(255,209,0,.07), transparent 60%),
     radial-gradient(620px 420px at -8% 84%, rgba(0,163,173,.12), transparent 60%);
 }
+/* Anything you drag — cards, the pack, stash tiles — must not select text or
+   ghost-drag its images while you're handling it. */
+.card,.card *,.pack-scene,.pack-scene *,.reveal-wrap,.reveal-wrap *,
+.slot,.slot *,.detail-card,.detail-card *,#packStage,.summary-grid,.summary-grid *{
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+}
+img{-webkit-user-drag:none;user-drag:none}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
 input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--yellow);outline-offset:2px;border-radius:4px}
@@ -811,7 +818,6 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
 
       <div class="auth-err" id="authErr"></div>
       <button class="btn btn-y btn-block" id="btnAuth" style="margin-top:6px">Sign in</button>
-      <button class="btn btn-ghost btn-block" id="btnGuest" style="margin-top:8px">Play as guest</button>
     </div>
 
     <p class="auth-note" id="authMode"></p>
@@ -844,7 +850,7 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
         <div>
           <p class="eyebrow">Booster store</p>
           <h1 class="h1">Pick your odds.</h1>
-          <p class="sub">Every tier pulls from the same 29-card set. Only the probabilities change.</p>
+          <p class="sub">Every tier pulls from the same 29-card set, and every card has a finite print run shared by all collectors.</p>
         </div>
         <button class="btn btn-o btn-sm" id="btnOddsInfo">How pulls work</button>
       </div>
@@ -1001,16 +1007,17 @@ select.input{appearance:none;background-image:linear-gradient(45deg,transparent 
    └──────────────────────────────────────────────────────────────────────────┘ */
 
 const firebaseConfig = {
-  apiKey:            "PASTE_YOUR_API_KEY",
-  authDomain:        "PASTE_YOUR_PROJECT.firebaseapp.com",
-  projectId:         "PASTE_YOUR_PROJECT_ID",
-  storageBucket:     "PASTE_YOUR_PROJECT.appspot.com",
-  messagingSenderId: "PASTE_YOUR_SENDER_ID",
-  appId:             "PASTE_YOUR_APP_ID"
+  apiKey: "AIzaSyCAqQD_CLusNG2DzcTPYvs7hovJRnTXEH8",
+  authDomain: "optuscards.firebaseapp.com",
+  projectId: "optuscards",
+  storageBucket: "optuscards.firebasestorage.app",
+  messagingSenderId: "449382822131",
+  appId: "1:449382822131:web:b5b9c40e12011705978786",
+  measurementId: "G-E1E3XMKMPJ"
 };
 
 /*  BEFORE YOU GO LIVE — enable these in the Firebase console:
-      • Authentication → Sign-in method → Email/Password  (and Anonymous, for "Play as guest")
+      • Authentication → Sign-in method → Email/Password
       • Firestore Database → Create database
       • Firestore → Rules → paste the block below
 
@@ -1033,6 +1040,14 @@ const firebaseConfig = {
           allow create: if request.auth.uid == request.resource.data.ownerUid;
           allow update: if request.auth != null;
           allow delete: if request.auth.uid == resource.data.ownerUid;
+        }
+
+        // The global print-run ledger: how many of each card have ever been
+        // minted, across every player. Written only inside pack transactions.
+        match /supply/global {
+          allow read:  if request.auth != null;
+          allow write: if request.auth != null;   // move into a Cloud Function
+                                                  // if you need mints to be tamper-proof
         }
       }
     }
@@ -1118,23 +1133,6 @@ const Store = {
     return this.player;
   },
 
-  async guest(){
-    if (MODE === "cloud"){
-      const { signInAnonymously } = FB.U;
-      const cred = await signInAnonymously(FB.auth);
-      this.uid = cred.user.uid;
-      this.player = await this._readPlayer(this.uid) || newPlayer("Guest " + this.uid.slice(0,4).toUpperCase());
-      await this._writePlayer(this.player);
-    } else {
-      const uid = LS.get("optcg:guest") || ("local-guest-" + Math.random().toString(36).slice(2,7));
-      LS.set("optcg:guest", uid);
-      this.uid = uid;
-      this.player = LS.get("optcg:p:"+uid) || newPlayer("Guest " + uid.slice(-4).toUpperCase());
-      LS.set("optcg:p:"+uid, this.player); LS.set("optcg:session", uid);
-    }
-    return this.player;
-  },
-
   async resume(){
     if (MODE === "cloud"){
       return new Promise(res=>{
@@ -1179,6 +1177,103 @@ const Store = {
   },
   /** Persist the in-memory player. Fire-and-forget; UI never waits on the network. */
   save(){ if (this.uid && this.player) this._writePlayer(this.player).catch(e=>console.warn("save failed",e)); },
+
+  /* ---------- global print-run ledger ----------
+     `supply` is { cardId: copiesMintedEverywhere }. Every card has a finite
+     print run (see PRINT_RUN), so once a card is fully minted nobody can pull
+     it again — the only way to get one is to trade for it, or wait for someone
+     to sell theirs back, which returns the copy to the pool. */
+  supply:{},
+
+  async loadSupply(){
+    if (MODE === "cloud"){
+      const { doc, getDoc } = FB.F;
+      const s = await getDoc(doc(FB.db, "supply", "global"));
+      this.supply = s.exists() ? (s.data().minted || {}) : {};
+    } else this.supply = LS.get("optcg:supply", {});
+    return this.supply;
+  },
+
+  /**
+   * Opens a pack as one atomic operation: read the authoritative ledger, roll
+   * against what's actually left, then write the mints, the stash and the
+   * credit deduction together. If two people open packs at the same moment and
+   * only one copy of a card remains, exactly one of them gets it — the loser's
+   * transaction retries and re-rolls against the updated ledger.
+   *
+   * `roll(pack, minted)` must return an array of cards that are still available.
+   */
+  async openPack(pack, roll){
+    if (MODE === "cloud"){
+      const { doc, runTransaction } = FB.F;
+      const supRef = doc(FB.db, "supply", "global");
+      const meRef  = doc(FB.db, "players", this.uid);
+      let result = null;
+
+      await runTransaction(FB.db, async tx => {
+        const [supSnap, meSnap] = await Promise.all([tx.get(supRef), tx.get(meRef)]);
+        if (!meSnap.exists()) throw new Error("Your player record is missing.");
+        const me = meSnap.data();
+        if ((me.credits || 0) < pack.price) throw new Error("Not enough credits.");
+
+        const minted = { ...(supSnap.exists() ? supSnap.data().minted || {} : {}) };
+        const cards = roll(pack, minted);
+        if (!cards.length) throw new Error("Every card in the set has been minted.");
+
+        const held = me.stash || {}, stash = { ...held }, mints = [], newIds = new Set();
+        for (const c of cards){
+          if (!held[c.id]) newIds.add(c.id);
+          minted[c.id] = (minted[c.id] || 0) + 1;
+          mints.push(minted[c.id]);
+          stash[c.id] = (stash[c.id] || 0) + 1;
+        }
+        tx.set(supRef, { minted }, { merge:true });
+        tx.update(meRef, {
+          credits: me.credits - pack.price, stash,
+          packsOpened:(me.packsOpened || 0) + 1,
+          cardsPulled:(me.cardsPulled || 0) + cards.length
+        });
+        result = { cards, mints, newIds };
+        this.supply = minted;
+      });
+
+      this.player = await this._readPlayer(this.uid);
+      return result;
+    }
+
+    /* Offline: the ledger is just this browser's. */
+    const me = this.player;
+    if (me.credits < pack.price) throw new Error("Not enough credits.");
+    const minted = { ...this.supply };
+    const cards = roll(pack, minted);
+    if (!cards.length) throw new Error("Every card in the set has been minted.");
+
+    const mints = [], newIds = new Set();
+    for (const c of cards){
+      if (!me.stash[c.id]) newIds.add(c.id);
+      minted[c.id] = (minted[c.id] || 0) + 1;
+      mints.push(minted[c.id]);
+      me.stash[c.id] = (me.stash[c.id] || 0) + 1;
+    }
+    me.credits -= pack.price;
+    me.packsOpened = (me.packsOpened || 0) + 1;
+    me.cardsPulled = (me.cardsPulled || 0) + cards.length;
+    this.supply = minted; LS.set("optcg:supply", minted); this.save();
+    return { cards, mints, newIds };
+  },
+
+  /** Selling puts the copy back into circulation for everyone else. */
+  async returnToPool(counts){
+    for (const [id, n] of Object.entries(counts))
+      this.supply[id] = Math.max(0, (this.supply[id] || 0) - n);
+    if (MODE === "cloud"){
+      const { doc, updateDoc, increment } = FB.F;
+      const patch = {};
+      for (const [id, n] of Object.entries(counts)) patch["minted." + id] = increment(-n);
+      try { await updateDoc(doc(FB.db, "supply", "global"), patch); }
+      catch(e){ console.warn("supply return failed", e); }
+    } else LS.set("optcg:supply", this.supply);
+  },
 
   /* ---------- trade board ---------- */
   async listOffers(){
@@ -1250,12 +1345,21 @@ const Store = {
       return;
     }
 
-    /* Offline: the counterparty is a sample listing, so only our side moves. */
-    const s = this.player.stash;
-    if ((s[offer.wantId]||0) < 1) throw new Error("You no longer hold the card they want.");
-    s[offer.wantId]--; if (!s[offer.wantId]) delete s[offer.wantId];
-    s[offer.giveId] = (s[offer.giveId]||0) + 1;
-    this.player.tradesDone = (this.player.tradesDone||0) + 1;
+    /* Offline: both stashes live in this browser, so move the cards on both sides. */
+    const mine = this.player.stash, themKey = "optcg:p:" + offer.ownerUid;
+    const them = LS.get(themKey);
+    if ((mine[offer.wantId] || 0) < 1) throw new Error("You no longer hold the card they want.");
+    if (!them) throw new Error("That collector's stash is unavailable.");
+    if ((them.stash?.[offer.giveId] || 0) < 1) throw new Error("They no longer hold the card they offered.");
+
+    mine[offer.wantId]--; if (!mine[offer.wantId]) delete mine[offer.wantId];
+    mine[offer.giveId] = (mine[offer.giveId] || 0) + 1;
+    them.stash[offer.giveId]--; if (!them.stash[offer.giveId]) delete them.stash[offer.giveId];
+    them.stash[offer.wantId] = (them.stash[offer.wantId] || 0) + 1;
+    them.tradesDone = (them.tradesDone || 0) + 1;
+    LS.set(themKey, them);
+
+    this.player.tradesDone = (this.player.tradesDone || 0) + 1;
     LS.set("optcg:offers", LS.get("optcg:offers",[]).map(o => o.id===offer.id ? {...o,status:"done"} : o));
     this.save();
   }
@@ -2093,6 +2197,18 @@ const SETS  = [...new Set(CARDS.map(c => c.set))];
 const sellValue = c => RARITY[c.r].sell;
 
 /* ============================================================================
+   PRINT RUNS
+   How many copies of each card will ever exist, across every player. Once a
+   card is fully minted it stops appearing in packs — the only routes to one are
+   the trading hub, or waiting for someone to sell theirs back into the pool.
+   ============================================================================ */
+const PRINT_RUN = { 1:5000, 2:2500, 3:900, 4:300, 5:120, 6:45, 7:20 };
+const runOf       = c  => PRINT_RUN[c.r];
+const mintedOf    = id => (Store.supply?.[id] || 0);
+const remainingOf = c  => Math.max(0, runOf(c) - mintedOf(c.id));
+const soldOut     = c  => remainingOf(c) === 0;
+
+/* ============================================================================
    PACK TIERS
    `slots` are the ordinary pulls; `hit` is the guaranteed final slot, which
    always rolls from a floor of Uncommon or better. More expensive packs shift
@@ -2241,12 +2357,12 @@ function artHTML(c){
     const s = SCENE[c.scene]();
     return `<div class="cart">
       <div class="sc">${s.bg}</div>
-      <div class="subwrap" style="${s.sub}"><img src="${PHOTO[c.img]}" alt="" loading="lazy"></div>
+      <div class="subwrap" style="${s.sub}"><img src="${PHOTO[c.img]}" alt="" loading="lazy" draggable="false"></div>
       <div class="sc">${s.fg}</div>
     </div>`;
   }
   const fit = c.fit === "contain" ? " contain" : "";
-  if (c.img) return `<div class="cart${fit}"><img src="${PHOTO[c.img]}" alt="" loading="lazy"></div>`;
+  if (c.img) return `<div class="cart${fit}"><img src="${PHOTO[c.img]}" alt="" loading="lazy" draggable="false"></div>`;
   return `<div class="cart${fit}">${ART[c.svg] ? ART[c.svg]() : ""}</div>`;
 }
 
@@ -2396,7 +2512,9 @@ function renderStore(){
         <span class="pct">${pct < 1 ? pct.toFixed(2) : pct.toFixed(1)}%</span></div>`;
     }).join("");
 
+    const scarce = CARDS.filter(c => (!p.only || c.set === p.only) && c.r >= 5 && remainingOf(c) > 0).length;
     const tags = [`<span class="chip">${p.size} cards</span>`];
+    if (!scarce) tags.push(`<span class="chip">Ultra+ minted out</span>`);
     if (p.only) tags.push(`<span class="chip">${p.only} only</span>`);
     if (p.bias) tags.push(`<span class="chip hot">${p.bias} weighted</span>`);
     if (p.id === "legends") tags.push(`<span class="chip hot">Holo floor</span>`);
@@ -2408,7 +2526,9 @@ function renderStore(){
         <p class="pack-desc">${p.blurb}</p>
       </div>
       <div class="pack-meta">${tags.join("")}</div>
-      <details class="odds"><summary><span>Chance of at least one</span><span>per pack</span></summary>${rows}</details>
+      <details class="odds"><summary><span>Chance of at least one</span><span>per pack</span></summary>${rows}
+        <p class="pack-desc" style="margin:12px 0 0;font-size:12px">Odds apply only to cards that still
+          have copies left in their print run.</p></details>
       <div class="buy-row">
         <span class="price"><span class="bolt">⚡</span>${fmt(p.price)}</span>
         <button class="btn btn-y btn-sm" data-buy="${p.id}" style="margin-left:auto">Open pack</button>
@@ -2417,7 +2537,7 @@ function renderStore(){
   }).join("");
 
   $$("#storeGrid [data-buy]").forEach(b =>
-    b.addEventListener("click", () => buyPack(PACKS.find(p => p.id === b.dataset.buy))));
+    b.addEventListener("click", () => buyPack(PACKS.find(p => p.id === b.dataset.buy), b)));
 }
 
 /* ============================================================================
@@ -2450,11 +2570,11 @@ function renderStash(){
   }
 
   grid.innerHTML = list.map(c => {
-    const n = owned(c.id);
+    const n = owned(c.id), out = soldOut(c);
     return `<div class="slot ${n ? "" : "locked"}" data-open="${c.id}">
       ${n ? cardHTML(c, { mini:true }) : cardHTML(c, { mini:true, down:true })}
       ${n > 1 ? `<span class="count">×${n}</span>` : ""}
-      ${n ? "" : `<span class="lockmark">NOT PULLED</span>`}
+      ${n ? "" : `<span class="lockmark">${out ? "MINTED OUT" : "NOT PULLED"}</span>`}
     </div>`;
   }).join("");
 
@@ -2484,6 +2604,10 @@ function openDetail(id){
           <div class="kv"><span>Card number</span><b>${c.serial}</b></div>
           <div class="kv"><span>Signal / Uptime / Speed</span><b>${c.s.join(" · ")}</b></div>
           <div class="kv"><span>Copies held</span><b>${n}</b></div>
+          <div class="kv"><span>Print run</span><b>${fmt(mintedOf(c.id))} / ${fmt(runOf(c))} minted</b></div>
+          <div class="kv"><span>Still in packs</span>
+            <b style="color:${remainingOf(c) ? "var(--r2)" : "var(--r1)"}">
+              ${remainingOf(c) ? fmt(remainingOf(c)) + " left" : "None — trade only"}</b></div>
           <div class="kv"><span>Sells for</span><b style="color:var(--yellow)">⚡${fmt(val)}</b></div>
         </div>
         <div style="display:flex;gap:9px;margin-top:16px;flex-wrap:wrap">
@@ -2507,18 +2631,21 @@ function sellCard(id){
   const val = sellValue(c);
   P().stash[id]--; if (!P().stash[id]) delete P().stash[id];
   P().credits += val; P().creditsEarned = (P().creditsEarned || 0) + val;
-  Store.save(); SFX.coin(); refreshWallet(true); renderStash(); renderProfile();
-  toast(`Sold ${c.name} for ⚡${fmt(val)}`, "good");
+  Store.save();
+  Store.returnToPool({ [id]:1 });        /* back into the pool for everyone else */
+  SFX.coin(); refreshWallet(true); renderStash(); renderProfile();
+  toast(`Sold ${c.name} for ⚡${fmt(val)} — returned to the pool`, "good");
 }
 
 $("#btnBulkSell").addEventListener("click", () => {
-  let gain = 0, count = 0;
+  let gain = 0, count = 0; const back = {};
   for (const [id, n] of Object.entries(P().stash)){
-    if (n > 1){ const extra = n - 1; gain += sellValue(BY_ID[id]) * extra; count += extra; P().stash[id] = 1; }
+    if (n > 1){ const extra = n - 1; gain += sellValue(BY_ID[id]) * extra; count += extra;
+                back[id] = extra; P().stash[id] = 1; }
   }
   if (!count) return toast("No duplicates to sell.");
   P().credits += gain; P().creditsEarned = (P().creditsEarned || 0) + gain;
-  Store.save(); SFX.coin(); refreshWallet(true); renderStash(); renderProfile();
+  Store.save(); Store.returnToPool(back); SFX.coin(); refreshWallet(true); renderStash(); renderProfile();
   toast(`Sold ${count} duplicate${count > 1 ? "s" : ""} for ⚡${fmt(gain)}`, "good");
 });
 
@@ -2537,22 +2664,6 @@ $("#sortBy").onchange     = e => { stashFilter.sort = e.target.value; renderStas
    TRADE VIEW
    ============================================================================ */
 let OFFERS = [];
-
-function seedDemoOffers(){
-  if (MODE === "cloud") return;
-  if (LS.get("optcg:offers")) return;
-  const handles = ["Muzz", "Priya K", "Dev on L2", "Nadia R", "Tom H", "Bec from Retail"];
-  const pool = CARDS.filter(c => c.r >= 2 && c.r <= 5);
-  const made = [];
-  for (let i = 0; i < 6; i++){
-    const give = pool[Math.floor(Math.random() * pool.length)];
-    let want = pool[Math.floor(Math.random() * pool.length)];
-    while (want.id === give.id) want = pool[Math.floor(Math.random() * pool.length)];
-    made.push({ id:"seed" + i, ownerUid:"npc-" + i, ownerHandle:handles[i], giveId:give.id, wantId:want.id,
-                status:"open", createdAt:Date.now() - i * 6e5 });
-  }
-  LS.set("optcg:offers", made);
-}
 
 async function renderTrade(){
   try { OFFERS = await Store.listOffers(); }
@@ -2587,7 +2698,9 @@ async function renderTrade(){
   };
 
   $("#offerList").innerHTML = others.length ? others.map(o => row(o, false)).join("")
-    : `<div class="empty"><b>The board is empty</b>Post an offer and it shows up here for everyone else.</div>`;
+    : `<div class="empty"><b>Nothing on the board</b>${MODE === "cloud"
+        ? "When another collector posts an offer it appears here."
+        : "Trading needs Firebase — add your keys at the top of the file and offers will sync between players."}</div>`;
   $("#myOfferList").innerHTML = mine.length ? mine.map(o => row(o, true)).join("")
     : `<div class="empty"><b>You have nothing posted</b>Duplicates are the easiest thing to part with.</div>`;
 
@@ -2736,10 +2849,20 @@ $("#btnOddsInfo").addEventListener("click", () => {
     <p class="sub" style="margin-top:0">Every slot in a pack is an independent roll against that pack's weight table.
       The final slot uses a separate table with a floor, so no pack can be all commons.
       The percentages in the store are the real derived chance of seeing at least one card of that tier.</p>
+    <p class="sub"><b style="color:var(--paper)">Every card has a finite print run.</b> The number of copies
+      that will ever exist is fixed per rarity and shared by every collector. Packs only roll against cards
+      that still have copies left, so once a card is minted out the only ways to get one are the trading hub
+      or waiting for someone to sell theirs — selling returns the copy to the pool.</p>
     <div style="margin-top:16px">
-      ${TIERS.slice().reverse().map(t => `<div class="kv">
-        <span><span class="dot" style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${RARITY[t].col};margin-right:8px"></span>${RARITY[t].name}</span>
-        <b style="color:var(--yellow)">sells ⚡${fmt(RARITY[t].sell)}</b></div>`).join("")}
+      ${TIERS.slice().reverse().map(t => {
+        const inTier = CARDS.filter(c => c.r === t);
+        const left = inTier.reduce((a, c) => a + remainingOf(c), 0);
+        const total = inTier.length * PRINT_RUN[t];
+        return `<div class="kv">
+          <span><span class="dot" style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${RARITY[t].col};margin-right:8px"></span>${RARITY[t].name}</span>
+          <b><span style="color:var(--mute)">${fmt(PRINT_RUN[t])} each · ${fmt(left)}/${fmt(total)} left</span>
+             &nbsp;<span style="color:var(--yellow)">⚡${fmt(RARITY[t].sell)}</span></b></div>`;
+      }).join("")}
     </div>
     <p class="sub">Duplicates are safe to sell — the copy count on each card in your stash shows what you can spare.</p>`;
   openScrim("#scrimInfo");
@@ -2832,12 +2955,17 @@ function pickTier(weights){
   return 1;
 }
 
-function pickCard(tier, pack){
-  let pool = CARDS.filter(c => c.r === tier && (!pack.only || c.set === pack.only));
-  /* Walk down the ladder if this sub-set has nothing at that tier. */
-  let t = tier;
-  while (!pool.length && t > 1){ t--; pool = CARDS.filter(c => c.r === t && (!pack.only || c.set === pack.only)); }
-  if (!pool.length) pool = CARDS.filter(c => !pack.only || c.set === pack.only);
+/** Only cards with copies left in their print run can be pulled. */
+function pickCard(tier, pack, minted){
+  const left = c => (minted[c.id] || 0) < runOf(c);
+  const inSet = c => !pack.only || c.set === pack.only;
+
+  let t = tier, pool = CARDS.filter(c => c.r === t && inSet(c) && left(c));
+  /* Walk down the ladder if nothing at this tier is still available. */
+  while (!pool.length && t > 1){ t--; pool = CARDS.filter(c => c.r === t && inSet(c) && left(c)); }
+  if (!pool.length) pool = CARDS.filter(c => inSet(c) && left(c));
+  if (!pool.length) pool = CARDS.filter(left);        /* drop the sub-set restriction */
+  if (!pool.length) return null;                      /* the whole set is minted out */
 
   const w = pool.map(c => (pack.bias && c.set === pack.bias) ? pack.biasWeight : 1);
   const total = w.reduce((a, b) => a + b, 0);
@@ -2846,10 +2974,20 @@ function pickCard(tier, pack){
   return pool[pool.length - 1];
 }
 
-function rollPack(pack){
-  const out = [];
-  for (let i = 0; i < pack.size - 1; i++) out.push(pickCard(pickTier(pack.slots), pack));
-  out.push(pickCard(pickTier(pack.hit), pack));
+/**
+ * Rolls a pack against a snapshot of the ledger. Picks are counted into a
+ * working copy as they happen, so a pack can never contain more copies of a
+ * card than were actually left.
+ */
+function rollPack(pack, minted = {}){
+  const work = { ...minted }, out = [];
+  const take = table => {
+    const c = pickCard(pickTier(table), pack, work);
+    if (c){ work[c.id] = (work[c.id] || 0) + 1; out.push(c); }
+  };
+  for (let i = 0; i < pack.size - 1; i++) take(pack.slots);
+  take(pack.hit);
+  if (!out.length) return out;
   /* Best card last — the reveal should climb, not peak in the middle. */
   const best = out.reduce((a, b, i) => out[a].r >= b.r ? a : i, 0);
   [out[best], out[out.length - 1]] = [out[out.length - 1], out[best]];
@@ -2859,24 +2997,35 @@ function rollPack(pack){
 /* ============================================================================
    OPENING SESSION STATE
    ============================================================================ */
-const OPEN = { pack:null, cards:[], newIds:new Set(), idx:0, phase:"idle", el:null, flipped:false };
+const OPEN = { pack:null, cards:[], mints:[], newIds:new Set(), idx:0, phase:"idle", el:null, flipped:false };
 
-function buyPack(pack){
+let buying = false;
+async function buyPack(pack, btn){
+  if (buying) return;
   if (P().credits < pack.price) return toast(`Not enough credits — you need ⚡${fmt(pack.price - P().credits)} more.`, "bad");
-  SFX.boot();
-  P().credits -= pack.price;
-  P().packsOpened = (P().packsOpened || 0) + 1;
+  buying = true; SFX.boot();
+  const label = btn?.textContent;
+  if (btn){ btn.disabled = true; btn.textContent = "Opening…"; }
 
-  const cards = rollPack(pack);
-  const newIds = new Set();
-  for (const c of cards){
-    if (!owned(c.id)) newIds.add(c.id);
-    P().stash[c.id] = (P().stash[c.id] || 0) + 1;
+  let res;
+  try {
+    /* The roll happens inside the ledger transaction, so what you pull is
+       decided against the supply as it stands at that instant. */
+    res = await Store.openPack(pack, rollPack);
+  } catch(e){
+    toast(e.message || "Could not open that pack.", "bad");
+    buying = false;
+    if (btn){ btn.disabled = false; btn.textContent = label; }
+    renderAll();
+    return;
   }
-  P().cardsPulled = (P().cardsPulled || 0) + cards.length;
-  Store.save(); refreshWallet(true); renderStash(); renderProfile();
+  buying = false;
+  if (btn){ btn.disabled = false; btn.textContent = label; }
 
-  OPEN.pack = pack; OPEN.cards = cards; OPEN.newIds = newIds; OPEN.idx = 0; OPEN.phase = "pack";
+  refreshWallet(true); renderStash(); renderProfile(); renderStore();
+
+  OPEN.pack = pack; OPEN.cards = res.cards; OPEN.mints = res.mints;
+  OPEN.newIds = res.newIds; OPEN.idx = 0; OPEN.phase = "pack";
   buildPackScene(pack);
   $("#packStage").classList.add("on");
   FX.size();
@@ -3115,7 +3264,7 @@ function hud(c, revealed){
       <div class="hud-stat"><b>${c.s[2]}</b><span>SPEED</span></div>
     </div>
     <div class="hud-foot">
-      <span class="num">${c.serial}</span>
+      <span class="num" title="Global mint number">No. ${fmt(OPEN.mints[OPEN.idx] ?? mintedOf(c.id))} of ${fmt(runOf(c))}</span>
       ${isNew ? `<span class="hud-new">NEW TO YOUR STASH</span>` : `<span class="num">Copy ${owned(c.id)}</span>`}
       <span class="num" style="color:var(--yellow)">⚡${fmt(sellValue(c))}</span>
     </div>
@@ -3296,13 +3445,13 @@ function closeStage(){
   renderAll();
 }
 $("#btnCloseSummary").addEventListener("click", closeStage);
-$("#btnOpenAnother").addEventListener("click", () => {
+$("#btnOpenAnother").addEventListener("click", e => {
   const pack = OPEN.pack;
   $("#revealWrap").querySelectorAll(".reveal-card").forEach(n => n.remove());
   $("#revealWrap").classList.remove("on");
   $("#summary").classList.remove("on");
   FX.clear(); window.__resetPack();
-  buyPack(pack);
+  buyPack(pack, e.currentTarget);
 });
 
 
@@ -3346,7 +3495,7 @@ function readableAuthError(err){
 async function enterApp(){
   $("#authScreen").style.display = "none";
   $("#app").hidden = false;
-  seedDemoOffers();
+  try { await Store.loadSupply(); } catch(e){ console.warn("supply load failed", e); }
   renderAll();
   await renderTrade();
 }
@@ -3373,13 +3522,6 @@ $("#btnAuth").addEventListener("click", async () => {
   }
 });
 
-$("#btnGuest").addEventListener("click", async () => {
-  $("#btnGuest").disabled = true;
-  try { await Store.guest(); await enterApp(); toast("Playing as a guest. Progress stays on this device."); }
-  catch(e){ authError(readableAuthError(e)); }
-  finally { $("#btnGuest").disabled = false; }
-});
-
 $("#inPass").addEventListener("keydown", e => { if (e.key === "Enter") $("#btnAuth").click(); });
 $("#inEmail").addEventListener("keydown", e => { if (e.key === "Enter") $("#btnAuth").click(); });
 
@@ -3395,8 +3537,8 @@ $("#btnSignOut").addEventListener("click", async () => {
    BOOT
    ============================================================================ */
 $("#authMode").textContent = MODE === "cloud"
-  ? "Connected to Firebase — your stash follows you to any device."
-  : "Offline mode: progress saves to this browser. Add your Firebase keys at the top of the file to sync and trade for real.";
+  ? "Connected to Firebase — your stash and the print-run ledger are shared with every other collector."
+  : "Offline mode: progress and the print-run ledger live in this browser only. Add your Firebase keys at the top of the file to play with other people.";
 
 FX.init();
 setAuthMode("signin");
