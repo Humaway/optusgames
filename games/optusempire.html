@@ -1,0 +1,2123 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Optus Empire: CX Crisis</title>
+<style>
+/* ============================================================
+   OPTUS EMPIRE — isometric store tycoon
+   ============================================================ */
+:root{
+  --teal:#00838A; --teal-600:#006E75; --teal-800:#004B52; --teal-900:#01323A; --teal-050:#E4F1F2;
+  --yellow:#FFC629; --yellow-600:#EDA900; --yellow-050:#FFF6DF;
+  --ink:#0D1F22; --slate:#33484B; --muted:#6E8589;
+  --paper:#EEF4F4; --card:#FFFFFF; --line:#D9E6E7;
+  --red:#DC4A38; --red-050:#FCEBE8; --green:#1D9E72; --green-050:#E6F5EF;
+  --amber:#E68A00; --amber-050:#FFF1DC;
+  --r-sm:8px; --r:12px; --r-lg:18px;
+  --sh-1:0 1px 2px rgba(1,50,58,.08), 0 2px 8px rgba(1,50,58,.06);
+  --sh-2:0 10px 34px rgba(1,50,58,.20);
+  --font-display:ui-rounded,"SF Pro Rounded","Segoe UI Variable Display","Trebuchet MS",system-ui,sans-serif;
+  --font-body:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  --font-data:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Consolas,monospace;
+  --bounce:cubic-bezier(.34,1.56,.64,1);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font-body);font-size:15px;
+  line-height:1.45;-webkit-font-smoothing:antialiased;overflow:hidden;touch-action:manipulation}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+:focus-visible{outline:3px solid var(--yellow);outline-offset:2px;border-radius:4px}
+h1,h2,h3,h4{font-family:var(--font-display);margin:0;letter-spacing:-.015em}
+.num{font-family:var(--font-data);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.screen{position:fixed;inset:0;display:none;overflow:auto}
+.screen.is-on{display:block}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 18px;border-radius:999px;
+  background:var(--teal);color:#fff;font-family:var(--font-display);font-weight:700;font-size:14px;
+  transition:transform .16s var(--bounce), background .15s;box-shadow:var(--sh-1);white-space:nowrap}
+.btn:hover{background:var(--teal-600);transform:translateY(-2px) scale(1.02)}
+.btn[disabled]{opacity:.4;pointer-events:none;box-shadow:none}
+.btn--yellow{background:var(--yellow);color:var(--teal-900)}
+.btn--yellow:hover{background:var(--yellow-600)}
+.btn--ghost{background:transparent;color:var(--teal-800);box-shadow:inset 0 0 0 1.5px var(--line)}
+.btn--sm{padding:7px 13px;font-size:13px}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;
+  font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:var(--teal-050);
+  color:var(--teal-800);font-family:var(--font-display)}
+.tag--good{background:var(--green-050);color:#147956}
+.tag--bad{background:var(--red-050);color:#a8331f}
+.tag--warn{background:var(--amber-050);color:#96590a}
+.tag--yellow{background:var(--yellow-050);color:#8a6100}
+
+/* ---------------- title ---------------- */
+#screen-title{background:radial-gradient(1100px 620px at 78% -12%, #0AA2A5 0%, transparent 62%),
+  radial-gradient(700px 500px at 8% 108%, #00666E 0%, transparent 60%),var(--teal-800);color:#fff;
+  display:none;place-items:center}
+#screen-title.is-on{display:grid}
+.title-wrap{max-width:720px;padding:36px 26px;text-align:center}
+.wordmark{font-family:var(--font-display);font-weight:800;font-size:clamp(42px,10vw,88px);letter-spacing:-.045em;line-height:.9}
+.wordmark span{color:var(--yellow)}
+.title-sub{font-family:var(--font-display);font-weight:700;letter-spacing:.34em;text-transform:uppercase;
+  font-size:clamp(11px,2.4vw,14px);color:rgba(255,255,255,.72);margin:16px 0 0}
+.title-blurb{max-width:520px;margin:20px auto 26px;color:rgba(255,255,255,.86);font-size:16px}
+.title-stats{display:flex;flex-wrap:wrap;gap:9px;justify-content:center;margin-bottom:26px}
+.title-stats i{font-style:normal;font-size:12px;font-weight:700;font-family:var(--font-display);
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.16);padding:7px 14px;border-radius:999px}
+.disclaimer{margin-top:30px;font-size:11px;color:rgba(255,255,255,.5);max-width:520px;margin-inline:auto;line-height:1.6}
+.ollie{width:96px;height:96px;display:block;margin:0 auto}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.ollie--bob{animation:bob 3.4s ease-in-out infinite}
+
+/* ---------------- maps ---------------- */
+.map-shell{max-width:1240px;margin:0 auto;padding:20px 20px 50px}
+.map-head{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;justify-content:space-between;margin-bottom:16px}
+.eyebrow{font-family:var(--font-display);font-size:11px;font-weight:800;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--teal);margin-bottom:6px}
+.map-head h1{font-size:clamp(23px,4.2vw,32px)}
+.map-head p{margin:6px 0 0;color:var(--muted);max-width:54ch;font-size:14px}
+.map-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(300px,.82fr);gap:18px;align-items:start}
+.map-card{position:relative;background:var(--card);border-radius:var(--r-lg);box-shadow:var(--sh-1);
+  overflow:hidden;border:1px solid var(--line)}
+.map-card svg{display:block;width:100%;height:auto;max-height:calc(100vh - 210px);margin:0 auto}
+.pin{cursor:pointer}
+.pin .hit{fill:transparent}
+.pin .dot{fill:var(--red);stroke:#fff;stroke-width:4}
+.pin .halo{fill:var(--red);opacity:.28;transform-box:fill-box;transform-origin:center;animation:ping 2.6s ease-out infinite}
+.pin .lbl{font-family:var(--font-display);font-size:17px;font-weight:800;fill:var(--teal-900);
+  paint-order:stroke;stroke:#fff;stroke-width:5px;stroke-linejoin:round}
+.pin:hover .dot,.pin.is-sel .dot{fill:var(--teal)}
+.pin.is-owned .dot{fill:var(--teal)} .pin.is-owned .halo{fill:var(--teal);opacity:.18}
+.pin.is-active .dot{fill:var(--yellow);stroke:var(--teal-900);stroke-width:3.5}
+.pin.is-rival .dot{fill:#93A7AC;stroke:#fff;stroke-width:3}
+.pin.is-rival .halo{display:none}
+.pin.is-rival .lbl{font-size:14px;fill:#5E7378;font-weight:700}
+@keyframes ping{0%{transform:scale(.6);opacity:.45}70%{transform:scale(2.5);opacity:0}100%{opacity:0}}
+.mapstat{font-family:var(--font-data);font-size:13px;font-weight:600;fill:var(--teal-800);
+  paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}
+.brief{background:var(--card);border-radius:var(--r-lg);border:1px solid var(--line);box-shadow:var(--sh-1);
+  padding:20px;position:sticky;top:20px}
+.brief__empty{color:var(--muted);font-size:14px;text-align:center;padding:34px 10px}
+.brief h2{font-size:22px}
+.brief .sub{color:var(--teal);font-family:var(--font-display);font-weight:700;font-size:13px;margin:2px 0 12px}
+.brief .flavour{font-size:14px;color:var(--slate);margin:0 0 16px}
+.mods{margin:0 0 14px}
+.mods h4{font-size:12px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px;font-family:var(--font-display)}
+.mods h4.good{color:#147956} .mods h4.bad{color:#a8331f}
+.mods ul{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.mods li{font-size:13.5px;color:var(--slate);padding-left:20px;position:relative;line-height:1.4}
+.mods li::before{position:absolute;left:0;top:0;font-weight:800;font-family:var(--font-display)}
+.mods--good li::before{content:"+";color:var(--green)}
+.mods--bad li::before{content:"−";color:var(--red)}
+.mods li b{color:var(--ink)}
+.brief__facts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 16px}
+.fact{background:var(--paper);border-radius:var(--r-sm);padding:9px 11px}
+.fact span{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.fact b{font-family:var(--font-data);font-size:16px}
+.atlas-cards{display:grid;gap:9px}
+.scard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:11px 13px;
+  box-shadow:var(--sh-1);text-align:left;width:100%;transition:.15s;display:block}
+.scard:hover{border-color:var(--teal);transform:translateY(-1px)}
+.scard.is-active{border-color:var(--teal);background:var(--teal-050)}
+.scard__top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.scard__top b{font-family:var(--font-display);font-size:14.5px}
+.scard__row{display:flex;gap:12px;margin-top:7px;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+.scard__row i{font-style:normal;font-family:var(--font-data);color:var(--ink);font-weight:600}
+.scard__bar{height:6px;border-radius:99px;background:var(--paper);margin-top:8px;overflow:hidden;border:1px solid var(--line)}
+.scard__bar i{display:block;height:100%;border-radius:99px}
+
+/* ============================================================
+   GAME SHELL
+   ============================================================ */
+#screen-game{display:none;overflow:hidden}
+#screen-game.is-on{display:flex;flex-direction:column}
+.topbar{background:linear-gradient(180deg,var(--teal) 0%,var(--teal-600) 100%);color:#fff;padding:8px 14px;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 2px 14px rgba(1,50,58,.22);z-index:20;flex:0 0 auto}
+.brand{font-family:var(--font-display);font-weight:800;font-size:16px;line-height:1.1}
+.brand small{display:block;font-size:9px;letter-spacing:.2em;font-weight:700;opacity:.7;text-transform:uppercase}
+.metrics{display:flex;gap:8px;flex:1 1 460px;min-width:0}
+.metric{background:rgba(255,255,255,.13);border-radius:10px;padding:5px 11px;min-width:0;flex:1 1 0;
+  border:1px solid rgba(255,255,255,.1)}
+.metric__label{font-size:9px;letter-spacing:.13em;text-transform:uppercase;opacity:.78;font-weight:700}
+.metric__value{font-family:var(--font-data);font-size:18px;font-weight:600;line-height:1.2;letter-spacing:-.02em}
+.metric__value small{font-size:11px;opacity:.62}
+.metric__value em{font-style:normal;font-size:12.5px;font-family:var(--font-body);opacity:.85}
+.bar{height:4px;border-radius:99px;background:rgba(0,0,0,.22);margin-top:4px;overflow:hidden}
+.bar__fill{height:100%;border-radius:99px;background:var(--yellow);transition:width .4s ease,background .3s}
+.metric.is-crit{animation:pulseRed 1.3s ease-in-out infinite}
+@keyframes pulseRed{0%,100%{background:rgba(255,255,255,.13)}50%{background:rgba(220,74,56,.5)}}
+.clock{text-align:right;font-family:var(--font-data);line-height:1.2}
+.clock b{font-size:15px;display:block}
+.clock span{font-size:11px;opacity:.75}
+.speed{display:flex;gap:4px;background:rgba(0,0,0,.18);padding:3px;border-radius:999px}
+.speed button{padding:5px 10px;border-radius:999px;font-family:var(--font-display);font-weight:700;font-size:12px;
+  color:rgba(255,255,255,.8);transition:.15s}
+.speed button.is-on{background:var(--yellow);color:var(--teal-900)}
+.mapbtn{padding:7px 13px;border-radius:999px;background:rgba(255,255,255,.16);font-family:var(--font-display);
+  font-weight:700;font-size:13px;color:#fff;display:flex;align-items:center;gap:6px;transition:.15s}
+.mapbtn:hover{background:rgba(255,255,255,.3)}
+
+.stage{flex:1 1 auto;min-height:0;display:grid;gap:12px;padding:12px;grid-template-columns:minmax(0,1fr) 372px}
+.col{min-height:0;min-width:0;display:flex;flex-direction:column;gap:10px}
+.panel{background:var(--card);border-radius:var(--r-lg);border:1px solid var(--line);box-shadow:var(--sh-1);min-width:0}
+.panel__head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.panel__head h3{font-size:14px}
+.panel__head .hint{font-size:11.5px;color:var(--muted)}
+.panel__body{padding:12px 14px}
+
+/* ============================================================
+   ISOMETRIC STORE
+   ============================================================ */
+.store{position:relative;flex:1 1 auto;min-height:0;border-radius:var(--r-lg);overflow:hidden;
+  border:1px solid var(--line);box-shadow:var(--sh-1);
+  background:radial-gradient(120% 90% at 50% 0%, #F2FAFA 0%, #DCE9EA 55%, #C9DEDF 100%);
+  cursor:grab;touch-action:none}
+.store.placing{cursor:crosshair}
+.store.dragging{cursor:grabbing}
+#world{position:absolute;left:50%;top:50%;width:0;height:0;transform-origin:0 0}
+.floorSvg{position:absolute;overflow:visible;pointer-events:none}
+.tile{fill:#F0E7D8;stroke:rgba(1,50,58,.09);stroke-width:1}
+.tile.alt{fill:#EADFCC}
+.tile.door{fill:#CFEAE6}
+.wallL{fill:#DCE9EA} .wallR{fill:#CBDCDE} .wallTop{fill:#EAF3F3}
+.hl{fill:rgba(0,131,138,.34);stroke:#00838A;stroke-width:2}
+.hl.bad{fill:rgba(220,74,56,.3);stroke:var(--red)}
+.qmark{fill:rgba(255,198,41,.22);stroke:rgba(237,169,0,.5);stroke-width:1;stroke-dasharray:4 4}
+
+.obj{position:absolute;transform-origin:50% 100%;will-change:transform;transition:filter .15s}
+.obj.pop{animation:plop .5s var(--bounce)}
+@keyframes plop{0%{transform:scale(.2) translateY(-26px);opacity:0}
+  55%{transform:scale(1.16) translateY(0);opacity:1}100%{transform:scale(1)}}
+.obj.pickable{cursor:grab}
+.obj.pickable:hover{filter:drop-shadow(0 0 0 #fff) brightness(1.06)}
+.obj.ghost{opacity:.72;pointer-events:none;filter:drop-shadow(0 10px 8px rgba(1,50,58,.25))}
+.obj.ghost.bad{filter:grayscale(.6) drop-shadow(0 0 8px rgba(220,74,56,.7))}
+.obj.dragging{filter:drop-shadow(0 16px 12px rgba(1,50,58,.32));z-index:9999!important}
+.obj .lbl{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);white-space:nowrap;
+  background:var(--teal-900);color:#fff;font-size:10px;padding:2px 7px;border-radius:99px;
+  font-family:var(--font-display);font-weight:700;opacity:0;transition:.15s;pointer-events:none}
+.obj.pickable:hover .lbl{opacity:1;transform:translateX(-50%) translateY(-4px)}
+
+.per{position:absolute;transform-origin:50% 100%;will-change:transform;pointer-events:none}
+.per.walk .bodywrap{animation:step .46s ease-in-out infinite}
+@keyframes step{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-4px) rotate(2deg)}}
+.per .bub{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);background:#fff;border-radius:9px;
+  padding:1px 5px;box-shadow:var(--sh-1);font-size:12px;white-space:nowrap}
+.per .ring{position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);width:26px;height:4px;
+  border-radius:99px;background:rgba(1,50,58,.16);overflow:hidden}
+.per .ring i{display:block;height:100%;background:var(--green);border-radius:99px}
+.per.warn .ring i{background:var(--amber)} .per.crit .ring i{background:var(--red)}
+.per.out{opacity:0;transition:opacity .4s}
+.floaty{position:absolute;transform:translate(-50%,-50%);font-family:var(--font-data);font-weight:700;
+  font-size:13px;pointer-events:none;animation:rise 1.3s ease-out forwards;z-index:99999;
+  text-shadow:0 1px 3px rgba(255,255,255,.95)}
+.floaty--cash{color:#0E7A55} .floaty--bad{color:#C33C29} .floaty--info{color:#0A6E76}
+@keyframes rise{0%{opacity:0;transform:translate(-50%,10%) scale(.7)}20%{opacity:1}
+  100%{opacity:0;transform:translate(-50%,-180%) scale(1.05)}}
+
+.store__hud{position:absolute;left:10px;top:10px;display:flex;gap:6px;flex-wrap:wrap;z-index:50}
+.store__hud .tag{background:rgba(255,255,255,.9);box-shadow:var(--sh-1)}
+.store__tools{position:absolute;right:10px;top:10px;display:flex;gap:6px;z-index:50}
+.tool{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.92);box-shadow:var(--sh-1);
+  display:grid;place-items:center;font-size:16px;transition:transform .16s var(--bounce)}
+.tool:hover{transform:scale(1.12)}
+.tool.is-on{background:var(--yellow)}
+.store__tip{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:60;
+  background:rgba(1,50,58,.92);color:#fff;font-size:12.5px;padding:7px 14px;border-radius:99px;
+  box-shadow:var(--sh-2);pointer-events:none;transition:opacity .3s;max-width:92%;text-align:center}
+.binzone{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:70;background:var(--red);
+  color:#fff;padding:10px 20px;border-radius:99px;font-family:var(--font-display);font-weight:700;font-size:13px;
+  box-shadow:var(--sh-2);display:none;align-items:center;gap:8px}
+.binzone.on{display:flex} .binzone.hot{transform:translateX(-50%) scale(1.12)}
+
+/* ============================================================
+   SIDE PANEL / CATALOGUE
+   ============================================================ */
+.tabs{display:flex;gap:4px;padding:9px 11px 0;border-bottom:1px solid var(--line);overflow-x:auto;flex:0 0 auto}
+.tab{padding:9px 12px;font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--muted);
+  border-radius:10px 10px 0 0;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-1px}
+.tab:hover{color:var(--teal-800);background:var(--teal-050)}
+.tab.is-on{color:var(--teal-800);border-bottom-color:var(--yellow)}
+.tabpanel{display:none;padding:12px 14px;overflow:auto;min-height:0;flex:1 1 auto}
+.tabpanel.is-on{display:block}
+.panel--tabs{display:flex;flex-direction:column;min-height:0;flex:1 1 auto;overflow:hidden}
+.group-title{font-family:var(--font-display);font-size:11px;font-weight:800;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--muted);margin:14px 0 8px}
+.group-title:first-child{margin-top:0}
+.card-row{display:grid;gap:8px}
+
+.shop{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.shopcard{background:var(--paper);border:1.5px solid transparent;border-radius:var(--r);padding:9px;
+  text-align:center;transition:transform .16s var(--bounce),border-color .15s,background .15s;position:relative}
+.shopcard:hover:not([disabled]){background:#fff;border-color:var(--teal);transform:translateY(-3px)}
+.shopcard.is-picked{border-color:var(--yellow);background:var(--yellow-050);transform:translateY(-3px)}
+.shopcard[disabled]{opacity:.45;cursor:not-allowed}
+.shopcard.locked{background:repeating-linear-gradient(135deg,#EDF3F3 0 8px,#E7EFEF 8px 16px)}
+.shopcard__art{height:52px;display:grid;place-items:center;margin-bottom:4px}
+.shopcard__art svg{max-height:52px;width:auto}
+.shopcard b{display:block;font-family:var(--font-display);font-size:12.5px;line-height:1.15}
+.shopcard span{display:block;font-family:var(--font-data);font-size:11.5px;color:var(--teal-800);margin-top:2px}
+.shopcard small{display:block;font-size:10.5px;color:var(--muted);margin-top:3px;line-height:1.3}
+.shopcard .own{position:absolute;top:5px;right:6px;font-family:var(--font-data);font-size:10px;
+  background:var(--teal-900);color:#fff;border-radius:99px;padding:1px 6px}
+
+.item{display:flex;gap:11px;align-items:flex-start;padding:11px 12px;border-radius:var(--r);background:var(--paper);
+  border:1px solid transparent;text-align:left;width:100%;transition:.15s}
+.item:hover:not([disabled]){background:#fff;border-color:var(--teal-050);box-shadow:var(--sh-1)}
+.item[disabled]{opacity:.5;cursor:not-allowed}
+.item--locked{opacity:.62;background:repeating-linear-gradient(135deg,#EDF3F3 0 8px,#E7EFEF 8px 16px)}
+.item__ico{width:34px;height:34px;border-radius:10px;flex:0 0 auto;display:grid;place-items:center;font-size:17px;
+  background:#fff;box-shadow:inset 0 0 0 1px var(--line)}
+.item__main{flex:1 1 auto;min-width:0}
+.item__name{font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.item__desc{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.35}
+.item__cost{font-family:var(--font-data);font-size:13px;font-weight:600;flex:0 0 auto;text-align:right;
+  color:var(--teal-800);padding-top:2px}
+.item__cost small{display:block;font-size:10px;color:var(--muted);font-family:var(--font-body)}
+.item--owned{background:var(--green-050)}
+.av{width:30px;height:30px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;
+  font-family:var(--font-display);font-weight:800;font-size:11px;color:#fff}
+.av--junior{background:#7FB2B6} .av--consultant{background:var(--teal)} .av--senior{background:var(--teal-900)}
+.av--specialist{background:#3E8E92} .av--manager{background:var(--yellow);color:var(--teal-900)}
+.ledger{display:grid;gap:2px}
+.ledger div{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px dashed var(--line);gap:10px}
+.ledger div:last-child{border:0}
+.ledger span{color:var(--muted)}
+.ledger b{font-family:var(--font-data);font-weight:600;text-align:right}
+.ledger .neg b{color:var(--red)} .ledger .pos b{color:var(--green)}
+.ledger .total{border-top:2px solid var(--ink);border-bottom:0;margin-top:5px;padding-top:8px;font-weight:700}
+.pace{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;background:var(--paper);padding:5px;border-radius:14px}
+.pace__opt{padding:8px 6px;border-radius:10px;text-align:center;transition:.16s var(--bounce);min-width:0;
+  font-family:var(--font-display);font-weight:700;font-size:13px;color:var(--slate)}
+.pace__opt small{display:block;font-size:10px;font-weight:600;opacity:.65}
+.pace__opt:hover{background:rgba(0,131,138,.09)}
+.pace__opt.is-on{background:var(--teal);color:#fff;box-shadow:var(--sh-1);transform:translateY(-1px)}
+.pace__opt.is-on.hustle{background:var(--red)} .pace__opt.is-on.strict{background:var(--green)}
+.banner{display:flex;gap:9px;align-items:center;padding:8px 11px;border-radius:var(--r);font-size:12.5px;
+  font-weight:600;line-height:1.35;margin-bottom:7px}
+.banner em{font-style:normal;font-size:16px}
+.banner--good{background:var(--green-050);color:#12684d}
+.banner--bad{background:var(--red-050);color:#9c2f1d}
+.banner--warn{background:var(--amber-050);color:#8a5200}
+.banner--info{background:var(--teal-050);color:var(--teal-800)}
+.log{max-height:132px;overflow:auto;display:grid;gap:1px;font-size:12.5px}
+.log p{margin:0;padding:5px 0;border-bottom:1px dashed var(--line);color:var(--slate);display:flex;gap:8px}
+.log b{font-family:var(--font-data);font-size:11px;color:var(--muted);flex:0 0 46px}
+.log .g{color:#147956} .log .r{color:#a8331f} .log .a{color:#8a5200}
+
+/* modal + toasts */
+.modal{position:fixed;inset:0;background:rgba(1,50,58,.26);display:none;place-items:end center;z-index:200;padding:16px}
+.modal.is-on{display:grid}
+.modal__card{background:var(--card);border-radius:20px;max-width:560px;width:100%;box-shadow:var(--sh-2);
+  overflow:hidden;animation:riseIn .3s var(--bounce);max-height:80vh;display:flex;flex-direction:column;margin-bottom:2vh}
+@keyframes riseIn{from{transform:translateY(30px) scale(.95);opacity:0}to{transform:none;opacity:1}}
+.modal__banner{padding:16px 22px;color:#fff;background:var(--teal)}
+.modal__banner.is-bad{background:var(--red)} .modal__banner.is-good{background:var(--green)}
+.modal__banner.is-warn{background:var(--amber)} .modal__banner.is-dark{background:var(--teal-900)}
+.modal__kicker{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;font-weight:800;opacity:.82;font-family:var(--font-display)}
+.modal__banner h2{font-size:21px;margin-top:4px;line-height:1.15}
+.modal__stats{display:flex;background:var(--teal-900);color:#fff;padding:8px 22px;flex-wrap:wrap}
+.modal__stats div{flex:1 1 auto;min-width:70px;padding-right:10px}
+.modal__stats span{display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;opacity:.6;font-weight:700}
+.modal__stats b{font-family:var(--font-data);font-size:15px;font-weight:600}
+.modal__stats b.warn{color:var(--yellow)} .modal__stats b.bad{color:#FF9C8A}
+.modal__body{padding:18px 22px;overflow:auto}
+.modal__body p{margin:0 0 12px;font-size:14.5px;color:var(--slate)}
+.choice{display:block;width:100%;text-align:left;padding:12px 14px;border-radius:var(--r);background:var(--paper);
+  margin-bottom:8px;transition:.16s var(--bounce);border:1.5px solid transparent}
+.choice:hover:not([disabled]){background:#fff;border-color:var(--teal);transform:translateX(3px)}
+.choice[disabled]{opacity:.45;cursor:not-allowed}
+.choice b{display:block;font-family:var(--font-display);font-size:14.5px}
+.choice span{display:block;font-size:12.5px;color:var(--muted);margin-top:3px}
+.choice .eff{margin-top:7px;display:flex;gap:6px;flex-wrap:wrap}
+.toasts{position:fixed;left:14px;bottom:14px;z-index:210;display:grid;gap:7px;width:min(340px,84vw);justify-items:end}
+.toast{background:var(--teal-900);color:#fff;border-radius:13px;padding:10px 14px;font-size:13px;box-shadow:var(--sh-2);
+  display:flex;gap:9px;align-items:center;animation:riseIn .3s var(--bounce);max-width:100%}
+.toast em{font-style:normal;font-size:16px}
+.toast b{font-family:var(--font-data);font-weight:600}
+.toast--bad{background:#8f2b1b} .toast--good{background:#14684e} .toast--rank{background:#7A5B00}
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:250;overflow:hidden}
+.confetti i{position:absolute;width:9px;height:14px;border-radius:2px;animation:fall 2.6s linear forwards}
+@keyframes fall{0%{transform:translateY(-20px) rotate(0);opacity:1}100%{transform:translateY(105vh) rotate(720deg);opacity:.9}}
+
+@media (max-width:1080px){
+  .stage{display:block;overflow:auto}
+  .col{display:block}
+  .store{height:48vh;min-height:300px;margin-bottom:10px}
+  .col .panel{margin-bottom:10px}
+  .panel--tabs{max-height:none;display:block}
+  .tabpanel{max-height:none;overflow:visible}
+}
+@media (max-width:620px){
+  .toasts{left:8px;right:8px;width:auto;justify-items:stretch}
+  .topbar{gap:7px;padding:7px 9px}
+  .metrics{flex:1 1 100%;order:3;flex-wrap:wrap}
+  .metric{flex:1 1 44%}
+  .metric__value{font-size:15px}
+  .stage{padding:8px;gap:8px}
+  .shop{grid-template-columns:1fr 1fr}
+  .store{height:44vh;min-height:260px}
+  .store__tip{font-size:11.5px;padding:6px 11px;bottom:8px}
+  .toasts{top:auto;bottom:10px;right:8px;left:8px;width:auto;justify-items:stretch}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;animation-iteration-count:1!important}
+}
+</style>
+</head>
+<body>
+
+<!-- ============================ TITLE ============================ -->
+<div class="screen is-on" id="screen-title">
+  <div class="title-wrap">
+    <svg class="ollie ollie--bob" viewBox="0 0 100 100" aria-hidden="true">
+      <ellipse cx="50" cy="95" rx="17" ry="3" fill="rgba(0,0,0,.18)"/>
+      <path d="M40 14 C46 8 56 4 63 3 C61 9 60 15 61 21 Z" fill="#FFD24A"/>
+      <circle cx="50" cy="46" r="34" fill="#FFC629"/>
+      <ellipse cx="50" cy="42" rx="27" ry="16" fill="#fff" transform="rotate(-7 50 42)"/>
+      <circle cx="40" cy="42" r="3.6" fill="#101820"/><circle cx="60" cy="42" r="3.6" fill="#101820"/>
+      <path d="M45 79 L42 95 M55 79 L58 95" stroke="#1A1A1A" stroke-width="4.5" stroke-linecap="round"/>
+    </svg>
+    <div class="wordmark">OPTUS <span>EMPIRE</span></div>
+    <p class="title-sub">CX Crisis</p>
+    <p class="title-blurb">Lay out the shop, staff the desks and keep Head Office happy. Drag counters, tables and shelves onto the floor, extend the lease when you outgrow it, and build a franchise across Brisbane's north.</p>
+    <div class="title-stats">
+      <i>Isometric store builder</i><i>Drag &amp; snap fit-out</i><i>1 day = 1 minute</i><i>8 franchise ranks</i>
+    </div>
+    <div>
+      <button class="btn btn--yellow" id="btnStart">Choose your store</button>
+      <button class="btn btn--ghost" id="btnHow" style="color:#fff;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.3)">How to play</button>
+    </div>
+    <p class="disclaimer">An unofficial parody / fan project made for fun. Not affiliated with, endorsed by, or representative of Optus Pty Limited. All trademarks belong to their owners. Locations are fictionalised versions of real suburbs.</p>
+  </div>
+</div>
+
+<!-- ============================ SITE SELECT ============================ -->
+<div class="screen" id="screen-map">
+  <div class="map-shell">
+    <div class="map-head">
+      <div>
+        <div class="eyebrow">Phase 1 · Site selection</div>
+        <h1>Pick your first store</h1>
+        <p>Every site trades one advantage for one headache. Tap a pin to read the site brief.</p>
+      </div>
+      <div class="tag tag--yellow" id="mapCash">Fit-out budget $22,000</div>
+    </div>
+    <div class="map-grid">
+      <div class="map-card" id="mapHost"></div>
+      <aside class="brief" id="brief"><div class="brief__empty">Tap a pin to read the site brief.</div></aside>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ ATLAS ============================ -->
+<div class="screen" id="screen-atlas">
+  <div class="map-shell">
+    <div class="map-head">
+      <div>
+        <div class="eyebrow">The corridor</div>
+        <h1>Your patch</h1>
+        <p>Tap one of your stores to stand on its floor. Grey pins are rival kiosks — they take share whenever your CX slips.</p>
+      </div>
+      <button class="btn btn--yellow" id="btnBackFloor">Back to the store</button>
+    </div>
+    <div class="map-grid">
+      <div class="map-card" id="atlasHost"></div>
+      <aside class="brief" id="atlasSide"></aside>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ GAME ============================ -->
+<div class="screen" id="screen-game">
+  <header class="topbar">
+    <div class="brand">Optus Empire<small>CX Crisis</small></div>
+    <div class="metrics">
+      <div class="metric" id="mCap"><div class="metric__label">Capital</div><div class="metric__value" id="vCap">$0</div></div>
+      <div class="metric" id="mCx"><div class="metric__label">CX score</div>
+        <div class="metric__value" id="vCx">0<small>/100</small></div><div class="bar"><i class="bar__fill" id="bCx"></i></div></div>
+      <div class="metric" id="mComp"><div class="metric__label">Compliance</div>
+        <div class="metric__value" id="vComp">0<small>/100</small></div><div class="bar"><i class="bar__fill" id="bComp"></i></div></div>
+      <div class="metric" id="mRank"><div class="metric__label" id="lRank">Rank 1</div>
+        <div class="metric__value"><em id="vRank">Trainee</em></div><div class="bar"><i class="bar__fill" id="bRank"></i></div></div>
+      <div class="metric" id="mStrike" style="flex:0 1 116px"><div class="metric__label">Head Office</div>
+        <div class="metric__value" id="vStrike">Clean</div></div>
+    </div>
+    <button class="mapbtn" id="btnAtlas">🗺 Map</button>
+    <div class="clock"><b id="vDay">Mon · Day 1</b><span id="vTime">9:00 am</span></div>
+    <div class="speed" id="speed">
+      <button data-sp="0" title="Pause (space)">❚❚</button>
+      <button data-sp="1" class="is-on" title="1 day = 60 seconds">1×</button>
+      <button data-sp="2" title="Double speed">2×</button>
+      <button data-sp="3" title="Triple speed">3×</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <section class="col">
+      <div class="store" id="store">
+        <div id="world"></div>
+        <div class="store__hud" id="storeHud"></div>
+        <div class="store__tools">
+          <button class="tool" id="toolZoomOut" title="Zoom out">−</button>
+          <button class="tool" id="toolZoomIn" title="Zoom in">+</button>
+          <button class="tool" id="toolCentre" title="Recentre">◎</button>
+        </div>
+        <div class="store__tip" id="storeTip" style="opacity:0"></div>
+        <div class="binzone" id="binzone">🗑 Drop here to sell</div>
+      </div>
+      <div class="panel">
+        <div class="panel__body" style="padding:10px 12px">
+          <div class="pace" id="pace">
+            <button class="pace__opt strict" data-pace="strict">Strict<small>Compliance up</small></button>
+            <button class="pace__opt is-on" data-pace="balanced">Balanced<small>Steady</small></button>
+            <button class="pace__opt hustle" data-pace="hustle">Hustle<small>$ up, risk up</small></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="col col--side">
+      <div class="panel panel--tabs">
+        <div class="tabs" id="tabs"></div>
+        <div class="tabpanel is-on" data-tab="build" id="tabBuild"></div>
+        <div class="tabpanel" data-tab="staff" id="tabStaff"></div>
+        <div class="tabpanel" data-tab="ops" id="tabOps"></div>
+        <div class="tabpanel" data-tab="books" id="tabBooks"></div>
+        <div class="tabpanel" data-tab="empire" id="tabEmpire"></div>
+      </div>
+      <div class="panel">
+        <div class="panel__head"><h3>Store log</h3><span class="hint" id="logHint">Live</span></div>
+        <div class="panel__body"><div class="log" id="log"></div></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal" id="modal"><div class="modal__card" id="modalCard"></div></div>
+<div class="toasts" id="toasts"></div>
+
+<script>
+/* ============================================================
+   1. CONSTANTS + DATA
+   ============================================================ */
+const TICKS_PER_DAY=240, DAY_MS=60000, OPEN_HOUR=9, CLOSE_HOUR=17;
+const TW=64, TH=32, TWh=TW/2, THh=TH/2;
+const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const DOW_TRAFFIC=[0.92,0.9,0.95,1.05,1.18,1.32,0.86];
+const TX_BASE=4.6, PAT_BASE=88;
+
+const LOCATIONS=[
+{ id:'redcliffe', name:'Redcliffe', sub:'The Peninsula Store', x:672, y:138, anchor:'start', dx:22, dy:6,
+  flavour:'Sea breeze, a sausage sizzle out the front, and a queue of regulars who would like you to explain the cloud again. Slowly.',
+  rent:430, traffic:42, wageMult:1.0, txMult:1.3, cxDrainMult:0.5, patience:1.3,
+  auditMult:1.0, fineMult:1.0, accMult:1.0, revMult:1.0, W:6, H:5,
+  buffs:['<b>Local loyalty &amp; slower pace.</b> CX drains 50% slower while people wait — nobody here is in a hurry.',
+         '<b>Coastal rent.</b> Lease costs a fraction of a major shopping centre.'],
+  debuffs:['<b>Tech averse.</b> Every transaction runs 1.3× longer while staff explain the basics.',
+           '<b>Prepaid country.</b> Premium 5G plans almost never sell. Recharges and SIM-only carry the store.'],
+  mix:{prepaid:3.4,simonly:2.4,accessory:1.5,mid:1.0,flagship:0.22,family:0.5,upgrade:0.9,support:1.7,repair:1.2}},
+{ id:'northlakes', name:'North Lakes', sub:'The Boom-Town Westfield', x:410, y:197, anchor:'start', dx:22, dy:6,
+  flavour:'New estates, new prams, new everything. Families arrive four at a time and want every line on one bill.',
+  rent:900, traffic:46, wageMult:1.05, txMult:1.0, cxDrainMult:1.0, patience:0.95,
+  auditMult:1.0, fineMult:1.0, accMult:1.15, revMult:1.05, rush:true, W:7, H:5,
+  buffs:['<b>Family plan frenzy.</b> Multi-line plans and multi-device deals land constantly — huge capital per sale.',
+         '<b>Room to grow.</b> The tenancy is large: more floor to fit out from day one.'],
+  debuffs:['<b>The 3:00 pm school rush.</b> Traffic spikes to 300% in the afternoon. Under-staff it and CX falls off a cliff.',
+           '<b>Westfield rent.</b> Centre management charges accordingly.'],
+  mix:{prepaid:1.0,simonly:1.6,accessory:1.6,mid:1.8,flagship:1.2,family:2.6,upgrade:1.2,support:1.2,repair:1.0}},
+{ id:'strathpine', name:'Strathpine', sub:'The Budget-Conscious Centre', x:322, y:470, anchor:'start', dx:22, dy:6,
+  flavour:'Steady, working-class, and allergic to being sold to. Everyone here knows exactly what a fair price is.',
+  rent:480, traffic:40, wageMult:0.8, txMult:1.0, cxDrainMult:1.0, patience:1.05,
+  auditMult:0.9, fineMult:0.9, accMult:0.85, revMult:0.92, W:6, H:5,
+  buffs:['<b>Low overhead.</b> The cheapest rent and wage bill in the game — easy to stay in the green.',
+         '<b>Forgiving crowd.</b> Head Office rarely bothers auditing a mid-suburban centre.'],
+  debuffs:['<b>The hard sell.</b> Flagship handsets barely move. You live on mid-range phones and SIM-only plans.',
+           '<b>Thin margins.</b> Every sale here is worth less than the same sale up the highway.'],
+  mix:{prepaid:2.6,simonly:3.0,accessory:1.3,mid:2.4,flagship:0.18,family:1.0,upgrade:1.1,support:1.5,repair:1.4}},
+{ id:'chermside', name:'Chermside', sub:'The Mega-Mall Flagship', x:472, y:783, anchor:'start', dx:22, dy:6,
+  flavour:'The beast of the north. Never quiet, never forgiving, and Head Office watches this one on a dashboard.',
+  rent:1600, traffic:52, wageMult:1.15, txMult:1.0, cxDrainMult:1.15, patience:0.85,
+  auditMult:2.0, fineMult:2.2, accMult:1.4, revMult:1.12, W:7, H:6,
+  buffs:['<b>Premium volume.</b> Uncapped foot traffic and the best accessory attachment rate anywhere.',
+         '<b>Flagship floor.</b> The largest tenancy in the game, and the newest handsets sell themselves.'],
+  debuffs:['<b>Cutthroat rent.</b> The lease is brutal and it is due every single day.',
+           '<b>Corporate spotlight.</b> Double the audit chance, and fines land at more than twice normal size.'],
+  mix:{prepaid:1.2,simonly:1.8,accessory:2.6,mid:1.8,flagship:2.2,family:1.6,upgrade:1.4,support:1.4,repair:1.2}},
+{ id:'stafford', name:'Stafford', sub:'The Local Hub', x:400, y:895, anchor:'start', dx:22, dy:6,
+  flavour:'A quiet little centre next to a bakery and a barber. Nobody from Head Office has ever found the car park.',
+  rent:520, traffic:26, wageMult:0.95, txMult:1.0, cxDrainMult:0.9, patience:1.1,
+  auditMult:0.15, fineMult:0.6, accMult:1.0, revMult:1.0, W:5, H:5,
+  buffs:['<b>Out of sight, out of mind.</b> Practically immune to Head Office audits — Hustle mode is genuinely viable here.',
+         '<b>Soft fines.</b> Even when compliance slips, the penalties are survivable.'],
+  debuffs:['<b>Ghost town.</b> Organic foot traffic is the lowest in the game.',
+           '<b>Pokey tenancy.</b> The smallest floor plan — you will be extending the lease early.'],
+  mix:{prepaid:2.0,simonly:2.2,accessory:1.4,mid:1.6,flagship:0.8,family:1.1,upgrade:1.1,support:1.1,repair:1.3}},
+{ id:'brookside', name:'Brookside', sub:'Established Suburbia', x:283, y:886, anchor:'end', dx:-22, dy:6,
+  flavour:'Mitchelton money. Grandparents buying iPads for grandkids, and absolutely nobody giving up their old plan.',
+  rent:720, traffic:38, wageMult:1.0, txMult:1.0, cxDrainMult:1.0, patience:1.15,
+  auditMult:1.0, fineMult:1.0, accMult:1.35, revMult:1.05, stubborn:true, W:6, H:5,
+  buffs:['<b>Generational spenders.</b> Tablets, heavy-duty cases and screen protectors, every single day.',
+         '<b>Loyal base.</b> Keep CX above 60 and retention keeps the door swinging on its own.'],
+  debuffs:['<b>Stuck in their ways.</b> 4G → 5G migrations take twice as long and grind down compliance as staff cut corners.',
+           '<b>Suspicious of change.</b> New plan structures are met with folded arms.'],
+  mix:{prepaid:1.6,simonly:1.8,accessory:2.6,mid:1.6,flagship:0.9,family:1.0,upgrade:1.9,support:1.3,repair:1.5}}];
+
+const RIVALS=[
+  {id:'rv1', name:'Telcom', near:'chermside', x:520, y:742, share:30},
+  {id:'rv2', name:'Vodaline', near:'northlakes', x:452, y:246, share:27},
+  {id:'rv3', name:'MobileWorld', near:'strathpine', x:280, y:518, share:25},
+  {id:'rv4', name:'Phone Hut', near:'brookside', x:236, y:842, share:22},
+  {id:'rv5', name:'Bay Telco', near:'redcliffe', x:712, y:196, share:20},
+  {id:'rv6', name:'5G Direct', near:'stafford', x:444, y:930, share:18}];
+
+const CTYPES=[
+  {k:'prepaid',  ico:'🔁', lbl:'Prepaid recharge',  val:19,  time:1.0, conn:1, pat:1.15, quick:true},
+  {k:'simonly',  ico:'📶', lbl:'SIM-only plan',     val:60,  time:1.35,conn:1, pat:1.0,  quick:true},
+  {k:'accessory',ico:'🎧', lbl:'Accessories',       val:39,  time:0.7, conn:0, pat:0.85, acc:true, quick:true},
+  {k:'mid',      ico:'📱', lbl:'Mid-range handset', val:116, time:2.0, conn:1, pat:1.05},
+  {k:'flagship', ico:'✨', lbl:'Flagship handset',  val:190, time:2.7, conn:1, pat:1.1},
+  {k:'family',   ico:'👨‍👩‍👧',lbl:'Family plan',      val:275, time:3.5, conn:4, pat:1.25},
+  {k:'upgrade',  ico:'🛜', lbl:'4G → 5G upgrade',   val:74,  time:1.8, conn:1, pat:1.0, is5g:true},
+  {k:'support',  ico:'😤', lbl:'Billing complaint', val:0,   time:1.7, conn:0, pat:0.7, support:true},
+  {k:'repair',   ico:'🔧', lbl:'Repair / trade-in', val:56,  time:1.5, conn:0, pat:1.0, repair:true}];
+const CT={}; CTYPES.forEach(c=>CT[c.k]=c);
+
+const PACES={
+  strict:  {lbl:'Strict & slow', txMult:1.28, revMult:0.88, comp:+0.52, cxTick:+0.0040, support:+0.55},
+  balanced:{lbl:'Balanced',      txMult:1.00, revMult:1.00, comp:+0.10, cxTick:0,       support:+0.10},
+  hustle:  {lbl:'Hustle mode',   txMult:0.74, revMult:1.36, comp:-0.78, cxTick:-0.0100, support:-0.55}};
+
+const ROLES={
+  junior:     {lbl:'JR', role:'Junior staff',      rank:1, hire:1450, wage:240, speed:0.86, comp:-0.16, upsell:0.90,
+               desc:'Cheap and keen. Slower on the counter and makes paperwork errors that chip away at compliance.'},
+  consultant: {lbl:'CN', role:'Consultant',        rank:3, hire:3850, wage:400, speed:1.06, comp:0.00,  upsell:1.00,
+               desc:'The reliable middle. Normal speed, clean paperwork, no drama.'},
+  senior:     {lbl:'SR', role:'Senior consultant', rank:5, hire:8300, wage:640, speed:1.42, comp:+0.26, upsell:1.22,
+               desc:'Fast, flawless compliance, and upsells 22% harder on every sale.'},
+  specialist: {lbl:'TS', role:'Tech specialist',   rank:6, hire:6700, wage:530, speed:1.18, comp:+0.10, upsell:1.05,
+               desc:'Halves the time on 5G migrations and repairs, and gets more from trade-ins.'},
+  manager:    {lbl:'MG', role:'Store manager',     rank:8, hire:14400,wage:880,speed:0,    comp:0,     upsell:1.0,
+               desc:'Runs a store while you are standing somewhere else. Required to hold more than one site.'}};
+const FIRST=['Ash','Bec','Cam','Dee','Eli','Fin','Gus','Hana','Indi','Jai','Kai','Lena','Mo','Nari','Ollie','Priya','Quinn','Rosa','Sam','Tash','Uma','Vik','Wes','Xan','Yaz','Zed','Bryce','Charlie','Dana','Elke'];
+
+/* ---------- the fit-out catalogue ---------- */
+const CAT=[
+{key:'desk',    name:'Service desk',      cat:'Service',     rank:1, cost:2600,  fw:1,fh:1,z:26, ico:'🖥️', staffed:true,
+ colors:['#12868D','#0B646B','#084B52'], blurb:'One staff member serves one customer here. More desks, more at once.'},
+{key:'express', name:'Express counter',   cat:'Service',     rank:4, cost:5600,  fw:1,fh:1,z:22, ico:'⚡', staffed:true, express:true,
+ colors:['#2AA79A','#1B857C','#12655E'], blurb:'Recharges, SIM-only and accessories fly through 40% faster.'},
+{key:'repair',  name:'Repair bench',      cat:'Service',     rank:6, cost:11000, fw:2,fh:1,z:24, ico:'🔧', staffed:true, repair:true,
+ colors:['#D9B372','#B38F52','#8C6E3B'], blurb:'Repairs and trade-ins pay 2.4× and pull extra traffic.'},
+{key:'collect', name:'Click &amp; collect', cat:'Service',   rank:7, cost:14000, fw:1,fh:1,z:30, ico:'📦', passive:1700,
+ colors:['#E8B96B','#C79646','#9E7530'], blurb:'Online orders route here. Steady income with no staff needed.'},
+{key:'shelf',   name:'Accessory shelf',   cat:'Display',     rank:1, cost:1400,  fw:1,fh:1,z:34, ico:'🎧',
+ colors:['#E3EEEF','#C0D6D8','#9FBEC1'], blurb:'Cases, cables, chargers. Lifts the attach rate on every sale.'},
+{key:'table',   name:'Demo table',        cat:'Display',     rank:3, cost:3400,  fw:2,fh:1,z:18, ico:'📱',
+ colors:['#FFFFFF','#DFE9EA','#C4D5D7'], blurb:'Browsers stop and play, then join the queue. Also lifts accessories.'},
+{key:'plinth',  name:'Flagship plinth',   cat:'Display',     rank:5, cost:6200,  fw:1,fh:1,z:30, ico:'✨',
+ colors:['#1B3E45','#122E34','#0B2126'], blurb:'The newest handset under a spotlight. Sells more flagships, for more.'},
+{key:'bench',   name:'Waiting bench',     cat:'Comfort',     rank:2, cost:1200,  fw:2,fh:1,z:14, ico:'🛋️',
+ colors:['#E4C98F','#C4A96E','#9E874F'], blurb:'People waiting beside it are far more patient.'},
+{key:'wifi',    name:'Wi-Fi point',       cat:'Comfort',     rank:2, cost:2400,  fw:1,fh:1,z:36, ico:'📡',
+ colors:['#8FD3D8','#69B7BE','#4C9AA1'], blurb:'Everyone stares at their phone instead of the clock. Patience up storewide.'},
+{key:'kiosk',   name:'Ticket kiosk',      cat:'Comfort',     rank:5, cost:5200,  fw:1,fh:1,z:32, ico:'🎫',
+ colors:['#153F46','#0E2F35','#082024'], blurb:'An orderly queue. Walk-outs cost half the CX and people wait longer.'},
+{key:'plant',   name:'Planter',           cat:'Comfort',     rank:1, cost:450,   fw:1,fh:1,z:24, ico:'🪴',
+ colors:['#79B47F','#5C9463','#437349'], blurb:'Softens the room. Ambience nudges CX up every day.'},
+{key:'rug',     name:'Floor rug',         cat:'Comfort',     rank:2, cost:750,   fw:2,fh:2,z:2,  ico:'🟦',
+ colors:['#2F8F93','#26787C','#1E6165'], blurb:'Warms up the floor. Ambience nudges CX up every day.'},
+{key:'coffee',  name:'Staff coffee point',cat:'Back office', rank:6, cost:4800,  fw:1,fh:1,z:26, ico:'☕',
+ colors:['#3A4A4E','#2A383B','#1D2729'], blurb:'Real breaks. Staff stop burning out on long trading days.'},
+{key:'server',  name:'Compliance terminal',cat:'Back office',rank:4, cost:6800,  fw:1,fh:1,z:30, ico:'🛡️',
+ colors:['#4E6B72','#3A545A','#2A3F44'], blurb:'Automated ID checks and audit trail. Compliance climbs every day.'},
+{key:'board',   name:'Training board',    cat:'Back office', rank:5, cost:5600,  fw:1,fh:1,z:30, ico:'🎓',
+ colors:['#2C6E63','#215750','#17403B'], blurb:'Juniors get proper coaching — noticeably quicker on the counter.'}];
+const CATBY={}; CAT.forEach(c=>CATBY[c.key]=c);
+const CAT_GROUPS=['Service','Display','Comfort','Back office'];
+
+const RANKS=[
+  {n:1, at:0,      title:'Trainee',            unlock:'Service desks, shelves, planters, junior staff'},
+  {n:2, at:8000,  title:'Keyholder',          unlock:'Wi-Fi, waiting benches, rugs, local marketing'},
+  {n:3, at:20000,  title:'2IC',                unlock:'Consultants, demo tables, the Books tab'},
+  {n:4, at:40000,  title:'Store manager',      unlock:'Express counters, compliance terminals, goodwill credits'},
+  {n:5, at:68000, title:'Area favourite',     unlock:'Senior consultants, flagship plinths, ticket kiosks, training boards'},
+  {n:6, at:105000, title:'Senior franchisee',  unlock:'Tech specialists, repair benches, staff coffee'},
+  {n:7, at:150000, title:'Franchise partner',  unlock:'Click & collect, regional campaigns, remediation plans'},
+  {n:8, at:210000, title:'Multi-site licensee',unlock:'Store managers and a second store on the map'}];
+
+const OPS=[
+  {id:'local', rank:2, ico:'📣', name:'Local marketing push', cost:1600, desc:'Letterbox drop and centre signage. Foot traffic +45% for 3 days.'},
+  {id:'comp',  rank:3, ico:'📚', name:'Compliance blitz', cost:1100, desc:'Close for the rest of the day and retrain. Compliance +16.'},
+  {id:'cx',    rank:4, ico:'🎁', name:'Goodwill credits', cost:2500, desc:'Credit every account that waited too long. CX +9 immediately.'},
+  {id:'big',   rank:7, ico:'📺', name:'Regional campaign', cost:4600, desc:'Radio, socials and a centre takeover. Foot traffic +85% for 4 days.'},
+  {id:'strike',rank:7, ico:'🧯', name:'Remediation plan', cost:10500, desc:'Clear one Head Office strike. Needs CX 60+ and compliance 70+.'}];
+
+/* ============================================================
+   2. STATE + HELPERS
+   ============================================================ */
+const G={ capital:22000, day:1, dow:0, tick:0, speed:1, running:false, over:false, won:false, lastSpeed:1,
+  stores:[], active:0, strikes:0, strikeLog:[], maxStrikes:3, lastStrike:-9,
+  weekConn:0, weekTarget:0, reviews:0, eventCool:3,
+  lifetimeRevenue:0, custServed:0, custLost:0, rank:1, tab:'build', onMap:false,
+  pick:null, drag:null, cam:{x:0,y:0,s:1} };
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const money=n=>(n<0?'-$':'$')+Math.abs(Math.round(n)).toLocaleString('en-AU');
+const store=()=>G.stores[G.active];
+const loc=s=>LOCATIONS.find(l=>l.id===s.locId);
+const rivalOf=s=>RIVALS.find(r=>r.near===s.locId);
+let uid=1;
+
+function makeStaff(type){ return {id:uid++, type, name:pick(FIRST), desk:null, busy:null, prog:0, need:0, stamina:100, servedToday:0}; }
+function makeStore(locId){
+  const L=LOCATIONS.find(l=>l.id===locId);
+  const s={ locId, W:L.W, H:L.H, items:[], staff:[makeStaff('junior'),makeStaff('junior'),makeStaff('junior')],
+    cx:72, compliance:82, pace:'balanced', queue:[], cust:[], mods:[], log:[],
+    rentMod:1, dayRev:0, dayWalk:0, dayServed:0, dayConn:0, spawnAcc:0, browseAcc:0,
+    lastEvent:'', closedToday:false, auditShield:0, expansions:0 };
+  /* opening fit-out: two desks and a shelf, already placed */
+  place(s,'desk',1,1,true); place(s,'desk',2,1,true); place(s,'desk',3,1,true); place(s,'shelf',0,0,true);
+  s.staff.forEach((st,i)=>{ if(s.items[i]) st.desk=s.items[i].id; });
+  return s;
+}
+/* ---------- grid ---------- */
+function inGrid(s,gx,gy,fw=1,fh=1){ return gx>=0&&gy>=0&&gx+fw<=s.W&&gy+fh<=s.H; }
+function doorTile(s){ return {gx:s.W-1, gy:s.H-1}; }
+function itemAt(s,gx,gy){
+  return s.items.find(it=>gx>=it.gx&&gx<it.gx+it.fw&&gy>=it.gy&&gy<it.gy+it.fh);
+}
+function canPlace(s,def,gx,gy,ignoreId){
+  if(!inGrid(s,gx,gy,def.fw,def.fh)) return false;
+  const d=doorTile(s);
+  for(let x=gx;x<gx+def.fw;x++) for(let y=gy;y<gy+def.fh;y++){
+    if(x===d.gx&&y===d.gy) return false;                 /* keep the doorway clear */
+    const it=itemAt(s,x,y);
+    if(it && it.id!==ignoreId) return false;
+  }
+  return true;
+}
+function place(s,key,gx,gy,silent){
+  const def=CATBY[key];
+  const it={id:uid++, key, gx, gy, fw:def.fw, fh:def.fh, fresh:!silent};
+  s.items.push(it);
+  return it;
+}
+function walkable(s,gx,gy){
+  if(!inGrid(s,gx,gy)) return false;
+  const it=itemAt(s,gx,gy);
+  if(!it) return true;
+  return false;
+}
+/* BFS path between tiles (4-way) */
+function pathTo(s,from,to){
+  if(from.gx===to.gx&&from.gy===to.gy) return [];
+  const key=(x,y)=>x+','+y, prev={}, seen={[key(from.gx,from.gy)]:1};
+  let q=[[from.gx,from.gy]];
+  while(q.length){
+    const nq=[];
+    for(const [x,y] of q){
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+        const nx=x+dx, ny=y+dy, k=key(nx,ny);
+        if(seen[k]) continue;
+        const isTarget=(nx===to.gx&&ny===to.gy);
+        if(!isTarget && !walkable(s,nx,ny)) continue;
+        if(!inGrid(s,nx,ny)) continue;
+        seen[k]=1; prev[k]=[x,y];
+        if(isTarget){
+          const out=[]; let cur=[nx,ny];
+          while(cur){ out.unshift({gx:cur[0],gy:cur[1]}); const p=prev[key(cur[0],cur[1])];
+            cur=(p&&!(p[0]===from.gx&&p[1]===from.gy))?p:null; }
+          return out;
+        }
+        nq.push([nx,ny]);
+      }
+    }
+    q=nq;
+  }
+  return null;
+}
+/* queue slots: walkable tiles nearest the door, skipping desk service tiles */
+function queueSlots(s){
+  const d=doorTile(s), reserved={};
+  s.items.filter(it=>CATBY[it.key].staffed).forEach(it=>{
+    const t=serviceTile(s,it); if(t) reserved[t.gx+','+t.gy]=1;
+  });
+  const out=[], seen={[d.gx+','+d.gy]:1};
+  let q=[[d.gx,d.gy]];
+  while(q.length&&out.length<14){
+    const nq=[];
+    for(const [x,y] of q){
+      for(const [dx,dy] of [[0,-1],[-1,0],[1,0],[0,1]]){
+        const nx=x+dx, ny=y+dy, k=nx+','+ny;
+        if(seen[k]||!walkable(s,nx,ny)) continue;
+        seen[k]=1;
+        if(!reserved[k]) out.push({gx:nx,gy:ny});
+        nq.push([nx,ny]);
+      }
+    }
+    q=nq;
+  }
+  return out;
+}
+function serviceTile(s,it){
+  const cands=[];
+  for(let x=it.gx;x<it.gx+it.fw;x++){ cands.push({gx:x,gy:it.gy+it.fh},{gx:x,gy:it.gy-1}); }
+  for(let y=it.gy;y<it.gy+it.fh;y++){ cands.push({gx:it.gx+it.fw,gy:y},{gx:it.gx-1,gy:y}); }
+  const ok=cands.filter(c=>walkable(s,c.gx,c.gy));
+  if(!ok.length) return null;
+  ok.sort((a,b)=>(b.gx+b.gy)-(a.gx+a.gy));
+  return ok[0];
+}
+/* ---------- derived stats from what is on the floor ---------- */
+function count(s,key){ return s.items.filter(i=>i.key===key).length; }
+function servicePoints(s){ return s.items.filter(i=>CATBY[i.key].staffed); }
+function stats(s){
+  const shelves=count(s,'shelf'), tables=count(s,'table'), plinths=count(s,'plinth');
+  const wifi=count(s,'wifi'), benches=count(s,'bench'), kiosks=count(s,'kiosk');
+  const plants=count(s,'plant'), rugs=count(s,'rug');
+  const servers=count(s,'server'), boards=count(s,'board'), coffee=count(s,'coffee');
+  const collect=count(s,'collect');
+  return {
+    shelves,tables,plinths,wifi,benches,kiosks,plants,rugs,servers,boards,coffee,collect,
+    desks:servicePoints(s).length,
+    acc: 1 + Math.min(0.55, shelves*0.10 + tables*0.07),
+    flagship: 1 + plinths*0.55,
+    patience: (1 + Math.min(0.5, wifi*0.20) + Math.min(0.3,kiosks*0.15)) ,
+    benchTiles: s.items.filter(i=>i.key==='bench'),
+    ambience: Math.min(9, plants*1.6 + rugs*2.2 + tables*0.8 + benches*0.8),
+    compliancePerDay: servers*1.7,
+    juniorSpeed: 1 + Math.min(0.36, boards*0.18),
+    stamina: coffee>0,
+    passive: collect*1700,
+    queueSoft: kiosks>0
+  };
+}
+function growth(){ return 1+0.055*Math.floor((G.day-1)/7); }
+function rivalDrag(s){ const r=rivalOf(s); return r?clamp(1-(r.share-20)/160,0.7,1.06):1; }
+function trafficMult(s){
+  const st=stats(s);
+  return (1+Math.min(0.22,st.tables*0.05+st.plinths*0.04)) * mods(s,'traffic') * rivalDrag(s) * growth();
+}
+function mods(s,key){ return s.mods.reduce((m,x)=>m*(x[key]!==undefined?x[key]:1),1); }
+function cxDrainMult(s){ return loc(s).cxDrainMult * (stats(s).kiosks?0.8:1); }
+function staffSpeed(s,st){
+  let sp=ROLES[st.type].speed, t=stats(s);
+  if(st.type==='junior') sp*=t.juniorSpeed;
+  if(st.stamina<40 && !t.stamina) sp*=0.68;
+  return sp;
+}
+function staffComp(s,st){ return ROLES[st.type].comp; }
+function wageBill(s){ return s.staff.reduce((n,st)=>n+ROLES[st.type].wage,0)*loc(s).wageMult; }
+function rentBill(s){ return (loc(s).rent + s.expansions*260)*s.rentMod; }
+function isManaged(s){ return s.staff.some(st=>st.type==='manager'); }
+function floorStaff(s){ return s.staff.filter(st=>st.type!=='manager'); }
+function rankInfo(){ return RANKS[G.rank-1]; }
+function nextRank(){ return RANKS[G.rank]; }
+function unlocked(r){ return G.rank>=r; }
+function checkRank(){
+  while(G.rank<8 && G.lifetimeRevenue>=RANKS[G.rank].at){
+    G.rank++;
+    const r=RANKS[G.rank-1];
+    toast(`⭐ Rank ${r.n} — ${r.title}. Unlocked: ${r.unlock}.`,'rank');
+    slog(store(),`Promoted to rank ${r.n}: ${r.title}.`,'g');
+    confetti(40); buildTabs(); renderPanels();
+  }
+}
+function slog(s,msg,cls){ if(!s) return; s.log.unshift({t:clockLabel(),msg,cls:cls||''}); if(s.log.length>40) s.log.pop(); }
+function toast(msg,kind){
+  const box=$('#toasts');
+  while(box.children.length>3) box.firstChild.remove();
+  const el=document.createElement('div');
+  el.className='toast'+(kind?' toast--'+kind:''); el.innerHTML=msg;
+  box.appendChild(el);
+  setTimeout(()=>{el.style.transition='opacity .3s';el.style.opacity='0';},2800);
+  setTimeout(()=>el.remove(),3150);
+}
+function clockLabel(){
+  const h=OPEN_HOUR+(G.tick/TICKS_PER_DAY)*(CLOSE_HOUR-OPEN_HOUR);
+  const hh=Math.floor(h), mm=Math.floor((h-hh)*60/5)*5, ap=hh>=12?'pm':'am', h12=hh>12?hh-12:hh;
+  return h12+':'+String(mm).padStart(2,'0')+ap;
+}
+function addMod(s,m){ const ex=s.mods.find(x=>x.id===m.id); if(ex){Object.assign(ex,m);return;} s.mods.push(m); }
+function confetti(n){
+  const box=document.createElement('div'); box.className='confetti';
+  const cols=['#FFC629','#00838A','#1D9E72','#E68A00','#4FD1C5'];
+  for(let i=0;i<(n||26);i++){
+    const c=document.createElement('i');
+    c.style.left=Math.random()*100+'%'; c.style.background=pick(cols);
+    c.style.animationDelay=(Math.random()*0.5)+'s';
+    c.style.animationDuration=(1.8+Math.random()*1.2)+'s';
+    box.appendChild(c);
+  }
+  document.body.appendChild(box); setTimeout(()=>box.remove(),3400);
+}
+function tipNow(msg,ms){
+  const el=$('#storeTip'); if(!el) return;
+  el.textContent=msg; el.style.opacity='1';
+  clearTimeout(tipNow._t); tipNow._t=setTimeout(()=>{el.style.opacity='0';},ms||2600);
+}
+
+/* ============================================================
+   3. ISOMETRIC ENGINE
+   ============================================================ */
+const WALL_H=46;
+function P(i,j){ return {x:(i-j)*TWh, y:(i+j)*THh}; }
+function tileCentre(gx,gy){ return P(gx+0.5,gy+0.5); }
+function gridBox(s){
+  return { minX:-s.H*TWh-40, maxX:s.W*TWh+40, minY:-WALL_H-56, maxY:(s.W+s.H)*THh+44 };
+}
+function applyCam(){
+  const s=store(), b=gridBox(s);
+  const cx=(b.minX+b.maxX)/2, cy=(b.minY+b.maxY)/2;
+  $('#world').style.transform=`scale(${G.cam.s}) translate(${-cx+G.cam.x}px, ${-cy+G.cam.y}px)`;
+}
+function fitCam(){
+  const s=store(), b=gridBox(s), host=$('#store');
+  const w=b.maxX-b.minX, h=b.maxY-b.minY;
+  const sc=Math.min((host.clientWidth-40)/w, (host.clientHeight-40)/h);
+  G.cam.s=clamp(sc,0.42,1.62); G.cam.x=0; G.cam.y=0;
+  applyCam();
+}
+function poly(pts){ return pts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' '); }
+
+function buildFloor(){
+  const s=store(), b=gridBox(s);
+  const w=b.maxX-b.minX, h=b.maxY-b.minY;
+  const d=doorTile(s);
+  let svg=`<svg class="floorSvg" viewBox="${b.minX} ${b.minY} ${w} ${h}"
+    style="left:${b.minX}px;top:${b.minY}px;width:${w}px;height:${h}px">`;
+  /* walls along the two back edges */
+  const wl=[P(0,0),P(0,s.H)], wr=[P(0,0),P(s.W,0)];
+  svg+=`<polygon class="wallL" points="${poly([wl[0],wl[1],{x:wl[1].x,y:wl[1].y-WALL_H},{x:wl[0].x,y:wl[0].y-WALL_H}])}"/>`;
+  svg+=`<polygon class="wallR" points="${poly([wr[0],wr[1],{x:wr[1].x,y:wr[1].y-WALL_H},{x:wr[0].x,y:wr[0].y-WALL_H}])}"/>`;
+  svg+=`<polygon class="wallTop" points="${poly([{x:wl[1].x,y:wl[1].y-WALL_H},{x:0,y:-WALL_H},{x:wr[1].x,y:wr[1].y-WALL_H},{x:0,y:-WALL_H+4}])}"/>`;
+  /* floor tiles */
+  for(let gx=0;gx<s.W;gx++) for(let gy=0;gy<s.H;gy++){
+    const cls='tile'+((gx+gy)%2?' alt':'')+((gx===d.gx&&gy===d.gy)?' door':'');
+    svg+=`<polygon class="${cls}" points="${poly([P(gx,gy),P(gx+1,gy),P(gx+1,gy+1),P(gx,gy+1)])}"/>`;
+  }
+  /* entrance marker */
+  const dc=tileCentre(d.gx,d.gy);
+  svg+=`<text x="${dc.x}" y="${dc.y+5}" text-anchor="middle" font-size="15" opacity=".65">🚪</text>`;
+  svg+=`<g id="qmarks"></g><g id="hlLayer"></g></svg>`;
+  const world=$('#world');
+  world.innerHTML=svg+`<div id="objLayer"></div><div id="perLayer"></div><div id="fxLayer"></div>`;
+  objEls={}; perEls={};
+  drawQueueMarks();
+  applyCam();
+}
+function drawQueueMarks(){
+  const s=store(), g=$('#qmarks'); if(!g) return;
+  const slots=queueSlots(s).slice(0,7);
+  g.innerHTML=slots.map(t=>`<polygon class="qmark" points="${poly([P(t.gx+.18,t.gy+.18),P(t.gx+.82,t.gy+.18),P(t.gx+.82,t.gy+.82),P(t.gx+.18,t.gy+.82)])}"/>`).join('');
+}
+function highlight(gx,gy,def,ok){
+  const g=$('#hlLayer'); if(!g) return;
+  if(gx===null){ g.innerHTML=''; return; }
+  g.innerHTML=`<polygon class="hl ${ok?'':'bad'}" points="${poly([P(gx,gy),P(gx+def.fw,gy),P(gx+def.fw,gy+def.fh),P(gx,gy+def.fh)])}"/>`;
+}
+/* --- sprites --- */
+function spriteSVG(def,scale){
+  const fw=def.fw, fh=def.fh, z=def.z, c=def.colors;
+  const A=P(0,0), B=P(fw,0), C=P(fw,fh), D=P(0,fh);
+  const up=p=>({x:p.x,y:p.y-z});
+  const pad=10;
+  const minX=D.x-pad, maxX=B.x+pad, minY=A.y-z-24, maxY=C.y+pad;
+  const w=maxX-minX, h=maxY-minY;
+  const cxT=(A.x+C.x)/2, cyT=(A.y+C.y)/2-z;
+  return {w,h,minX,minY, svg:
+    `<svg width="${w}" height="${h}" viewBox="${minX} ${minY} ${w} ${h}" style="overflow:visible">
+      <ellipse cx="${(A.x+C.x)/2}" cy="${(A.y+C.y)/2+2}" rx="${(fw+fh)*TWh/2.6}" ry="${(fw+fh)*THh/2.6}" fill="rgba(1,50,58,.16)"/>
+      <polygon points="${poly([D,C,up(C),up(D)])}" fill="${c[1]}"/>
+      <polygon points="${poly([C,B,up(B),up(C)])}" fill="${c[2]}"/>
+      <polygon points="${poly([up(A),up(B),up(C),up(D)])}" fill="${c[0]}"/>
+      <polygon points="${poly([up(A),up(B),up(C),up(D)])}" fill="url(#shine)" opacity=".25"/>
+      <text x="${cxT}" y="${cyT+6}" text-anchor="middle" font-size="${Math.min(22,14+(fw+fh)*2)}">${def.ico}</text>
+      <defs><linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+      </linearGradient></defs>
+    </svg>`};
+}
+let objEls={}, perEls={};
+function renderObjects(){
+  const s=store(), seen={};
+  const layer=$('#objLayer'); if(!layer) return;
+  s.items.forEach(it=>{
+    const def=CATBY[it.key]; seen[it.id]=1;
+    let el=objEls[it.id];
+    if(!el){
+      const sp=spriteSVG(def);
+      el=document.createElement('div');
+      el.className='obj pickable'+(it.fresh?' pop':'');
+      el.dataset.item=it.id; el.innerHTML=sp.svg+`<span class="lbl">${def.name.replace('&amp;','&')}</span>`;
+      el.style.width=sp.w+'px'; el.style.height=sp.h+'px';
+      el._sp=sp; layer.appendChild(el); objEls[it.id]=el;
+      it.fresh=false;
+    }
+    const o=P(it.gx,it.gy), sp=el._sp;
+    el.style.left=(o.x+sp.minX)+'px';
+    el.style.top=(o.y+sp.minY)+'px';
+    el.style.zIndex=Math.round((it.gx+it.gy+it.fw+it.fh)*10+5);
+  });
+  Object.keys(objEls).forEach(k=>{ if(!seen[k]){ objEls[k].remove(); delete objEls[k]; } });
+}
+const BLOB=(col,eyes,extra)=>`<svg width="100%" height="100%" viewBox="0 0 100 118">
+  <ellipse cx="50" cy="114" rx="15" ry="3.4" fill="rgba(1,50,58,.20)"/>
+  <g class="bodywrap">
+  <path d="M40 14 C46 8 56 4 63 3 C61 9 60 15 61 21 Z" fill="${col}"/>
+  <circle cx="50" cy="46" r="34" fill="${col}"/>
+  <ellipse cx="50" cy="42" rx="27" ry="16" fill="#fff" transform="rotate(-7 50 42)"/>
+  ${eyes}${extra||''}
+  <path d="M45 79 L42 108 M55 79 L58 108" stroke="#1A1A1A" stroke-width="5" stroke-linecap="round"/>
+  </g></svg>`;
+const EYES={
+  happy:`<circle cx="40" cy="42" r="3.6" fill="#101820"/><circle cx="60" cy="42" r="3.6" fill="#101820"/>`,
+  meh:`<rect x="36" y="40" width="8" height="4" rx="2" fill="#101820"/><rect x="56" y="40" width="8" height="4" rx="2" fill="#101820"/>`,
+  cross:`<path d="M34 34 L46 41 M66 34 L54 41" stroke="#101820" stroke-width="3.4" stroke-linecap="round"/>
+    <circle cx="40" cy="46" r="3.2" fill="#101820"/><circle cx="60" cy="46" r="3.2" fill="#101820"/>`};
+const LANYARD=`<path d="M36 60 L50 70 L64 60" stroke="#FFC629" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+
+function personEl(key,html,w,h){
+  let el=perEls[key];
+  if(!el){
+    el=document.createElement('div');
+    el.className='per'; el.style.width=w+'px'; el.style.height=h+'px';
+    el.style.transition='left var(--tickms,260ms) linear, top var(--tickms,260ms) linear';
+    el.innerHTML=html;
+    $('#perLayer').appendChild(el); perEls[key]=el;
+  }
+  return el;
+}
+function renderPeople(){
+  const s=store(), seen={};
+  const W=40, H=47;
+  s.cust.forEach(c=>{
+    const key='c'+c.id; seen[key]=1;
+    const ratio=c.pat?c.wait/c.pat:0;
+    const eyes = ratio>0.75?EYES.cross : ratio>0.45?EYES.meh : EYES.happy;
+    let el=perEls[key];
+    if(!el){
+      el=personEl(key, BLOB('#FFC629',EYES.happy)+`<span class="bub"></span><span class="ring"><i></i></span>`,W,H);
+      el.dataset.cust=c.id;
+    }
+    if(el._eyes!==eyes){ el._eyes=eyes; el.querySelector('svg').innerHTML=
+      BLOB(c.state==='browse'?'#FFE39A':'#FFC629',eyes).replace(/^<svg[^>]*>|<\/svg>$/g,''); }
+    const p=tileCentre(c.fx+(c.ox||0),c.fy+(c.oy||0));
+    el.style.left=(p.x-W/2)+'px'; el.style.top=(p.y-H+6)+'px';
+    el.style.zIndex=Math.round((c.fx+c.fy)*10+7);
+    el.classList.toggle('walk', !!(c.path&&c.path.length));
+    el.className=el.className.replace(/ (warn|crit)/g,'')+(ratio>0.75?' crit':ratio>0.45?' warn':'');
+    const ring=el.querySelector('.ring');
+    if(c.state==='queue'){ ring.style.display=''; ring.querySelector('i').style.width=Math.max(0,(1-ratio)*100)+'%'; }
+    else ring.style.display='none';
+    const bub=el.querySelector('.bub');
+    bub.textContent = c.state==='serve' ? c.ct.ico : c.state==='browse' ? '👀' : ratio>0.75?'😤':'';
+    bub.style.display=bub.textContent?'':'none';
+  });
+  s.staff.forEach(st=>{
+    if(st.type==='manager') return;
+    const key='s'+st.id; seen[key]=1;
+    let el=perEls[key];
+    if(!el){ el=personEl(key, BLOB('#00838A',EYES.happy,LANYARD)+`<span class="bub"></span>`,W,H); el.dataset.staff=st.id; }
+    let pos;
+    const item=st.desk?s.items.find(i=>i.id===st.desk):null;
+    if(item){ const t=serviceTile(s,item), c0=tileCentre(item.gx+(item.fw-1)/2,item.gy+(item.fh-1)/2);
+      const svc=t?tileCentre(t.gx,t.gy):c0;
+      pos={x:c0.x+(c0.x-svc.x)*0.28, y:c0.y+(c0.y-svc.y)*0.28-10}; }
+    else { const c0=tileCentre(0,0); pos={x:c0.x,y:c0.y-6}; }
+    el.style.left=(pos.x-W/2)+'px'; el.style.top=(pos.y-H+6)+'px';
+    el.style.zIndex=Math.round(((item?item.gx+item.gy:0))*10+6);
+    const bub=el.querySelector('.bub');
+    bub.textContent = !item ? '💤' : st.busy ? '💬' : '';
+    bub.style.display=bub.textContent?'':'none';
+  });
+  Object.keys(perEls).forEach(k=>{
+    if(seen[k]) return;
+    const el=perEls[k]; delete perEls[k];
+    el.classList.add('out'); setTimeout(()=>el.remove(),420);
+  });
+}
+function floaty(gx,gy,text,kind){
+  const layer=$('#fxLayer'); if(!layer) return;
+  const p=tileCentre(gx,gy);
+  const el=document.createElement('div');
+  el.className='floaty floaty--'+(kind||'cash');
+  el.style.left=p.x+'px'; el.style.top=(p.y-40)+'px'; el.textContent=text;
+  layer.appendChild(el); setTimeout(()=>el.remove(),1350);
+}
+
+/* ============================================================
+   4. INPUT — pan, zoom, place, drag
+   ============================================================ */
+function screenToWorld(e){
+  const host=$('#store'), r=host.getBoundingClientRect();
+  const px=(e.clientX-r.left-r.width/2)/G.cam.s;
+  const py=(e.clientY-r.top-r.height/2)/G.cam.s;
+  const s=store(), b=gridBox(s);
+  const cx=(b.minX+b.maxX)/2, cy=(b.minY+b.maxY)/2;
+  return {x:px+cx-G.cam.x, y:py+cy-G.cam.y};
+}
+function worldToGrid(w){
+  const i=(w.x/TWh + w.y/THh)/2, j=(w.y/THh - w.x/TWh)/2;
+  return {i,j,gx:Math.floor(i),gy:Math.floor(j)};
+}
+let ghostEl=null;
+function showGhost(def,gx,gy,ok){
+  if(!ghostEl){ ghostEl=document.createElement('div'); ghostEl.className='obj ghost'; $('#objLayer').appendChild(ghostEl); }
+  const sp=spriteSVG(def);
+  if(ghostEl._key!==def.key){ ghostEl.innerHTML=sp.svg; ghostEl._key=def.key;
+    ghostEl.style.width=sp.w+'px'; ghostEl.style.height=sp.h+'px'; }
+  const o=P(gx,gy);
+  ghostEl.style.left=(o.x+sp.minX)+'px'; ghostEl.style.top=(o.y+sp.minY)+'px';
+  ghostEl.style.zIndex=99998;
+  ghostEl.classList.toggle('bad',!ok);
+  ghostEl.style.display='';
+}
+function hideGhost(){ if(ghostEl) ghostEl.style.display='none'; highlight(null); }
+
+let ptr={mode:null,sx:0,sy:0,cx:0,cy:0,moved:false,item:null};
+const host=()=>$('#store');
+function onDown(e){
+  const s=store();
+  const objEl=e.target.closest('.obj.pickable');
+  if(G.pick){ return; }                                   /* placing: handled on click */
+  if(objEl){
+    const it=s.items.find(i=>i.id===+objEl.dataset.item);
+    if(it){
+      ptr={mode:'item',sx:e.clientX,sy:e.clientY,item:it,moved:false};
+      objEl.classList.add('dragging');
+      $('#binzone').classList.add('on');
+      host().setPointerCapture(e.pointerId);
+      return;
+    }
+  }
+  ptr={mode:'pan',sx:e.clientX,sy:e.clientY,cx:G.cam.x,cy:G.cam.y,moved:false};
+  host().classList.add('dragging');
+  host().setPointerCapture(e.pointerId);
+}
+function onMove(e){
+  const s=store();
+  if(G.pick){
+    const def=CATBY[G.pick];
+    const g=worldToGrid(screenToWorld(e));
+    const ok=canPlace(s,def,g.gx,g.gy) && G.capital>=def.cost;
+    highlight(g.gx,g.gy,def,ok); showGhost(def,g.gx,g.gy,ok);
+    return;
+  }
+  if(ptr.mode==='pan'){
+    G.cam.x=ptr.cx+(e.clientX-ptr.sx)/G.cam.s;
+    G.cam.y=ptr.cy+(e.clientY-ptr.sy)/G.cam.s;
+    if(Math.abs(e.clientX-ptr.sx)+Math.abs(e.clientY-ptr.sy)>4) ptr.moved=true;
+    applyCam();
+  } else if(ptr.mode==='item'){
+    ptr.moved=true;
+    const def=CATBY[ptr.item.key];
+    const g=worldToGrid(screenToWorld(e));
+    const ok=canPlace(s,def,g.gx,g.gy,ptr.item.id);
+    highlight(g.gx,g.gy,def,ok); showGhost(def,g.gx,g.gy,ok);
+    const bin=$('#binzone'), br=bin.getBoundingClientRect();
+    bin.classList.toggle('hot', e.clientX>br.left&&e.clientX<br.right&&e.clientY>br.top&&e.clientY<br.bottom);
+  }
+}
+function onUp(e){
+  const s=store();
+  host().classList.remove('dragging');
+  if(ptr.mode==='item'&&ptr.item){
+    const el=objEls[ptr.item.id]; if(el) el.classList.remove('dragging');
+    const bin=$('#binzone'), br=bin.getBoundingClientRect();
+    const overBin=e.clientX>br.left&&e.clientX<br.right&&e.clientY>br.top&&e.clientY<br.bottom;
+    if(overBin){ sellItem(ptr.item); }
+    else{
+      const def=CATBY[ptr.item.key];
+      const g=worldToGrid(screenToWorld(e));
+      if(ptr.moved && canPlace(s,def,g.gx,g.gy,ptr.item.id)){
+        ptr.item.gx=g.gx; ptr.item.gy=g.gy;
+        reflow(s); tipNow(def.name.replace('&amp;','&')+' moved');
+      }
+    }
+    bin.classList.remove('on','hot');
+    hideGhost(); renderObjects(); drawQueueMarks();
+  }
+  ptr={mode:null};
+}
+function onClick(e){
+  const s=store();
+  if(!G.pick) return;
+  const def=CATBY[G.pick];
+  const g=worldToGrid(screenToWorld(e));
+  if(!canPlace(s,def,g.gx,g.gy)){ tipNow('That spot is taken — try somewhere else.'); return; }
+  if(G.capital<def.cost){ tipNow('Not enough capital for that yet.'); setPick(null); return; }
+  G.capital-=def.cost;
+  const it=place(s,G.pick,g.gx,g.gy);
+  reflow(s);
+  floaty(g.gx,g.gy,'−'+money(def.cost),'bad');
+  slog(s,`${def.name.replace('&amp;','&')} installed.`,'g');
+  renderObjects(); drawQueueMarks(); renderPanels(); renderTop();
+  if(G.capital<def.cost) setPick(null);
+}
+function sellItem(it){
+  const s=store(), def=CATBY[it.key];
+  if(CATBY[it.key].staffed && servicePoints(s).length<=1){ tipNow('You need at least one service desk.'); return; }
+  const refund=Math.round(def.cost*0.5);
+  G.capital+=refund;
+  s.items=s.items.filter(i=>i.id!==it.id);
+  s.staff.forEach(st=>{ if(st.desk===it.id){ st.desk=null; if(st.busy){ st.busy.state='leave'; st.busy=null; } } });
+  floaty(it.gx,it.gy,'+'+money(refund),'cash');
+  toast(`Sold ${def.name.replace('&amp;','&')} for ${money(refund)}`);
+  reflow(s);
+}
+function reflow(s){
+  /* re-seat staff and re-path anyone whose plan just became nonsense */
+  const points=servicePoints(s);
+  const taken={};
+  s.staff.forEach(st=>{ if(st.desk && points.some(p=>p.id===st.desk)) taken[st.desk]=1; else st.desk=null; });
+  s.staff.filter(st=>st.type!=='manager'&&!st.desk).forEach(st=>{
+    const free=points.find(p=>!taken[p.id]);
+    if(free){ st.desk=free.id; taken[free.id]=1; }
+  });
+  s.cust.forEach(c=>{
+    if(c.state==='toDesk'||c.state==='browse'){ c.state='queue'; c.slot=null; c.path=null; }
+    if(!walkable(s,Math.round(c.fx),Math.round(c.fy))){
+      const d=doorTile(s); c.fx=d.gx; c.fy=d.gy;
+    }
+  });
+  drawQueueMarks();
+}
+function setPick(key){
+  G.pick=key;
+  host().classList.toggle('placing',!!key);
+  if(!key) hideGhost();
+  $$('.shopcard').forEach(c=>c.classList.toggle('is-picked',c.dataset.buy===key));
+  if(key) tipNow('Tap the floor to place it. Esc to cancel.',3500);
+}
+function zoom(mult){ G.cam.s=clamp(G.cam.s*mult,0.42,1.9); applyCam(); }
+
+/* ============================================================
+   5. SIMULATION
+   ============================================================ */
+const WALK=0.62;
+function pickType(s){
+  const L=loc(s), st=stats(s), w=[]; let total=0;
+  for(const c of CTYPES){
+    let x=L.mix[c.k]||1;
+    if(c.acc) x*=1+0.22*st.shelves+0.15*st.tables;
+    if(c.repair) x*= st.desks&&s.items.some(i=>i.key==='repair')?2.3:1;
+    if(c.support) x*= s.cx<60?1+(60-s.cx)/45:0.8;
+    if(c.k==='flagship') x*= st.flagship*mods(s,'flagshipW');
+    total+=x; w.push(total);
+  }
+  const r=Math.random()*total;
+  for(let i=0;i<w.length;i++) if(r<=w[i]) return CTYPES[i];
+  return CTYPES[0];
+}
+function arrivalsPerDay(s){
+  const L=loc(s);
+  let cxF=0.45+(s.cx/100)*0.95;
+  if(L.id==='brookside'&&s.cx>60) cxF*=1.18;
+  if(s.cx<40) cxF*=0.75;
+  return L.traffic*DOW_TRAFFIC[G.dow]*cxF*trafficMult(s);
+}
+function rushFactor(s){
+  const L=loc(s);
+  if(!L.rush||G.dow>4) return 1;
+  return (G.tick>=170&&G.tick<=224)?3:0.82;
+}
+function patienceOf(s,ct,gx,gy){
+  const st=stats(s);
+  let p=PAT_BASE*ct.pat*loc(s).patience*st.patience*mods(s,'patience');
+  /* a bench beside you makes waiting far easier */
+  if(st.benchTiles.some(b=>Math.abs(b.gx-gx)<=1.5&&Math.abs(b.gy-gy)<=1.5)) p*=1.4;
+  return p;
+}
+function spawnCust(s,browse){
+  const d=doorTile(s);
+  const jitter={ox:rnd(-0.17,0.17), oy:rnd(-0.17,0.17)};
+  const ct=pickType(s);
+  s.cust.push({id:uid++, ct, ox:jitter.ox, oy:jitter.oy, state:browse?'browse':'walkin', fx:d.gx, fy:d.gy,
+    path:null, slot:null, wait:0, pat:PAT_BASE*ct.pat*loc(s).patience*stats(s).patience,
+    browseT:browse?Math.round(rnd(40,90)):0});
+}
+function stepMove(c){
+  if(!c.path||!c.path.length) return false;
+  const t=c.path[0];
+  const dx=t.gx-c.fx, dy=t.gy-c.fy;
+  const dist=Math.hypot(dx,dy);
+  if(dist<=WALK){ c.fx=t.gx; c.fy=t.gy; c.path.shift(); return c.path.length>0; }
+  c.fx+=dx/dist*WALK; c.fy+=dy/dist*WALK;
+  return true;
+}
+function txTicks(s,st,ct,item){
+  const L=loc(s), P=PACES[s.pace];
+  let t=ct.time*TX_BASE*L.txMult*P.txMult/(staffSpeed(s,st));
+  const def=item?CATBY[item.key]:null;
+  if(def&&def.express&&ct.quick) t*=0.6;
+  if(ct.is5g&&L.stubborn) t*=2;
+  if((ct.is5g||ct.repair)&&st.type==='specialist') t*=0.5;
+  t*=mods(s,'tx');
+  return Math.max(4,t);
+}
+function completeSale(s,st,c){
+  const ct=c.ct, L=loc(s), P=PACES[s.pace], R=ROLES[st.type], sx=stats(s);
+  const item=s.items.find(i=>i.id===st.desk);
+  let rev=ct.val*L.revMult*P.revMult*R.upsell*mods(s,'rev');
+  if(ct.acc) rev*=sx.acc*L.accMult;
+  else rev+=14*sx.acc*L.accMult*Math.random();
+  if(ct.repair) rev*=(item&&CATBY[item.key].repair?2.4:1)*(st.type==='specialist'?1.25:1);
+  if(ct.k==='flagship') rev*=1+ (sx.plinths?0.10:0);
+  rev=Math.round(rev);
+  G.capital+=rev; G.lifetimeRevenue+=rev; G.custServed++;
+  s.dayRev+=rev; s.dayServed++; s.dayConn+=ct.conn; G.weekConn+=ct.conn;
+
+  let dc=P.comp+staffComp(s,st);
+  if(dc<0) dc*=(sx.servers?0.75:1);
+  if(ct.is5g&&L.stubborn) dc-=0.45;
+  if(Math.random()<0.06&&st.type==='junior'&&sx.boards<2) dc-=1.2;
+  s.compliance=clamp(s.compliance+dc,0,100);
+
+  const ratio=c.wait/c.pat;
+  let dx=ct.support?P.support:(ratio<0.4?0.17:ratio<0.75?0.05:-0.34);
+  s.cx=clamp(s.cx+dx,0,100);
+  st.stamina=clamp(st.stamina-(s.pace==='hustle'?4.4:s.pace==='strict'?2.4:3.2)/(sx.stamina?1.7:1),0,100);
+  st.servedToday++;
+  if(rev>=140) slog(s,`${st.name} closed a ${ct.lbl.toLowerCase()} — <b>${money(rev)}</b>`,'g');
+  if(item) floaty(item.gx,item.gy,'+'+money(rev),'cash');
+  c.state='leave'; c.claimed=null; c.path=pathTo(s,{gx:Math.round(c.fx),gy:Math.round(c.fy)},doorTile(s));
+  st.busy=null; st.prog=0;
+}
+function simTick(){
+  const s=store();
+  if(s.closedToday) return;
+  const L=loc(s), sx=stats(s), d=doorTile(s);
+
+  /* arrivals */
+  s.spawnAcc+=arrivalsPerDay(s)/TICKS_PER_DAY*rushFactor(s)*(mods(s,'traffic')?1:1);
+  while(s.spawnAcc>=1){ s.spawnAcc--;
+    if(s.cust.filter(c=>c.state!=='leave').length>26){ s.dayWalk++; G.custLost++; continue; }
+    spawnCust(s,false);
+  }
+  if(sx.tables){
+    s.browseAcc+=arrivalsPerDay(s)*0.35*sx.tables/TICKS_PER_DAY;
+    while(s.browseAcc>=1){ s.browseAcc--; spawnCust(s,true); }
+  }
+
+  /* queue slots */
+  const slots=queueSlots(s);
+  const queued=s.cust.filter(c=>c.state==='queue'||c.state==='walkin');
+  queued.forEach((c,i)=>{
+    const slot=slots[i];
+    if(!slot){ c.state='queue'; return; }
+    if(c.slot?.gx!==slot.gx||c.slot?.gy!==slot.gy){
+      c.slot=slot;
+      c.path=pathTo(s,{gx:Math.round(c.fx),gy:Math.round(c.fy)},slot)||[];
+    }
+    if(!c.path||!c.path.length){
+      if(Math.abs(c.fx-slot.gx)<0.3&&Math.abs(c.fy-slot.gy)<0.3) c.state='queue';
+    }
+  });
+
+  /* desks call the next customer over — including while finishing the current sale */
+  floorStaff(s).forEach(st=>{
+    if(!st.desk) return;
+    if(st.busy && st.prog < st.need*0.42) return;
+    if(s.cust.some(c=>c.claimed===st.id && c.state!=='serve')) return;
+    const item=s.items.find(i=>i.id===st.desk); if(!item) return;
+    const t=serviceTile(s,item); if(!t) return;
+    const next=s.cust.find(c=>(c.state==='queue'||c.state==='walkin')&&!c.claimed);
+    if(!next) return;
+    next.claimed=st.id; next.state='toDesk'; next.deskTile=t;
+    next.path=pathTo(s,{gx:Math.round(next.fx),gy:Math.round(next.fy)},t)||[];
+  });
+
+  /* movement + states */
+  for(let i=s.cust.length-1;i>=0;i--){
+    const c=s.cust[i];
+    stepMove(c);
+    if(c.state==='walkin'||c.state==='queue'){
+      c.wait++;
+      if(c.wait>c.pat){
+        s.cust.splice(i,1); s.dayWalk++; G.custLost++;
+        s.cx=clamp(s.cx-2.6*(sx.queueSoft?0.5:1)*cxDrainMult(s),0,100);
+        if(s.dayWalk%3===1) slog(s,`A ${c.ct.lbl.toLowerCase()} customer gave up and left.`,'r');
+        continue;
+      }
+    }
+    if(c.state==='browse'){
+      c.browseT--;
+      if(!c.path||!c.path.length){
+        const tables=s.items.filter(i2=>i2.key==='table');
+        if(tables.length){
+          const t=pick(tables), around=[];
+          for(let x=t.gx-1;x<=t.gx+t.fw;x++) for(let y=t.gy-1;y<=t.gy+t.fh;y++)
+            if(walkable(s,x,y)) around.push({gx:x,gy:y});
+          if(around.length) c.path=pathTo(s,{gx:Math.round(c.fx),gy:Math.round(c.fy)},pick(around))||[];
+        }
+      }
+      if(c.browseT<=0){
+        if(Math.random()<0.55){ c.state='walkin'; c.slot=null; c.path=null; c.wait=0;
+          c.pat=patienceOf(s,c.ct,Math.round(c.fx),Math.round(c.fy)); }
+        else { c.state='leave'; c.path=pathTo(s,{gx:Math.round(c.fx),gy:Math.round(c.fy)},d)||[]; }
+      }
+    }
+    if((c.state==='toDesk'||c.state==='atDesk')&&(!c.path||!c.path.length)){
+      const st=s.staff.find(x=>x.id===c.claimed);
+      if(!st||!st.desk){ c.state='queue'; c.claimed=null; }
+      else if(st.busy){ c.state='atDesk'; c.wait++; }
+      else{
+        const item=s.items.find(i=>i.id===st.desk);
+        c.state='serve'; st.busy=c; st.prog=0; st.need=txTicks(s,st,c.ct,item);
+      }
+    }
+    if(c.state==='leave'&&(!c.path||!c.path.length)) s.cust.splice(i,1);
+  }
+  /* serving */
+  floorStaff(s).forEach(st=>{
+    if(!st.busy) return;
+    st.prog++;
+    if(st.prog>=st.need) completeSale(s,st,st.busy);
+  });
+
+  /* ambient CX */
+  const waiting=s.cust.filter(c=>c.state==='queue'&&c.wait>12).length;
+  if(waiting>1) s.cx=clamp(s.cx-0.0016*cxDrainMult(s)*(waiting-1)*5,0,100);
+  s.cx=clamp(s.cx+PACES[s.pace].cxTick+sx.ambience*0.00035,0,100);
+  s.mods.forEach(m=>{ if(m.cxTick) s.cx=clamp(s.cx+m.cxTick,0,100); });
+}
+function tick(){
+  simTick();
+  G.tick++;
+  if(G.tick>=TICKS_PER_DAY) endOfDay();
+}
+
+/* ============================================================
+   6. DAY / WEEK / EVENTS
+   ============================================================ */
+function runManaged(s){
+  const L=loc(s), P=PACES[s.pace], sx=stats(s);
+  const demand=arrivalsPerDay(s);
+  const cap=floorStaff(s).filter(st=>st.desk).reduce((n,st)=>n+staffSpeed(s,st),0)*9/L.txMult;
+  const served=Math.min(demand,cap);
+  let avg=0,tw=0;
+  CTYPES.forEach(c=>{ const w=L.mix[c.k]||1; avg+=c.val*w; tw+=w; });
+  avg=avg/tw*L.revMult*P.revMult*sx.acc;
+  const rev=Math.round(served*avg*0.74);
+  G.capital+=rev; G.lifetimeRevenue+=rev; s.dayRev=rev; s.dayServed=Math.round(served);
+  const conn=Math.round(served*0.58); s.dayConn=conn; G.weekConn+=conn;
+  const fill=served/Math.max(1,demand), target=fill>0.9?66:fill>0.72?52:34;
+  s.cx=clamp(s.cx+(s.cx<target?1.4:-2.2),0,100);
+  s.compliance=clamp(s.compliance+(s.pace==='hustle'?-3.2:s.pace==='strict'?1.8:-0.4)+sx.compliancePerDay,0,100);
+  return rev;
+}
+function updateRivals(){
+  RIVALS.forEach(r=>{
+    const mine=G.stores.find(s=>s.locId===r.near);
+    const target=mine?clamp(58-mine.cx*0.45,6,62):46;
+    r.share=clamp(r.share+(target-r.share)*0.14,4,72);
+  });
+}
+function endOfDay(){
+  G.tick=0;
+  let cost=0, income=0, gross=0;
+  G.stores.forEach((s,i)=>{
+    if(i!==G.active){
+      if(isManaged(s)) income+=runManaged(s);
+      else { s.cx=clamp(s.cx-6,0,100); s.compliance=clamp(s.compliance-2.5,0,100); s.dayRev=0; }
+    }
+    const sx=stats(s), rent=rentBill(s), wages=wageBill(s), pass=sx.passive;
+    cost+=rent+wages; income+=pass; gross+=s.dayRev;
+    G.capital-=rent+wages; G.capital+=pass;
+    s.staff.forEach(st=>{ st.stamina=clamp(st.stamina+(sx.stamina?100:52),0,100); st.servedToday=0; st.busy=null; st.prog=0; });
+    s.compliance=clamp(s.compliance+0.9+sx.compliancePerDay,0,100);
+    s.cx=clamp(s.cx+0.4+sx.ambience*0.22+(loc(s).id==='brookside'&&s.cx>60?0.9:0),0,100);
+    s.mods=s.mods.filter(m=>{ m.days--; return m.days>0; });
+    s.cust.length=0; s.spawnAcc=0; s.browseAcc=0; s.closedToday=false;
+    s.auditShield=Math.max(0,s.auditShield-1);
+    s.dayRev=0; s.dayServed=0; s.dayWalk=0; s.dayConn=0;
+  });
+  updateRivals(); checkRank();
+  const before=G.strikeLog.length;
+  G.strikeLog=G.strikeLog.filter(d=>G.day-d<12); G.strikes=G.strikeLog.length;
+  if(G.strikeLog.length<before) toast('✅ A Head Office strike has aged off your record.','good');
+  const net=gross+income-cost;
+  toast(`${DAYS[G.dow]} closed · takings <b>${money(gross)}</b> · net <b>${money(net)}</b>`, net>=0?'good':'bad');
+  G.day++; G.dow=(G.dow+1)%7; G.eventCool--;
+  const s0=store();
+  if(s0.cx<36&&G.day>5&&G.day-G.lastStrike>=2){ G.lastStrike=G.day; strike('CX fell below 36 at '+loc(s0).name+'.'); }
+  else if(s0.cx<44) toast('⚠️ Head Office is watching your CX score.','bad');
+  if(G.capital<-9000){ gameOver('Insolvent','You ran the franchise into the ground. The receivers have the keys, the demo tables and, for some reason, the coffee machine.'); return; }
+  if(!G.won&&G.stores.length>=3&&G.capital>=250000){ G.won=true; winGame(); return; }
+  if((G.day-1)%7===0) weeklyReview(); else maybeEvent();
+  perEls={}; $('#perLayer') && ($('#perLayer').innerHTML='');
+  render(true);
+}
+function nextTarget(){
+  const base=G.stores.reduce((n,s)=>n+loc(s).traffic,0);
+  return Math.round(base*7*0.30*(1+0.09*G.reviews)*growth());
+}
+function weeklyReview(){
+  G.reviews++;
+  const target=G.weekTarget||nextTarget(), hit=G.weekConn>=target, bonus=3800+1600*G.stores.length;
+  if(hit) G.capital+=bonus; else { G.capital-=4600; store().cx=clamp(store().cx-6,0,100); }
+  showModal({tone:hit?'is-good':'is-bad',kicker:'Head Office · Weekly review',title:hit?'Quota met':'Quota missed',
+    body:`<p>Week ${G.reviews} closed with <b>${G.weekConn}</b> connections against a target of <b>${target}</b>.</p>
+      <p>${hit?`Your regional manager sent a thumbs up emoji and a performance bonus of <b>${money(bonus)}</b>.`
+              :`You are on a performance improvement plan. <b>${money(4600)}</b> clawed back and CX takes the hit.`}</p>`,
+    choices:[{label:'Back to the floor',act:()=>{}}]});
+  if(!hit) strike('Missed the weekly connection quota.');
+  G.weekConn=0; G.weekTarget=nextTarget();
+}
+function strike(reason){
+  G.strikeLog.push(G.day); G.strikes=G.strikeLog.length;
+  if(G.strikes>=G.maxStrikes){
+    gameOver('Franchise terminated','Three strikes. Head Office has bought back your territory at a price they described as "generous" and you described, loudly, in the car park.');
+    return;
+  }
+  toast(`⚠️ Head Office strike ${G.strikes}/${G.maxStrikes} — ${reason}`,'bad');
+}
+const EVENTS=[
+{id:'outage',w:14,min:4,build:s=>({tone:'is-bad',kicker:'Network operations',title:'Major network outage',
+  body:`<p>The 5G towers covering your sector are down. The queue at <b>${loc(s).name}</b> has stopped being a queue and started being a mob.</p>`,
+  choices:[
+    {label:'Give everyone free data add-ons',cost:1750,detail:'Buy the goodwill back before it turns into a review.',
+     tags:[['CX protected','tag--good']],act:()=>addMod(s,{id:'outage',label:'Outage goodwill',days:2,traffic:1.05})},
+    {label:'Blame the handset manufacturer',detail:'Costs nothing. Nobody believes you.',
+     tags:[['CX −16','tag--bad'],['Compliance −6','tag--bad']],
+     act:()=>{s.cx=clamp(s.cx-16,0,100);s.compliance=clamp(s.compliance-6,0,100);}},
+    {label:'Hand out loaner modems',cost:4900,detail:'Expensive, but people remember it.',
+     tags:[['CX +8','tag--good'],['Traffic +20% (4 days)','tag--good']],
+     act:()=>{s.cx=clamp(s.cx+8,0,100);addMod(s,{id:'outage',label:'Loaner modem goodwill',days:4,traffic:1.2});}}]})},
+{id:'iphone',w:10,min:6,build:s=>({tone:'is-good',kicker:'Product launch',title:'Launch day is Friday',
+  body:`<p>The new flagship drops in three days and foot traffic will triple.</p>
+    <p>${servicePoints(s).length>2?'You have the counters to absorb it.':'<b>You only have '+servicePoints(s).length+' service points.</b> At triple traffic the queue will not move.'}</p>`,
+  choices:[
+    {label:'Order deep stock',cost:7000,detail:'Every variant, every colour, plus accessories on the wall.',
+     tags:[['Traffic ×3 (3 days)','tag--good'],['Revenue +25%','tag--good']],
+     act:()=>addMod(s,{id:'launch',label:'Launch day',days:3,traffic:3,rev:1.25,flagshipW:3})},
+    {label:'Take the standard allocation',detail:'Play it safe. You will sell out by lunch on day one.',
+     tags:[['Traffic ×2 (3 days)','tag--warn']],
+     act:()=>addMod(s,{id:'launch',label:'Launch day',days:3,traffic:2,flagshipW:2})}]})},
+{id:'rival',w:10,min:5,build:s=>({tone:'is-bad',kicker:'Competitor watch',
+  title:`${rivalOf(s)?rivalOf(s).name:'A rival'} opened a kiosk opposite you`,
+  body:`<p>Forty metres away, with a big banner and a bloke handing out free lanyards.</p>`,
+  choices:[
+    {label:'Run a counter-campaign',cost:2800,detail:'Local radio, centre signage and a better lanyard.',
+     tags:[['Rival share −8','tag--good']],act:()=>{const r=rivalOf(s);if(r)r.share=clamp(r.share-8,4,72);}},
+    {label:'Ignore them',detail:'Let the product speak for itself.',
+     tags:[['Rival share +12','tag--bad'],['Traffic −20% (4 days)','tag--bad']],
+     act:()=>{const r=rivalOf(s);if(r)r.share=clamp(r.share+12,4,72);
+       addMod(s,{id:'rivalmod',label:'Losing walk-ins',days:4,traffic:0.8});}}]})},
+{id:'viral',w:9,min:4,cond:s=>s.cx<78,build:s=>({tone:'is-warn',kicker:'Reputation',title:'A queue video is doing numbers',
+  body:`<p>Someone filmed your queue at ${loc(s).name} and captioned it with something unkind about wait times.</p>`,
+  choices:[
+    {label:'Respond publicly and fix the roster',cost:1600,detail:'Own it, offer credits, post a follow-up.',
+     tags:[['CX +4','tag--good']],act:()=>{s.cx=clamp(s.cx+4,0,100);}},
+    {label:'Say nothing',detail:'These things blow over. Usually.',
+     tags:[['CX −10','tag--bad'],['Traffic −10% (3 days)','tag--bad']],
+     act:()=>{s.cx=clamp(s.cx-10,0,100);addMod(s,{id:'viral',label:'Bad press',days:3,traffic:0.9});}}]})},
+{id:'sick',w:11,min:3,cond:s=>floorStaff(s).length>1,build:s=>({tone:'',kicker:'Roster',
+  title:`${pick(floorStaff(s)).name} has called in sick`,
+  body:`<p>Gastro, apparently. The floor is a person down today unless you find someone.</p>`,
+  choices:[
+    {label:'Call an agency temp',cost:900,detail:'Warm body, average speed, no compliance instincts at all.',
+     tags:[['Compliance drifts','tag--warn']],act:()=>addMod(s,{id:'temp',label:'Agency temp',days:1})},
+    {label:'Run short-staffed',detail:'Everyone else picks up the slack.',
+     tags:[['Transactions 22% slower','tag--bad']],
+     act:()=>addMod(s,{id:'short',label:'Short-staffed today',days:1,tx:1.22,patience:0.9})}]})},
+{id:'rent',w:7,min:9,build:s=>({tone:'is-warn',kicker:'Centre management',title:'Rent review',
+  body:`<p>Your lease at ${loc(s).name} is up for review. The letter uses the phrase "market alignment" four times.</p>`,
+  choices:[
+    {label:'Pay to lock the rate for good',cost:6000,detail:'One payment now, no increase later.',
+     tags:[['Rent frozen','tag--good']],act:()=>slog(s,'Lease rate locked in.','g')},
+    {label:'Accept the increase',detail:'Rent goes up permanently.',
+     tags:[['Rent +12%','tag--bad']],act:()=>{s.rentMod*=1.12;}}]})},
+{id:'idcheck',w:8,min:6,build:s=>({tone:'',kicker:'Regulatory',title:'Identity check crackdown',
+  body:`<p>New ID verification rules land this week. Doing it properly slows every sale down.</p>`,
+  choices:[
+    {label:'Follow the process exactly',detail:'Slower floor, spotless paperwork.',
+     tags:[['Compliance +9','tag--good'],['18% slower (4 days)','tag--warn']],
+     act:()=>{s.compliance=clamp(s.compliance+9,0,100);addMod(s,{id:'id',label:'Full ID verification',days:4,tx:1.18});}},
+    {label:'Process as usual',detail:'Nobody has ever checked. Probably.',
+     tags:[['Compliance −14','tag--bad']],
+     act:()=>{s.compliance=clamp(s.compliance-14,0,100);}}]})},
+{id:'sale',w:8,min:7,build:s=>({tone:'is-good',kicker:'Marketing',title:'End of financial year sale',
+  body:`<p>National campaign starts tomorrow. Two days of doubled traffic — and every staff member pushing harder than usual.</p>`,
+  choices:[
+    {label:'Go all in',detail:'Extended hours, full window takeover.',
+     tags:[['Traffic ×2 (2 days)','tag--good'],['Patience −10%','tag--warn']],
+     act:()=>addMod(s,{id:'sale',label:'EOFY sale',days:2,traffic:2,rev:1.1,patience:0.9})},
+    {label:'Trade normally',detail:'Keep the floor calm.',
+     tags:[['Traffic +25% (2 days)','tag--good']],
+     act:()=>addMod(s,{id:'sale',label:'EOFY sale',days:2,traffic:1.25})}]})},
+{id:'school',w:7,min:5,build:s=>({tone:'',kicker:'Community',title:'Local school fundraiser',
+  body:`<p>The P&amp;C would like a sponsor for the fete. Your logo on a banner, next to a jumping castle.</p>`,
+  choices:[
+    {label:'Sponsor the fete',cost:1400,detail:'Cheap goodwill in a suburb that talks.',
+     tags:[['CX +6','tag--good'],['Traffic +18% (5 days)','tag--good']],
+     act:()=>{s.cx=clamp(s.cx+6,0,100);addMod(s,{id:'fete',label:'Community sponsorship',days:5,traffic:1.18});}},
+    {label:'Politely decline',detail:'Budget is budget.',act:()=>{}}]})},
+{id:'poach',w:6,min:10,cond:s=>s.staff.some(x=>x.type==='senior'||x.type==='specialist'),build:s=>{
+  const t=pick(s.staff.filter(x=>x.type==='senior'||x.type==='specialist'));
+  return {tone:'is-warn',kicker:'People',title:`${t.name} has an offer from a competitor`,
+    body:`<p>${t.name} has been offered more money down the road and would like "a quick chat in the back".</p>`,
+    choices:[
+      {label:'Match the offer',cost:3500,detail:'A one-off retention payment.',tags:[['Keeps staff','tag--good']],act:()=>{}},
+      {label:'Wish them well',detail:'You lose them at the end of the day.',tags:[['−1 staff member','tag--bad']],
+       act:()=>{s.staff=s.staff.filter(x=>x.id!==t.id);reflow(s);slog(s,`${t.name} resigned.`,'r');}}]};
+}}];
+function maybeEvent(){
+  const s=store();
+  const p=(0.10*loc(s).auditMult+(s.compliance<50?0.06:0))*(1+0.25*(G.stores.length-1));
+  if(G.day>4&&Math.random()<p){ audit(s); return; }
+  if(G.eventCool>0) return;
+  if(Math.random()>0.55) return;
+  const pool=EVENTS.filter(e=>G.day>=e.min&&(!e.cond||e.cond(s))&&e.id!==s.lastEvent);
+  if(!pool.length) return;
+  let total=0; pool.forEach(e=>total+=e.w);
+  let r=Math.random()*total, chosen=pool[0];
+  for(const e of pool){ r-=e.w; if(r<=0){ chosen=e; break; } }
+  s.lastEvent=chosen.id; G.eventCool=2;
+  showModal(chosen.build(s));
+}
+function audit(s){
+  showModal({tone:'is-warn',kicker:'Head Office',title:'A mystery shopper is in the store',
+    body:`<p>Someone at ${loc(s).name} is asking oddly specific questions about contract terms and taking notes on their phone.</p><p>Pass mark is 70.</p>`,
+    choices:[
+      {label:'Let the floor handle it',detail:'Whatever happens, happens.',act:()=>resolveAudit(s,0)},
+      {label:'Pull your best consultant onto the floor',cost:1200,detail:'Buys you a bit of polish for the walk-through.',
+       tags:[['+12 effective compliance','tag--good']],act:()=>resolveAudit(s,12)},
+      {label:'Close for a "stocktake"',detail:'Lose the rest of the day, dodge it entirely.',
+       tags:[['No trade today','tag--bad']],act:()=>{s.closedToday=true;s.cust.length=0;slog(s,'Closed early to dodge the mystery shopper.','a');}}]});
+}
+function resolveAudit(s,bonus){
+  const score=s.compliance+bonus+(s.auditShield>0?15:0), L=loc(s);
+  if(score>=70){
+    const cash=Math.round(1050*L.fineMult);
+    G.capital+=cash; s.compliance=clamp(s.compliance+3,0,100);
+    showModal({tone:'is-good',kicker:'Audit result',title:'Passed',
+      body:`<p>Scored <b>${Math.round(score)}</b>. Clean paperwork, correct disclosures, ID checked. Head Office released a compliance bonus of <b>${money(cash)}</b>.</p>`,
+      choices:[{label:'Back to the floor',act:()=>{}}]});
+    slog(s,'Passed a Head Office audit.','g');
+  } else {
+    const fine=Math.round((1600+(70-score)*80)*L.fineMult);
+    G.capital-=fine; s.compliance=clamp(s.compliance+6,0,100);
+    showModal({tone:'is-bad',kicker:'Audit result',title:'Failed',
+      body:`<p>Scored <b>${Math.round(score)}</b> against a pass mark of 70. Unsigned agreements, missing ID checks and a "verbal" contract variation.</p>
+        <p>Fine issued: <b>${money(fine)}</b>. Mandatory retraining nudges compliance up 6.</p>`,
+      choices:[{label:'Sign the acknowledgement',act:()=>{}}]});
+    slog(s,`Failed audit — fined ${money(fine)}.`,'r');
+    if(score<50) strike('Failed a compliance audit badly.');
+  }
+}
+
+/* ============================================================
+   7. PANELS
+   ============================================================ */
+function expansionCost(s){ return Math.round(9000*(1+s.expansions*0.95)); }
+function renderTop(){
+  const s=store();
+  $('#vCap').textContent=money(G.capital);
+  $('#vCx').innerHTML=Math.round(s.cx)+'<small>/100</small>';
+  $('#vComp').innerHTML=Math.round(s.compliance)+'<small>/100</small>';
+  const bcx=$('#bCx'), bcp=$('#bComp');
+  bcx.style.width=s.cx+'%'; bcx.style.background=s.cx<40?'#DC4A38':s.cx<60?'#E68A00':'#FFC629';
+  bcp.style.width=s.compliance+'%'; bcp.style.background=s.compliance<50?'#DC4A38':s.compliance<70?'#E68A00':'#FFC629';
+  $('#mCx').classList.toggle('is-crit',s.cx<40);
+  $('#mComp').classList.toggle('is-crit',s.compliance<45);
+  $('#mCap').classList.toggle('is-crit',G.capital<0);
+  const r=rankInfo(), nx=nextRank();
+  $('#lRank').textContent='Rank '+r.n; $('#vRank').textContent=r.title;
+  $('#bRank').style.width=nx?clamp((G.lifetimeRevenue-r.at)/(nx.at-r.at)*100,0,100)+'%':'100%';
+  $('#vStrike').textContent=G.strikes===0?'Clean':`${G.strikes}/${G.maxStrikes} strikes`;
+  $('#mStrike').classList.toggle('is-crit',G.strikes>=2);
+  $('#vDay').textContent=`${DAYS[G.dow]} · Day ${G.day}`;
+  $('#vTime').textContent=s.closedToday?'Closed':clockLabel();
+}
+function renderHud(){
+  const s=store(), sx=stats(s);
+  const q=s.cust.filter(c=>c.state==='queue'||c.state==='walkin').length;
+  const idle=floorStaff(s).filter(st=>!st.desk).length;
+  const spare=Math.max(0,sx.desks-floorStaff(s).length);
+  $('#storeHud').innerHTML=
+    `<span class="tag">Optus ${loc(s).name}</span>
+     <span class="tag ${q>6?'tag--bad':q>3?'tag--warn':''}">${q} waiting</span>
+     <span class="tag tag--yellow">${s.dayServed} served</span>
+     <span class="tag ${s.dayWalk>4?'tag--bad':''}">${s.dayWalk} walk-outs</span>
+     <span class="tag">${money(s.dayRev)} today</span>
+     ${idle?`<span class="tag tag--bad">${idle} staff with no desk</span>`:''}
+     ${spare?`<span class="tag tag--warn">${spare} desk${spare>1?'s':''} unstaffed</span>`:''}`;
+}
+function renderLog(){
+  const s=store();
+  $('#log').innerHTML=s.log.length?s.log.slice(0,18).map(l=>`<p><b>${l.t}</b><span class="${l.cls}">${l.msg}</span></p>`).join('')
+    :`<p style="color:var(--muted)">Nothing logged yet today.</p>`;
+  const sx=stats(s);
+  $('#logHint').textContent=`${sx.desks} desks · ${floorStaff(s).length} staff`;
+}
+const TABS=[{id:'build',label:'Build',rank:1},{id:'staff',label:'Staff',rank:1},
+  {id:'ops',label:'Operations',rank:2},{id:'books',label:'Books',rank:3},{id:'empire',label:'Empire',rank:8}];
+function buildTabs(){
+  const on=TABS.filter(t=>unlocked(t.rank));
+  if(!on.some(t=>t.id===G.tab)) G.tab='build';
+  $('#tabs').innerHTML=on.map(t=>`<button class="tab ${t.id===G.tab?'is-on':''}" data-tab="${t.id}">${t.label}</button>`).join('');
+  $$('.tabpanel').forEach(p=>p.classList.toggle('is-on',p.dataset.tab===G.tab));
+}
+function itemHTML(o){
+  return `<button class="item ${o.owned?'item--owned':''} ${o.locked?'item--locked':''}" ${o.disabled||o.locked?'disabled':''}
+    data-act="${o.act||''}" data-arg="${o.arg||''}">
+    <div class="item__ico">${o.ico}</div>
+    <div class="item__main"><div class="item__name">${o.name}${o.tag?`<span class="tag ${o.tagCls||''}">${o.tag}</span>`:''}</div>
+      <div class="item__desc">${o.desc}</div></div>
+    <div class="item__cost">${o.cost}${o.sub?`<small>${o.sub}</small>`:''}</div></button>`;
+}
+function miniSprite(def){
+  const sp=spriteSVG(def);
+  return `<svg viewBox="${sp.minX} ${sp.minY} ${sp.w} ${sp.h}" width="${Math.min(76,sp.w)}" height="${Math.min(52,sp.h)}"
+    style="overflow:visible">${sp.svg.replace(/^<svg[^>]*>/,'').replace(/<\/svg>$/,'')}</svg>`;
+}
+function renderBuild(){
+  const s=store(), r=rankInfo(), nx=nextRank();
+  let html=`<div class="fact" style="padding:11px 12px">
+      <span>Rank ${r.n} · ${r.title}</span>
+      <b style="font-size:15px">${money(G.lifetimeRevenue)}${nx?` <small style="font-family:var(--font-body);color:var(--muted);font-size:11px">of ${money(nx.at)}</small>`:''}</b>
+      <div class="bar" style="background:var(--line);height:7px;margin-top:7px">
+        <i class="bar__fill" style="width:${nx?clamp((G.lifetimeRevenue-r.at)/(nx.at-r.at)*100,0,100):100}%;background:var(--teal)"></i></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:7px">${nx?`<b style="color:var(--slate)">Next:</b> ${nx.unlock}`:'Everything is unlocked.'}</div>
+    </div>
+    <div class="banner banner--info" style="margin-top:9px"><em>🧱</em><div>${coachLine(s)}</div></div>`;
+  html+=`<div class="group-title">Floor space</div><div class="card-row">${itemHTML({
+    ico:'📐', name:'Extend the lease', tag:`${s.W}×${s.H}`,
+    desc: s.expansions>=4?'The tenancy is as big as it gets.':'Take the next bay. More floor means more desks, tables and shelves.',
+    cost: s.expansions>=4?'Max':money(expansionCost(s)), sub:s.expansions>=4?'':'+260/day rent',
+    disabled: s.expansions>=4||G.capital<expansionCost(s), locked:!unlocked(2), act:'expand', arg:'1'})}</div>`;
+  CAT_GROUPS.forEach(g=>{
+    const list=CAT.filter(c=>c.cat===g);
+    if(!list.some(c=>unlocked(c.rank))) return;
+    html+=`<div class="group-title">${g}</div><div class="shop">`;
+    list.forEach(def=>{
+      const owned=count(s,def.key), lock=!unlocked(def.rank), poor=G.capital<def.cost;
+      html+=`<button class="shopcard ${lock?'locked':''} ${G.pick===def.key?'is-picked':''}"
+        ${lock||poor?'disabled':''} data-buy="${def.key}" title="${def.blurb}">
+        ${owned?`<span class="own">×${owned}</span>`:''}
+        <div class="shopcard__art">${lock?'🔒':miniSprite(def)}</div>
+        <b>${def.name}</b><span>${lock?'Rank '+def.rank:money(def.cost)}</span>
+        <small>${lock?RANKS[def.rank-1].title:def.blurb}</small></button>`;
+    });
+    html+='</div>';
+  });
+  $('#tabBuild').innerHTML=html;
+}
+function coachLine(s){
+  const sx=stats(s), q=s.cust.filter(c=>c.state==='queue').length;
+  if(sx.desks>floorStaff(s).length) return 'You have a desk with nobody behind it. Hire from the Staff tab.';
+  if(floorStaff(s).some(st=>!st.desk)) return 'Someone is on the payroll with no desk to work at. Place another service desk.';
+  if(q>4) return 'The queue is outrunning your counters. More desks and staff, or a faster pace.';
+  if(!sx.shelves) return 'An accessory shelf lifts the value of every single sale. Cheapest upgrade you can make.';
+  if(s.compliance<62) return 'Compliance is drifting. Run strict pace for a day, or buy a compliance terminal.';
+  if(s.cx<58) return 'CX is what fills the store tomorrow. Benches and Wi-Fi keep waiting customers calm.';
+  if(nextRank()) return `Bank ${money(nextRank().at-G.lifetimeRevenue)} more in revenue to reach rank ${nextRank().n}.`;
+  return 'Top rank. Now go and take the corridor.';
+}
+function renderStaff(){
+  const s=store();
+  let html=`<div class="group-title">On the books · ${money(wageBill(s))} per day</div><div class="card-row">`;
+  s.staff.forEach(st=>{
+    const R=ROLES[st.type], desk=s.items.find(i=>i.id===st.desk);
+    html+=itemHTML({ico:`<span class="av av--${st.type}" style="width:100%;height:100%;border-radius:10px">${R.lbl}</span>`,
+      name:st.name, tag:R.role, tagCls: st.type==='manager'?'':(desk?'tag--good':'tag--bad'),
+      desc:`${st.type==='manager'?'Runs this store when you are elsewhere':desk?'At the '+CATBY[desk.key].name.replace('&amp;','&').toLowerCase():'No desk to work at'} · stamina ${Math.round(st.stamina)}% · ${money(R.wage)}/day`,
+      cost:'Let go', sub:'no payout', act:'fire', arg:st.id});
+  });
+  html+='</div><div class="group-title">Hire</div><div class="card-row">';
+  Object.keys(ROLES).forEach(t=>{
+    const R=ROLES[t];
+    if(!unlocked(R.rank)){ html+=itemHTML({ico:'🔒',name:R.role,locked:true,desc:R.desc,cost:'Rank '+R.rank,sub:RANKS[R.rank-1].title}); return; }
+    const full=t!=='manager'&&floorStaff(s).length>=8, hasMgr=t==='manager'&&isManaged(s);
+    html+=itemHTML({ico:'👤',name:R.role,desc:R.desc,cost:money(R.hire),sub:money(R.wage)+'/day',
+      disabled:G.capital<R.hire||full||hasMgr,act:'hire',arg:t});
+  });
+  html+='</div>';
+  $('#tabStaff').innerHTML=html;
+}
+function renderOps(){
+  const s=store(), L=loc(s), P=PACES[s.pace], rv=rivalOf(s), sx=stats(s);
+  let html=`<div class="group-title">Actions</div><div class="card-row">`;
+  OPS.forEach(o=>{
+    if(!unlocked(o.rank)){ html+=itemHTML({ico:'🔒',name:o.name,locked:true,desc:o.desc,cost:'Rank '+o.rank,sub:RANKS[o.rank-1].title}); return; }
+    if(o.id==='strike'&&!G.strikes) return;
+    let dis=G.capital<o.cost;
+    if(o.id==='strike') dis=dis||s.cx<60||s.compliance<70;
+    if(o.id==='comp') dis=dis||s.closedToday;
+    html+=itemHTML({ico:o.ico,name:o.name,desc:o.desc,cost:money(o.cost),sub:'one-off',disabled:dis,act:'op',arg:o.id});
+  });
+  html+=`</div><div class="group-title">This floor</div><div class="ledger">
+    <div><span>Service desks</span><b>${sx.desks}</b></div>
+    <div><span>Accessory lift</span><b>+${Math.round((sx.acc-1)*100)}%</b></div>
+    <div><span>Queue patience</span><b>+${Math.round((sx.patience-1)*100)}%</b></div>
+    <div><span>Ambience</span><b>${sx.ambience.toFixed(1)}</b></div>
+    <div><span>Compliance per day</span><b>+${(0.9+sx.compliancePerDay).toFixed(1)}</b></div>
+    <div><span>${rv?rv.name:'Rival'} share</span><b>${rv?Math.round(rv.share):0}%</b></div>
+    <div><span>Corridor growth</span><b>+${Math.round((growth()-1)*100)}%</b></div>
+  </div>
+  <div class="group-title">Site brief · ${L.name}</div>
+  <div class="mods mods--good"><h4 class="good">Working for you</h4><ul>${L.buffs.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+  <div class="mods mods--bad"><h4 class="bad">Working against you</h4><ul>${L.debuffs.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+  <div class="group-title">Pace right now</div><div class="ledger">
+    <div><span>Transaction speed</span><b>${Math.round((1/P.txMult)*100)}%</b></div>
+    <div><span>Revenue per sale</span><b>${Math.round(P.revMult*100)}%</b></div>
+    <div><span>Compliance per sale</span><b>${P.comp>0?'+':''}${P.comp.toFixed(2)}</b></div>
+  </div>`;
+  $('#tabOps').innerHTML=html;
+}
+function renderBooks(){
+  const s=store(), sx=stats(s);
+  const rent=rentBill(s), wages=wageBill(s), target=G.weekTarget||nextTarget(), nx=nextRank();
+  $('#tabBooks').innerHTML=`<div class="group-title">Today at ${loc(s).name}</div>
+    <div class="ledger">
+      <div class="pos"><span>Sales revenue</span><b>${money(s.dayRev)}</b></div>
+      <div class="pos"><span>Click &amp; collect</span><b>${money(sx.passive)}</b></div>
+      <div class="neg"><span>Rent</span><b>−${money(rent)}</b></div>
+      <div class="neg"><span>Wages</span><b>−${money(wages)}</b></div>
+      <div class="total"><span>Projected day result</span><b>${money(s.dayRev+sx.passive-rent-wages)}</b></div>
+    </div>
+    <div class="group-title">Weekly connection quota</div>
+    <div class="ledger">
+      <div><span>Connections this week</span><b>${G.weekConn}</b></div>
+      <div><span>Target</span><b>${target}</b></div>
+      <div><span>Days until review</span><b>${7-((G.day-1)%7)}</b></div>
+    </div>
+    <div class="bar" style="background:var(--line);height:8px;margin-top:8px">
+      <i class="bar__fill" style="width:${clamp(G.weekConn/target*100,0,100)}%;background:${G.weekConn>=target?'var(--green)':'var(--teal)'}"></i></div>
+    <div class="group-title">Franchise rank</div>
+    <div class="ledger">
+      <div><span>Rank ${G.rank} · ${rankInfo().title}</span><b>${money(G.lifetimeRevenue)}</b></div>
+      ${nx?`<div><span>Next rank at</span><b>${money(nx.at)}</b></div>`:'<div><span>Top rank reached</span><b>★</b></div>'}
+    </div>
+    <div class="group-title">Company</div>
+    <div class="brief__facts">
+      <div class="fact"><span>Customers served</span><b>${G.custServed.toLocaleString()}</b></div>
+      <div class="fact"><span>Walk-outs</span><b>${G.custLost.toLocaleString()}</b></div>
+      <div class="fact"><span>Floor</span><b>${s.W}×${s.H}</b></div>
+      <div class="fact"><span>Stores</span><b>${G.stores.length}</b></div>
+    </div>`;
+}
+function renderEmpire(){
+  const owned=G.stores.map(x=>x.locId), cost=75000+50000*(G.stores.length-1);
+  let html=`<div class="group-title">Your stores</div><div class="card-row">`;
+  G.stores.forEach((st,i)=>{
+    html+=itemHTML({ico:'🏬',name:'Optus '+loc(st).name,
+      tag:i===G.active?'You are here':(isManaged(st)?'Managed':'Unmanaged'),
+      tagCls:i===G.active?'':(isManaged(st)?'tag--good':'tag--bad'),
+      desc:`CX ${Math.round(st.cx)} · Compliance ${Math.round(st.compliance)} · ${st.staff.length} staff · ${st.W}×${st.H} floor`,
+      cost:i===G.active?'Active':'Visit',sub:i===G.active?'':'switch store',disabled:i===G.active,act:'goto',arg:i});
+  });
+  html+=`</div><div class="group-title">Expand</div>`;
+  if(G.stores.length>1&&G.stores.some((x,i)=>i!==G.active&&!isManaged(x)))
+    html+=`<div class="banner banner--warn"><em>⚠️</em><div>Every store you are not standing in needs a <b>store manager</b>, and even then it runs at about three quarters of your pace.</div></div>`;
+  html+='<div class="card-row">';
+  LOCATIONS.filter(L=>!owned.includes(L.id)).forEach(L=>{
+    html+=itemHTML({ico:'📍',name:'Open '+L.name,
+      desc:`${L.sub} · ${L.W}×${L.H} floor · rent ${money(L.rent)}/day`,
+      cost:money(cost),sub:'fit-out',disabled:G.capital<cost,act:'buyStore',arg:L.id});
+  });
+  html+='</div>';
+  $('#tabEmpire').innerHTML=html;
+}
+function renderPanels(){
+  renderBuild(); renderStaff();
+  if(unlocked(2)) renderOps();
+  if(unlocked(3)) renderBooks();
+  if(unlocked(8)) renderEmpire();
+  $$('#pace .pace__opt').forEach(b=>b.classList.toggle('is-on',b.dataset.pace===store().pace));
+}
+function render(full){
+  renderTop(); renderHud(); renderLog(); renderObjects(); renderPeople();
+  if(full) renderPanels();
+  if(G.onMap) renderAtlas();
+}
+
+/* ============================================================
+   8. ACTIONS + MODALS + MAPS + LOOP
+   ============================================================ */
+const ACTIONS={
+  expand(){
+    const s=store();
+    if(!unlocked(2)||s.expansions>=4) return;
+    const c=expansionCost(s);
+    if(G.capital<c) return;
+    G.capital-=c; s.expansions++;
+    if(s.expansions%2===1) s.W++; else s.H++;
+    buildFloor(); renderObjects(); reflow(s); fitCam();
+    toast(`📐 Lease extended — floor is now ${s.W}×${s.H}`,'good');
+    slog(s,`Extended the tenancy to ${s.W}×${s.H}.`,'g');
+    confetti(20);
+  },
+  hire(type){
+    const s=store(), R=ROLES[type];
+    if(!unlocked(R.rank)||G.capital<R.hire) return;
+    if(type==='manager'&&isManaged(s)) return;
+    G.capital-=R.hire;
+    const st=makeStaff(type); s.staff.push(st); reflow(s);
+    toast(`👋 ${st.name} joined as ${R.role.toLowerCase()}`,'good');
+    slog(s,`${st.name} hired as ${R.role.toLowerCase()}.`);
+  },
+  fire(id){
+    const s=store(), st=s.staff.find(x=>x.id===+id); if(!st) return;
+    showModal({tone:'is-warn',kicker:'People',title:`Let ${st.name} go?`,
+      body:`<p>${ROLES[st.type].role} on ${money(ROLES[st.type].wage)} a day.</p>`,
+      choices:[{label:`Let ${st.name} go`,detail:'No payout, no hard feelings.',act:()=>{
+          if(st.busy) st.busy.state='queue', st.busy.claimed=null;
+          s.staff=s.staff.filter(x=>x.id!==+id); reflow(s);
+          toast(`${st.name} has left the business.`); slog(s,`${st.name} let go.`,'a');
+        }},{label:'Keep them on',act:()=>{}}]});
+  },
+  op(kind){
+    const s=store(), o=OPS.find(x=>x.id===kind);
+    if(!o||!unlocked(o.rank)||G.capital<o.cost) return;
+    if(kind==='strike'&&(!G.strikes||s.cx<60||s.compliance<70)) return;
+    if(kind==='comp'&&s.closedToday) return;
+    G.capital-=o.cost;
+    if(kind==='local'){ addMod(s,{id:'mkt',label:'Local marketing',days:3,traffic:1.45}); toast('📣 Local marketing live for 3 days','good'); }
+    if(kind==='big'){ addMod(s,{id:'mkt',label:'Regional campaign',days:4,traffic:1.85}); s.cx=clamp(s.cx+3,0,100); toast('📺 Regional campaign live','good'); }
+    if(kind==='cx'){ s.cx=clamp(s.cx+9,0,100); toast('🎁 Goodwill credits applied · CX +9','good'); }
+    if(kind==='comp'){ s.compliance=clamp(s.compliance+16,0,100); s.closedToday=true; s.cust.length=0;
+      toast('📚 Compliance retraining · +16','good'); slog(s,'Closed for compliance retraining.','a'); }
+    if(kind==='strike'){ G.strikeLog.shift(); G.strikes=G.strikeLog.length; toast('🧯 One strike cleared','good'); }
+  },
+  goto(i){ G.active=+i; setPick(null); buildFloor(); renderObjects(); fitCam(); toast('Now at '+loc(store()).name); },
+  buyStore(id){
+    const cost=75000+50000*(G.stores.length-1);
+    if(!unlocked(8)||G.capital<cost) return;
+    G.capital-=cost;
+    const old=store();
+    G.stores.push(makeStore(id));
+    G.active=G.stores.length-1; setPick(null); buildFloor(); renderObjects(); fitCam();
+    showModal({tone:'is-good',kicker:'Expansion',title:'Optus '+loc(store()).name+' is yours',
+      body:`<p>Fit-out paid, keys collected, three counters and three juniors to open the doors.</p>
+        <p><b>Optus ${loc(old).name}</b> now needs a store manager, and even with one it runs at about three quarters of the pace you get standing on the floor.</p>`,
+      choices:[{label:'Get to work',act:()=>{}}]});
+  }
+};
+document.addEventListener('click',e=>{
+  const it=e.target.closest('[data-act]');
+  if(it&&!it.disabled){ ACTIONS[it.dataset.act]?.(it.dataset.arg); render(true); return; }
+  const buy=e.target.closest('[data-buy]');
+  if(buy&&!buy.disabled){ setPick(G.pick===buy.dataset.buy?null:buy.dataset.buy); }
+});
+$('#pace').addEventListener('click',e=>{
+  const b=e.target.closest('[data-pace]'); if(!b) return;
+  store().pace=b.dataset.pace;
+  $$('#pace .pace__opt').forEach(x=>x.classList.toggle('is-on',x===b));
+  render(true);
+});
+$('#tabs').addEventListener('click',e=>{
+  const t=e.target.closest('.tab'); if(!t) return;
+  G.tab=t.dataset.tab;
+  $$('#tabs .tab').forEach(x=>x.classList.toggle('is-on',x===t));
+  $$('.tabpanel').forEach(p=>p.classList.toggle('is-on',p.dataset.tab===G.tab));
+});
+$('#toolZoomIn').onclick=()=>zoom(1.18);
+$('#toolZoomOut').onclick=()=>zoom(1/1.18);
+$('#toolCentre').onclick=()=>fitCam();
+
+/* ---------- modals ---------- */
+let modalResume=false;
+function statStrip(){
+  const s=store();
+  return `<div class="modal__stats">
+    <div><span>Capital</span><b class="${G.capital<0?'bad':''}">${money(G.capital)}</b></div>
+    <div><span>CX</span><b class="${s.cx<40?'bad':s.cx<60?'warn':''}">${Math.round(s.cx)}</b></div>
+    <div><span>Compliance</span><b class="${s.compliance<50?'bad':s.compliance<70?'warn':''}">${Math.round(s.compliance)}</b></div>
+    <div><span>Desks</span><b>${stats(s).desks}</b></div>
+    <div><span>Day</span><b>${G.day}</b></div>
+    <div><span>Strikes</span><b class="${G.strikes?'bad':''}">${G.strikes}/${G.maxStrikes}</b></div></div>`;
+}
+function showModal(cfg){
+  if(G.running){ modalResume=true; setSpeed(0,true); }
+  const c=$('#modalCard');
+  c.innerHTML=`<div class="modal__banner ${cfg.tone||''}"><div class="modal__kicker">${cfg.kicker||''}</div><h2>${cfg.title||''}</h2></div>
+    ${G.stores.length?statStrip():''}
+    <div class="modal__body">${cfg.body||''}<div id="modalChoices" style="margin-top:14px"></div></div>`;
+  const box=c.querySelector('#modalChoices');
+  (cfg.choices||[]).forEach(ch=>{
+    const b=document.createElement('button'); b.className='choice';
+    const cost=ch.cost?`<span class="tag ${G.capital>=ch.cost?'tag--yellow':'tag--bad'}">${money(ch.cost)}</span>`:'';
+    b.innerHTML=`<b>${ch.label}</b>${ch.detail?`<span>${ch.detail}</span>`:''}
+      <div class="eff">${cost}${(ch.tags||[]).map(t=>`<span class="tag ${t[1]||''}">${t[0]}</span>`).join('')}</div>`;
+    if(ch.cost&&G.capital<ch.cost) b.disabled=true;
+    b.onclick=()=>{ closeModal(); if(ch.cost) G.capital-=ch.cost; ch.act&&ch.act(); render(true); };
+    box.appendChild(b);
+  });
+  $('#modal').classList.add('is-on');
+  setTimeout(()=>box.querySelector('button')?.focus(),40);
+}
+function closeModal(){
+  $('#modal').classList.remove('is-on');
+  if(modalResume){ modalResume=false; setSpeed(G.lastSpeed||1,true); }
+}
+function gameOver(title,text){
+  G.over=true; setSpeed(0,true);
+  showModal({tone:'is-dark',kicker:'Game over',title,
+    body:`<p>${text}</p><div class="brief__facts">
+      <div class="fact"><span>Days traded</span><b>${G.day-1}</b></div>
+      <div class="fact"><span>Lifetime revenue</span><b>${money(G.lifetimeRevenue)}</b></div>
+      <div class="fact"><span>Customers served</span><b>${G.custServed.toLocaleString()}</b></div>
+      <div class="fact"><span>Rank reached</span><b>${G.rank} · ${rankInfo().title}</b></div></div>`,
+    choices:[{label:'Start again',detail:'New site, clean slate, same Head Office.',act:()=>location.reload()}]});
+}
+function winGame(){
+  setSpeed(0,true);
+  showModal({tone:'is-good',kicker:'Head Office · National awards',title:'Franchisee of the Year',
+    body:`<p>Three stores, ${money(G.capital)} in the bank and a CX score the regional manager keeps showing people on his phone.</p>`,
+    choices:[{label:'Keep trading',act:()=>{}},{label:'Finish here',act:()=>location.reload()}]});
+}
+/* ---------- maps ---------- */
+const MAP_ART=`
+  <rect width="926" height="968" fill="#EDF3EE"/>
+  <path d="M926 0 H470 L496 56 L552 108 L600 156 L596 226 L548 292 L520 362 L556 432 L596 520 L640 612 L700 706 L662 782 L648 880 L706 968 H926 Z" fill="#AEDDE8"/>
+  <path d="M556 268 C580 246 592 202 600 160 C610 100 660 26 712 30 C776 36 790 120 764 190 C742 246 690 274 640 272 C610 271 578 276 556 268 Z" fill="#EDF3EE"/>
+  <path d="M548 372 C494 396 448 378 396 386 C348 393 322 384 292 392" stroke="#AEDDE8" stroke-width="14" fill="none" stroke-linecap="round"/>
+  <ellipse cx="228" cy="796" rx="86" ry="52" fill="#D6E8D2"/><ellipse cx="150" cy="150" rx="70" ry="44" fill="#D6E8D2"/>
+  <ellipse cx="252" cy="470" rx="58" ry="34" fill="#D6E8D2"/>
+  <path d="M412 60 C424 200 386 300 398 420 C408 528 452 640 470 720 C492 812 514 900 528 968" stroke="#F6C453" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <path d="M398 420 C420 520 452 640 466 730 C476 806 442 880 404 968" stroke="#F6C453" stroke-width="7" fill="none" stroke-linecap="round"/>
+  <path d="M120 620 C230 600 330 596 430 606 C520 614 580 632 630 672" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M60 470 C170 452 268 462 340 474 C420 488 486 512 528 548" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M646 246 C664 200 668 160 672 116" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+const mapSvg=inner=>`<svg viewBox="0 0 926 968" role="img" aria-label="Map of Brisbane's northern suburbs">${MAP_ART}<g>${inner}</g></svg>`;
+function pinSvg(L,cls,label,extra){
+  return `<g class="pin ${cls}" data-loc="${L.id}" tabindex="0" role="button" aria-label="${L.name}">
+    <circle class="halo" cx="${L.x}" cy="${L.y}" r="14"/><circle class="dot" cx="${L.x}" cy="${L.y}" r="13"/>
+    <circle class="hit" cx="${L.x}" cy="${L.y}" r="44"/>
+    <text class="lbl" x="${L.x+L.dx}" y="${L.y+L.dy}" text-anchor="${L.anchor}">${label||L.name}</text>${extra||''}</g>`;
+}
+function buildSelectMap(){
+  $('#mapHost').innerHTML=mapSvg(LOCATIONS.map(L=>pinSvg(L,'')).join(''));
+  $$('#mapHost .pin').forEach(p=>{
+    const go=()=>selectLoc(p.dataset.loc);
+    p.addEventListener('click',go);
+    p.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault();go();} });
+  });
+  $('#mapCash').textContent='Fit-out budget '+money(G.capital);
+}
+function selectLoc(id){
+  $$('#mapHost .pin').forEach(p=>p.classList.toggle('is-sel',p.dataset.loc===id));
+  const L=LOCATIONS.find(l=>l.id===id);
+  $('#brief').innerHTML=`<h2>Optus ${L.name}</h2><div class="sub">${L.sub}</div>
+    <p class="flavour">${L.flavour}</p>
+    <div class="brief__facts">
+      <div class="fact"><span>Daily rent</span><b>${money(L.rent)}</b></div>
+      <div class="fact"><span>Floor plan</span><b>${L.W}×${L.H}</b></div>
+      <div class="fact"><span>Foot traffic</span><b>${L.traffic<24?'Low':L.traffic<31?'Medium':L.traffic<40?'High':'Extreme'}</b></div>
+      <div class="fact"><span>Audit risk</span><b>${L.auditMult<.5?'Minimal':L.auditMult>1.5?'Doubled':'Normal'}</b></div>
+    </div>
+    <div class="mods mods--good"><h4 class="good">Buffs</h4><ul>${L.buffs.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+    <div class="mods mods--bad"><h4 class="bad">Debuffs</h4><ul>${L.debuffs.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+    <button class="btn btn--yellow" style="width:100%" id="btnOpen">Open here</button>`;
+  $('#btnOpen').onclick=()=>startGame(id);
+}
+function renderAtlas(){
+  const owned=G.stores.map(s=>s.locId);
+  let inner='';
+  LOCATIONS.forEach(L=>{
+    const s=G.stores.find(x=>x.locId===L.id);
+    if(s){ const i=G.stores.indexOf(s);
+      inner+=pinSvg(L,'is-owned'+(i===G.active?' is-active':''),L.name,
+        `<text class="mapstat" x="${L.x+L.dx}" y="${L.y+30}" text-anchor="${L.anchor}">CX ${Math.round(s.cx)} · ${money(s.dayRev)}</text>`);
+    } else inner+=pinSvg(L,'',L.name,
+      `<text class="mapstat" x="${L.x+L.dx}" y="${L.y+30}" text-anchor="${L.anchor}" style="fill:#8AA0A4">site available</text>`);
+  });
+  RIVALS.forEach(r=>{ inner+=`<g class="pin is-rival"><circle class="dot" cx="${r.x}" cy="${r.y}" r="9"/>
+    <text class="lbl" x="${r.x+14}" y="${r.y+5}">${r.name} ${Math.round(r.share)}%</text></g>`; });
+  $('#atlasHost').innerHTML=mapSvg(inner);
+  $$('#atlasHost .pin[data-loc]').forEach(p=>p.addEventListener('click',()=>{
+    const i=G.stores.findIndex(s=>s.locId===p.dataset.loc);
+    if(i>=0){ ACTIONS.goto(i); closeAtlas(); } else toast('You do not own that site yet.','bad');
+  }));
+  $('#atlasSide').innerHTML=`<h2>Trading now</h2><div class="sub">Day ${G.day} · ${clockLabel()}</div>
+    <div class="atlas-cards">${G.stores.map((s,i)=>`<button class="scard ${i===G.active?'is-active':''}" data-store="${i}">
+      <div class="scard__top"><b>Optus ${loc(s).name}</b>
+        <span class="tag ${i===G.active?'':isManaged(s)?'tag--good':'tag--bad'}">${i===G.active?'You are here':isManaged(s)?'Managed':'No manager'}</span></div>
+      <div class="scard__row"><span>CX <i>${Math.round(s.cx)}</i></span><span>Compliance <i>${Math.round(s.compliance)}</i></span>
+        <span>Desks <i>${stats(s).desks}</i></span><span>Today <i>${money(s.dayRev)}</i></span></div>
+      <div class="scard__bar"><i style="width:${s.cx}%;background:${s.cx<40?'var(--red)':s.cx<60?'var(--amber)':'var(--green)'}"></i></div>
+    </button>`).join('')}</div>
+    <div class="group-title">Rivals in the corridor</div>
+    <div class="ledger">${RIVALS.map(r=>`<div><span>${r.name}</span><b>${Math.round(r.share)}%</b></div>`).join('')}</div>`;
+  $$('#atlasSide .scard').forEach(b=>b.addEventListener('click',()=>{ ACTIONS.goto(+b.dataset.store); closeAtlas(); }));
+}
+function openAtlas(){ G.onMap=true; renderAtlas(); show('screen-atlas'); }
+function closeAtlas(){ G.onMap=false; show('screen-game'); fitCam(); render(true); }
+$('#btnAtlas').onclick=openAtlas;
+$('#btnBackFloor').onclick=closeAtlas;
+
+/* ---------- loop ---------- */
+function setSpeed(v,silent){
+  G.speed=+v||0; G.running=G.speed>0;
+  if(G.speed>0) G.lastSpeed=G.speed;
+  $$('#speed button').forEach(b=>b.classList.toggle('is-on',+b.dataset.sp===G.speed));
+  const w=$('#world'); if(w) w.style.setProperty('--tickms',(DAY_MS/Math.max(1,G.speed)/TICKS_PER_DAY)+'ms');
+  if(!silent&&!G.speed) toast('⏸ Paused');
+}
+$('#speed').addEventListener('click',e=>{ const b=e.target.closest('[data-sp]'); if(b) setSpeed(b.dataset.sp); });
+document.addEventListener('keydown',e=>{
+  const inGame=$('#screen-game').classList.contains('is-on');
+  if(e.code==='Space'&&inGame){ e.preventDefault(); setSpeed(G.running?0:(G.lastSpeed||1)); }
+  if(e.key==='Escape'){
+    if($('#modal').classList.contains('is-on')) $('#modalChoices button:not([disabled])')?.click();
+    else if(G.pick) setPick(null);
+    else if(G.onMap) closeAtlas();
+  }
+  if(e.key==='m'&&inGame&&!G.onMap) openAtlas();
+  if(['1','2','3'].includes(e.key)&&inGame&&!$('#modal').classList.contains('is-on')){
+    store().pace=['strict','balanced','hustle'][+e.key-1]; render(true);
+  }
+});
+let last=0, acc=0, lastLive=0, lastFull=0;
+function frame(ts){
+  requestAnimationFrame(frame);
+  if(!G.running||G.over){ last=ts; return; }
+  if(!last){ last=ts; return; }
+  const dt=Math.min(400,ts-last); last=ts;
+  const tickMs=DAY_MS/G.speed/TICKS_PER_DAY;
+  acc+=dt;
+  let guard=0;
+  while(acc>=tickMs&&guard<30&&G.running){ acc-=tickMs; tick(); guard++; }
+  if(ts-lastLive>80){ lastLive=ts; render(false); }
+  if(ts-lastFull>1100){ lastFull=ts; renderPanels(); }
+}
+requestAnimationFrame(frame);
+
+/* ---------- boot ---------- */
+function show(screen){ $$('.screen').forEach(s=>s.classList.toggle('is-on',s.id===screen)); }
+function startGame(id){
+  G.stores=[makeStore(id)]; G.active=0; G.weekTarget=nextTarget(); G.rank=1; G.tab='build';
+  slog(G.stores[0],'Doors open. Three counters, three juniors, one dream.');
+  show('screen-game');
+  buildTabs(); buildFloor(); renderObjects(); fitCam(); render(true);
+  setSpeed(1,true);
+  tipNow('Drag the counters around, or tap something in the Build panel and tap the floor to place it.',6000);
+}
+const st=$('#store');
+st.addEventListener('pointerdown',onDown);
+st.addEventListener('pointermove',onMove);
+st.addEventListener('pointerup',onUp);
+st.addEventListener('pointercancel',onUp);
+st.addEventListener('click',e=>{ if(!ptr.moved) onClick(e); });
+st.addEventListener('contextmenu',e=>{ e.preventDefault(); setPick(null); });
+st.addEventListener('wheel',e=>{ e.preventDefault(); zoom(e.deltaY<0?1.1:1/1.1); },{passive:false});
+window.addEventListener('resize',()=>{ if($('#screen-game').classList.contains('is-on')) fitCam(); });
+$('#btnStart').onclick=()=>{ buildSelectMap(); show('screen-map'); };
+$('#btnHow').onclick=()=>showModal({tone:'is-dark',kicker:'Briefing',title:'How to run the store',
+  body:`<p><b>You are the fit-out.</b> Tap something in the Build panel, then tap a floor tile to drop it in. Drag anything that is already down to move it, or drag it onto the bin to sell it back at half price.</p>
+    <p><b>Desks are throughput.</b> Every service desk seats one staff member and serves one customer at a time. A desk with nobody behind it is dead space; a staff member with no desk is a wasted wage.</p>
+    <p><b>Everything else shapes the room.</b> Shelves lift the value of each sale, demo tables pull browsers in off the walkway, benches and Wi-Fi keep the queue patient, plants and rugs lift the mood, and back-office gear keeps compliance and staff in shape.</p>
+    <p><b>Outgrow the tenancy and extend the lease.</b> More floor means more counters — and more rent.</p>
+    <p><b>Head Office is watching.</b> Three strikes — CX under 36, a badly failed audit, or a missed weekly connection quota — and the franchise is taken off you.</p>`,
+  choices:[{label:'Got it',act:()=>{}}]});
+show('screen-title');
+</script>
+</body>
+</html>
