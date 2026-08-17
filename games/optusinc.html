@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0E11">
+<title>Optus Inc. — Total Coverage</title>
+<style>
+:root{
+  --ink:#0B0E11;          /* charcoal base */
+  --panel:#131A20;        /* raised panel */
+  --panel-2:#1B242B;      /* card */
+  --line:#2A363F;         /* hairline */
+  --yes:#FFD700;          /* Yes Yellow */
+  --teal:#008B8B;         /* Optus teal */
+  --teal-lit:#00C9BE;     /* signal teal, for glow */
+  --alarm:#FF5C4E;        /* pushback */
+  --rival:#C7407A;        /* Telstra-ish magenta, events only */
+  --text:#E8EEF2;
+  --dim:#8A9AA6;
+  --display:"Bahnschrift","DIN Alternate","Oswald","Arial Narrow",Impact,sans-serif;
+  --body:"Inter","Segoe UI",system-ui,-apple-system,"Helvetica Neue",sans-serif;
+  --mono:"JetBrains Mono","SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  --topH:58px; --botH:36px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{
+  background:var(--ink);color:var(--text);font-family:var(--body);
+  overflow:hidden;touch-action:manipulation;
+  background-image:radial-gradient(circle at 50% 38%,rgba(0,139,139,.16),transparent 60%);
+}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--yes);outline-offset:2px}
+
+/* ---------- shell ---------- */
+#app{display:grid;grid-template-rows:auto 1fr auto;height:100%;height:100dvh}
+
+/* ---------- top bar ---------- */
+#topbar{
+  display:flex;align-items:stretch;gap:1px;background:var(--line);
+  border-bottom:1px solid var(--line);
+  padding-top:env(safe-area-inset-top);
+}
+.stat{background:var(--panel);padding:8px 14px;display:flex;flex-direction:column;justify-content:center;min-width:0}
+.stat .k{font-family:var(--display);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.stat .v{font-family:var(--mono);font-size:16px;font-weight:600;letter-spacing:-.02em;white-space:nowrap}
+.stat .v small{font-size:11px;color:var(--dim);font-weight:400}
+#s-cust .v{color:var(--yes)}
+#s-cap .v{color:var(--teal-lit)}
+#s-push{flex:1;min-width:120px}
+#pbTrack{position:relative;height:9px;border-radius:2px;background:#0A1014;overflow:hidden;margin-top:5px;
+  box-shadow:inset 0 0 0 1px var(--line)}
+#pbFill{position:absolute;inset:0 100% 0 0;background:linear-gradient(90deg,var(--teal),var(--yes) 55%,var(--alarm));transition:right .3s linear}
+#pbTicks{position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 9px,rgba(11,14,17,.85) 9px 10px)}
+#s-push .v{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.speed{display:flex;background:var(--panel);align-items:center;gap:1px;padding:0 6px}
+.spd{width:34px;height:34px;border-radius:3px;font-family:var(--display);font-size:13px;letter-spacing:.04em;color:var(--dim)}
+.spd[aria-pressed="true"]{background:var(--teal);color:#04120F}
+.spd:hover{color:var(--text)}
+
+/* ---------- stage ---------- */
+#stage{position:relative;min-height:0;overflow:hidden}
+#map{width:100%;height:100%;display:block}
+.hit{cursor:pointer;fill:transparent;stroke:transparent;stroke-width:2}
+.slabel{font-family:var(--display);font-size:19px;letter-spacing:.09em;fill:var(--text);pointer-events:none;paint-order:stroke;stroke:rgba(11,14,17,.75);stroke-width:3.5px}
+.sval{font-family:var(--mono);font-size:13px;fill:var(--dim);pointer-events:none;paint-order:stroke;stroke:rgba(11,14,17,.7);stroke-width:3px}
+.sval.on{fill:var(--yes)}
+.leader{stroke:var(--line);stroke-width:1.5;fill:none}
+.bub{cursor:pointer}
+@keyframes ring{from{r:4;opacity:.55}to{r:34;opacity:0}}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes bob{50%{transform:translateY(-4px)}}
+.pulse{animation:ring 2.6s linear infinite}
+.bubg{animation:pop .35s ease-out both, bob 2.2s ease-in-out infinite 0.35s;transform-box:fill-box;transform-origin:center}
+
+/* ---------- state panel ---------- */
+#panel{
+  position:absolute;left:12px;top:12px;width:236px;background:rgba(19,26,32,.94);
+  border:1px solid var(--line);border-radius:6px;padding:12px 13px;backdrop-filter:blur(8px);
+  display:none;animation:pop .18s ease-out
+}
+#panel.show{display:block}
+#panel h3{margin:0;font-family:var(--display);font-size:20px;letter-spacing:.06em}
+#panel .sub{font-size:11px;color:var(--dim);margin:1px 0 10px;letter-spacing:.04em}
+.row{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-top:1px solid var(--line)}
+.row span:last-child{font-family:var(--mono);color:var(--text)}
+.bars{display:flex;gap:2px;align-items:flex-end;height:13px}
+.bars i{width:4px;background:var(--line);border-radius:1px}
+.bars i.on{background:var(--teal-lit)}
+.bars i:nth-child(1){height:35%}.bars i:nth-child(2){height:55%}.bars i:nth-child(3){height:75%}.bars i:nth-child(4){height:100%}
+#panelClose{position:absolute;top:6px;right:8px;color:var(--dim);font-size:18px;line-height:1}
+
+/* ---------- toasts ---------- */
+#toasts{position:absolute;right:12px;top:12px;width:250px;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:rgba(19,26,32,.95);border:1px solid var(--line);border-left:3px solid var(--teal);
+  border-radius:5px;padding:9px 11px;font-size:12.5px;line-height:1.35;animation:pop .25s ease-out}
+.toast b{display:block;font-family:var(--display);letter-spacing:.08em;text-transform:uppercase;font-size:11px;margin-bottom:3px;color:var(--teal-lit)}
+.toast.bad{border-left-color:var(--alarm)}.toast.bad b{color:var(--alarm)}
+.toast.good{border-left-color:var(--yes)}.toast.good b{color:var(--yes)}
+.toast.rival{border-left-color:var(--rival)}.toast.rival b{color:var(--rival)}
+
+/* ---------- dock ---------- */
+#dock{position:absolute;left:12px;bottom:12px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.dockbtn{background:var(--yes);color:#12140A;font-family:var(--display);letter-spacing:.1em;text-transform:uppercase;
+  font-size:14px;padding:11px 18px;border-radius:5px;box-shadow:0 6px 18px rgba(0,0,0,.45);display:flex;gap:9px;align-items:center}
+.dockbtn:hover{filter:brightness(1.08)}
+.dockbtn.ghost{background:var(--panel);color:var(--text);border:1px solid var(--line)}
+.dockbtn:disabled{opacity:.42;cursor:not-allowed;filter:none}
+.dockbtn .cost{font-family:var(--mono);font-size:12px;letter-spacing:0;opacity:.75;text-transform:none}
+#dot{width:7px;height:7px;border-radius:50%;background:#12140A;opacity:0}
+#dot.on{opacity:1;animation:bob 1s ease-in-out infinite}
+
+/* ---------- ticker ---------- */
+#ticker{height:var(--botH);background:#080B0D;border-top:1px solid var(--line);display:flex;align-items:center;overflow:hidden;
+  padding-bottom:env(safe-area-inset-bottom)}
+#tickTag{flex:none;background:var(--yes);color:#12140A;font-family:var(--display);font-size:11px;letter-spacing:.14em;
+  padding:0 10px;height:100%;display:flex;align-items:center}
+#tickWrap{position:relative;flex:1;height:100%;overflow:hidden}
+#tickText{position:absolute;top:50%;transform:translateY(-50%);white-space:nowrap;font-size:13px;color:#C3D0D9;will-change:left}
+#tickText em{color:var(--teal-lit);font-style:normal}
+
+/* ---------- overlays ---------- */
+.veil{position:fixed;inset:0;background:rgba(6,9,11,.82);backdrop-filter:blur(6px);z-index:40;display:none;
+  align-items:center;justify-content:center;padding:16px}
+.veil.show{display:flex}
+.sheet{background:var(--panel);border:1px solid var(--line);border-radius:10px;width:min(860px,100%);max-height:88dvh;
+  display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.sheet header{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.sheet header h2{margin:0;font-family:var(--display);font-size:22px;letter-spacing:.09em;text-transform:uppercase;flex:1}
+.wallet{font-family:var(--mono);font-size:14px;color:var(--teal-lit)}
+.x{font-size:24px;color:var(--dim);line-height:1;padding:2px 6px}
+.tabs{display:flex;gap:1px;background:var(--line);border-bottom:1px solid var(--line)}
+.tab{flex:1;background:var(--panel);padding:11px 6px;font-family:var(--display);font-size:12.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--dim)}
+.tab[aria-selected="true"]{background:var(--panel-2);color:var(--yes);box-shadow:inset 0 -2px 0 var(--yes)}
+.grid{overflow-y:auto;padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:10px;-webkit-overflow-scrolling:touch}
+.card{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:11px 12px;text-align:left;
+  display:flex;flex-direction:column;gap:6px;min-height:112px;transition:border-color .15s,transform .1s}
+.card:hover:not(.owned):not(.locked){border-color:var(--teal);transform:translateY(-1px)}
+.card h4{margin:0;font-family:var(--display);font-size:15.5px;letter-spacing:.05em}
+.card p{margin:0;font-size:11.5px;line-height:1.4;color:var(--dim);flex:1}
+.card .foot{display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:12px}
+.card .price{color:var(--teal-lit)}
+.card .eff{font-size:10.5px;color:var(--yes);font-family:var(--mono)}
+.card.owned{border-color:var(--yes);background:rgba(255,215,0,.07);cursor:default}
+.card.owned .price{color:var(--yes)}
+.card.locked{opacity:.45;cursor:not-allowed}
+.card.poor .price{color:var(--alarm)}
+.tag{font-family:var(--display);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);
+  border:1px solid var(--line);border-radius:99px;padding:2px 7px;align-self:flex-start}
+
+/* ---------- title / end ---------- */
+#intro .sheet,#end .sheet{width:min(620px,100%);text-align:center}
+.hero{padding:30px 26px 24px}
+.mark{font-family:var(--display);font-size:clamp(38px,9vw,66px);line-height:.92;letter-spacing:.02em;margin:0;color:var(--yes)}
+.mark small{display:block;font-size:clamp(13px,3vw,17px);letter-spacing:.42em;color:var(--teal-lit);margin-top:10px}
+.lede{color:var(--dim);font-size:13.5px;line-height:1.6;margin:16px auto 0;max-width:44ch}
+.diffs{display:flex;gap:8px;justify-content:center;margin:22px 0 4px;flex-wrap:wrap}
+.diff{border:1px solid var(--line);background:var(--panel-2);border-radius:6px;padding:9px 16px;font-family:var(--display);
+  font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+.diff[aria-pressed="true"]{border-color:var(--yes);color:var(--yes)}
+.big{background:var(--yes);color:#12140A;font-family:var(--display);font-size:17px;letter-spacing:.14em;text-transform:uppercase;
+  padding:13px 34px;border-radius:5px;margin-top:18px}
+.big:hover{filter:brightness(1.08)}
+.legalese{font-size:10.5px;color:#5C6B76;padding:10px 20px 16px;line-height:1.5}
+#end .mark{font-size:clamp(30px,7vw,48px)}
+#endStats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-top:20px}
+#endStats div{background:var(--panel);padding:12px}
+#endStats .k{font-family:var(--display);font-size:10px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase}
+#endStats .v{font-family:var(--mono);font-size:18px;color:var(--yes)}
+#pick{position:absolute;left:50%;top:14px;transform:translateX(-50%);background:rgba(19,26,32,.95);border:1px solid var(--teal);
+  border-radius:99px;padding:9px 20px;font-family:var(--display);letter-spacing:.1em;text-transform:uppercase;font-size:13px;
+  display:none;z-index:5;box-shadow:0 0 30px rgba(0,201,190,.25)}
+#pick.show{display:block}
+
+@media (max-width:720px){
+  :root{--topH:auto}
+  #topbar{flex-wrap:wrap}
+  .stat{padding:6px 10px;flex:1 1 33%}
+  .stat .v{font-size:14px}
+  #s-push{flex:1 1 100%;order:5}
+  .speed{order:4;flex:0 0 auto;margin-left:auto}
+  #panel{left:8px;right:8px;top:auto;bottom:74px;width:auto}
+  #toasts{width:auto;left:8px;right:8px;top:8px}
+  #dock{left:8px;bottom:8px}
+  #pick{top:auto;bottom:120px}
+  .dockbtn{padding:10px 14px;font-size:13px}
+  .grid{grid-template-columns:1fr}
+  .slabel{font-size:23px}.sval{font-size:16px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ TOP BAR ============ -->
+  <header id="topbar">
+    <div class="stat" id="s-date"><div class="k">Date</div><div class="v" id="vDate">1 Jan 2024</div></div>
+    <div class="stat" id="s-cust"><div class="k">Optus customers</div><div class="v"><span id="vCust">0</span> <small id="vShare">0.0%</small></div></div>
+    <div class="stat" id="s-cap"><div class="k">Capital</div><div class="v"><span id="vCap">0</span> <small id="vRate">+0.0/day</small></div></div>
+    <div class="stat" id="s-push">
+      <div class="k">Pushback</div>
+      <div class="v"><span id="vPush">0%</span><small id="vPushRate">stable</small></div>
+      <div id="pbTrack"><div id="pbFill"></div><div id="pbTicks"></div></div>
+    </div>
+    <div class="speed" role="group" aria-label="Game speed">
+      <button class="spd" data-spd="0" aria-pressed="false" title="Pause">II</button>
+      <button class="spd" data-spd="1" aria-pressed="true" title="Normal speed">1x</button>
+      <button class="spd" data-spd="2" aria-pressed="false" title="Fast">2x</button>
+      <button class="spd" data-spd="3" aria-pressed="false" title="Very fast">3x</button>
+    </div>
+  </header>
+
+  <!-- ============ MAP ============ -->
+  <main id="stage">
+    <svg id="map" viewBox="80 58 850 722" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Map of Australia showing Optus coverage">
+      <defs>
+        <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <radialGradient id="sea" cx="50%" cy="42%" r="62%">
+          <stop offset="0%" stop-color="#0F1A20"/><stop offset="100%" stop-color="#0B0E11"/>
+        </radialGradient>
+        <pattern id="mesh" width="26" height="26" patternUnits="userSpaceOnUse">
+          <path d="M26 0 L0 0 0 26" fill="none" stroke="#18242B" stroke-width="1"/>
+        </pattern>
+      </defs>
+      <rect x="0" y="0" width="1100" height="900" fill="url(#sea)"/>
+      <rect x="0" y="0" width="1100" height="900" fill="url(#mesh)" opacity=".55"/>
+      <g id="layer-base"></g>
+      <g id="layer-cov"></g>
+      <g id="layer-cust"></g>
+      <g id="layer-border"></g>
+      <g id="layer-fx"></g>
+      <g id="layer-hit"></g>
+      <g id="layer-labels"></g>
+      <g id="layer-bubbles"></g>
+    </svg>
+
+    <div id="pick">Tap a state to build your first tower</div>
+
+    <aside id="panel" aria-live="polite">
+      <button id="panelClose" aria-label="Close">&times;</button>
+      <h3 id="pName">—</h3>
+      <div class="sub" id="pStatus">No network</div>
+      <div class="row"><span>Population</span><span id="pPop">—</span></div>
+      <div class="row"><span>Optus customers</span><span id="pCust">—</span></div>
+      <div class="row"><span>Market share</span><span id="pShare">—</span></div>
+      <div class="row"><span>Coverage</span><span class="bars" id="pBars"><i></i><i></i><i></i><i></i></span></div>
+      <div class="row"><span>Connects to</span><span id="pLinks">—</span></div>
+    </aside>
+
+    <div id="toasts" aria-live="polite"></div>
+
+    <div id="dock">
+      <button class="dockbtn" id="btnUpgrades">Upgrades <span id="dot"></span></button>
+      <button class="dockbtn ghost" id="btnDamage">Damage control <span class="cost" id="dcCost">30</span></button>
+    </div>
+  </main>
+
+  <!-- ============ TICKER ============ -->
+  <footer id="ticker">
+    <div id="tickTag">YES NEWS</div>
+    <div id="tickWrap"><div id="tickText"></div></div>
+  </footer>
+</div>
+
+<!-- ============ UPGRADES ============ -->
+<div class="veil" id="modal" role="dialog" aria-modal="true" aria-label="Upgrades">
+  <div class="sheet">
+    <header>
+      <h2>Board Approvals</h2>
+      <div class="wallet"><span id="mCap">0</span> capital</div>
+      <button class="x" id="mClose" aria-label="Close upgrades">&times;</button>
+    </header>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="infra" aria-selected="true">Infrastructure</button>
+      <button class="tab" role="tab" data-tab="market" aria-selected="false">Marketing &amp; perks</button>
+      <button class="tab" role="tab" data-tab="defence" aria-selected="false">Corporate defence</button>
+    </div>
+    <div class="grid" id="mGrid"></div>
+  </div>
+</div>
+
+<!-- ============ TITLE ============ -->
+<div class="veil show" id="intro">
+  <div class="sheet">
+    <div class="hero">
+      <h1 class="mark">OPTUS INC.<small>TOTAL COVERAGE</small></h1>
+      <p class="lede">One tower. One state. Twenty-seven million Australians who currently pay someone else.
+      Roll out the network, convert the country, and stay ahead of the regulator — because the moment
+      you look like a monopoly, the Pushback starts and it does not stop.</p>
+      <div class="diffs" role="group" aria-label="Difficulty">
+        <button class="diff" data-diff="casual" aria-pressed="false">Casual</button>
+        <button class="diff" data-diff="normal" aria-pressed="true">Standard</button>
+        <button class="diff" data-diff="brutal" aria-pressed="false">Brutal</button>
+      </div>
+      <button class="big" id="btnStart">Build the first tower</button>
+    </div>
+    <p class="legalese">Parody. Not affiliated with, endorsed by, or connected to Singtel Optus Pty Limited,
+    Telstra, Vodafone or the ACCC. All company names are used for satire under fair dealing.</p>
+  </div>
+</div>
+
+<!-- ============ END ============ -->
+<div class="veil" id="end">
+  <div class="sheet">
+    <div class="hero">
+      <h1 class="mark" id="endTitle">—</h1>
+      <p class="lede" id="endBlurb">—</p>
+    </div>
+    <div id="endStats">
+      <div><div class="k">Customers</div><div class="v" id="eCust">—</div></div>
+      <div><div class="k">Market share</div><div class="v" id="eShare">—</div></div>
+      <div><div class="k">Days elapsed</div><div class="v" id="eDays">—</div></div>
+      <div><div class="k">Pushback</div><div class="v" id="ePush">—</div></div>
+    </div>
+    <div style="padding:18px"><button class="big" id="btnAgain" style="margin:0">Run it again</button></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =========================================================================
+   OPTUS INC. — TOTAL COVERAGE
+   A Plague Inc.-style rollout sim. Single file, vanilla JS, no dependencies.
+   ========================================================================= */
+
+/* ------------------------------- 1. WORLD ------------------------------- */
+/* Stylised low-poly Australia. Coordinates are hand-plotted from a
+   lon/lat projection so the states sit in roughly the right places.
+   link types: land (easy) | outback (needs remote infrastructure) | sea (needs cable/satellite) */
+
+const STATE_DATA = [
+  { id:'WA', name:'Western Australia', pop:2960000, remote:0.58,
+    d:'M410,176 L360,150 L305,185 L255,225 L215,285 L172,335 L150,395 L133,455 L128,505 L148,556 L215,552 L290,540 L360,520 L410,505 Z',
+    marker:[248,378], label:[248,412], anchor:'middle',
+    spots:[[230,300],[200,400],[280,470],[300,225],[180,468]],
+    links:{ SA:'outback', NT:'outback' } },
+
+  { id:'NT', name:'Northern Territory', pop:255000, remote:0.50,
+    d:'M410,176 L445,140 L470,165 L500,138 L545,130 L560,160 L579,215 L579,396 L410,396 Z',
+    marker:[492,258], label:[492,292], anchor:'middle',
+    spots:[[470,222],[505,300],[540,352],[448,300]],
+    links:{ WA:'outback', SA:'outback', QLD:'outback' } },
+
+  { id:'SA', name:'South Australia', pop:1873000, remote:0.74,
+    d:'M410,396 L635,396 L635,627 L600,610 L590,570 L580,558 L570,530 L555,562 L538,548 L520,520 L470,512 L410,505 Z',
+    marker:[512,446], label:[512,480], anchor:'middle',
+    spots:[[470,440],[545,438],[600,470],[500,498]],
+    links:{ WA:'outback', NT:'outback', QLD:'outback', NSW:'land', VIC:'land' } },
+
+  { id:'QLD', name:'Queensland', pop:5560000, remote:0.82,
+    d:'M579,215 L620,205 L640,160 L655,120 L672,103 L680,140 L700,190 L740,240 L790,300 L830,360 L862,420 L872,453 L635,453 L635,396 L579,396 Z',
+    marker:[712,282], label:[712,316], anchor:'middle',
+    spots:[[700,252],[762,332],[660,200],[800,392],[640,300]],
+    links:{ NSW:'land', SA:'outback', NT:'outback' } },
+
+  { id:'NSW', name:'New South Wales', pop:8339000, remote:1.00,
+    d:'M635,453 L872,453 L858,490 L840,530 L827,552 L812,585 L804,615 L740,590 L690,565 L650,553 L635,548 Z',
+    marker:[748,496], label:[748,530], anchor:'middle',
+    spots:[[720,490],[792,500],[830,518],[758,540],[688,480]],
+    links:{ QLD:'land', VIC:'land', SA:'land', ACT:'land' } },
+
+  { id:'ACT', name:'Aust. Capital Territory', pop:475000, remote:1.15,
+    d:'M779,565 L795,566 L797,582 L781,583 Z',
+    marker:[788,574], label:[878,566], anchor:'start', leader:[[864,562],[800,571]], hitR:26,
+    spots:[[788,574]],
+    links:{ NSW:'land' } },
+
+  { id:'VIC', name:'Victoria', pop:6959000, remote:1.00,
+    d:'M635,548 L650,553 L690,565 L740,590 L804,615 L780,635 L740,648 L710,632 L680,645 L650,640 L635,627 Z',
+    marker:[706,606], label:[608,672], anchor:'end', leader:[[618,664],[694,616]],
+    spots:[[690,600],[732,612],[762,620]],
+    links:{ NSW:'land', SA:'land', TAS:'sea' } },
+
+  { id:'TAS', name:'Tasmania', pop:575000, remote:0.86,
+    d:'M706,690 L740,682 L768,692 L772,715 L755,735 L730,730 L712,715 Z',
+    marker:[738,706], label:[812,720], anchor:'start', leader:[[798,716],[772,711]],
+    spots:[[736,706]],
+    links:{ VIC:'sea' } }
+];
+
+/* ---------------------------- 2. UPGRADES ------------------------------- */
+/* eff keys:
+   spread   additive daily border-crossing chance
+   outback  multiplier added to outback links
+   sea      multiplier added to sea links
+   cov      additive daily coverage build rate
+   conv     additive daily conversion rate
+   cash     multiplier on capital income
+   def      pushback rate reduction (0..1, capped 0.72)
+   heat     extra pushback per day (the cost of being pushy)
+   shield   reduces the size of bad events (0..1)
+   once     one-off flat pushback removed on purchase          */
+
+const UPGRADES = {
+  infra:[
+    {id:'g3',    n:'3G Rollout',            c:8,  eff:{spread:.010, cov:.004}, t:'The old workhorse. Reaches further than anyone admits, at speeds nobody misses.', news:'Optus switches on 3G in the regions; one bloke in Dubbo notices.'},
+    {id:'g4',    n:'4G Towers',             c:16, r:['g3'], eff:{spread:.016, cov:.007}, t:'Proper coverage. Streaming without the buffering wheel becomes a selling point.', news:'4G goes live. Australians rediscover the joy of a loading bar finishing.'},
+    {id:'agg',   n:'Carrier Aggregation',   c:24, r:['g4'], eff:{cov:.009, conv:.0007}, t:'Bond the spectrum together and quietly double the speed on the same towers.', news:'Speed tests double overnight. Telstra insists its network "feels" faster.'},
+    {id:'nbnfw', n:'Fixed Wireless NBN',    c:28, r:['g4'], eff:{cov:.012, cash:.10}, t:'Home internet off the mobile network. Sticky customers, tidy margins.', news:'Optus starts selling home internet with no cable and no apology.'},
+    {id:'black', n:'Blackspot Program',     c:22, r:['g3'], eff:{outback:.55, spread:.006}, t:'Government-subsidised towers along the highways nobody else will touch.', news:'Federal blackspot funding secured. Somewhere near Cloncurry, a tower appears.'},
+    {id:'cable', n:'Bass Strait Cable',     c:34, eff:{sea:1.1, spread:.004}, t:'Lay fibre across the strait. Tasmania stops being a rounding error.', news:'Submarine cable lands at Devonport. Tasmania joins the mainland, digitally.'},
+    {id:'g5',    n:'5G Micro-cells',        c:40, r:['g4'], eff:{spread:.022, cov:.014, conv:.0009}, t:'Small cells on every second light pole. Dense, fast, faintly ominous.', news:'5G micro-cells appear on suburban power poles. Facebook groups mobilise.'},
+    {id:'sat',   n:'Optus Satellite',       c:52, r:['black'], eff:{outback:1.15, sea:.75, cov:.010}, t:'Beam it down. Distance stops mattering; the desert gets four bars.', news:'Satellite service launches. A station owner near Halls Creek posts a reel about it.'},
+    {id:'fibre', n:'Fibre Backhaul',        c:44, r:['g5'], eff:{cov:.016, cash:.15}, t:'The towers were never the bottleneck. The pipe behind them was.', news:'Backhaul upgrade completed. Congestion complaints drop by half.'},
+    {id:'mmw',   n:'mmWave Metro',          c:60, r:['g5','fibre'], eff:{cov:.020, conv:.0014}, t:'Absurd speeds over absurdly short distances. Perfect for CBDs and bragging.', news:'mmWave hits 2Gbps in the Brisbane CBD, provided you stand very still.'}
+  ],
+  market:[
+    {id:'stream', n:'Free Streaming Bundles', c:10, eff:{conv:.0015}, t:'Bundle the shows people already pay for. Feels free. Isn\u2019t.', news:'Every plan now includes streaming. Nobody reads which one.'},
+    {id:'roam',  n:'Cheap Roaming',         c:15, eff:{conv:.0012, cash:.08}, t:'One flat daily rate overseas. The Bali market alone is worth it.', news:'$5-a-day roaming announced. Bali arrivals cheer, then check their bill anyway.'},
+    {id:'tiktok',n:'Viral TikTok Campaign', c:19, eff:{conv:.0017, cash:.06}, t:'Pay a 22-year-old less than one billboard costs. Reach ten times as many people.', news:'Optus ad becomes a sound. Teenagers switch carriers to be part of the bit.'},
+    {id:'kiosk', n:'Aggressive Kiosks',     c:13, eff:{conv:.0023, heat:.030}, t:'Staff placed between shoppers and the food court. Effective. Resented.', news:'Shopping centre kiosks doubled. Complaints to Fair Trading also doubled.'},
+    {id:'plush', n:'Free Ollie Plushie',    c:17, eff:{conv:.0013}, t:'A small yellow mascot with a bandit visor. Children demand the plan it comes with.', news:'Ollie plushies sell out. Resale market emerges. Parents defeated.'},
+    {id:'sport', n:'Football Rights',       c:28, r:['stream'], eff:{conv:.0021, cash:.10}, t:'Buy the league. Everyone who wants the football has to want you first.', news:'Optus Sport locks up the football. A nation reluctantly downloads the app.'},
+    {id:'ollie', n:'Ollie Goes Influencer', c:24, r:['tiktok'], eff:{conv:.0019}, t:'The mascot gets a posting schedule and a slightly unhinged brand voice.', news:'Ollie replies to a rival\u2019s tweet. The reply outperforms the ad budget.'},
+    {id:'family',n:'Family Bundle Discount',c:32, eff:{conv:.0025, cash:.06}, t:'Four lines, one bill, one very difficult conversation about leaving.', news:'Family plans launch. Switching now requires a household vote.'},
+    {id:'yes',   n:'Yes Rewards Loyalty',   c:38, r:['family'], eff:{conv:.0029}, t:'Points, perks, early tickets. The customers you have stop shopping around.', news:'Loyalty program launches. Churn falls to a rounding error.'},
+    {id:'stadium',n:'Stadium Naming Rights',c:48, r:['sport'], eff:{conv:.0026, cash:.12, heat:.016}, t:'Put the logo on the roof. Every highlight reel becomes an ad.', news:'A stadium is renamed. Locals refuse to use the new name for eleven years.'}
+  ],
+  defence:[
+    {id:'lobby', n:'Lobbying Politicians',  c:20, eff:{def:.14}, t:'Breakfast briefings in Canberra. Nothing improper, everything useful.', news:'Telco policy roundtable held. Catering described as "generous".'},
+    {id:'pr',    n:'PR Crisis Team',        c:24, eff:{def:.08, shield:.30}, t:'Statements pre-written for outages that haven\u2019t happened yet.', news:'Optus hires a crisis team. First job: the press release about hiring them.'},
+    {id:'gens',  n:'Backup Generators',     c:30, eff:{def:.06, outage:true}, t:'Diesel at every exchange. Nationwide outages stop being possible.', news:'Backup power installed network-wide. Engineers sleep for the first time since 2023.'},
+    {id:'cyber', n:'Cyber Security Overhaul',c:42, eff:{def:.08, breach:true}, t:'Close the API nobody was supposed to find. Better late than in the papers.', news:'Security overhaul completed. The exposed endpoint is, at last, not exposed.'},
+    {id:'legal', n:'Legal Loopholes',       c:27, r:['lobby'], eff:{def:.16}, t:'Restructure into enough subsidiaries that "market share" stops meaning anything.', news:'Corporate restructure filed. Fourteen new entities, one very tired lawyer.'},
+    {id:'astro', n:'Astroturf Consumer Group',c:30, r:['pr'], eff:{def:.10, shield:.20, heat:.010}, t:'"Aussies for Better Mobile" writes letters. Funding is not disclosed.', news:'New consumer group praises telco competition. Nobody can find its office.'},
+    {id:'poach', n:'Poach Telstra Execs',   c:36, eff:{def:.12, rival:true, cash:.06}, t:'Hire the people running the counter-campaign. It ends the counter-campaign.', news:'Three Telstra executives defect. Their LinkedIn posts are pure poetry.'},
+    {id:'dc',    n:'Redundant Data Centres',c:44, r:['gens'], eff:{def:.10, shield:.25}, t:'Two of everything, in two places. Failures become paperwork, not headlines.', news:'Second data centre goes live. The word "resilience" is used forty times.'},
+    {id:'accc',  n:'Sponsor the ACCC Gala', c:55, r:['legal'], eff:{def:.18, once:9}, t:'Purely a community partnership. The lanyards look wonderful.', news:'Regulator\u2019s charity gala gains a naming sponsor. Everyone agrees it\u2019s fine.'}
+  ]
+};
+
+/* ---------------------------- 3. HEADLINES ------------------------------ */
+const FILLER = [
+  'Telstra CEO seen crying quietly in a Bunnings car park.',
+  'Citizens demand faster 5G to watch kangaroos on TikTok.',
+  'New tower mistaken for very tall emu; farmer apologises to tower.',
+  'Bloke in Wagga gets 5G, immediately downloads 400GB of nothing.',
+  'ACCC opens 47th inquiry, files it under "later".',
+  'Vodafone spotted quietly updating its LinkedIn headline.',
+  'Man in Broome claims full bars in open desert. Scientists baffled.',
+  'Telstra launches campaign featuring a slightly sadder dog.',
+  'Survey: 8 in 10 Australians can\u2019t name their own plan.',
+  'Optus store queue in Chatswood now visible from space.',
+  'Grandmother in Ballarat live-streams entire lawn bowls final in 4K.',
+  'Tradie discovers hotspot; entire worksite now on one phone plan.',
+  'NBN Co responds to competition with a strongly worded diagram.',
+  'Coverage map updated. Somehow, Tasmania is still slightly wrong.',
+  'Optus Sport commentator says "unbelievable scenes" for the ninth time.',
+  'Ollie mascot spotted at a servo in Goulburn. No further details.',
+  'Roaming rates cut again. Bali arrivals hall erupts.',
+  'Study finds Australians will change carriers for a $10 gift card.'
+];
+
+/* ------------------------------ 4. STATE -------------------------------- */
+const DIFF = {
+  casual:{ push:0.72, cash:1.28, ev:0.72, label:'Casual' },
+  normal:{ push:1.00, cash:1.00, ev:1.00, label:'Standard' },
+  brutal:{ push:1.16, cash:0.88, ev:1.26, label:'Brutal' }
+};
+
+const BASE = { spread:0.011, cov:0.0050, conv:0.0013, cash:0.045, cashPerShare:0.78 };
+const SPEEDS = [0, 520, 250, 120];          // ms per in-game day
+const START = new Date(2024, 0, 1);
+const TOTAL_POP = STATE_DATA.reduce((a,s)=>a+s.pop,0);
+
+let G = null;   // live game object
+
+/* ------------------------------ 5. HELPERS ------------------------------ */
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const SVGNS = 'http://www.w3.org/2000/svg';
+const clamp = (v,a,b) => v<a?a:v>b?b:v;
+const rnd = (a,b) => a + Math.random()*(b-a);
+const pick = a => a[(Math.random()*a.length)|0];
+const el = (tag,attrs)=>{ const n=document.createElementNS(SVGNS,tag); for(const k in attrs) n.setAttribute(k,attrs[k]); return n; };
+
+function fmt(n){
+  n = Math.floor(n);
+  if (n >= 1e6) return (n/1e6).toFixed(n>=1e7?1:2)+'M';
+  if (n >= 1e3) return (n/1e3).toFixed(0)+'k';
+  return String(n);
+}
+function fmtDate(d){
+  const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return d.getDate()+' '+M[d.getMonth()]+' '+d.getFullYear();
+}
+function mix(a,b,t){ // hex lerp
+  t = clamp(t,0,1);
+  const pa=[parseInt(a.slice(1,3),16),parseInt(a.slice(3,5),16),parseInt(a.slice(5,7),16)];
+  const pb=[parseInt(b.slice(1,3),16),parseInt(b.slice(3,5),16),parseInt(b.slice(5,7),16)];
+  return '#'+pa.map((v,i)=>Math.round(v+(pb[i]-v)*t).toString(16).padStart(2,'0')).join('');
+}
+
+/* tiny audio — one oscillator per blip, no assets */
+let AC=null, muted=false;
+function blip(freq, dur, type, vol){
+  if (muted) return;
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(), g=AC.createGain();
+    o.type=type||'sine'; o.frequency.value=freq;
+    g.gain.setValueAtTime(vol||0.05, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime+(dur||0.12));
+    o.connect(g).connect(AC.destination); o.start(); o.stop(AC.currentTime+(dur||0.12));
+  }catch(e){}
+}
+
+/* ------------------------------ 6. NEW GAME ----------------------------- */
+function newGame(diff){
+  G = {
+    diff: DIFF[diff] || DIFF.normal,
+    day: 0,
+    date: new Date(START),
+    capital: 12,
+    pushback: 0,
+    owned: new Set(),
+    speed: 1,
+    phase: 'pick',          // pick -> play -> over
+    over: null,
+    bubbles: [],
+    nextBubble: 6,
+    dcUses: 0, pbRate: 0,
+    dcCooldown: 0,
+    peakShare: 0,
+    seen: {},
+    states: {}
+  };
+  STATE_DATA.forEach(s => {
+    G.states[s.id] = { id:s.id, coverage:0, customers:0, tower:false, live:false };
+  });
+  mods();       // prime the modifier cache
+}
+
+/* Recompute the effect cache from owned upgrades. Cheap; called on purchase. */
+function mods(){
+  const m = { spread:0, outback:0, sea:0, cov:0, conv:0, cash:0, def:0, heat:0, shield:0,
+              outage:false, breach:false, rival:false };
+  for (const tab in UPGRADES) for (const u of UPGRADES[tab]){
+    if (!G.owned.has(u.id)) continue;
+    for (const k in u.eff){
+      if (typeof u.eff[k] === 'boolean') m[k] = m[k] || u.eff[k];
+      else if (k !== 'once') m[k] += u.eff[k];
+    }
+  }
+  m.def = clamp(m.def, 0, 0.78);
+  m.shield = clamp(m.shield, 0, 0.7);
+  G.mods = m;
+  return m;
+}
+
+const S = id => G.states[id];
+const META = id => STATE_DATA.find(s=>s.id===id);
+const totalCustomers = () => STATE_DATA.reduce((a,s)=>a+S(s.id).customers,0);
+const shareOf = id => S(id).customers / META(id).pop;
+
+/* --------------------------- 7. THE DAY TICK ---------------------------- */
+function tick(){
+  const m = G.mods;
+  const cust = totalCustomers();
+  const share = cust / TOTAL_POP;
+  G.peakShare = Math.max(G.peakShare, share);
+
+  /* -- 7a. spread across borders ------------------------------------- */
+  for (const meta of STATE_DATA){
+    const st = S(meta.id);
+    if (st.tower) continue;
+    let chance = 0;
+    for (const nid in meta.links){
+      const nb = S(nid);
+      if (!nb.tower || nb.coverage < 0.14) continue;
+      let mult;
+      switch (meta.links[nid]){
+        case 'land':    mult = 1.0; break;
+        case 'outback': mult = 0.20 + m.outback; break;
+        case 'sea':     mult = 0.04 + m.sea; break;
+      }
+      chance += (BASE.spread + m.spread) * mult * nb.coverage * meta.remote;
+    }
+    if (chance > 0 && Math.random() < chance){
+      st.tower = true;
+      st.coverage = 0.05;
+      st.customers = Math.min(meta.pop * 0.004, 2500);
+      onStateLive(meta);
+    }
+  }
+
+  /* -- 7b. coverage build-out ----------------------------------------- */
+  for (const meta of STATE_DATA){
+    const st = S(meta.id);
+    if (!st.tower || st.coverage >= 1) continue;
+    const rate = (BASE.cov + m.cov) * (0.35 + 0.65*meta.remote);
+    st.coverage = clamp(st.coverage + rate * (1.05 - st.coverage), 0, 1);
+  }
+
+  /* -- 7c. conversion -------------------------------------------------- */
+  for (const meta of STATE_DATA){
+    const st = S(meta.id);
+    if (st.coverage <= 0) continue;
+    const headroom = Math.max(0.05, 1 - st.customers/meta.pop);
+    const rate = (BASE.conv + m.conv) * st.coverage;
+    st.customers = Math.min(meta.pop, st.customers + meta.pop * rate * headroom);
+    if (st.customers/meta.pop > 0.995) st.customers = meta.pop;
+  }
+
+  /* -- 7d. capital ----------------------------------------------------- */
+  G.capital += dailyCapital(share);
+
+  /* -- 7e. pushback ---------------------------------------------------- */
+  const covered = STATE_DATA.filter(s=>S(s.id).tower).length;
+  if (share > 0.05 || covered >= 3){
+    const raw = 0.42*Math.pow(share,1.7) + 0.052*(covered/8) + m.heat;
+    G.pushback = clamp(G.pushback + raw * (1-m.def) * G.diff.push, 0, 100);
+    G.pbRate = raw * (1-m.def) * G.diff.push;
+  } else G.pbRate = 0;
+
+  /* -- 7f. events & bubbles ------------------------------------------- */
+  rollEvents(share, covered);
+  bubbleTick(share);
+  if (G.dcCooldown > 0) G.dcCooldown--;
+
+  /* -- 7g. milestones -------------------------------------------------- */
+  milestones(share, covered);
+
+  /* -- 7h. end states -------------------------------------------------- */
+  if (G.pushback >= 100) return finish(false);
+  if (STATE_DATA.every(s => S(s.id).customers >= META(s.id).pop * 0.999)) return finish(true);
+
+  G.day++;
+  G.date = new Date(START.getTime() + G.day*86400000);
+}
+
+function dailyCapital(share){
+  return (BASE.cash + BASE.cashPerShare*share) * (1 + G.mods.cash) * G.diff.cash;
+}
+
+function onStateLive(meta){
+  const st = S(meta.id);
+  st.live = true;
+  news('First tower goes live in ' + meta.name + '. Locals unsure whether to cheer or complain.');
+  toast('Network live', meta.name + ' is now on the Optus network.', 'good');
+  blip(660, 0.14, 'triangle', 0.05);
+  drawTower(meta);
+}
+
+/* --------------------------- 8. RANDOM EVENTS --------------------------- */
+const EVENTS = [
+  { id:'accc', min:0.22, p:0.0045, run(share){
+      const hit = 6 * (1-G.mods.shield);
+      G.pushback = clamp(G.pushback + hit, 0, 100);
+      news('ACCC announces a market inquiry into "concentration in mobile services".');
+      toast('ACCC inquiry', 'Pushback +' + hit.toFixed(1) + '%. The regulator has noticed you.', 'bad');
+      blip(180, 0.3, 'sawtooth', 0.05);
+    }},
+  { id:'telstra', min:0.14, p:0.0055, run(){
+      if (G.mods.rival && Math.random() < 0.7){
+        news('Telstra\u2019s counter-campaign is quietly shelved. Nobody will say why.');
+        toast('Campaign shelved', 'Your ex-Telstra hires killed it before launch.', 'good');
+        return;
+      }
+      const live = STATE_DATA.filter(s=>S(s.id).customers > 1000);
+      if (!live.length) return;
+      const t = live.reduce((a,b)=> S(a.id).customers > S(b.id).customers ? a : b);
+      const loss = S(t.id).customers * rnd(0.03,0.07) * (1-G.mods.shield);
+      S(t.id).customers -= loss;
+      G.pushback = clamp(G.pushback + 2.5*(1-G.mods.shield), 0, 100);
+      news('Telstra floods ' + t.name + ' with half-price plans and a very emotional advertisement.');
+      toast('Telstra counter-offensive', fmt(loss) + ' customers lost in ' + t.id + '.', 'rival');
+      blip(220, 0.25, 'square', 0.045);
+    }},
+  { id:'outage', min:0, p:0.0038, need:g=>STATE_DATA.filter(s=>S(s.id).tower).length>=4, run(){
+      if (G.mods.outage){
+        if (Math.random()<0.35) news('Power failure at a Sydney exchange. Backup generators carry the load. Nobody notices.');
+        return;
+      }
+      const hit = 9 * (1-G.mods.shield);
+      G.pushback = clamp(G.pushback + hit, 0, 100);
+      STATE_DATA.forEach(s => S(s.id).customers *= 0.955);
+      news('NATIONWIDE OUTAGE: triple-zero calls affected. Parliament wants a word.');
+      toast('Nationwide outage', 'Pushback +' + hit.toFixed(1) + '%, customers walking.', 'bad');
+      blip(120, 0.5, 'sawtooth', 0.06);
+    }},
+  { id:'breach', min:0.10, p:0.0026, need:g=>g.day>110, run(){
+      if (G.mods.breach) return;
+      const hit = 11 * (1-G.mods.shield);
+      G.pushback = clamp(G.pushback + hit, 0, 100);
+      STATE_DATA.forEach(s => S(s.id).customers *= 0.97);
+      news('Data breach: an open API exposes millions of records. Again.');
+      toast('Data breach', 'Pushback +' + hit.toFixed(1) + '%. The word "again" is doing heavy lifting.', 'bad');
+      blip(140, 0.45, 'sawtooth', 0.055);
+    }},
+  { id:'viral', min:0.04, p:0.0050, run(){
+      const gain = rnd(6,14) * (1+G.mods.cash);
+      G.capital += gain;
+      G.pushback = clamp(G.pushback - 0.8, 0, 100);
+      news(pick(['An Optus ad becomes a meme. The marketing team pretends it was planned.',
+                 'Ollie photobombs a live cross on the news. Engagement goes vertical.',
+                 'A rival\u2019s app goes down during the football. Switching spikes.']));
+      toast('Free publicity', '+' + Math.round(gain) + ' capital, and the mood softens.', 'good');
+      blip(880, 0.1, 'triangle', 0.04);
+    }},
+  { id:'grant', min:0.02, p:0.0030, run(){
+      const gain = rnd(8,18);
+      G.capital += gain;
+      news('Regional connectivity grant approved. The cheque clears before the press release.');
+      toast('Government grant', '+' + Math.round(gain) + ' capital for remote rollout.', 'good');
+    }}
+];
+
+function rollEvents(share, covered){
+  for (const e of EVENTS){
+    if (share < (e.min||0)) continue;
+    if (e.need && !e.need(G)) continue;
+    const bad = ['accc','telstra','outage','breach'].includes(e.id);
+    const p = e.p * (bad ? G.diff.ev : 1);
+    if (Math.random() < p) e.run(share);
+  }
+}
+
+/* ------------------------------ 9. BUBBLES ------------------------------ */
+function bubbleTick(share){
+  G.nextBubble--;
+  if (G.nextBubble <= 0 && G.bubbles.length < 3){
+    spawnBubble(share);
+    G.nextBubble = Math.round(rnd(11,19));
+  }
+  for (let i=G.bubbles.length-1; i>=0; i--){
+    if (--G.bubbles[i].life <= 0) removeBubble(i);
+  }
+}
+
+function spawnBubble(share){
+  const live = STATE_DATA.filter(s => S(s.id).tower);
+  const pool = live.length ? (Math.random()<0.75 ? live : STATE_DATA) : STATE_DATA;
+  const meta = pick(pool);
+  const spot = pick(meta.spots);
+  const suburb = Math.random() < 0.4 && S(meta.id).tower;
+  G.bubbles.push({
+    x: spot[0] + rnd(-14,14), y: spot[1] + rnd(-12,12),
+    state: meta.id, life: Math.round(rnd(30,48)), kind: suburb ? 'suburb' : 'viral',
+    value: Math.round(rnd(3,7) + 7*share)
+  });
+  drawBubbles();
+}
+
+function popBubble(i){
+  const b = G.bubbles[i];
+  if (!b) return;
+  G.capital += b.value;
+  if (b.kind === 'suburb'){
+    const st = S(b.state);
+    st.coverage = clamp(st.coverage + 0.07, 0, 1);
+    news('New estate opens in ' + META(b.state).name + '. Every house is pre-wired to Optus.');
+    toast('New suburb', '+' + b.value + ' capital and a coverage bump in ' + b.state + '.', 'good');
+  } else {
+    news(pick(['A switching promo goes viral in ' + META(b.state).name + '. Stores run out of SIMs.',
+               'Local radio talks about Optus for eleven straight minutes. Free of charge.']));
+    toast('Viral hit', '+' + b.value + ' capital from ' + b.state + '.', 'good');
+  }
+  blip(1040, 0.09, 'triangle', 0.05);
+  removeBubble(i);
+}
+
+function removeBubble(i){ G.bubbles.splice(i,1); drawBubbles(); }
+
+/* --------------------------- 10. MILESTONES ----------------------------- */
+function milestones(share, covered){
+  const once = (key, fn) => { if (!G.seen[key]){ G.seen[key]=1; fn(); } };
+  if (share >= 0.10) once('s10', ()=> news('Optus passes 10% of the country. Analysts call it "a rounding error with ambition".'));
+  if (share >= 0.25) once('s25', ()=> { news('One in four Australians now on Optus. Telstra holds an "all hands".'); toast('Quarter of the country','Capital income rising. So is attention.','good'); });
+  if (share >= 0.50) once('s50', ()=> { news('Optus overtakes every rival combined. The word "monopoly" enters the news cycle.'); toast('Half of Australia','Pushback will now climb fast. Buy defence.','bad'); });
+  if (share >= 0.75) once('s75', ()=> news('Three in four Australians on Optus. Senate estimates schedules an extra day.'));
+  if (share >= 0.90) once('s90', ()=> news('Rivals reduced to hobbyists. The ACCC is described as "very interested indeed".'));
+  if (covered === 8)  once('all8', ()=> { news('Coverage reaches all eight states and territories. The map is finally yellow.'); toast('National coverage','Every state and territory has a tower.','good'); });
+  if (G.pushback >= 25) once('p25', ()=> toast('Pushback at 25%','Regulators are circling. Corporate defence is not optional.','bad'));
+  if (G.pushback >= 50) once('p50', ()=> { news('ACCC signals it is "considering structural remedies". Share price wobbles.'); toast('Pushback at 50%','Halfway to a forced break-up.','bad'); });
+  if (G.pushback >= 80) once('p80', ()=> { news('Draft legislation circulating: "Telecommunications (Divestiture) Bill".'); toast('Pushback at 80%','This is the last chance to fight it.','bad'); });
+}
+
+/* ---------------------------- 11. NEWS TICKER --------------------------- */
+const queue = [];
+function news(text){ queue.push(text); if (queue.length > 24) queue.shift(); }
+
+const tickText = $('#tickText');
+let tickX = 0, tickCur = '';
+function tickerStep(dt){
+  if (!tickCur){
+    tickCur = queue.length ? queue.shift() : pick(FILLER);
+    tickText.innerHTML = '<em>&#9679;</em>&nbsp; ' + tickCur;
+    tickX = $('#tickWrap').clientWidth;
+  }
+  tickX -= dt * 0.075;
+  tickText.style.left = tickX + 'px';
+  if (tickX < -tickText.offsetWidth - 40) tickCur = '';
+}
+
+/* ------------------------------ 12. TOASTS ------------------------------ */
+function toast(title, body, kind){
+  const box = $('#toasts');
+  const d = document.createElement('div');
+  d.className = 'toast ' + (kind||'');
+  d.innerHTML = '<b>' + title + '</b>' + body;
+  box.appendChild(d);
+  if (box.children.length > 4) box.removeChild(box.firstChild);
+  setTimeout(()=>{ d.style.transition='opacity .4s'; d.style.opacity='0';
+                   setTimeout(()=>d.remove(), 420); }, 5200);
+}
+
+/* ------------------------------ 13. THE MAP ----------------------------- */
+const L = {
+  base:$('#layer-base'), cov:$('#layer-cov'), cust:$('#layer-cust'),
+  border:$('#layer-border'), fx:$('#layer-fx'), hit:$('#layer-hit'),
+  labels:$('#layer-labels'), bub:$('#layer-bubbles')
+};
+const nodes = {};
+
+function buildMap(){
+  for (const k in L) L[k].innerHTML = '';
+  STATE_DATA.forEach(meta => {
+    const n = {};
+    n.base = el('path', { d:meta.d, fill:'#1A222A' });
+    n.cov  = el('path', { d:meta.d, fill:'#008B8B', 'fill-opacity':0 });
+    n.cust = el('path', { d:meta.d, fill:'#FFD700', 'fill-opacity':0 });
+    n.line = el('path', { d:meta.d, fill:'none', stroke:'#33424D', 'stroke-width':1.6,
+                          'stroke-linejoin':'round' });
+    n.hit  = meta.hitR
+      ? el('circle', { cx:meta.marker[0], cy:meta.marker[1], r:meta.hitR, class:'hit' })
+      : el('path', { d:meta.d, class:'hit' });
+    n.hit.setAttribute('tabindex','0');
+    n.hit.setAttribute('role','button');
+    n.hit.setAttribute('aria-label', meta.name);
+    L.base.appendChild(n.base); L.cov.appendChild(n.cov);
+    L.cust.appendChild(n.cust); L.border.appendChild(n.line); L.hit.appendChild(n.hit);
+
+    if (meta.leader){
+      L.labels.appendChild(el('path', {
+        d:'M'+meta.leader[0][0]+','+meta.leader[0][1]+' L'+meta.leader[1][0]+','+meta.leader[1][1],
+        class:'leader' }));
+    }
+    n.name = el('text', { x:meta.label[0], y:meta.label[1], class:'slabel', 'text-anchor':meta.anchor });
+    n.name.textContent = meta.id;
+    n.val = el('text', { x:meta.label[0], y:meta.label[1]+17, class:'sval', 'text-anchor':meta.anchor });
+    n.val.textContent = '—';
+    L.labels.appendChild(n.name); L.labels.appendChild(n.val);
+
+    const go = ()=> onStateClick(meta);
+    n.hit.addEventListener('click', go);
+    n.hit.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } });
+    nodes[meta.id] = n;
+  });
+}
+
+function drawTower(meta){
+  const [x,y] = meta.marker;
+  const g = el('g', {});
+  g.appendChild(el('circle', { cx:x, cy:y, r:4, fill:'#00C9BE', class:'pulse' }));
+  g.appendChild(el('circle', { cx:x, cy:y, r:4, fill:'#00C9BE', class:'pulse', style:'animation-delay:1.3s' }));
+  // mast
+  g.appendChild(el('path', { d:'M'+x+','+(y+9)+' L'+x+','+(y-9), stroke:'#FFD700', 'stroke-width':2.4, 'stroke-linecap':'round' }));
+  g.appendChild(el('path', { d:'M'+(x-6)+','+(y+9)+' L'+x+','+(y-3)+' L'+(x+6)+','+(y+9),
+                             fill:'none', stroke:'#FFD700', 'stroke-width':2, 'stroke-linejoin':'round' }));
+  g.appendChild(el('circle', { cx:x, cy:y-11, r:2.6, fill:'#FFD700', filter:'url(#glow)' }));
+  g.setAttribute('pointer-events','none');
+  L.fx.appendChild(g);
+}
+
+function drawBubbles(){
+  L.bub.innerHTML = '';
+  G.bubbles.forEach((b,i)=>{
+    const g = el('g', { class:'bubg bub' });
+    const col = b.kind === 'suburb' ? '#00C9BE' : '#FFD700';
+    g.appendChild(el('circle', { cx:b.x, cy:b.y, r:19, fill:col, 'fill-opacity':.16 }));
+    g.appendChild(el('circle', { cx:b.x, cy:b.y, r:13, fill:col, 'fill-opacity':.9, filter:'url(#glow)' }));
+    const t = el('text', { x:b.x, y:b.y+4.5, 'text-anchor':'middle',
+      style:'font:700 13px var(--body);fill:#12140A;pointer-events:none' });
+    t.textContent = b.kind === 'suburb' ? '\u2302' : '\u2605';
+    g.appendChild(t);
+    g.addEventListener('click', e => { e.stopPropagation(); popBubble(i); });
+    L.bub.appendChild(g);
+  });
+}
+
+/* ------------------------------ 14. RENDER ------------------------------ */
+let selected = null;
+function render(){
+  const cust = totalCustomers(), share = cust / TOTAL_POP;
+
+  $('#vDate').textContent  = fmtDate(G.date);
+  $('#vCust').textContent  = fmt(cust);
+  $('#vShare').textContent = (share*100).toFixed(1) + '%';
+  $('#vCap').textContent   = Math.floor(G.capital);
+  $('#vRate').textContent  = '+' + dailyCapital(share).toFixed(2) + '/day';
+  $('#vPush').textContent  = G.pushback.toFixed(1) + '%';
+  $('#vPushRate').textContent = G.pbRate > 0.001 ? '+' + (G.pbRate*30).toFixed(1) + '/mo' : 'stable';
+  $('#pbFill').style.right = (100 - G.pushback) + '%';
+
+  STATE_DATA.forEach(meta => {
+    const st = S(meta.id), n = nodes[meta.id];
+    const sh = st.customers / meta.pop;
+    n.cov.setAttribute('fill-opacity', (st.coverage * 0.34).toFixed(3));
+    n.cust.setAttribute('fill-opacity', Math.pow(sh, 0.85).toFixed(3));
+    n.line.setAttribute('stroke', st.tower ? mix('#33424D','#FFD700', sh*0.85+0.15) : '#33424D');
+    n.val.textContent = st.tower ? (sh*100).toFixed(0)+'%' : (G.phase==='pick' ? fmt(meta.pop) : '—');
+    n.val.classList.toggle('on', sh > 0.02);
+  });
+
+  const affordable = ['infra','market','defence'].some(t =>
+    UPGRADES[t].some(u => !G.owned.has(u.id) && canBuy(u) && G.capital >= u.c));
+  $('#dot').classList.toggle('on', affordable);
+
+  if (selected && $('#panel').classList.contains('show')) fillPanel(META(selected));
+
+  const dcCost = damageCost();
+  $('#dcCost').textContent = G.dcCooldown > 0 ? G.dcCooldown+'d' : dcCost;
+  $('#btnDamage').disabled = G.dcCooldown > 0 || G.capital < dcCost || G.pushback <= 0;
+  if (!$('#modal').classList.contains('show')) return;
+  $('#mCap').textContent = Math.floor(G.capital);
+  refreshCards();
+}
+
+/* --------------------------- 15. STATE PANEL ---------------------------- */
+function onStateClick(meta){
+  if (G.phase === 'pick'){ startIn(meta); return; }
+  selected = meta.id;
+  fillPanel(meta);
+  $('#panel').classList.add('show');
+}
+
+function fillPanel(meta){
+  const st = S(meta.id);
+  const sh = st.customers / meta.pop;
+  $('#pName').textContent = meta.id;
+  $('#pStatus').textContent = st.tower
+    ? (sh > 0.9 ? 'Saturated' : sh > 0.4 ? 'Converting fast' : 'Network live')
+    : 'No network';
+  $('#pPop').textContent   = META(meta.id).pop.toLocaleString('en-AU');
+  $('#pCust').textContent  = Math.floor(st.customers).toLocaleString('en-AU');
+  $('#pShare').textContent = (sh*100).toFixed(1) + '%';
+  [...$('#pBars').children].forEach((b,i)=> b.classList.toggle('on', st.coverage > i*0.25 + 0.02));
+  $('#pLinks').textContent = Object.entries(meta.links)
+    .map(([k,v]) => k + (v==='land' ? '' : v==='sea' ? ' (sea)' : ' (outback)')).join(', ');
+}
+$('#panelClose').onclick = ()=>{ selected = null; $('#panel').classList.remove('show'); };
+
+function startIn(meta){
+  const st = S(meta.id);
+  st.tower = true; st.coverage = 0.16;
+  st.customers = Math.min(meta.pop * 0.012, 42000);
+  G.phase = 'play';
+  $('#pick').classList.remove('show');
+  drawTower(meta);
+  news('Optus switches on its first tower in ' + meta.name + '. The rollout begins.');
+  toast('First tower live', meta.name + ' is on the network. Spend capital to grow.', 'good');
+  blip(520, 0.18, 'triangle', 0.06);
+}
+
+/* ---------------------------- 16. UPGRADES UI --------------------------- */
+let curTab = 'infra', cards = {};
+
+function canBuy(u){ return !u.r || u.r.every(id => G.owned.has(id)); }
+
+function effLabel(u){
+  const bits = [];
+  const e = u.eff;
+  if (e.spread)  bits.push('spread +' + Math.round(e.spread*1000)/10);
+  if (e.outback) bits.push('outback \u00d7' + (1+e.outback).toFixed(2));
+  if (e.sea)     bits.push('sea \u00d7' + (1+e.sea).toFixed(2));
+  if (e.cov)     bits.push('build +' + Math.round(e.cov*1000)/10);
+  if (e.conv)    bits.push('switching +' + Math.round(e.conv*10000)/10);
+  if (e.cash)    bits.push('capital +' + Math.round(e.cash*100) + '%');
+  if (e.def)     bits.push('pushback \u2212' + Math.round(e.def*100) + '%');
+  if (e.shield)  bits.push('events \u2212' + Math.round(e.shield*100) + '%');
+  if (e.once)    bits.push('pushback \u2212' + e.once + '% now');
+  if (e.heat)    bits.push('\u26a0 pushback +' + Math.round(e.heat*1000)/10 + '/day');
+  if (e.outage)  bits.push('blocks outages');
+  if (e.breach)  bits.push('blocks breaches');
+  if (e.rival)   bits.push('blunts Telstra');
+  return bits.join(' \u00b7 ');
+}
+
+function buildCards(){
+  const grid = $('#mGrid');
+  grid.innerHTML = ''; cards = {};
+  UPGRADES[curTab].forEach(u => {
+    const b = document.createElement('button');
+    b.className = 'card';
+    const req = u.r ? '<span class="tag">Needs ' + u.r.map(id => nameOf(id)).join(' + ') + '</span>' : '';
+    b.innerHTML = req +
+      '<h4>' + u.n + '</h4>' +
+      '<p>' + u.t + '</p>' +
+      '<div class="eff">' + effLabel(u) + '</div>' +
+      '<div class="foot"><span class="price">' + u.c + ' capital</span><span class="own"></span></div>';
+    b.onclick = ()=> buy(u);
+    b._own = b.querySelector('.own');
+    grid.appendChild(b);
+    cards[u.id] = b;
+  });
+  refreshCards();
+}
+
+function nameOf(id){
+  for (const t in UPGRADES){ const u = UPGRADES[t].find(x=>x.id===id); if (u) return u.n; }
+  return id;
+}
+
+function refreshCards(){
+  UPGRADES[curTab].forEach(u => {
+    const b = cards[u.id]; if (!b) return;
+    const owned = G.owned.has(u.id), ok = canBuy(u), poor = G.capital < u.c;
+    b.classList.toggle('owned', owned);
+    b.classList.toggle('locked', !owned && !ok);
+    b.classList.toggle('poor', !owned && ok && poor);
+    b._own.textContent = owned ? 'APPROVED' : !ok ? 'LOCKED' : poor ? '' : 'BUY';
+    b.disabled = owned || !ok;
+  });
+}
+
+function buy(u){
+  if (G.owned.has(u.id) || !canBuy(u)) return;
+  if (G.capital < u.c){ blip(160,0.1,'square',0.04); return; }
+  G.capital -= u.c;
+  G.owned.add(u.id);
+  if (u.eff.once) G.pushback = clamp(G.pushback - u.eff.once, 0, 100);
+  mods();
+  if (u.news) news(u.news);
+  toast('Approved', u.n + ' \u2014 ' + effLabel(u), 'good');
+  blip(760, 0.12, 'triangle', 0.05);
+  refreshCards();
+  $('#mCap').textContent = Math.floor(G.capital);
+}
+
+/* ------------------------- 17. DAMAGE CONTROL --------------------------- */
+function damageCost(){ return 26 + 11*G.dcUses; }
+
+$('#btnDamage').onclick = ()=>{
+  const cost = damageCost();
+  if (G.phase !== 'play' || G.dcCooldown > 0 || G.capital < cost) return;
+  G.capital -= cost; G.dcUses++; G.dcCooldown = 20;
+  const cut = 6 + G.mods.shield*8 + G.mods.def*6;
+  G.pushback = clamp(G.pushback - cut, 0, 100);
+  news(pick(['Optus CEO fronts a press conference and apologises to a room of no one in particular.',
+             'Full-page apology runs in every masthead. It is very sincerely worded.',
+             'Optus announces a $10 credit for all customers. The news cycle moves on.']));
+  toast('Damage control', 'Pushback \u2212' + cut.toFixed(1) + '%. Next one costs more.', 'good');
+  blip(420, 0.2, 'sine', 0.05);
+  render();
+};
+
+/* ---------------------------- 18. MAIN LOOP ----------------------------- */
+let last = 0, acc = 0, resume = 1;
+
+function frame(ts){
+  const dt = Math.min(64, ts - (last || ts)); last = ts;
+  tickerStep(dt);
+  if (G && G.phase === 'play' && G.speed > 0){
+    acc += dt;
+    const step = SPEEDS[G.speed];
+    let guard = 0;
+    while (acc >= step && guard++ < 12){ acc -= step; if (G.phase==='play') tick(); }
+  }
+  if (G) render();
+  requestAnimationFrame(frame);
+}
+
+function setSpeed(s){
+  if (!G) return;
+  G.speed = s;
+  $$('.spd').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.spd === s)));
+}
+$$('.spd').forEach(b => b.onclick = ()=> setSpeed(+b.dataset.spd));
+
+/* ------------------------------ 19. MODAL ------------------------------- */
+function openModal(){
+  if (!G || G.phase !== 'play') return;
+  resume = G.speed || 1;
+  setSpeed(0);
+  $('#modal').classList.add('show');
+  $('#mCap').textContent = Math.floor(G.capital);
+  buildCards();
+}
+function closeModal(){
+  $('#modal').classList.remove('show');
+  if (G && G.phase === 'play') setSpeed(resume);
+}
+$('#btnUpgrades').onclick = openModal;
+$('#mClose').onclick = closeModal;
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+$$('.tab').forEach(t => t.onclick = ()=>{
+  curTab = t.dataset.tab;
+  $$('.tab').forEach(x => x.setAttribute('aria-selected', String(x === t)));
+  buildCards();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+  if (!G || G.phase !== 'play') return;
+  if (e.key === 'u' || e.key === 'U'){ $('#modal').classList.contains('show') ? closeModal() : openModal(); }
+  if (e.code === 'Space' && !(e.target && e.target.classList && e.target.classList.contains('hit'))){
+    e.preventDefault(); setSpeed(G.speed ? 0 : resume);
+  }
+  if (['1','2','3'].includes(e.key)) setSpeed(+e.key);
+});
+
+/* ------------------------------- 20. END -------------------------------- */
+function finish(won){
+  G.phase = 'over';
+  $('#modal').classList.remove('show');
+  G.over = won;
+  const cust = totalCustomers();
+  $('#endTitle').textContent = won ? 'TOTAL COVERAGE' : 'BROKEN UP';
+  $('#endTitle').style.color = won ? '#FFD700' : '#FF5C4E';
+  $('#endBlurb').textContent = won
+    ? 'Every state, every territory, every Australian. The ACCC is still writing its report, but you got there first. Somewhere in the Pilbara a tower hums quietly to itself.'
+    : 'The Pushback hit 100%. Optus is broken into four regional carriers, the board resigns by media release, and Telstra buys the naming rights back at a discount.';
+  $('#eCust').textContent  = fmt(cust);
+  $('#eShare').textContent = ((cust/TOTAL_POP)*100).toFixed(1) + '%';
+  $('#eDays').textContent  = G.day;
+  $('#ePush').textContent  = G.pushback.toFixed(0) + '%';
+  $('#end').classList.add('show');
+  news(won ? 'Optus reaches 100% market share. The phrase "the Optus network" now simply means "the network".'
+           : 'Optus broken up by order of the Federal Court. Ollie is retained by the new NSW entity.');
+  blip(won ? 880 : 110, 0.6, won ? 'triangle' : 'sawtooth', 0.06);
+}
+
+/* ------------------------------ 21. BOOT -------------------------------- */
+let chosenDiff = 'normal';
+$$('.diff').forEach(b => b.onclick = ()=>{
+  chosenDiff = b.dataset.diff;
+  $$('.diff').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+});
+
+function boot(){
+  newGame(chosenDiff);
+  buildMap();
+  selected = null;
+  $('#panel').classList.remove('show');
+  $('#toasts').innerHTML = '';
+  queue.length = 0;
+  $('#intro').classList.remove('show');
+  $('#end').classList.remove('show');
+  $('#pick').classList.add('show');
+  setSpeed(1);
+  render();
+  news('Optus board approves a national rollout. Difficulty: ' + G.diff.label + '. Pick a state to begin.');
+}
+
+$('#btnStart').onclick = ()=>{ boot(); blip(600,0.14,'triangle',0.05); };
+$('#btnAgain').onclick = ()=>{ $('#end').classList.remove('show'); $('#intro').classList.add('show'); };
+
+/* prime the map behind the title card so it isn't an empty box */
+newGame('normal');
+buildMap();
+render();
+G.phase = 'idle';
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
