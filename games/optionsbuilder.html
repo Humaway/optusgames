@@ -105,7 +105,19 @@ button{font:inherit;cursor:pointer}
 .row .svc select:hover{background:#E6F6F8;box-shadow:none}
 .row .svc select.second{background:#FFF6D6;border-color:#EBD48A;color:#7a5b00}
 .row .svc select.existing{background:#F1F1F1;border-color:#D8D8D8;color:#5c6a6c}
-.rowdel{border:0;background:transparent;color:#9aa6a8;font-size:13px;line-height:1;padding:0 2px;visibility:hidden}
+.rowdel,.rowswap{border:0;background:transparent;color:#9aa6a8;font-size:13px;line-height:1;padding:0 2px;visibility:hidden}
+.row:hover .rowswap{visibility:visible}
+.rowswap:hover{color:var(--teal-deep)}
+.needplan{
+  font-family:var(--ui-font);font-size:9.5px;border:1px solid #EBC98A;background:#FFF6E2;color:#8a5c00;
+  border-radius:999px;padding:0 6px;cursor:pointer;
+}
+.needplan:hover{background:#FFEFC9}
+.pick-note{
+  display:none;padding:8px 10px;background:#FFF6E2;border-bottom:1px solid #EBD9B4;color:#7a5b00;font-size:12px;
+}
+.pick-note.on{display:block}
+.pick-note b{color:#5c4400}
 .row:hover .rowdel{visibility:visible}
 .rowdel:hover{color:#B3261E}
 .addline{
@@ -253,7 +265,7 @@ textarea.json{width:100%;height:150px;font-family:ui-monospace,Menlo,Consolas,mo
   </div>
 </div>
 
-<p class="hint">Optus's current range is loaded — 97 phones, 13 watches, 15 tablets. Prices I couldn't verify ask for the RRP once, then autofill forever. Each service line carries its own status — <b>1st service</b>, <b>Additional service</b> or <b>Existing service</b> — set it under the description and the eligible discounts apply themselves. The status doesn't print.</p>
+<p class="hint">Optus's current range is loaded — 97 phones, 13 watches, 15 tablets. Prices I couldn't verify ask for the RRP once, then autofill forever. Hover a line for <b>⇄</b> to swap it for something else. Each service line carries its own status — <b>1st service</b>, <b>Additional service</b> or <b>Existing service</b> — set it under the description and the eligible discounts apply themselves. The status doesn't print.</p>
 
 <div class="picker" id="picker">
   <div class="picker-top">
@@ -270,6 +282,7 @@ textarea.json{width:100%;height:150px;font-family:ui-monospace,Menlo,Consolas,mo
       <button data-cat="custom" aria-pressed="false">Custom line</button>
     </div>
   </div>
+  <div class="pick-note" id="pick-note"></div>
   <div class="results" id="pick-res"></div>
 </div>
 
@@ -1444,6 +1457,11 @@ const state = {
    4. ADDING LINES
 ════════════════════════════════════════════════════════════════════ */
 const findIn = (cat, id) => (CAT[cat]||[]).find(d=>d.id===id);
+/* A device can't sit on the sheet without a service to run it. */
+const REQUIRES = {devices:'plans', watches:'dataplans', tablets:'dataplans'};
+const NEED_LABEL = {plans:'mobile plan', dataplans:'data or watch plan'};
+const hasService = (o, cat) => o.items.some(r=>r.kind==='service' && r.refCat===cat);
+const needsPlan = (o, r) => r.kind==='device' && REQUIRES[r.refCat] && !hasService(o, REQUIRES[r.refCat]);
 const promoApplies = (p, term) => !p.terms || !p.terms.length || p.terms.includes(term);
 
 function rowCredit(desc, monthly, term, minMonths, parent){
@@ -1590,6 +1608,10 @@ function statusControl(r){
   }</select></div>`;
 }
 
+function planWarning(r){
+  return `<div class="svc"><button class="needplan" title="Click to add one">needs a ${NEED_LABEL[REQUIRES[r.refCat]]}</button></div>`;
+}
+
 function renderRows(host, o, oi){
   host.innerHTML = '';
   o.items.forEach(r=>{
@@ -1598,11 +1620,14 @@ function renderRows(host, o, oi){
     const t = rowTotal(r);
     div.innerHTML = `
       <div class="c-prod"><input value="${esc(r.product)}" data-f="product" aria-label="Product"></div>
-      <div class="c-desc"><input value="${esc(r.desc)}" data-f="desc" aria-label="Description">${r.kind==='service'?statusControl(r):''}</div>
+      <div class="c-desc"><input value="${esc(r.desc)}" data-f="desc" aria-label="Description">${
+        r.kind==='service' ? statusControl(r) : (needsPlan(o, r) ? planWarning(r) : '')}</div>
       <div class="c-term">${termControl(r)}</div>
       <div class="c-mth ${r.monthly<0?'neg':''}"><input value="${r.monthly.toFixed(2)}" data-f="monthly" inputmode="decimal" aria-label="Price per month"></div>
       <div class="c-wk ${r.monthly<0?'neg':''}">${money(weekly(r.monthly))}</div>
-      <div class="c-tot ${t<0?'neg':''}">${money(t)}<button class="rowdel" title="Remove line">✕</button></div>`;
+      <div class="c-tot ${t<0?'neg':''}">${money(t)}${
+        (r.kind==='device'||r.kind==='service') ? '<button class="rowswap" title="Swap for another product">⇄</button>' : ''
+      }<button class="rowdel" title="Remove line">✕</button></div>`;
     div.querySelector('[data-f="product"]').addEventListener('input', e=>{ r.product = e.target.value; });
     div.querySelector('[data-f="desc"]').addEventListener('input',    e=>{ r.desc = e.target.value; });
     div.querySelector('[data-f="monthly"]').addEventListener('change', e=>{
@@ -1615,9 +1640,21 @@ function renderRows(host, o, oi){
     if(term) term.addEventListener('change', e=>{ setTerm(o, r, parseInt(e.target.value,10)||1); render(); });
     const elig = div.querySelector('[data-f="elig"]');
     if(elig) elig.addEventListener('change', e=>{ r.elig = e.target.value; syncServiceOffers(o, r); render(); });
+    const swapBtn = div.querySelector('.rowswap');
+    if(swapBtn) swapBtn.addEventListener('click', e=>{ e.stopPropagation(); openSwap(swapBtn, oi, r); });
+    const warn = div.querySelector('.needplan');
+    if(warn) warn.addEventListener('click', e=>{
+      e.stopPropagation();
+      const need = REQUIRES[r.refCat];
+      openPicker(warn, oi, {cat:need, query: r.refCat==='watches' ? 'watch' : '',
+        note:`<b>${esc(r.desc)}</b> still needs a ${NEED_LABEL[need]}.`});
+    });
     div.querySelector('.rowdel').addEventListener('click', ()=>{
+      const wasService = r.kind==='service';
       o.items = o.items.filter(x=>x.uid!==r.uid && x.parent!==r.uid);
       render();
+      if(wasService && o.items.some(x=>needsPlan(o, x)))
+        toast('That plan was running a device on this option — add another, or the line has no service');
     });
     host.appendChild(div);
   });
@@ -1708,10 +1745,15 @@ const picker = document.getElementById('picker');
 const pickQ  = document.getElementById('pick-q');
 const pickRes= document.getElementById('pick-res');
 let pickOpt = 0, pickCat = 'all', pickIndex = 0, pickList = [];
+let pending = null;    // device waiting on its plan
+let swapping = null;   // {oi, uid} of the row being replaced
 
-function openPicker(anchor, oi){
-  pickOpt = oi; pickCat = 'all'; pickQ.value = ''; pickIndex = 0;
-  document.querySelectorAll('#pick-tabs button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.cat==='all'));
+function openPicker(anchor, oi, opts){
+  opts = opts || {};
+  pending = null; swapping = null;
+  pickOpt = oi; pickCat = opts.cat || 'all'; pickQ.value = opts.query || ''; pickIndex = 0;
+  setNote(opts.note || '');
+  document.querySelectorAll('#pick-tabs button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.cat===pickCat));
   picker.classList.add('open');
   const r = anchor.getBoundingClientRect(), w = picker.offsetWidth;
   const left = Math.min(r.left + window.scrollX, window.scrollX + document.documentElement.clientWidth - w - 12);
@@ -1720,7 +1762,15 @@ function openPicker(anchor, oi){
   renderResults();
   pickQ.focus();
 }
-const closePicker = () => picker.classList.remove('open');
+function closePicker(){
+  picker.classList.remove('open');
+  pending = null; swapping = null; setNote('');
+}
+function setNote(html){
+  const el = document.getElementById('pick-note');
+  el.innerHTML = html;
+  el.classList.toggle('on', !!html);
+}
 
 function buildList(){
   const q = pickQ.value.trim().toLowerCase();
@@ -1774,7 +1824,7 @@ function renderResults(){
   if(act) act.scrollIntoView({block:'nearest'});
 }
 
-function askPrice(it){
+function askPrice(it, next){
   pickRes.innerHTML = `<div class="pricebox">
       <p class="pb-title">What's the RRP for <b>${esc(it.obj.name)}</b>?</p>
       <div class="pb-row"><span class="dollar">$</span>
@@ -1790,28 +1840,101 @@ function askPrice(it){
     if(!v || v <= 0){ input.focus(); return; }
     it.obj.rrp = r2(v); it.obj.verified = true;
     saveCatalogue();
-    addDeviceLine(pickOpt, it.cat, it.obj);
-    closePicker();
+    const done = next || (()=>{ addDeviceLine(pickOpt, it.cat, it.obj); closePicker(); });
+    done();
     toast(`${it.obj.name} saved at ${money(it.obj.rrp)} — it'll autofill from now on`);
   };
   document.getElementById('rrp-go').addEventListener('click', commit);
   input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); commit(); } });
   document.getElementById('rrp-skip').addEventListener('click', ()=>{
-    addDeviceLine(pickOpt, it.cat, it.obj); closePicker();
+    if(next) next(); else { addDeviceLine(pickOpt, it.cat, it.obj); closePicker(); }
   });
   input.focus();
 }
 
 function choose(i){
   const it = pickList[i]; if(!it) return;
-  if(it.type==='device'){
-    if(!it.obj.rrp){ askPrice(it); return; }
-    addDeviceLine(pickOpt, it.cat, it.obj);
+  if(swapping) return applySwap(it);
+
+  // Mid-chain: a device is waiting for the plan that runs it.
+  if(pending){
+    if(it.type==='service'){
+      const dev = pending; pending = null;
+      addServiceLine(pickOpt, it.cat, it.obj);
+      return placeDevice(dev);
+    }
+    pending = null;
   }
+
+  if(it.type==='device')  return startDevice(it);
   if(it.type==='service') addServiceLine(pickOpt, it.cat, it.obj);
   if(it.type==='extra')   addExtraLine(pickOpt, it.obj);
   if(it.type==='custom')  addCustom(pickOpt);
   closePicker();
+}
+
+/* Phones need a mobile plan; watches and tablets need a data plan.
+   If the column hasn't got one yet, ask for it before the device. */
+function startDevice(it){
+  const need = REQUIRES[it.cat];
+  if(need && !hasService(state.options[pickOpt], need)){
+    pending = it;
+    pickCat = need; pickQ.value = it.cat==='watches' ? 'watch' : ''; pickIndex = 0;
+    document.querySelectorAll('#pick-tabs button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.cat===need));
+    setNote(`<b>${esc(it.obj.name)}</b> needs a ${NEED_LABEL[need]} to run on. Pick one and both lines go on together. `
+          + `<button class="pb-skip" id="need-skip">Add it without a plan</button>`);
+    document.getElementById('need-skip').addEventListener('click', ()=>{ pending = null; placeDevice(it); });
+    renderResults();
+    pickQ.focus();
+    return;
+  }
+  placeDevice(it);
+}
+function placeDevice(it){
+  if(!it.obj.rrp) return askPrice(it, ()=>{ addDeviceLine(pickOpt, it.cat, it.obj); closePicker(); });
+  addDeviceLine(pickOpt, it.cat, it.obj);
+  closePicker();
+}
+
+/* Swapping an existing line for something else, in place. */
+function openSwap(anchor, oi, row){
+  const cat = row.refCat || (row.kind==='device' ? 'devices' : 'plans');
+  openPicker(anchor, oi, {
+    cat,
+    note: `Swapping out <b>${esc(row.desc)}</b> — pick what goes in its place.`
+  });
+  swapping = {oi, uid:row.uid};
+}
+function applySwap(it){
+  if(it.type!=='device' && it.type!=='service'){ toast('Pick a device or a plan to swap in'); return; }
+  if(it.type==='device' && !it.obj.rrp) return askPrice(it, ()=>doSwap(it));
+  doSwap(it);
+}
+function doSwap(it){
+  const target = swapping; if(!target) return;
+  const o = state.options[target.oi];
+  const idx = o.items.findIndex(r=>r.uid===target.uid);
+  if(idx < 0){ closePicker(); return; }
+  const old = o.items[idx];
+  o.items = o.items.filter(r=>r.uid!==old.uid && r.parent!==old.uid);
+
+  let row;
+  if(it.type==='device'){
+    const term = old.kind==='device' ? old.term : 36;
+    row = {uid:++uid, kind:'device', refCat:it.cat, refId:it.obj.id, product:PRODUCT_LABEL[it.cat],
+           desc:it.obj.name, term, minMonths:term, monthly:deviceMonthly(it.obj.rrp, term)};
+    o.items.splice(idx, 0, row);
+    syncDevicePromos(o, row, true);
+  } else {
+    row = {uid:++uid, kind:'service', refCat:it.cat, refId:it.obj.id, product:PRODUCT_LABEL[it.cat],
+           desc:it.obj.name, term:1, minMonths:1, monthly:it.obj.price, elig: old.elig || 'new'};
+    o.items.splice(idx, 0, row);
+    syncServiceOffers(o, row, true);
+  }
+  swapping = null;
+  closePicker();
+  render();
+  toast(`Swapped ${old.desc} for ${row.desc}`);
 }
 
 pickQ.addEventListener('input', ()=>{ pickIndex = 0; renderResults(); });
