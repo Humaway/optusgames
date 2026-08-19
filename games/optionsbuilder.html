@@ -92,7 +92,9 @@ button{font:inherit;cursor:pointer}
 .c-prod{justify-content:flex-start}
 .c-desc{flex-direction:column;align-items:stretch;justify-content:center;gap:2px}
 .c-term,.c-mth,.c-wk{justify-content:center}
-.c-tot{justify-content:flex-end;font-weight:700}
+.c-tot{justify-content:center;font-weight:700;position:relative}
+.c-mth .cell,.c-tot .cell,.c-term .cell{text-align:center}
+.row .c-term select{text-align:center;text-align-last:center}
 .neg{color:#B3261E}
 .row input,.row select,.row .cell{
   font:inherit;font-family:var(--sheet-font);font-size:11px;border:0;background:transparent;
@@ -118,7 +120,12 @@ button{font:inherit;cursor:pointer}
 .row .svc select:hover{background:#E6F6F8;box-shadow:none}
 .row .svc select.second{background:#FFF6D6;border-color:#EBD48A;color:#7a5b00}
 .row .svc select.existing{background:#F1F1F1;border-color:#D8D8D8;color:#5c6a6c}
-.rowdel,.rowswap{border:0;background:transparent;color:#9aa6a8;font-size:13px;line-height:1;padding:0 2px;visibility:hidden}
+.rowdel,.rowswap{
+  border:0;background:transparent;color:#9aa6a8;font-size:13px;line-height:1;padding:0 2px;visibility:hidden;
+  position:absolute;top:50%;transform:translateY(-50%);
+}
+.rowdel{right:1px}
+.rowswap{right:16px}
 .row:hover .rowswap{visibility:visible}
 .rowswap:hover{color:var(--teal-deep)}
 .needplan{
@@ -1585,7 +1592,7 @@ const isFilled = o => o.items.length>0 || o.oneOffs.length>0 || o.tailored.trim(
 /* ══════════════════════════════════════════════════════════════════
    6. RENDER SHEET
 ════════════════════════════════════════════════════════════════════ */
-const COLS   = '13% 33% 9% 12% 12% 21%';
+const COLS   = '12% 31% 8% 14% 14% 21%';
 const TOTCOL = '52% 13% 13% 22%';
 const cols = document.getElementById('cols');
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
@@ -1631,16 +1638,33 @@ function statusControl(r){
 
 /* Keeps a contenteditable cell behaving like a spreadsheet cell: plain text in,
    plain text out, no rich paste, no stray line breaks. */
+function plainPaste(e){
+  e.preventDefault();
+  const t = ((e.clipboardData || window.clipboardData).getData('text') || '').replace(/\s+/g,' ');
+  document.execCommand('insertText', false, t);
+}
+function selectCell(el){
+  const rng = document.createRange(); rng.selectNodeContents(el);
+  const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rng);
+}
 function wireCell(el, set){
   if(!el) return;
   el.addEventListener('input', () => set(el.textContent));
-  el.addEventListener('paste', e => {
-    e.preventDefault();
-    const t = ((e.clipboardData || window.clipboardData).getData('text') || '').replace(/\s+/g,' ');
-    document.execCommand('insertText', false, t);
-  });
+  el.addEventListener('paste', plainPaste);
   el.addEventListener('keydown', e => { if(e.key === 'Enter') e.preventDefault(); });
   el.addEventListener('blur', () => { const v = el.textContent.trim(); el.textContent = v; set(v); });
+}
+/* Money cells show $1,548.72 but hand you the plain number to type over. */
+function wireMoney(el, get, commit){
+  if(!el) return;
+  el.addEventListener('focus', () => { el.textContent = r2(get()).toFixed(2); selectCell(el); });
+  el.addEventListener('paste', plainPaste);
+  el.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); el.blur(); } });
+  el.addEventListener('blur', () => {
+    const v = r2(num(el.textContent));
+    el.textContent = money(v);
+    commit(v);
+  });
 }
 
 function planWarning(r){
@@ -1658,19 +1682,16 @@ function renderRows(host, o, oi){
       <div class="c-desc"><div class="cell" contenteditable="true" data-f="desc" data-ph="Description" role="textbox" aria-label="Description">${esc(r.desc)}</div>${
         r.kind==='service' ? statusControl(r) : (needsPlan(o, r) ? planWarning(r) : '')}</div>
       <div class="c-term">${termControl(r)}</div>
-      <div class="c-mth ${r.monthly<0?'neg':''}"><input value="${money(r.monthly)}" data-f="monthly" inputmode="decimal" aria-label="Price per month"></div>
+      <div class="c-mth ${r.monthly<0?'neg':''}"><div class="cell" contenteditable="true" data-f="monthly" role="textbox" aria-label="Price per month">${money(r.monthly)}</div></div>
       <div class="c-wk ${r.monthly<0?'neg':''}">${money(weekly(r.monthly))}</div>
       <div class="c-tot ${t<0?'neg':''}">${money(t)}${
         (r.kind==='device'||r.kind==='service') ? '<button class="rowswap" title="Swap for another product">⇄</button>' : ''
       }<button class="rowdel" title="Remove line">✕</button></div>`;
     wireCell(div.querySelector('[data-f="product"]'), v=>{ r.product = v; });
     wireCell(div.querySelector('[data-f="desc"]'),    v=>{ r.desc = v; });
-    const mth = div.querySelector('[data-f="monthly"]');
-    mth.addEventListener('focus', e=>{ e.target.value = r.monthly.toFixed(2); e.target.select(); });
-    mth.addEventListener('blur',  e=>{ e.target.value = money(r.monthly); });
-    mth.addEventListener('change', e=>{
-      r.monthly = r2(num(e.target.value));
-      if(r.kind==='credit' && r.monthly>0) r.monthly = -r.monthly;
+    wireMoney(div.querySelector('[data-f="monthly"]'), ()=>r.monthly, v=>{
+      if(r.monthly === v) return;
+      r.monthly = (r.kind==='credit' && v > 0) ? -v : v;
       r.fromCat = false;
       render();
     });
@@ -1743,13 +1764,13 @@ function renderOneOffs(host, o){
       <div class="c-prod"><div class="cell" contenteditable="true" data-f="p" data-ph="Product" role="textbox" aria-label="Product">${esc(f.product||'Misc')}</div></div>
       <div class="c-desc"><div class="cell" contenteditable="true" data-f="d" data-ph="Description" role="textbox" aria-label="Description">${esc(f.desc)}</div></div>
       <div class="c-term">1</div><div class="c-mth"></div><div class="c-wk"></div>
-      <div class="c-tot"><input value="${money(+f.amount||0)}" data-f="a" inputmode="decimal" style="text-align:right;font-weight:700" aria-label="Amount"><button class="rowdel" title="Remove line">✕</button></div>`;
+      <div class="c-tot"><div class="cell" contenteditable="true" data-f="a" role="textbox" aria-label="Amount">${money(+f.amount||0)}</div><button class="rowdel" title="Remove line">✕</button></div>`;
     wireCell(div.querySelector('[data-f="p"]'), v=>{ f.product = v; });
     wireCell(div.querySelector('[data-f="d"]'), v=>{ f.desc = v; });
-    const amt = div.querySelector('[data-f="a"]');
-    amt.addEventListener('focus', e=>{ e.target.value = (+f.amount||0).toFixed(2); e.target.select(); });
-    amt.addEventListener('blur',  e=>{ e.target.value = money(+f.amount||0); });
-    amt.addEventListener('change', e=>{ f.amount = r2(num(e.target.value)); render(); });
+    wireMoney(div.querySelector('[data-f="a"]'), ()=>(+f.amount||0), v=>{
+      if((+f.amount||0) === v) return;
+      f.amount = v; render();
+    });
     div.querySelector('.rowdel').addEventListener('click', ()=>{ o.oneOffs = o.oneOffs.filter(x=>x!==f); render(); });
     host.appendChild(div);
   });
