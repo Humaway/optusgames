@@ -1,0 +1,2053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CCT &mdash; Customer Champion Tool &mdash; Yes Optus Redcliffe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ==================================================================
+   CCT Form web app - single file, vanilla JS + CSS
+   ================================================================== */
+:root{
+  --teal:#00838f;
+  --teal-dark:#0d4c53;
+  --cyan:#00a9b4;
+  --panel:#e3eaed;
+  --panel-alt:#eef2f4;
+  --field:#e9eef1;
+  --line:#c9d3d8;
+  --yellow:#ffd400;
+  --navy:#16293a;
+  --blue:#1668b5;
+  --blue-dark:#0d4f8b;
+  --grey-dark:#54585c;
+  --pink:#ec5a6b;
+  --ink:#222629;
+  --muted:#6b7378;
+  --shadow:0 1px 3px rgba(0,0,0,.12);
+  --sans:'Poppins',system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--sans);
+  color:var(--ink);
+  background:#fff;
+  font-size:15px;
+  line-height:1.4;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+
+.shell{max-width:1340px;margin:0 auto;padding:18px 16px 60px}
+
+/* ---------- store header + tabs ---------- */
+.store-head h1{font-size:27px;font-weight:700;margin:0 0 8px;letter-spacing:-.2px}
+.store-head p{margin:0 0 3px;font-size:15px;color:#333}
+.store-head p b{font-weight:600;color:#111}
+
+.top-tabs{display:flex;gap:0;margin-top:16px;border-bottom:1px solid #dfe3e6}
+.top-tab{
+  flex:1;text-align:center;padding:10px 6px 12px;font-size:14px;font-weight:600;
+  color:#1c1f22;background:none;border:0;border-bottom:3px solid transparent;cursor:default;
+}
+.top-tab.active{border-bottom-color:var(--pink)}
+
+/* ---------- identity strip ---------- */
+.who{
+  display:flex;align-items:center;justify-content:flex-end;gap:8px;
+  font-size:13px;color:var(--muted);padding:6px 2px 0;
+}
+.who b{color:#1c1f22;font-weight:600}
+.who button{background:none;border:0;color:var(--blue);cursor:pointer;font-size:13px;padding:0;text-decoration:underline}
+
+/* ---------- section nav buttons ---------- */
+.navrow{display:flex;align-items:center;gap:0;margin:20px 0 14px;flex-wrap:wrap}
+.navbtn{
+  min-width:136px;padding:11px 16px;margin-right:82px;
+  background:#fff;border:1px solid #ced4d9;border-radius:6px;
+  color:var(--blue);font-size:15px;font-weight:500;cursor:pointer;
+}
+.navbtn:last-of-type{margin-right:0}
+.navbtn:hover{background:#f5f8fa}
+.navbtn.active{border:2px solid var(--blue-dark);background:#f2f7fb;color:var(--blue-dark);font-weight:600}
+.navspacer{flex:1 1 40px}
+
+.searchbox{
+  position:relative;display:flex;align-items:center;
+  min-width:420px;border:1px solid #ced4d9;border-radius:6px;background:#fff;padding:0 10px 0 0;
+}
+.searchbox .avatar{
+  width:26px;height:26px;border-radius:4px;background:var(--cyan);margin:8px 10px 8px 8px;
+  display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex:0 0 auto;
+}
+.searchbox input{
+  flex:1;border:0;outline:0;font-family:inherit;font-size:15px;color:#333;padding:12px 4px;background:transparent;
+}
+.searchbox input::placeholder{color:#8b9299}
+.searchbox .mag{color:#4a5157;font-size:18px;padding:0 4px}
+
+/* ---------- form (new form page) ---------- */
+.newform{margin-top:6px;max-width:1120px}
+.fieldgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 165px;max-width:840px}
+.field{margin-bottom:26px}
+.field label{display:block;font-size:15px;color:#2b2f33;margin-bottom:8px}
+.req{color:#c0392b}
+.field input[type=text],
+.field input[type=tel],
+.field select,
+.field textarea{
+  width:100%;font-family:inherit;font-size:15px;color:#222;
+  border:1px solid #ced4d9;border-radius:6px;padding:10px 12px;background:#fff;
+}
+.field select{height:42px;padding:8px 12px}
+.field textarea{min-height:80px;resize:vertical}
+.field.wide{max-width:660px}
+.field.narrow{max-width:415px}
+.err{color:#c0392b;font-size:13px;margin-top:6px;display:none}
+.field.invalid .err{display:block}
+.field.invalid input,.field.invalid select,.field.invalid textarea{border-color:#c0392b}
+
+.createrow{display:flex;gap:135px;align-items:flex-start;margin-top:4px}
+.btn-yellow{
+  background:var(--yellow);color:#0a6c7a;border:0;border-radius:3px;
+  padding:15px 34px;font-size:19px;font-weight:600;letter-spacing:.4px;cursor:pointer;
+}
+.btn-yellow:hover{filter:brightness(.96)}
+.createrow .btn-yellow{margin-top:31px;flex:0 0 auto}
+
+/* ---------- data tables ---------- */
+.dtable{width:100%;border-collapse:collapse;border:1px solid #dfe3e6;margin-top:4px}
+.dtable th{
+  text-align:center;font-size:19px;font-weight:600;color:#1c1f22;
+  padding:16px 10px;border-bottom:1px solid #dfe3e6;background:#fff;white-space:nowrap;
+}
+.dtable th button{
+  background:none;border:0;font:inherit;color:inherit;cursor:pointer;padding:0;
+  display:inline-flex;align-items:center;gap:6px;
+}
+.dtable th .arrow{font-size:15px;color:#1c1f22}
+.dtable td{
+  text-align:center;padding:14px 10px;border-bottom:1px solid #e6eaed;font-size:15px;color:#2b2f33;vertical-align:middle;
+}
+.dtable tr:last-child td{border-bottom:0}
+.sub{display:block;font-size:12px;color:var(--muted);margin-top:3px}
+.btn-teal{
+  background:var(--cyan);color:#fff;border:0;border-radius:4px;padding:11px 20px;
+  font-size:14px;font-weight:500;cursor:pointer;
+}
+.btn-teal:hover{filter:brightness(.94)}
+.btn-blue{
+  background:var(--blue);color:#fff;border:0;border-radius:4px;padding:11px 26px;
+  font-size:15px;font-weight:500;cursor:pointer;
+}
+.btn-blue:hover{filter:brightness(.94)}
+.iconbtn{
+  background:none;border:0;cursor:pointer;color:var(--grey-dark);font-size:18px;padding:6px 8px;line-height:1;
+}
+.iconbtn:hover{color:#c0392b}
+.linkbtn{background:none;border:0;color:var(--blue);cursor:pointer;font-size:13px;text-decoration:underline;padding:2px}
+.actioncell{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap}
+.pill-editing{
+  display:inline-block;background:#fff5d6;border:1px solid #e8d071;color:#7a5c00;
+  font-size:11px;padding:2px 8px;border-radius:10px;margin-top:5px;white-space:nowrap;
+}
+.emptystate{padding:44px 10px;text-align:center;color:var(--muted);font-size:15px}
+.emptystate b{display:block;color:#1c1f22;font-size:17px;font-weight:600;margin-bottom:6px}
+
+/* ---------- banners / toasts / modal ---------- */
+.banner{
+  border:1px solid #e2c14a;background:#fdf6dd;color:#5c4a06;border-radius:6px;
+  padding:14px 16px;margin:14px 0;font-size:14px;line-height:1.55;
+}
+.banner b{display:block;font-size:15px;margin-bottom:5px;color:#4a3c05}
+.banner code{background:#fff;border:1px solid #e6dcb3;border-radius:3px;padding:1px 5px;font-size:13px}
+.banner.info{border-color:#a9c8e6;background:#eef5fc;color:#204a70}
+.banner.info b{color:#173a58}
+
+#toasts{position:fixed;right:18px;bottom:18px;z-index:60;display:flex;flex-direction:column;gap:8px}
+.toast{
+  background:var(--navy);color:#fff;padding:12px 18px;border-radius:6px;font-size:14px;
+  box-shadow:0 6px 20px rgba(0,0,0,.22);animation:tin .2s ease-out;max-width:340px;
+}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+.modal-back{position:fixed;inset:0;background:rgba(12,20,28,.5);display:flex;align-items:center;justify-content:center;z-index:70;padding:16px}
+.modal{background:#fff;border-radius:8px;max-width:460px;width:100%;padding:24px;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+.modal h3{margin:0 0 10px;font-size:19px;font-weight:600}
+.modal p{margin:0 0 16px;font-size:14px;color:#444;line-height:1.55}
+.modal input[type=text]{width:100%;font-family:inherit;font-size:15px;padding:10px 12px;border:1px solid #ced4d9;border-radius:6px}
+.modal .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+.btn-navy{background:var(--navy);color:#fff;border:0;border-radius:4px;padding:11px 22px;font-size:15px;font-weight:600;cursor:pointer}
+.btn-ghost{background:#fff;color:#333;border:1px solid #ced4d9;border-radius:4px;padding:11px 22px;font-size:15px;cursor:pointer}
+
+/* ==================================================================
+   CCT FORM EDITOR
+   ================================================================== */
+.editor-top{display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px;gap:12px}
+.btn-outline{
+  background:#fff;border:1px solid #ced4d9;border-radius:6px;color:var(--blue);
+  padding:11px 20px;font-size:15px;cursor:pointer;
+}
+.btn-outline:hover{background:#f5f8fa}
+.btn-refresh{
+  background:var(--blue);color:#fff;border:0;border-radius:4px;width:42px;height:38px;
+  font-size:18px;cursor:pointer;line-height:1;
+}
+.btn-refresh:hover{filter:brightness(.94)}
+
+.stickybar{
+  position:sticky;top:0;z-index:30;background:#fff;border-bottom:1px solid #e0e5e8;
+  display:flex;align-items:center;gap:14px;padding:9px 2px;margin-bottom:6px;flex-wrap:wrap;
+}
+.stickybar .cctid{font-size:14px;font-weight:600;color:#1c1f22}
+.stickybar .cctid span{font-weight:400;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px}
+.status-chip{
+  font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px;text-transform:uppercase;letter-spacing:.4px;
+}
+.status-chip.inProgress{background:#e0f5f6;color:#046570;border:1px solid #a9dfe3}
+.status-chip.completed{background:#e6f2e6;color:#256029;border:1px solid #abd6ad}
+.saveind{margin-left:auto;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:7px}
+.saveind .dot{width:8px;height:8px;border-radius:50%;background:#9aa4aa;flex:0 0 auto}
+.saveind.saving .dot{background:#e2a03f}
+.saveind.saved .dot{background:#3f9c47}
+.saveind.offline .dot{background:#c0392b}
+.readonly-note{font-size:13px;color:#7a5c00;background:#fdf6dd;border:1px solid #e2c14a;padding:4px 10px;border-radius:12px}
+
+/* --- hero --- */
+.cct-hero{display:grid;grid-template-columns:1fr 1fr;gap:30px;align-items:start;margin:14px 0 22px}
+.hero-word{
+  font-size:74px;line-height:1.14;font-weight:700;color:var(--teal);letter-spacing:-1px;margin:0;
+}
+.hero-marks{display:flex;align-items:center;gap:46px;margin-top:26px}
+.yes-logo{font-size:64px;line-height:1;color:var(--yellow);font-style:italic;font-weight:700;font-family:'Brush Script MT','Segoe Script',cursive}
+.badge{
+  width:196px;height:196px;border-radius:50%;background:var(--teal);position:relative;
+  display:flex;align-items:center;justify-content:center;flex:0 0 auto;
+}
+.badge .inner{width:150px;height:150px;border-radius:50%;background:var(--yellow);display:flex;align-items:center;justify-content:center}
+.badge .tick{font-size:74px;color:var(--teal);line-height:1;margin-top:-6px}
+.badge svg{position:absolute;inset:0;width:100%;height:100%}
+.badge text{fill:#fff;font-size:11.5px;font-weight:700;letter-spacing:1.6px;font-family:var(--sans)}
+
+/* --- header details panel --- */
+.detail-panel{background:var(--panel);padding:16px 14px}
+.detail-row{display:grid;grid-template-columns:minmax(120px,1fr) 1.35fr;align-items:center;gap:10px;margin-bottom:11px}
+.detail-row:last-child{margin-bottom:0}
+.detail-row label{font-size:16px;font-weight:600;color:var(--teal)}
+.detail-row input,.detail-row select{
+  width:100%;font-family:inherit;font-size:15px;color:#3b4247;background:var(--field);
+  border:1px solid #d3dade;border-radius:5px;padding:9px 11px;
+}
+.detail-row select{height:40px}
+
+/* --- section headers --- */
+.sec-head{
+  background:var(--teal);color:#fff;font-size:15px;font-weight:600;padding:10px 14px;margin:0;
+}
+.sec-head.center{text-align:center}
+.sec-head.dark{background:var(--teal-dark)}
+.sec-head.cyan{background:var(--cyan)}
+.sec-head.grey{background:var(--grey-dark)}
+.sec-head.upper{text-transform:uppercase;letter-spacing:.4px}
+
+.bigarea{width:100%;font-family:inherit;font-size:15px;color:#333;border:1px solid #d7dde1;padding:12px 14px;resize:vertical}
+.bigarea::placeholder{color:#8a8177}
+.h-260{min-height:260px}
+.h-250{min-height:250px}
+.h-110{min-height:110px}
+.h-72{min-height:72px}
+.block{margin-bottom:22px}
+
+/* --- FORD --- */
+.ford-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.ford-grid textarea{min-height:106px;border:1px solid #d7dde1;margin:0}
+
+/* --- question table + additional info --- */
+.qwrap{display:grid;grid-template-columns:2fr 1fr;gap:0;align-items:stretch}
+.qtable{display:flex;flex-direction:column}
+.qrow{display:grid;grid-template-columns:1fr 17.2% 16.8%;background:var(--panel);border-bottom:2px solid #fff}
+.qrow:last-child{border-bottom:0}
+.qlabel{
+  padding:12px 14px;font-size:16px;font-weight:600;color:var(--teal);display:flex;align-items:center;
+  border-right:2px solid #fff;
+}
+.qcell{
+  padding:12px 10px;display:flex;align-items:center;gap:9px;justify-content:flex-start;
+  border-right:2px solid #fff;
+}
+.qcell:last-child{border-right:0}
+.qcell.span2{grid-column:span 2}
+.qcell.stack{flex-direction:column;align-items:flex-start;gap:7px}
+.qcell label{display:flex;align-items:center;gap:9px;font-size:15px;color:#2b2f33;cursor:pointer}
+.qlabel.span2{grid-column:span 2;border-right:2px solid #fff}
+.qrow.sq{grid-template-columns:auto auto auto 1fr}
+.qrow.sq .sqlabel{padding:12px 14px;font-size:16px;font-weight:600;color:var(--teal);display:flex;align-items:center;border-right:2px solid #fff}
+.qrow.sq .sqinput{display:flex;align-items:center;padding:8px 10px;border-right:2px solid #fff}
+.qrow.sq .sqinput input{width:160px;border:1px solid #ced4d9;border-radius:5px;padding:9px 10px;font-family:inherit;font-size:15px;background:#fff}
+.qrow.sq .sqopts{display:flex;align-items:center;gap:16px;padding:12px 10px;flex-wrap:wrap}
+.qrow.sq .sqopts label{display:flex;align-items:center;gap:8px;font-size:15px;cursor:pointer}
+.addinfo{display:flex;flex-direction:column}
+.addinfo textarea{flex:1;min-height:120px;border:1px solid #d7dde1;font-family:inherit;font-size:15px;padding:10px 12px;resize:vertical}
+.addinfo .spacer{height:0}
+
+/* --- checkbox styling --- */
+input[type=checkbox]{
+  appearance:none;-webkit-appearance:none;width:19px;height:19px;flex:0 0 auto;
+  border:1px solid #b7c2c8;border-radius:3px;background:#fff;cursor:pointer;position:relative;margin:0;
+}
+input[type=checkbox]:checked::after{
+  content:"";position:absolute;left:5px;top:1px;width:6px;height:11px;
+  border:solid var(--teal);border-width:0 2.5px 2.5px 0;transform:rotate(45deg);
+}
+input[type=checkbox]:disabled{background:#f1f3f5;cursor:not-allowed}
+
+/* --- visit outcome --- */
+.visit-outcome{max-width:445px}
+.visit-outcome .opts{display:flex;gap:64px;padding:14px 18px;background:#f4f5f6;border:1px solid #e2e6e8;border-top:0}
+.visit-outcome .opts label{display:flex;align-items:center;gap:10px;font-size:15px;cursor:pointer}
+
+/* --- big check bars --- */
+.barrow{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:14px}
+.checkbar{display:flex;align-items:center;gap:11px;padding:11px 14px;color:#fff;font-size:15px;font-weight:600;letter-spacing:.3px}
+.checkbar.dark{background:var(--teal-dark)}
+.checkbar.cyan{background:var(--cyan)}
+.checkbar label{cursor:pointer}
+
+/* --- DE number row --- */
+.derow{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:14px}
+.decell{display:grid;grid-template-columns:1fr 1.35fr;align-items:center;background:var(--panel);border-right:2px solid #fff}
+.decell:last-child{border-right:0}
+.decell span{padding:12px 14px;font-size:16px;font-weight:600;color:var(--teal)}
+.decell input{
+  margin:8px 10px 8px 0;width:calc(100% - 10px);background:var(--field);border:1px solid #d3dade;
+  border-radius:5px;padding:9px 11px;font-family:inherit;font-size:15px;color:#3b4247;
+}
+
+/* --- two column check panels --- */
+.twocol{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:26px}
+.colpanel{border-right:2px solid #fff}
+.colpanel:last-child{border-right:0}
+.checklist{padding:14px 14px 8px}
+.checklist label{display:flex;align-items:flex-start;gap:11px;margin-bottom:11px;font-size:15px;color:#5a544c;line-height:1.35;cursor:pointer}
+.checklist label input{margin-top:1px}
+.visionid{display:flex;align-items:center;gap:20px;padding:6px 14px 14px}
+.visionid span{font-size:14px;font-weight:600;color:#3b4247;white-space:nowrap}
+.visionid input{
+  flex:0 1 330px;border:1px solid #ced4d9;border-radius:5px;padding:11px 12px;font-family:inherit;font-size:15px;background:#fff;
+}
+
+/* --- order processed --- */
+.orderrow{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-bottom:26px}
+.ordercell{display:grid;grid-template-columns:1fr 1.35fr;align-items:center;background:var(--panel);border-right:2px solid #fff}
+.ordercell:last-child{border-right:0}
+.ordercell span{padding:14px;font-size:16px;font-weight:600;color:var(--teal)}
+.ordercell input{
+  margin:8px 10px 8px 0;width:calc(100% - 10px);background:var(--field);border:1px solid #d3dade;
+  border-radius:5px;padding:10px 11px;font-family:inherit;font-size:15px;color:#3b4247;
+}
+
+/* --- compliance check half width --- */
+.halfblock{max-width:660px;margin-bottom:26px}
+.contract-list{padding:16px 4px 4px}
+.contract-list label{display:flex;align-items:flex-start;gap:14px;margin-bottom:16px;font-size:15px;color:#5a544c;line-height:1.35;cursor:pointer;text-transform:none}
+
+/* --- device processed --- */
+.devtable{width:100%;border-collapse:separate;border-spacing:2px;background:#fff}
+.devtable th{
+  background:var(--panel);color:var(--teal);font-size:16px;font-weight:600;text-align:left;
+  padding:11px 14px;
+}
+.devtable th.blank{background:#fff}
+.devtable td.rowlabel{background:var(--panel);color:var(--teal);font-size:16px;font-weight:600;padding:11px 14px;width:33%}
+.devtable td.cell{background:var(--panel);padding:6px 8px}
+.devtable td.cell input{
+  width:100%;background:var(--field);border:1px solid #d3dade;border-radius:5px;
+  padding:9px 10px;font-family:inherit;font-size:15px;color:#3b4247;
+}
+
+/* --- device fulfilment --- */
+.fulfil{max-width:660px;margin-bottom:26px}
+.fulfil .opts{padding:14px 4px 4px}
+.fulfil .opts label{display:flex;align-items:center;gap:12px;margin-bottom:11px;font-size:15px;color:#5a544c;cursor:pointer}
+
+/* --- notes / tofu --- */
+.tofurow{display:grid;grid-template-columns:1fr 1fr;gap:2px;background:#fff}
+.tofucell{display:flex;align-items:center;background:var(--panel);padding:4px}
+.tofucell input{
+  width:100%;background:transparent;border:0;outline:0;font-family:inherit;font-size:15px;color:#3b4247;padding:11px 12px;
+}
+.tofucell input::placeholder{color:#7d848a}
+
+/* --- footer --- */
+.cct-footer{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-top:34px;flex-wrap:wrap}
+.footer-logo{display:flex;align-items:center;gap:12px}
+.footer-logo .yes{font-size:44px;color:var(--yellow);font-style:italic;font-weight:700;font-family:'Brush Script MT','Segoe Script',cursive;line-height:1}
+.footer-logo .optus{font-size:33px;font-weight:700;color:var(--teal);letter-spacing:-.5px}
+.footer-btns{display:flex;gap:22px;flex-wrap:wrap}
+.btn-sao{background:var(--yellow);color:var(--navy);border:0;border-radius:3px;padding:15px 30px;font-size:19px;font-weight:600;cursor:pointer;letter-spacing:.3px}
+.btn-dark{background:var(--navy);color:#fff;border:0;border-radius:3px;padding:15px 40px;font-size:19px;font-weight:600;cursor:pointer;letter-spacing:.3px}
+.btn-dark:hover,.btn-sao:hover{filter:brightness(.93)}
+.backlink{margin-top:18px;display:inline-block;font-size:15px}
+
+.notfound{padding:70px 10px;text-align:center}
+.notfound h2{font-size:24px;margin:0 0 10px}
+.notfound p{color:var(--muted);margin:0 0 20px}
+
+/* ==================================================================
+   RESPONSIVE  (usable to 768px; stacked cards below that)
+   ================================================================== */
+@media (max-width:1100px){
+  .navbtn{margin-right:22px}
+  .searchbox{min-width:280px}
+  .hero-word{font-size:56px}
+}
+@media (max-width:900px){
+  .cct-hero{grid-template-columns:1fr}
+  .hero-word{font-size:48px}
+  .badge{width:150px;height:150px}
+  .badge .inner{width:114px;height:114px}
+  .badge .tick{font-size:56px}
+  .qwrap{grid-template-columns:1fr}
+  .twocol,.derow,.orderrow,.barrow,.ford-grid{grid-template-columns:1fr}
+  .colpanel{border-right:0}
+  .decell,.ordercell{border-right:0;border-bottom:2px solid #fff}
+  .fieldgrid{grid-template-columns:1fr;gap:0}
+  .createrow{gap:20px}
+}
+@media (max-width:768px){
+  .shell{padding:14px 12px 50px}
+  .navrow{gap:10px}
+  .navbtn{margin-right:0;flex:1 1 44%;min-width:0}
+  .searchbox{min-width:100%;order:9}
+  .qrow{grid-template-columns:1fr}
+  .qlabel,.qlabel.span2{border-right:0;border-bottom:2px solid #fff}
+  .qcell,.qcell.span2{grid-column:auto;border-right:0}
+  .qrow.sq{grid-template-columns:1fr}
+  .qrow.sq .sqlabel,.qrow.sq .sqinput{border-right:0;border-bottom:2px solid #fff}
+  .detail-row{grid-template-columns:1fr}
+  .visit-outcome .opts{gap:26px}
+  .footer-btns{gap:12px}
+  .btn-dark,.btn-sao{padding:13px 22px;font-size:16px}
+
+  /* tables -> stacked cards */
+  .dtable,.dtable tbody,.dtable tr,.dtable td{display:block;width:100%}
+  .dtable thead{display:none}
+  .dtable{border:0}
+  .dtable tr{border:1px solid #dfe3e6;border-radius:8px;margin-bottom:12px;padding:6px 4px;background:#fff}
+  .dtable td{
+    display:flex;justify-content:space-between;align-items:center;gap:14px;text-align:right;
+    border-bottom:1px solid #eef1f3;padding:10px 12px;
+  }
+  .dtable td:last-child{border-bottom:0}
+  .dtable td::before{
+    content:attr(data-label);font-weight:600;color:#1c1f22;text-align:left;font-size:13px;flex:0 0 auto;
+  }
+  .dtable td.empty-cell{display:block;text-align:center}
+  .dtable td.empty-cell::before{content:none}
+  .devtable{display:block;overflow-x:auto;white-space:nowrap}
+}
+
+/* ==================================================================
+   PRINT  (A4, one form per page, nav + buttons hidden)
+   ================================================================== */
+@media print{
+  @page{size:A4 portrait;margin:10mm}
+  html,body{background:#fff}
+  body{font-size:10.5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .no-print,.top-tabs,.navrow,.who,.editor-top,.stickybar,.cct-footer,#toasts,.modal-back,.banner,.backlink{display:none !important}
+  .shell{max-width:none;padding:0}
+  .cct-form{page-break-after:always}
+  .cct-form:last-child{page-break-after:auto}
+  .block,.qwrap,.twocol,.devtable,.barrow{page-break-inside:avoid}
+  .hero-word{font-size:34px}
+  .badge{width:110px;height:110px}
+  .badge .inner{width:84px;height:84px}
+  .badge .tick{font-size:40px}
+  .bigarea{min-height:0;height:auto}
+  textarea{overflow:hidden}
+  .sec-head{padding:5px 8px;font-size:11px}
+  .qlabel,.decell span,.ordercell span,.devtable th,.devtable td.rowlabel{font-size:11px;padding:5px 8px}
+  input,select,textarea{border-color:#bfc8cd !important;color:#000 !important}
+}
+
+/* extra rules added after the main blocks */
+.qrow.tri{grid-template-columns:1fr 17.2% 16.6% 16.6%}
+.addinfo textarea.ai{min-height:212px}
+.addinfo textarea.mid{min-height:78px}
+.checkbar input[type=checkbox]{border-color:#ffffff}
+.checkbar input[type=checkbox]:checked::after{border-color:var(--teal-dark)}
+.detail-panel input[type=date],.detail-panel input[type=time]{color:#3b4247}
+@media (max-width:768px){.qrow.tri{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toasts"></div>
+<div id="modal-root"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script>
+/* ==========================================================================
+   1.  FIREBASE CONFIG  —  PASTE YOUR OWN PROJECT KEYS IN THIS BLOCK
+   --------------------------------------------------------------------------
+   Firebase console -> Project settings -> Your apps -> Web app -> SDK setup
+   Replace every "PASTE_..." string below. Nothing else in this file needs to
+   change. Until these are replaced the app runs in a local demo mode and
+   shows a banner explaining this.
+   ========================================================================== */
+var firebaseConfig = {
+  apiKey:            "PASTE_YOUR_API_KEY",
+  authDomain:        "PASTE_YOUR_PROJECT.firebaseapp.com",
+  projectId:         "PASTE_YOUR_PROJECT_ID",
+  storageBucket:     "PASTE_YOUR_PROJECT.appspot.com",
+  messagingSenderId: "PASTE_YOUR_SENDER_ID",
+  appId:             "PASTE_YOUR_APP_ID"
+};
+/* ====================== END OF FIREBASE CONFIG ============================ */
+
+/* Store details shown in the page header (from the screenshots). */
+var STORE = { name: 'Yes Optus Redcliffe', dealerCode: 'W0405', manager: 'Chloe Dunn' };
+
+/* The screenshots only ever show "Please Select" in the CCT "Reason for Visit"
+   dropdown, so the list below is a guess. Edit it freely - it is the only
+   place these options are defined. See ASSUMPTIONS at the bottom of the file. */
+var REASON_FOR_VISIT_OPTIONS = [
+  'Billing / Account enquiry',
+  'Technical support / Fault',
+  'New connection',
+  'Upgrade / Recontract',
+  'Plan change',
+  'Device purchase',
+  'Add a service',
+  'Cancellation / Disconnection',
+  'Complaint',
+  'Other'
+];
+var BUSINESS_OR_PERSONAL_OPTIONS = ['Business', 'Personal'];
+
+var COLLECTION = 'ccts';
+var SVR = '__SERVER_TIMESTAMP__';           /* sentinel for "server time" */
+var CONFIGURED = JSON.stringify(firebaseConfig).indexOf('PASTE_') === -1;
+
+/* ==========================================================================
+   2.  SMALL HELPERS
+   ========================================================================== */
+function $(sel, root) { return (root || document).querySelector(sel); }
+function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function toDate(v) {
+  if (!v) return null;
+  if (typeof v.toDate === 'function') return v.toDate();
+  if (typeof v === 'number') return new Date(v);
+  if (v instanceof Date) return v;
+  if (v.seconds) return new Date(v.seconds * 1000);
+  return null;
+}
+function fmtDate(v) {
+  var d = toDate(v); if (!d) return '';
+  var p = function (n) { return (n < 10 ? '0' : '') + n; };
+  return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear();
+}
+function fmtISODate(s) {
+  /* "2026-08-20" -> "20/08/2026" without going near timezones */
+  if (!s || typeof s !== 'string') return '';
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (m[3] + '/' + m[2] + '/' + m[1]) : s;
+}
+function fmtClock(d) {
+  var p = function (n) { return (n < 10 ? '0' : '') + n; };
+  return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+function relTime(v) {
+  var d = toDate(v); if (!d) return '';
+  var s = Math.round((Date.now() - d.getTime()) / 1000);
+  if (s < 10) return 'just now';
+  if (s < 60) return s + ' sec ago';
+  var m = Math.round(s / 60);
+  if (m < 60) return m + ' min ago';
+  var h = Math.round(m / 60);
+  if (h < 24) return h + (h === 1 ? ' hour ago' : ' hours ago');
+  var dd = Math.round(h / 24);
+  return dd + (dd === 1 ? ' day ago' : ' days ago');
+}
+function todayISO() {
+  var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+function nowHM() {
+  var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+  return p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function setDeep(obj, path, value) {
+  var parts = path.split('.'), o = obj;
+  for (var i = 0; i < parts.length - 1; i++) {
+    if (typeof o[parts[i]] !== 'object' || o[parts[i]] === null) o[parts[i]] = {};
+    o = o[parts[i]];
+  }
+  o[parts[parts.length - 1]] = value;
+}
+function toast(msg) {
+  var t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  $('#toasts').appendChild(t);
+  setTimeout(function () { t.remove(); }, 4200);
+}
+
+/* ==========================================================================
+   3.  DATA LAYER
+   Two interchangeable back ends behind one tiny API:
+     - Firestore (when firebaseConfig has been filled in)
+     - a localStorage demo store (so the app still runs before that)
+   Both support live listeners; the demo store syncs across tabs via the
+   window "storage" event, so two-tab concurrent editing works either way.
+   ========================================================================== */
+var db = null, fbInitError = null;
+
+function initFirebase() {
+  if (!CONFIGURED) return false;
+  if (typeof firebase === 'undefined') {
+    fbInitError = 'The Firebase SDK scripts could not be loaded. Check your internet connection.';
+    return false;
+  }
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    db.enablePersistence({ synchronizeTabs: true }).catch(function (e) {
+      console.warn('Offline persistence unavailable:', e.code);
+    });
+    return true;
+  } catch (e) {
+    fbInitError = e.message || String(e);
+    return false;
+  }
+}
+var USING_FIRESTORE = initFirebase();
+
+/* ---------- Firestore adapter ---------- */
+function fsValue(v) {
+  return v === SVR ? firebase.firestore.FieldValue.serverTimestamp() : v;
+}
+function fsPatch(patch) {
+  var out = {};
+  Object.keys(patch).forEach(function (k) { out[k] = fsValue(patch[k]); });
+  return out;
+}
+
+/* ---------- localStorage demo adapter ---------- */
+var DEMO_KEY = 'cct.demo.docs';
+var demoListeners = [];
+function demoAll() {
+  try { return JSON.parse(localStorage.getItem(DEMO_KEY) || '{}'); } catch (e) { return {}; }
+}
+function demoSave(all, silent) {
+  localStorage.setItem(DEMO_KEY, JSON.stringify(all));
+  if (!silent) demoListeners.forEach(function (fn) { fn(); });
+}
+window.addEventListener('storage', function (e) {
+  if (e.key === DEMO_KEY) demoListeners.forEach(function (fn) { fn(); });
+});
+function demoResolve(v) { return v === SVR ? Date.now() : v; }
+
+var Store = {
+  create: function (data) {
+    if (USING_FIRESTORE) {
+      return db.collection(COLLECTION).add(fsPatch(data)).then(function (ref) { return ref.id; });
+    }
+    var all = demoAll();
+    var id = 'demo-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+    var doc = {};
+    Object.keys(data).forEach(function (k) { doc[k] = demoResolve(data[k]); });
+    all[id] = doc;
+    demoSave(all);
+    return Promise.resolve(id);
+  },
+
+  /* patch keys may use dotted paths, e.g. "fields.customerFirstName" */
+  update: function (id, patch) {
+    if (USING_FIRESTORE) return db.collection(COLLECTION).doc(id).update(fsPatch(patch));
+    var all = demoAll();
+    if (!all[id]) return Promise.reject(new Error('not-found'));
+    Object.keys(patch).forEach(function (k) { setDeep(all[id], k, demoResolve(patch[k])); });
+    demoSave(all);
+    return Promise.resolve();
+  },
+
+  remove: function (id) {
+    if (USING_FIRESTORE) return db.collection(COLLECTION).doc(id).delete();
+    var all = demoAll();
+    delete all[id];
+    demoSave(all);
+    return Promise.resolve();
+  },
+
+  /* live list of one status, newest first by orderField */
+  watchList: function (status, orderField, cb, errCb) {
+    if (USING_FIRESTORE) {
+      var stop = null;
+      var subscribe = function (ordered) {
+        var q = db.collection(COLLECTION).where('status', '==', status);
+        if (ordered) q = q.orderBy(orderField, 'desc');
+        return q.onSnapshot(function (snap) {
+          var rows = [];
+          snap.forEach(function (d) { rows.push(Object.assign({ id: d.id }, d.data())); });
+          if (!ordered) {
+            rows.sort(function (a, b) {
+              var x = toDate(a[orderField]), y = toDate(b[orderField]);
+              return (y ? y.getTime() : 0) - (x ? x.getTime() : 0);
+            });
+          }
+          cb(rows);
+        }, function (err) {
+          /* status + orderBy on another field needs a composite index. If it is
+             missing, fall back to sorting in the browser and tell the user. */
+          if (ordered && err.code === 'failed-precondition') {
+            if (errCb) errCb('index');
+            stop = subscribe(false);
+          } else if (errCb) { errCb(err.message || String(err)); }
+        });
+      };
+      stop = subscribe(true);
+      return function () { if (stop) stop(); };
+    }
+    var emit = function () {
+      var all = demoAll(), rows = [];
+      Object.keys(all).forEach(function (id) {
+        if (all[id].status === status) rows.push(Object.assign({ id: id }, all[id]));
+      });
+      rows.sort(function (a, b) {
+        var x = toDate(a[orderField]), y = toDate(b[orderField]);
+        return (y ? y.getTime() : 0) - (x ? x.getTime() : 0);
+      });
+      cb(rows);
+    };
+    demoListeners.push(emit);
+    emit();
+    return function () { demoListeners = demoListeners.filter(function (f) { return f !== emit; }); };
+  },
+
+  /* live single document; cb(dataOrNull, meta) */
+  watchDoc: function (id, cb) {
+    if (USING_FIRESTORE) {
+      return db.collection(COLLECTION).doc(id).onSnapshot({ includeMetadataChanges: true }, function (snap) {
+        cb(snap.exists ? snap.data() : null, {
+          fromCache: snap.metadata.fromCache,
+          hasPendingWrites: snap.metadata.hasPendingWrites
+        });
+      }, function (err) { cb(null, { error: err.message || String(err) }); });
+    }
+    var emit = function () {
+      var all = demoAll();
+      cb(all[id] || null, { fromCache: false, hasPendingWrites: false });
+    };
+    demoListeners.push(emit);
+    emit();
+    return function () { demoListeners = demoListeners.filter(function (f) { return f !== emit; }); };
+  }
+};
+
+/* ==========================================================================
+   4.  IDENTITY  (no accounts in this version - just a name in localStorage)
+   ========================================================================== */
+var NAME_KEY = 'cct.userName';
+function getName() { return (localStorage.getItem(NAME_KEY) || '').trim(); }
+function setName(n) { localStorage.setItem(NAME_KEY, (n || '').trim()); }
+
+function showModal(opts) {
+  /* opts: {title, body, inputValue, inputLabel, confirmText, cancelText,
+            danger, onConfirm(value), dismissible} */
+  var back = document.createElement('div');
+  back.className = 'modal-back';
+  back.innerHTML =
+    '<div class="modal" role="dialog" aria-modal="true" aria-label="' + esc(opts.title) + '">' +
+      '<h3>' + esc(opts.title) + '</h3>' +
+      (opts.body ? '<p>' + opts.body + '</p>' : '') +
+      (opts.input ? '<input type="text" id="modal-input" value="' + esc(opts.inputValue || '') +
+                    '" placeholder="' + esc(opts.placeholder || '') + '" />' +
+                    '<div class="err" id="modal-err" style="display:none"></div>' : '') +
+      '<div class="modal-actions">' +
+        (opts.cancelText ? '<button class="btn-ghost" id="modal-cancel">' + esc(opts.cancelText) + '</button>' : '') +
+        '<button class="btn-navy" id="modal-ok">' + esc(opts.confirmText || 'OK') + '</button>' +
+      '</div>' +
+    '</div>';
+  $('#modal-root').appendChild(back);
+  var input = $('#modal-input', back);
+  if (input) { input.focus(); input.select(); }
+  var close = function () { back.remove(); };
+  var ok = function () {
+    var val = input ? input.value.trim() : null;
+    if (opts.input && opts.required && !val) {
+      var e = $('#modal-err', back); e.style.display = 'block'; e.textContent = opts.requiredMsg || 'This is required.';
+      input.focus();
+      return;
+    }
+    close();
+    if (opts.onConfirm) opts.onConfirm(val);
+  };
+  $('#modal-ok', back).addEventListener('click', ok);
+  var c = $('#modal-cancel', back);
+  if (c) c.addEventListener('click', function () { close(); if (opts.onCancel) opts.onCancel(); });
+  back.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter' && input) { ev.preventDefault(); ok(); }
+    if (ev.key === 'Escape' && opts.cancelText) { close(); if (opts.onCancel) opts.onCancel(); }
+  });
+  if (opts.cancelText) {
+    back.addEventListener('mousedown', function (ev) { if (ev.target === back) { close(); if (opts.onCancel) opts.onCancel(); } });
+  }
+  return back;
+}
+
+function askForName(then) {
+  showModal({
+    title: getName() ? 'Change your name' : 'Who are you?',
+    body: 'Your name is stamped on everything you create, edit and complete. ' +
+          'It is stored on this device only.',
+    input: true, required: true, requiredMsg: 'Enter your name to continue.',
+    placeholder: 'e.g. Luka Conway',
+    inputValue: getName(),
+    confirmText: 'Save name',
+    cancelText: getName() ? 'Cancel' : null,
+    onConfirm: function (v) { setName(v); render(); if (then) then(v); }
+  });
+}
+
+/* ==========================================================================
+   5.  PAGE CHROME  (store header, tabs, nav buttons, search)
+   ========================================================================== */
+var searchState = { inProgress: '', completed: '' };
+
+function chromeHTML(active, search) {
+  var name = getName();
+  var btn = function (key, label, href) {
+    return '<button class="navbtn' + (active === key ? ' active' : '') +
+           '" data-go="' + href + '">' + label + '</button>';
+  };
+  return '' +
+  '<div class="who no-print">' +
+    (name ? 'Signed in as <b>' + esc(name) + '</b> <button id="change-name">change</button>'
+          : '<button id="change-name">Set your name</button>') +
+  '</div>' +
+  '<div class="store-head">' +
+    '<h1>' + esc(STORE.name) + '</h1>' +
+    '<p><b>Store Information:</b> ' + esc(STORE.name) + '</p>' +
+    '<p><b>Dealer Code:</b> ' + esc(STORE.dealerCode) + '</p>' +
+    '<p><b>Store Manager:</b> ' + esc(STORE.manager) + '</p>' +
+  '</div>' +
+  '<div class="top-tabs no-print">' +
+    '<button class="top-tab" disabled>Compliance Forms</button>' +
+    '<button class="top-tab" disabled>Stocktakes</button>' +
+    '<button class="top-tab active">CCT</button>' +
+  '</div>' +
+  '<div class="navrow no-print">' +
+    btn('new', 'New Form', '#/new') +
+    btn('inProgress', 'In Progress', '#/in-progress') +
+    btn('completed', 'Completed', '#/completed') +
+    btn('reports', 'Reports', '#/reports') +
+    (search
+      ? '<div class="navspacer"></div>' +
+        '<div class="searchbox">' +
+          '<span class="avatar" aria-hidden="true">&#128100;</span>' +
+          '<input type="text" id="search-input" placeholder="' + esc(search.placeholder) + '" value="' + esc(search.value || '') + '" aria-label="' + esc(search.placeholder) + '" />' +
+          '<span class="mag" aria-hidden="true">&#128269;</span>' +
+        '</div>'
+      : '') +
+  '</div>';
+}
+
+function bindChrome(root, onSearch) {
+  var cn = $('#change-name', root);
+  if (cn) cn.addEventListener('click', function () { askForName(); });
+  $$('[data-go]', root).forEach(function (b) {
+    b.addEventListener('click', function () { location.hash = b.getAttribute('data-go'); });
+  });
+  var si = $('#search-input', root);
+  if (si && onSearch) si.addEventListener('input', function () { onSearch(si.value); });
+}
+
+function configBanner() {
+  if (CONFIGURED && USING_FIRESTORE) return '';
+  if (CONFIGURED && !USING_FIRESTORE) {
+    return '<div class="banner no-print"><b>Firebase could not start</b>' +
+      esc(fbInitError || 'Unknown error') +
+      '<br />The app is running against a local demo store in this browser instead, so you can still click through it.</div>';
+  }
+  return '<div class="banner no-print"><b>Firebase is not configured yet</b>' +
+    'Open this file in a text editor, find the block marked <code>1. FIREBASE CONFIG</code> at the top of the ' +
+    '<code>&lt;script&gt;</code>, and replace every <code>"PASTE_..."</code> value with the keys from ' +
+    'Firebase console &rarr; Project settings &rarr; Your apps &rarr; Web app &rarr; SDK setup and configuration. ' +
+    'You will also need a Firestore database with a collection called <code>ccts</code>.' +
+    '<br /><br />Until then everything below runs against a <b>local demo store</b> in this browser ' +
+    '(localStorage). It behaves the same way and even syncs live between two tabs on this machine, ' +
+    'but nothing is shared with anyone else.</div>';
+}
+
+/* ==========================================================================
+   6.  ROUTER
+   ========================================================================== */
+var cleanups = [];
+function addCleanup(fn) { cleanups.push(fn); }
+function runCleanups() {
+  cleanups.forEach(function (f) { try { f(); } catch (e) {} });
+  cleanups = [];
+}
+
+function render() {
+  runCleanups();
+  var hash = location.hash || '#/new';
+  var app = $('#app');
+  var m = hash.match(/^#\/cct\/(.+)$/);
+  if (m) return viewCct(app, decodeURIComponent(m[1]));
+  if (hash.indexOf('#/in-progress') === 0) return viewInProgress(app);
+  if (hash.indexOf('#/completed') === 0) return viewCompleted(app);
+  if (hash.indexOf('#/reports') === 0) return viewReports(app);
+  return viewNew(app);
+}
+window.addEventListener('hashchange', render);
+
+/* ==========================================================================
+   7.  NEW FORM PAGE  (image 1)
+   ========================================================================== */
+function viewNew(app) {
+  app.innerHTML =
+    '<div class="shell">' +
+      chromeHTML('new', null) +
+      configBanner() +
+      '<div class="newform">' +
+        '<div class="field narrow" data-f="yourName">' +
+          '<label for="nf-your-name"><span class="req">*</span>Your name</label>' +
+          '<input type="text" id="nf-your-name" value="' + esc(getName()) + '" autocomplete="off" />' +
+          '<div class="err">Enter your name.</div>' +
+        '</div>' +
+        '<div class="fieldgrid">' +
+          '<div class="field" data-f="customerFirstName">' +
+            '<label for="nf-first"><span class="req">*</span>Customer First Name</label>' +
+            '<input type="text" id="nf-first" autocomplete="off" />' +
+            '<div class="err">Enter the customer first name.</div>' +
+          '</div>' +
+          '<div class="field" data-f="customerPhoneNumber">' +
+            '<label for="nf-phone"><span class="req">*</span>Customer Phone Number</label>' +
+            '<input type="text" id="nf-phone" autocomplete="off" inputmode="tel" />' +
+            '<div class="err">Enter the customer phone number.</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="field narrow" data-f="businessOrPersonal">' +
+          '<label for="nf-bop"><span class="req">*</span>Business or Personal</label>' +
+          '<select id="nf-bop">' +
+            '<option value="">Please Select</option>' +
+            BUSINESS_OR_PERSONAL_OPTIONS.map(function (o) { return '<option value="' + esc(o) + '">' + esc(o) + '</option>'; }).join('') +
+          '</select>' +
+          '<div class="err">Choose Business or Personal.</div>' +
+        '</div>' +
+        '<div class="createrow">' +
+          '<div class="field wide" data-f="reasonForVisitSituation" style="flex:1 1 660px">' +
+            '<label for="nf-reason"><span class="req">*</span>Reason for visit - Situation</label>' +
+            '<textarea id="nf-reason" rows="4"></textarea>' +
+            '<div class="err">Describe the reason for the visit.</div>' +
+          '</div>' +
+          '<button class="btn-yellow" id="btn-create">CREATE</button>' +
+          '<button class="btn-yellow" id="btn-create-view">CREATE &amp; VIEW</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  bindChrome(app);
+
+  var mark = function (key, bad) {
+    var el = $('[data-f="' + key + '"]', app);
+    if (el) el.classList.toggle('invalid', !!bad);
+  };
+  var collect = function () {
+    return {
+      yourName: $('#nf-your-name').value.trim(),
+      customerFirstName: $('#nf-first').value.trim(),
+      customerPhoneNumber: $('#nf-phone').value.trim(),
+      businessOrPersonal: $('#nf-bop').value,
+      reasonForVisitSituation: $('#nf-reason').value.trim()
+    };
+  };
+  var validate = function (v) {
+    var ok = true;
+    ['yourName', 'customerFirstName', 'customerPhoneNumber', 'businessOrPersonal', 'reasonForVisitSituation']
+      .forEach(function (k) { var bad = !v[k]; mark(k, bad); if (bad) ok = false; });
+    if (!ok) {
+      var first = $('.field.invalid input, .field.invalid select, .field.invalid textarea', app);
+      if (first) first.focus();
+    }
+    return ok;
+  };
+  ['#nf-your-name', '#nf-first', '#nf-phone', '#nf-bop', '#nf-reason'].forEach(function (sel) {
+    $(sel).addEventListener('input', function () {
+      var f = $(sel).closest('.field');
+      if (f && $(sel).value.trim()) f.classList.remove('invalid');
+    });
+    $(sel).addEventListener('change', function () {
+      var f = $(sel).closest('.field');
+      if (f && $(sel).value.trim()) f.classList.remove('invalid');
+    });
+  });
+
+  var doCreate = function (thenView) {
+    var v = collect();
+    if (!validate(v)) return;
+    setName(v.yourName);
+    var fields = defaultFields();
+    fields.staffName = v.yourName;
+    fields.customerFirstName = v.customerFirstName;
+    fields.phoneNumber = v.customerPhoneNumber;
+    fields.businessOrPersonal = v.businessOrPersonal;
+    fields.reasonForVisitSituation = v.reasonForVisitSituation;
+    fields.date = todayISO();
+    fields.time = nowHM();
+    fields.dealerCode = STORE.dealerCode;
+
+    var doc = {
+      status: 'inProgress',
+      createdAt: SVR,
+      createdBy: v.yourName,
+      updatedAt: SVR,
+      lastEditedBy: v.yourName,
+      completedAt: null,
+      completedBy: null,
+      activeEditor: null,
+      fields: fields
+    };
+    $('#btn-create').disabled = true;
+    $('#btn-create-view').disabled = true;
+    Store.create(doc).then(function (id) {
+      if (thenView) {
+        location.hash = '#/cct/' + id;
+      } else {
+        location.hash = '#/in-progress';
+        toast('CCT created for ' + v.customerFirstName + ' - it is now in In Progress.');
+      }
+    }).catch(function (err) {
+      $('#btn-create').disabled = false;
+      $('#btn-create-view').disabled = false;
+      toast('Could not create the CCT: ' + (err.message || err));
+    });
+  };
+  $('#btn-create').addEventListener('click', function () { doCreate(false); });
+  $('#btn-create-view').addEventListener('click', function () { doCreate(true); });
+}
+
+/* ==========================================================================
+   8.  REPORTS  (button exists in the screenshots, no screen was supplied)
+   ========================================================================== */
+function viewReports(app) {
+  app.innerHTML =
+    '<div class="shell">' + chromeHTML('reports', null) + configBanner() +
+    '<div class="emptystate"><b>Reports isn\'t part of this build</b>' +
+    'No Reports screen was included in the screenshots, so nothing has been invented for it. ' +
+    'Send me that screen and it can be built to match.</div></div>';
+  bindChrome(app);
+}
+
+/* ==========================================================================
+   9.  IN PROGRESS PAGE  (image 2)
+   ========================================================================== */
+function matchesSearch(row, q) {
+  if (!q) return true;
+  var f = row.fields || {};
+  var hay = [f.customerFirstName, f.phoneNumber, f.reasonForVisitSituation, f.reasonForVisit,
+             row.createdBy, row.completedBy, row.lastEditedBy,
+             fmtDate(row.createdAt), fmtDate(row.completedAt)].join(' ').toLowerCase();
+  return hay.indexOf(q.toLowerCase()) !== -1;
+}
+function isBeingEdited(row) {
+  var ae = row.activeEditor;
+  if (!ae || !ae.name || ae.name === getName()) return null;
+  var d = toDate(ae.at);
+  if (!d) return null;
+  return (Date.now() - d.getTime() < 60000) ? ae.name : null;
+}
+function applySort(rows, sort) {
+  if (!sort || !sort.key) return rows;
+  var val = function (r) {
+    if (sort.key === 'customerName') return (r.fields && r.fields.customerFirstName || '').toLowerCase();
+    if (sort.key === 'date') {
+      if (r.fields && r.fields.date) return r.fields.date;
+      var d = toDate(r.createdAt); return d ? d.toISOString().slice(0, 10) : '';
+    }
+    if (sort.key === 'completedDate') { var c = toDate(r.completedAt); return c ? c.getTime() : 0; }
+    return 0;
+  };
+  var copy = rows.slice();
+  copy.sort(function (a, b) {
+    var x = val(a), y = val(b);
+    if (x < y) return sort.dir === 'asc' ? -1 : 1;
+    if (x > y) return sort.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+  return copy;
+}
+
+function viewInProgress(app) {
+  var rows = [], sort = { key: null, dir: 'asc' }, indexWarning = false;
+
+  app.innerHTML =
+    '<div class="shell">' +
+      chromeHTML('inProgress', { placeholder: 'Search InProgress Forms', value: searchState.inProgress }) +
+      configBanner() +
+      '<div id="ip-warn"></div>' +
+      '<div id="ip-table"></div>' +
+    '</div>';
+  bindChrome(app, function (v) { searchState.inProgress = v; draw(); });
+
+  function draw() {
+    var q = searchState.inProgress;
+    var visible = applySort(rows.filter(function (r) { return matchesSearch(r, q); }), sort);
+    var arrow = function (key) {
+      return '<span class="arrow">' + (sort.key === key && sort.dir === 'desc' ? '\u2193' : '\u2191') + '</span>';
+    };
+    var html =
+      '<table class="dtable"><thead><tr>' +
+        '<th><button data-sort="customerName">Customer Name ' + arrow('customerName') + '</button></th>' +
+        '<th><button data-sort="date">Date ' + arrow('date') + '</button></th>' +
+        '<th>Contact Number</th>' +
+        '<th>Reason for Visit</th>' +
+        '<th>Created By</th>' +
+        '<th>Action</th>' +
+      '</tr></thead><tbody>';
+
+    if (!visible.length) {
+      html += '<tr><td colspan="6" class="empty-cell"><div class="emptystate"><b>' +
+        (q ? 'Nothing matches "' + esc(q) + '"' : 'No forms in progress') + '</b>' +
+        (q ? 'Clear the search to see every in-progress form.'
+           : 'Start one on the New Form tab - it will appear here for anyone in store to pick up.') +
+        '</div></td></tr>';
+    } else {
+      visible.forEach(function (r) {
+        var f = r.fields || {};
+        var editing = isBeingEdited(r);
+        html +=
+          '<tr>' +
+            '<td data-label="Customer Name">' + esc(f.customerFirstName || '') + '</td>' +
+            '<td data-label="Date">' + esc(f.date ? fmtISODate(f.date) : fmtDate(r.createdAt)) + '</td>' +
+            '<td data-label="Contact Number">' + esc(f.phoneNumber || '') + '</td>' +
+            '<td data-label="Reason for Visit">' + esc(f.reasonForVisitSituation || '') + '</td>' +
+            '<td data-label="Created By">' + esc(r.createdBy || '') +
+              (r.lastEditedBy ? '<span class="sub">last saved by ' + esc(r.lastEditedBy) + ' &middot; ' + esc(relTime(r.updatedAt)) + '</span>' : '') +
+            '</td>' +
+            '<td data-label="Action">' +
+              '<div class="actioncell">' +
+                '<button class="btn-teal" data-edit="' + esc(r.id) + '">In Progress</button>' +
+                '<button class="iconbtn" data-del="' + esc(r.id) + '" title="Delete this form" aria-label="Delete form for ' + esc(f.customerFirstName || '') + '">&#128465;</button>' +
+              '</div>' +
+              (editing ? '<span class="pill-editing">being edited by ' + esc(editing) + '</span>' : '') +
+            '</td>' +
+          '</tr>';
+      });
+    }
+    html += '</tbody></table>';
+    $('#ip-table').innerHTML = html;
+
+    $$('[data-sort]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var k = b.getAttribute('data-sort');
+        sort = { key: k, dir: (sort.key === k && sort.dir === 'asc') ? 'desc' : 'asc' };
+        draw();
+      });
+    });
+    $$('[data-edit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!getName()) return askForName();
+        location.hash = '#/cct/' + b.getAttribute('data-edit');
+      });
+    });
+    $$('[data-del]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-del');
+        var row = rows.filter(function (r) { return r.id === id; })[0] || { fields: {} };
+        showModal({
+          title: 'Delete this form?',
+          body: 'The in-progress CCT for <b>' + esc(row.fields.customerFirstName || 'this customer') +
+                '</b> will be removed for everyone. This can\'t be undone.',
+          confirmText: 'Delete form', cancelText: 'Keep it',
+          onConfirm: function () {
+            Store.remove(id).then(function () { toast('Form deleted.'); })
+              .catch(function (e) { toast('Could not delete: ' + (e.message || e)); });
+          }
+        });
+      });
+    });
+  }
+
+  draw();
+  addCleanup(Store.watchList('inProgress', 'updatedAt', function (r) {
+    rows = r; draw();
+  }, function (err) {
+    if (err === 'index' && !indexWarning) {
+      indexWarning = true;
+      $('#ip-warn').innerHTML = '<div class="banner info"><b>Sorting in the browser</b>' +
+        'Firestore needs a composite index for <code>status</code> + <code>updatedAt</code>. ' +
+        'Open the browser console and click the link Firestore printed to create it; ' +
+        'until then the list is sorted here instead. Everything else works normally.</div>';
+    } else if (err !== 'index') {
+      $('#ip-warn').innerHTML = '<div class="banner"><b>Could not load the list</b>' + esc(err) + '</div>';
+    }
+  }));
+
+  /* keep the relative "last saved" times honest */
+  var tick = setInterval(draw, 30000);
+  addCleanup(function () { clearInterval(tick); });
+}
+
+/* ==========================================================================
+   10.  COMPLETED PAGE  (image 3)
+   ========================================================================== */
+function viewCompleted(app) {
+  var rows = [], sort = { key: null, dir: 'asc' }, indexWarning = false;
+
+  app.innerHTML =
+    '<div class="shell">' +
+      chromeHTML('completed', { placeholder: 'Search Completed Forms', value: searchState.completed }) +
+      configBanner() +
+      '<div id="cp-warn"></div>' +
+      '<div id="cp-table"></div>' +
+    '</div>';
+  bindChrome(app, function (v) { searchState.completed = v; draw(); });
+
+  function draw() {
+    var q = searchState.completed;
+    var visible = applySort(rows.filter(function (r) { return matchesSearch(r, q); }), sort);
+    var arrow = function (key) {
+      return '<span class="arrow">' + (sort.key === key && sort.dir === 'desc' ? '\u2193' : '\u2191') + '</span>';
+    };
+    var html =
+      '<table class="dtable"><thead><tr>' +
+        '<th><button data-sort="customerName">Customer Name ' + arrow('customerName') + '</button></th>' +
+        '<th><button data-sort="date">Created Date ' + arrow('date') + '</button></th>' +
+        '<th><button data-sort="completedDate">Completed Date ' + arrow('completedDate') + '</button></th>' +
+        '<th>Created By</th>' +
+        '<th>Completed By</th>' +
+        '<th>Action</th>' +
+      '</tr></thead><tbody>';
+
+    if (!visible.length) {
+      html += '<tr><td colspan="6" class="empty-cell"><div class="emptystate"><b>' +
+        (q ? 'Nothing matches "' + esc(q) + '"' : 'No completed forms yet') + '</b>' +
+        (q ? 'Clear the search to see every completed form.'
+           : 'Forms land here once someone submits them from the CCT.') +
+        '</div></td></tr>';
+    } else {
+      visible.forEach(function (r) {
+        var f = r.fields || {};
+        html +=
+          '<tr>' +
+            '<td data-label="Customer Name">' + esc(f.customerFirstName || '') + '</td>' +
+            '<td data-label="Created Date">' + esc(f.date ? fmtISODate(f.date) : fmtDate(r.createdAt)) + '</td>' +
+            '<td data-label="Completed Date">' + esc(fmtDate(r.completedAt)) + '</td>' +
+            '<td data-label="Created By">' + esc(r.createdBy || '') + '</td>' +
+            '<td data-label="Completed By">' + esc(r.completedBy || '') + '</td>' +
+            '<td data-label="Action">' +
+              '<div class="actioncell">' +
+                '<button class="btn-blue" data-view="' + esc(r.id) + '">View</button>' +
+                '<button class="linkbtn" data-reopen="' + esc(r.id) + '">Reopen</button>' +
+              '</div>' +
+            '</td>' +
+          '</tr>';
+      });
+    }
+    html += '</tbody></table>';
+    $('#cp-table').innerHTML = html;
+
+    $$('[data-sort]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var k = b.getAttribute('data-sort');
+        sort = { key: k, dir: (sort.key === k && sort.dir === 'asc') ? 'desc' : 'asc' };
+        draw();
+      });
+    });
+    $$('[data-view]').forEach(function (b) {
+      b.addEventListener('click', function () { location.hash = '#/cct/' + b.getAttribute('data-view'); });
+    });
+    $$('[data-reopen]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (!getName()) return askForName();
+        var id = b.getAttribute('data-reopen');
+        var row = rows.filter(function (r) { return r.id === id; })[0] || { fields: {} };
+        showModal({
+          title: 'Reopen this form?',
+          body: 'The CCT for <b>' + esc(row.fields.customerFirstName || 'this customer') +
+                '</b> goes back to In Progress so it can be edited again.',
+          confirmText: 'Reopen', cancelText: 'Cancel',
+          onConfirm: function () {
+            Store.update(id, {
+              status: 'inProgress', completedAt: null, completedBy: null,
+              updatedAt: SVR, lastEditedBy: getName()
+            }).then(function () {
+              toast('Reopened - it is back in In Progress.');
+              location.hash = '#/in-progress';
+            }).catch(function (e) { toast('Could not reopen: ' + (e.message || e)); });
+          }
+        });
+      });
+    });
+  }
+
+  draw();
+  addCleanup(Store.watchList('completed', 'completedAt', function (r) {
+    rows = r; draw();
+  }, function (err) {
+    if (err === 'index' && !indexWarning) {
+      indexWarning = true;
+      $('#cp-warn').innerHTML = '<div class="banner info"><b>Sorting in the browser</b>' +
+        'Firestore needs a composite index for <code>status</code> + <code>completedAt</code>. ' +
+        'Open the browser console and click the link Firestore printed to create it; ' +
+        'until then the list is sorted here instead.</div>';
+    } else if (err !== 'index') {
+      $('#cp-warn').innerHTML = '<div class="banner"><b>Could not load the list</b>' + esc(err) + '</div>';
+    }
+  }));
+}
+
+/* ==========================================================================
+   11.  THE CCT FORM MARKUP  (images 4-8, one continuous form top to bottom)
+   Every input carries data-field="<camelCaseKeyFromItsLabel>"; the autosave
+   and live-patch code below is generic and driven entirely by those.
+   ========================================================================== */
+function cbx(key, label) {
+  return '<label><input type="checkbox" data-field="' + key + '" /><span>' + label + '</span></label>';
+}
+function devRow(label, keyBase) {
+  var cells = '';
+  for (var i = 1; i <= 4; i++) {
+    cells += '<td class="cell"><input type="text" data-field="' + keyBase + i + '" aria-label="' + label + ' device ' + i + '" /></td>';
+  }
+  return '<tr><td class="rowlabel">' + label + '</td>' + cells + '</tr>';
+}
+
+function cctFormHTML() {
+  return `
+<div class="cct-form">
+
+  <!-- ============ header / hero (image 4) ============ -->
+  <div class="cct-hero">
+    <div>
+      <h2 class="hero-word">Customer<br />Champion<br />Tool</h2>
+      <div class="hero-marks">
+        <span class="yes-logo" aria-label="yes">yes</span>
+        <div class="badge" role="img" aria-label="Tried, tested, proven. Best practice.">
+          <svg viewBox="0 0 200 200" aria-hidden="true">
+            <defs>
+              <path id="cct-arc-top" d="M 24,100 A 76,76 0 0 1 176,100" fill="none" />
+              <path id="cct-arc-bot" d="M 28,100 A 72,72 0 0 0 172,100" fill="none" />
+            </defs>
+            <text><textPath href="#cct-arc-top" startOffset="50%" text-anchor="middle">TRIED &#183; TESTED &#183; PROVEN</textPath></text>
+            <text><textPath href="#cct-arc-bot" startOffset="50%" text-anchor="middle">BEST PRACTICE</textPath></text>
+          </svg>
+          <div class="inner"><span class="tick">&#10003;</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-panel">
+      <div class="detail-row">
+        <label for="fld-staffName">Staff Name</label>
+        <input type="text" id="fld-staffName" data-field="staffName" />
+      </div>
+      <div class="detail-row">
+        <label for="fld-customerFirstName">Customer First Name</label>
+        <input type="text" id="fld-customerFirstName" data-field="customerFirstName" />
+      </div>
+      <div class="detail-row">
+        <label for="fld-phoneNumber">Phone Number</label>
+        <input type="text" id="fld-phoneNumber" data-field="phoneNumber" />
+      </div>
+      <div class="detail-row">
+        <label for="fld-date">Date</label>
+        <input type="date" id="fld-date" data-field="date" />
+      </div>
+      <div class="detail-row">
+        <label for="fld-time">Time</label>
+        <input type="time" id="fld-time" data-field="time" />
+      </div>
+      <div class="detail-row">
+        <label for="fld-reasonForVisit">Reason for Visit</label>
+        <select id="fld-reasonForVisit" data-field="reasonForVisit">
+          <option value="">Please Select</option>
+          ${REASON_FOR_VISIT_OPTIONS.map(function (o) { return '<option value="' + esc(o) + '">' + esc(o) + '</option>'; }).join('')}
+        </select>
+      </div>
+      <div class="detail-row">
+        <label for="fld-businessOrPersonal">Business or Personal</label>
+        <select id="fld-businessOrPersonal" data-field="businessOrPersonal">
+          <option value="">Please Select</option>
+          ${BUSINESS_OR_PERSONAL_OPTIONS.map(function (o) { return '<option value="' + esc(o) + '">' + esc(o) + '</option>'; }).join('')}
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Reason for Visit Situation (images 4-5) ============ -->
+  <div class="block">
+    <h3 class="sec-head center">Reason for Visit Situation</h3>
+    <textarea class="bigarea h-250" data-field="reasonForVisitSituation" aria-label="Reason for Visit Situation"></textarea>
+  </div>
+
+  <!-- ============ F.O.R.D (image 5) ============ -->
+  <div class="block">
+    <h3 class="sec-head">F.O.R.D</h3>
+    <div class="ford-grid">
+      <textarea placeholder="F" data-field="fordF" aria-label="F"></textarea>
+      <textarea placeholder="O" data-field="fordO" aria-label="O"></textarea>
+      <textarea placeholder="R" data-field="fordR" aria-label="R"></textarea>
+      <textarea placeholder="D" data-field="fordD" aria-label="D"></textarea>
+    </div>
+  </div>
+
+  <!-- ============ question table + Additional Information / Mid-point Check (images 5-6) ============ -->
+  <div class="qwrap block">
+    <div class="qtable">
+
+      <div class="qrow">
+        <div class="qlabel span2">Coverage Check completed with full residential address?</div>
+        <div class="qcell">${cbx('coverageCheckCompletedWithFullResidentialAddress', 'Yes')}</div>
+      </div>
+
+      <div class="qrow">
+        <div class="qlabel">What is the coverage result?</div>
+        <div class="qcell span2 stack">
+          ${cbx('coverageResultVoiceDataText', 'Voice | Data | Text')}
+          ${cbx('coverageResultNoCoverage', 'No Coverage')}
+        </div>
+      </div>
+
+      <div class="qrow">
+        <div class="qlabel">Is there an additional needs flag?</div>
+        <div class="qcell">${cbx('additionalNeedsFlagYes', 'Yes')}</div>
+        <div class="qcell">${cbx('additionalNeedsFlagNo', 'No')}</div>
+      </div>
+
+      <div class="qrow">
+        <div class="qlabel">Is Specialist Care required?</div>
+        <div class="qcell">${cbx('specialistCareRequiredYes', 'Yes')}</div>
+        <div class="qcell">${cbx('specialistCareRequiredNo', 'No')}</div>
+      </div>
+
+      <div class="qrow">
+        <div class="qlabel span2">Was budget discussed?</div>
+        <div class="qcell">${cbx('wasBudgetDiscussed', 'Yes')}</div>
+      </div>
+
+      <div class="qrow sq">
+        <div class="sqlabel">SQ Response</div>
+        <div class="sqlabel">SQ Ref#</div>
+        <div class="sqinput"><input type="text" data-field="sqRef" aria-label="SQ Ref#" /></div>
+        <div class="sqopts">
+          ${cbx('sqResponseNbn', 'NBN')}
+          ${cbx('sqResponse5g', '5G')}
+          ${cbx('sqResponse4g', '4G')}
+          ${cbx('sqResponseMbb', 'MBB')}
+        </div>
+      </div>
+
+      <div class="qrow">
+        <div class="qlabel span2">Address, Email and phone are up to date?</div>
+        <div class="qcell">${cbx('addressEmailAndPhoneAreUpToDate', 'Yes')}</div>
+      </div>
+
+      <div class="qrow">
+        <div class="qlabel span2">Did you sight 100pts of ID?</div>
+        <div class="qcell">${cbx('didYouSight100ptsOfId', 'Yes')}</div>
+      </div>
+
+      <div class="qrow">
+        <div class="qlabel span2">DVS Consent Form Submitted?</div>
+        <div class="qcell">${cbx('dvsConsentFormSubmitted', 'Yes')}</div>
+      </div>
+
+      <div class="qrow">
+        <div class="qlabel span2">Did you check offers in Optimiser Assist?</div>
+        <div class="qcell">${cbx('didYouCheckOffersInOptimiserAssist', 'Yes')}</div>
+      </div>
+
+      <div class="qrow tri">
+        <div class="qlabel">Is this a U&amp;P or Trade-in?</div>
+        <div class="qcell">${cbx('isThisAUpOrTradeInUp', 'U&amp;P')}</div>
+        <div class="qcell">${cbx('isThisAUpOrTradeInTradeIn', 'Trade-in')}</div>
+        <div class="qcell">${cbx('isThisAUpOrTradeInNo', 'No')}</div>
+      </div>
+
+    </div>
+
+    <div class="addinfo">
+      <h3 class="sec-head">Additional Information</h3>
+      <textarea class="ai" data-field="additionalInformation" aria-label="Additional Information"></textarea>
+      <h3 class="sec-head">Mid-point Check</h3>
+      <textarea class="mid" placeholder="Leader who signed off:" data-field="midPointCheck" aria-label="Mid-point Check"></textarea>
+    </div>
+  </div>
+
+  <!-- ============ Action / Outcome (image 6) ============ -->
+  <div class="block">
+    <h3 class="sec-head center">Action</h3>
+    <textarea class="bigarea h-260" placeholder="Explain changes made and recommendations given:" data-field="action" aria-label="Action"></textarea>
+  </div>
+  <div class="block">
+    <h3 class="sec-head center">Outcome</h3>
+    <textarea class="bigarea h-260" placeholder="What solution was provided:" data-field="outcome" aria-label="Outcome"></textarea>
+  </div>
+
+  <!-- ============ VISIT OUTCOME (image 6) ============ -->
+  <div class="visit-outcome block">
+    <h3 class="sec-head center upper">VISIT OUTCOME</h3>
+    <div class="opts">
+      ${cbx('visitOutcomeSales', 'Sales')}
+      ${cbx('visitOutcomeService', 'Service')}
+    </div>
+  </div>
+
+  <!-- ============ CIS ISSUED / OPTIONS BUILDER USED (images 6-7) ============ -->
+  <div class="barrow">
+    <div class="checkbar dark">
+      <input type="checkbox" id="fld-cisIssued" data-field="cisIssued" />
+      <label for="fld-cisIssued">CIS ISSUED</label>
+    </div>
+    <div class="checkbar cyan">
+      <input type="checkbox" id="fld-optionsBuilderUsed" data-field="optionsBuilderUsed" />
+      <label for="fld-optionsBuilderUsed">OPTIONS BUILDER USED</label>
+    </div>
+  </div>
+
+  <!-- ============ DE Number / Dealer Code (image 7) ============ -->
+  <div class="derow">
+    <div class="decell"><span>DE Number</span><input type="text" data-field="deNumber" aria-label="DE Number" /></div>
+    <div class="decell"><span>Dealer Code</span><input type="text" data-field="dealerCode" aria-label="Dealer Code" /></div>
+  </div>
+
+  <!-- ============ ID &amp; Authentication / Account Compliance (image 7) ============ -->
+  <div class="twocol">
+    <div class="colpanel">
+      <h3 class="sec-head dark">ID &amp; Authentication</h3>
+      <div class="checklist">
+        ${cbx('mfa', 'MFA')}
+        ${cbx('mfaOverride', 'MFA Override (MFA unable to be complete)')}
+        ${cbx('idValidated', 'ID Validated')}
+        ${cbx('manualEntryProcess', 'Manual entry process')}
+        ${cbx('idConfirmationVisionCard', 'ID confirmation Vision card')}
+        ${cbx('idNotTamperedWith', 'ID not tampered with')}
+      </div>
+      <div class="visionid">
+        <span>Vision ID Number</span>
+        <input type="text" data-field="visionIdNumber" aria-label="Vision ID Number" />
+      </div>
+    </div>
+    <div class="colpanel">
+      <h3 class="sec-head dark">Account Compliance</h3>
+      <div class="checklist">
+        ${cbx('confirmCustomerDetailsAreCorrect', 'Confirm customer details (name, address, contact number/email) are correct')}
+        ${cbx('actionTakenToCorrectlyCaptureAndUpdateCustomerRecords', 'Action taken to correctly capture and update customer records i.e., contact number/email address is incorrect')}
+        ${cbx('mobileCoverageCheckOutboundCommsSentBeforeCreditCheck', 'Mobile Coverage Check Outbound Comms sent to customer via email before Credit Check.')}
+        ${cbx('coverageCheckResultsExplainedDuringCaf', 'Coverage Check results that were sent to customer via email explained during CAF')}
+        ${cbx('appropriateNotesLeftInJarvis', 'Appropriate notes left in Jarvis')}
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Order Processed (image 7) ============ -->
+  <div class="block">
+    <h3 class="sec-head">Order Processed</h3>
+    <div class="orderrow">
+      <div class="ordercell"><span>JARVIS Order Number</span><input type="text" data-field="jarvisOrderNumber" aria-label="JARVIS Order Number" /></div>
+      <div class="ordercell"><span>PRONTO Order Number</span><input type="text" data-field="prontoOrderNumber" aria-label="PRONTO Order Number" /></div>
+    </div>
+  </div>
+
+  <!-- ============ Compliance Check (image 7) ============ -->
+  <div class="halfblock">
+    <h3 class="sec-head center">Compliance Check</h3>
+    <textarea class="bigarea h-72" placeholder="Leader who signed off:" data-field="complianceCheck" aria-label="Compliance Check"></textarea>
+  </div>
+
+  <!-- ============ Contract Compliance (images 7-8) ============ -->
+  <div class="block">
+    <h3 class="sec-head">Contract Compliance</h3>
+    <div class="contract-list">
+      ${cbx('allRequiredCreditCheckingInformationIsInputIntoJarvisCorrectly', 'ALL REQUIRED CREDIT CHECKING INFORMATION IS INPUT INTO JARVIS CORRECTLY AND THE SCRIPT READ TO THE CUSTOMER')}
+      ${cbx('cisProvidedAndExplained', 'CIS PROVIDED AND EXPLAINED')}
+      ${cbx('nbnFactSheetProvidedAndExplained', 'NBN FACT SHEET PROVIDED AND EXPLAINED')}
+      ${cbx('mustMentionsProvidedAndExplained', 'MUST MENTIONS PROVIDED AND EXPLAINED')}
+      ${cbx('totalMinimumCostAndContractDetailBreakdownExplained', 'TOTAL MINIMUM COST (MONTHLY AND OVER CONTRACT PERIOD) AND CONTRACT DETAIL BREAKDOWN EXPLAINED TO THE CUSTOMER')}
+      ${cbx('contractSignedDigitallyOrManually', 'CONTRACT SIGNED DIGITALLY OR MANUALLY (Manual Signature CHOWN Only)')}
+      ${cbx('signatureAndIdMatchesContract', 'SIGNATURE &amp; ID MATCHES CONTRACT')}
+      ${cbx('appropriateNotesLeftInJarvisContract', 'APPROPRIATE NOTES LEFT IN JARVIS')}
+    </div>
+  </div>
+
+  <!-- ============ Device Processed (image 8) ============ -->
+  <div class="block">
+    <h3 class="sec-head cyan">Device Processed</h3>
+    <table class="devtable">
+      <thead>
+        <tr><th class="blank"></th><th>Device 1</th><th>Device 2</th><th>Device 3</th><th>Device 4</th></tr>
+      </thead>
+      <tbody>
+        ${devRow('Make', 'deviceMake')}
+        ${devRow('Model', 'deviceModel')}
+        ${devRow('Size', 'deviceSize')}
+        ${devRow('Colour', 'deviceColour')}
+        ${devRow('IMEI/SN', 'deviceImeiSn')}
+        ${devRow('Last 3 digits of MSN', 'deviceLast3DigitsOfMsn')}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ============ Device Fulfilment (image 8) ============ -->
+  <div class="fulfil">
+    <h3 class="sec-head cyan">Device Fulfilment</h3>
+    <div class="opts">
+      ${cbx('deviceFulfilmentInStore', 'In-store')}
+      ${cbx('deviceFulfilmentDeliverToStore', 'Deliver to store')}
+      ${cbx('deviceFulfilmentDeliverToCustomer', 'Deliver to customer')}
+    </div>
+  </div>
+
+  <!-- ============ Notes/TOFU (image 8) ============ -->
+  <div class="block">
+    <h3 class="sec-head grey">Notes/TOFU</h3>
+    <div class="tofurow">
+      <div class="tofucell"><input type="text" placeholder="Action/Owner" data-field="notesActionOwner" aria-label="Action/Owner" /></div>
+      <div class="tofucell"><input type="text" class="dateish" placeholder="Date" data-field="notesDate" aria-label="Date" /></div>
+    </div>
+  </div>
+
+</div>`;
+}
+
+/* Default field map - derived from the markup itself so it can never drift. */
+var _defaultsCache = null;
+function defaultFields() {
+  if (!_defaultsCache) {
+    var tmp = document.createElement('div');
+    tmp.innerHTML = cctFormHTML();
+    var out = {};
+    $$('[data-field]', tmp).forEach(function (el) {
+      out[el.getAttribute('data-field')] = (el.type === 'checkbox') ? false : '';
+    });
+    _defaultsCache = out;
+  }
+  return JSON.parse(JSON.stringify(_defaultsCache));
+}
+
+/* ==========================================================================
+   12.  CCT EDITOR  (images 4-8) - autosave, live editing, submit
+   ========================================================================== */
+function viewCct(app, id) {
+  if (!getName()) {
+    app.innerHTML = '<div class="shell">' + chromeHTML(null, null) +
+      '<div class="emptystate"><b>Enter your name first</b>Editing stamps your name on the form.</div></div>';
+    bindChrome(app);
+    askForName();
+    return;
+  }
+
+  var docData = null;
+  var readonly = false;
+  var built = false;
+  var timers = {};      /* key -> debounce timer   */
+  var pending = {};     /* key -> value waiting to be written */
+  var inflight = 0;
+  var lastTouch = 0;
+  var unsub = null;
+
+  app.innerHTML =
+    '<div class="shell">' +
+      chromeHTML(null, { placeholder: 'Search InProgress Forms', value: searchState.inProgress }) +
+      configBanner() +
+      '<div class="editor-top no-print">' +
+        '<button class="btn-outline" id="back-all">Back to All Forms</button>' +
+        '<button class="btn-refresh" id="btn-refresh" title="Reload this form" aria-label="Reload this form">&#8635;</button>' +
+      '</div>' +
+      '<div class="stickybar no-print" id="stickybar">' +
+        '<span class="cctid">CCT <span>' + esc(id) + '</span></span>' +
+        '<span class="status-chip inProgress" id="status-chip">In Progress</span>' +
+        '<span class="readonly-note" id="ro-note" style="display:none">Read only</span>' +
+        '<span class="saveind" id="saveind"><span class="dot"></span><span id="saveind-text">Loading&hellip;</span></span>' +
+      '</div>' +
+      '<div id="cct-body"><div class="emptystate">Loading this CCT&hellip;</div></div>' +
+    '</div>';
+
+  bindChrome(app, function (v) { searchState.inProgress = v; });
+  $('#search-input') && $('#search-input').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') location.hash = '#/in-progress';
+  });
+  $('#back-all').addEventListener('click', function () {
+    location.hash = readonly ? '#/completed' : '#/in-progress';
+  });
+  $('#btn-refresh').addEventListener('click', function () {
+    if (docData) { applyRemote(docData, true); toast('Form reloaded from the server copy.'); }
+  });
+
+  /* ---------- save indicator ---------- */
+  function setInd(state, text) {
+    var el = $('#saveind'); if (!el) return;
+    el.className = 'saveind ' + state;
+    $('#saveind-text').textContent = text;
+  }
+  function indicateSaved() { setInd('saved', 'Saved ' + fmtClock(new Date())); }
+
+  /* ---------- writing ---------- */
+  function commit(key) {
+    if (readonly) return;
+    if (!(key in pending)) return;
+    var value = pending[key];
+    var patch = {};
+    patch['fields.' + key] = value;
+    patch.updatedAt = SVR;
+    patch.lastEditedBy = getName();
+
+    inflight++;
+    setInd('saving', 'Saving\u2026');
+    var offlineTimer = setTimeout(function () {
+      if (!navigator.onLine) setInd('offline', 'Offline \u2014 changes queued');
+    }, 1200);
+
+    Store.update(id, patch).then(function () {
+      clearTimeout(offlineTimer);
+      inflight--;
+      if (pending[key] === value) delete pending[key];
+      if (inflight === 0 && Object.keys(pending).length === 0) indicateSaved();
+    }).catch(function (err) {
+      clearTimeout(offlineTimer);
+      inflight--;
+      if (!navigator.onLine) { setInd('offline', 'Offline \u2014 changes queued'); return; }
+      setInd('offline', 'Not saved \u2014 ' + (err.message || err));
+    });
+  }
+  function queue(key, value, immediate) {
+    if (readonly) return;
+    pending[key] = value;
+    if (timers[key]) clearTimeout(timers[key]);
+    if (immediate) { commit(key); }
+    else {
+      setInd('saving', 'Saving\u2026');
+      timers[key] = setTimeout(function () { commit(key); }, 800);
+    }
+    touchEditor();
+  }
+  function flushAll() {
+    Object.keys(timers).forEach(function (k) { clearTimeout(timers[k]); delete timers[k]; });
+    Object.keys(pending).forEach(function (k) { commit(k); });
+  }
+
+  /* ---------- presence ---------- */
+  function touchEditor() {
+    if (readonly) return;
+    if (Date.now() - lastTouch < 20000) return;
+    lastTouch = Date.now();
+    Store.update(id, { 'activeEditor.name': getName(), 'activeEditor.at': SVR }).catch(function () {});
+  }
+
+  /* ---------- reading remote changes ---------- */
+  function applyRemote(data, force) {
+    var root = $('#cct-body'); if (!root || !built) return;
+    var f = data.fields || {};
+    $$('[data-field]', root).forEach(function (el) {
+      var k = el.getAttribute('data-field');
+      if (!force && el === document.activeElement) return;   /* never steal the caret */
+      if (!force && (k in pending)) return;                  /* our own unsaved edit wins */
+      var v = f[k];
+      if (el.type === 'checkbox') {
+        var b = !!v;
+        if (el.checked !== b) el.checked = b;
+      } else {
+        var s = (v == null ? '' : String(v));
+        if (el.classList.contains('dateish')) { el.type = s ? 'date' : (el === document.activeElement ? 'date' : 'text'); }
+        if (el.value !== s) el.value = s;
+      }
+    });
+  }
+
+  /* ---------- build the form once ---------- */
+  function build(data) {
+    readonly = data.status === 'completed';
+    var body = $('#cct-body');
+    body.innerHTML = cctFormHTML() +
+      '<div class="cct-footer no-print">' +
+        '<div class="footer-logo"><span class="yes">yes</span><span class="optus">OPTUS</span></div>' +
+        '<div class="footer-btns">' +
+          '<button class="btn-sao" id="btn-sao">COPY SAO</button>' +
+          (readonly
+            ? '<button class="btn-dark" id="btn-print">PRINT</button><button class="btn-dark" id="btn-reopen">REOPEN</button>'
+            : '<button class="btn-dark" id="btn-save">SAVE</button><button class="btn-dark" id="btn-submit">SUBMIT</button>') +
+        '</div>' +
+      '</div>' +
+      '<a class="backlink no-print" href="' + (readonly ? '#/completed' : '#/in-progress') + '">' +
+        (readonly ? '&larr; Back to Completed' : '&larr; Back to In Progress') + '</a>';
+    built = true;
+
+    $$('[data-field]', body).forEach(function (el) {
+      var k = el.getAttribute('data-field');
+      if (readonly) { el.disabled = true; return; }
+      if (el.type === 'checkbox') {
+        el.addEventListener('change', function () { queue(k, el.checked, true); });
+      } else if (el.tagName === 'SELECT') {
+        el.addEventListener('change', function () { queue(k, el.value, true); });
+      } else if (el.type === 'date' || el.type === 'time') {
+        el.addEventListener('change', function () { queue(k, el.value, true); });
+        el.addEventListener('blur', function () { queue(k, el.value, true); });
+      } else {
+        el.addEventListener('input', function () { queue(k, el.value, false); });
+        el.addEventListener('blur', function () {
+          if (el.classList.contains('dateish')) queue(k, el.value, true);
+          else if (k in pending) queue(k, el.value, true);
+        });
+      }
+      el.addEventListener('focus', touchEditor);
+    });
+
+    /* "Date"-styled text input in Notes/TOFU: shows the word Date until used */
+    $$('.dateish', body).forEach(function (el) {
+      el.addEventListener('focus', function () { el.type = 'date'; });
+      el.addEventListener('blur', function () { if (!el.value) el.type = 'text'; });
+    });
+
+    var sao = $('#btn-sao', body);
+    if (sao) sao.addEventListener('click', function () { copySao(); });
+
+    var save = $('#btn-save', body);
+    if (save) save.addEventListener('click', function () {
+      flushAll();
+      if (Object.keys(pending).length === 0 && inflight === 0) indicateSaved();
+      toast('Everything on this form is saved.');
+    });
+
+    var submit = $('#btn-submit', body);
+    if (submit) submit.addEventListener('click', function () { doSubmit(); });
+
+    var pr = $('#btn-print', body);
+    if (pr) pr.addEventListener('click', function () { window.print(); });
+
+    var ro = $('#btn-reopen', body);
+    if (ro) ro.addEventListener('click', function () {
+      showModal({
+        title: 'Reopen this form?',
+        body: 'It goes back to In Progress so it can be edited again.',
+        confirmText: 'Reopen', cancelText: 'Cancel',
+        onConfirm: function () {
+          Store.update(id, { status: 'inProgress', completedAt: null, completedBy: null, updatedAt: SVR, lastEditedBy: getName() })
+            .then(function () { toast('Reopened.'); location.hash = '#/in-progress'; })
+            .catch(function (e) { toast('Could not reopen: ' + (e.message || e)); });
+        }
+      });
+    });
+  }
+
+  /* ---------- COPY SAO ---------- */
+  function copySao() {
+    var f = (docData && docData.fields) || {};
+    var line = function (label, val) { return val ? label + ': ' + val + '\n' : ''; };
+    var text =
+      'CCT - ' + STORE.name + ' (' + STORE.dealerCode + ')\n' +
+      line('Staff', f.staffName) + line('Customer', f.customerFirstName) +
+      line('Phone', f.phoneNumber) + line('Date', f.date) + line('Time', f.time) +
+      line('Reason for Visit', f.reasonForVisit) + line('Business or Personal', f.businessOrPersonal) +
+      '\nSITUATION\n' + (f.reasonForVisitSituation || '') +
+      '\n\nACTION\n' + (f.action || '') +
+      '\n\nOUTCOME\n' + (f.outcome || '') +
+      '\n\n' + line('JARVIS Order Number', f.jarvisOrderNumber) + line('PRONTO Order Number', f.prontoOrderNumber) +
+      line('DE Number', f.deNumber);
+    var done = function () { toast('SAO summary copied to your clipboard.'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else { fallback(); }
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) { toast('Could not copy automatically - the text is in the console.'); console.log(text); }
+      ta.remove();
+    }
+  }
+
+  /* ---------- submit ---------- */
+  function doSubmit() {
+    flushAll();
+    var f = (docData && docData.fields) || {};
+    showModal({
+      title: 'Submit this CCT?',
+      body: 'The CCT for <b>' + esc(f.customerFirstName || 'this customer') + '</b> moves to Completed and ' +
+            'is stamped with your name. You can reopen it from the Completed tab if you need to.',
+      confirmText: 'Submit', cancelText: 'Keep editing',
+      onConfirm: function () {
+        Store.update(id, {
+          status: 'completed', completedAt: SVR, completedBy: getName(),
+          updatedAt: SVR, lastEditedBy: getName(), activeEditor: null
+        }).then(function () {
+          toast('Submitted - it is now in Completed.');
+          location.hash = '#/completed';
+        }).catch(function (err) { toast('Could not submit: ' + (err.message || err)); });
+      }
+    });
+  }
+
+  /* ---------- live document listener ---------- */
+  unsub = Store.watchDoc(id, function (data, meta) {
+    if (meta && meta.error) {
+      $('#cct-body').innerHTML = '<div class="banner"><b>Could not open this CCT</b>' + esc(meta.error) + '</div>';
+      setInd('offline', 'Not connected');
+      return;
+    }
+    if (!data) {
+      $('#cct-body').innerHTML =
+        '<div class="notfound"><h2>That CCT isn&#39;t here</h2>' +
+        '<p>No form exists with the id <code>' + esc(id) + '</code>. It may have been deleted, ' +
+        'or the link may be wrong.</p>' +
+        '<button class="btn-blue" onclick="location.hash=&#39;#/in-progress&#39;">Go to In Progress</button></div>';
+      $('#stickybar').style.display = 'none';
+      return;
+    }
+    docData = data;
+    var wasReadonly = readonly;
+    if (!built) { build(data); touchEditor(); }
+    else if ((data.status === 'completed') !== wasReadonly) { built = false; build(data); }
+
+    var chip = $('#status-chip');
+    chip.className = 'status-chip ' + (data.status === 'completed' ? 'completed' : 'inProgress');
+    chip.textContent = data.status === 'completed' ? 'Completed' : 'In Progress';
+    $('#ro-note').style.display = readonly ? '' : 'none';
+
+    applyRemote(data);
+
+    if (Object.keys(pending).length === 0 && inflight === 0) {
+      if (!navigator.onLine) setInd('offline', 'Offline \u2014 changes queued');
+      else if (readonly) setInd('', 'Read only \u2014 nothing is being saved');
+      else indicateSaved();
+    }
+  });
+
+  var onOnline = function () { if (Object.keys(pending).length) flushAll(); else if (!readonly) indicateSaved(); };
+  var onOffline = function () { setInd('offline', 'Offline \u2014 changes queued'); };
+  window.addEventListener('online', onOnline);
+  window.addEventListener('offline', onOffline);
+
+  var presenceTick = setInterval(function () { if (!readonly && document.hasFocus()) { lastTouch = 0; touchEditor(); } }, 30000);
+
+  window.addEventListener('beforeunload', flushAll);
+  addCleanup(function () {
+    flushAll();
+    if (unsub) unsub();
+    clearInterval(presenceTick);
+    window.removeEventListener('online', onOnline);
+    window.removeEventListener('offline', onOffline);
+    window.removeEventListener('beforeunload', flushAll);
+  });
+}
+
+/* ==========================================================================
+   13.  BOOT
+   ========================================================================== */
+/* Textareas keep their on-screen height when printing, which would clip long
+   answers, so grow them to fit just for the print job. */
+window.addEventListener('beforeprint', function () {
+  $$('textarea').forEach(function (t) {
+    t.setAttribute('data-h', t.style.height || '');
+    t.style.height = 'auto';
+    t.style.height = Math.max(t.scrollHeight, 24) + 'px';
+  });
+});
+window.addEventListener('afterprint', function () {
+  $$('textarea').forEach(function (t) { t.style.height = t.getAttribute('data-h') || ''; });
+});
+
+(function boot() {
+  if (!location.hash) location.hash = '#/new';
+  render();
+  if (!getName()) askForName();
+})();
+</script>
+
+<!--
+================================================================================
+ASSUMPTIONS
+Everything below is something the screenshots did not settle. Nothing here was
+invented silently - each item says what was assumed and where to change it.
+================================================================================
+
+TEXT THAT WAS HARD TO READ IN THE IMAGES
+  1. Image 5, coverage result option read as "Voice | Data | Text".
+  2. Image 7, Account Compliance item 2 wraps mid-word in the screenshot
+     ("con-tact"); reproduced as "Action taken to correctly capture and update
+     customer records i.e., contact number/email address is incorrect".
+  3. Image 7, DE Number sample value read as "DE1052897" - treated as sample
+     data, so the field starts empty rather than pre-filled.
+  4. Image 4 badge text read as "TRIED . TESTED . PROVEN" around the top and
+     "BEST PRACTICE" around the bottom, drawn as CSS/SVG rather than an image
+     file so this stays a single self-contained file. The "yes" wordmark is set
+     in a script face for the same reason.
+
+CONTENT THE IMAGES DO NOT SHOW
+  5. CCT "Reason for Visit" dropdown - only "Please Select" is ever visible in
+     the screenshots. A guessed list lives in REASON_FOR_VISIT_OPTIONS at the
+     top of the script; replace it with the real one.
+  6. "Business or Personal" dropdown - image 4 shows "Personal" selected, so the
+     options are assumed to be Business and Personal
+     (BUSINESS_OR_PERSONAL_OPTIONS, also at the top of the script).
+  7. Store name, dealer code and store manager are hard-coded from the header in
+     images 1 and 4 (STORE at the top of the script). Dealer Code also pre-fills
+     the CCT "Dealer Code" field on create.
+  8. "Reports" is a button in every screenshot but no Reports screen was
+     supplied, so #/reports is an honest placeholder rather than invented
+     content.
+  9. "Compliance Forms" and "Stocktakes" top tabs are rendered as in the images
+     but are inert - those sections were not part of this build.
+
+BEHAVIOUR THE IMAGES DO NOT SHOW  (please confirm - happy to change any of these)
+ 10. Yes/No pairs ("Is there an additional needs flag?", "Is Specialist Care
+     required?", "Is this a U&P or Trade-in?", "What is the coverage result?")
+     are drawn as square checkboxes in the screenshots, so they are independent
+     checkboxes here - ticking Yes does NOT untick No. Say the word and they
+     become mutually exclusive.
+ 11. In Progress row button: the brief calls it "Edit", the screenshot shows a
+     teal button labelled "In Progress". Visual fidelity won - the button reads
+     "In Progress" and opens #/cct/<id>.
+ 12. The trash icon on In Progress rows deletes the form (with a confirmation).
+ 13. "Reopen" on Completed rows and in the read-only form is required by the
+     brief but is not in the screenshots, so it is a small text link next to
+     View rather than a second big button.
+ 14. The column sort arrows in images 2 and 3 are wired up as click-to-sort.
+     The default order is still the one the brief asked for - updatedAt
+     descending for In Progress, completedAt descending for Completed.
+ 15. The search box on the CCT editor screen (image 4) filters the In Progress
+     list; pressing Enter takes you there.
+ 16. The blue refresh button on the CCT re-applies the current server copy to
+     every field.
+ 17. "COPY SAO" copies a plain-text summary of the form (staff, customer,
+     situation, action, outcome, order numbers) to the clipboard. This is a
+     guess at what SAO means here - tell me the real format and it is a
+     five-minute change.
+ 18. "SAVE" flushes anything still in the 800ms debounce. Everything already
+     autosaves, so it is a reassurance button rather than a required step.
+ 19. Notes/TOFU "Date" is a text input showing the word "Date" that becomes a
+     date picker on focus, because a native date input cannot show a
+     placeholder.
+ 20. "Staff Name" is pre-filled with the creator's name and stays editable.
+     "Date" and "Time" are pre-filled with the moment the form was created.
+ 21. Read-only view (a completed CCT) disables every input and swaps SAVE and
+     SUBMIT for PRINT and REOPEN. COPY SAO stays available.
+
+FIRESTORE NOTES
+ 22. status + orderBy(updatedAt / completedAt) needs a composite index. If it is
+     missing, the app catches the error, sorts in the browser instead and shows
+     a banner pointing at the console link that creates the index.
+ 23. Offline persistence is enabled with synchronizeTabs, so two tabs on the
+     same machine share one cache.
+ 24. Until firebaseConfig is filled in, the app runs against a localStorage demo
+     store with the same API. It syncs live between tabs on this machine, which
+     is enough to try concurrent editing, but it is not shared with anyone else.
+-->
+</body>
+</html>
