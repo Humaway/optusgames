@@ -458,6 +458,8 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
 #edcv{flex:1 1 auto;width:100%;display:block;touch-action:none;cursor:crosshair;min-height:0}
 .ed__read{font-family:var(--mono);font-size:11.5px;color:var(--dim);white-space:nowrap}
 .ed__read b{color:var(--white);font-weight:400;font-variant-numeric:tabular-nums}
+.ed__read--sel b{color:var(--accent)}
+.ed__help b{color:var(--white);font-weight:600}
 .ed__msg{font-family:var(--mono);font-size:11.5px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38vw}
 .ed__help{font-family:var(--mono);font-size:10.5px;color:rgba(255,255,255,.34);letter-spacing:.04em;
   padding:0 18px 11px;line-height:1.7}
@@ -803,8 +805,13 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
       <button id="emOllie" aria-pressed="true">Ollie · 4 lanes</button>
       <button id="emRue" aria-pressed="false">Rue · 5 lanes</button>
     </div>
+    <div class="seg" id="edTools">
+      <button data-tool="select" aria-pressed="true">Select</button>
+      <button data-tool="draw" aria-pressed="false">Draw</button>
+    </div>
     <span class="ed__read"><b id="edCount">0</b> notes</span>
     <span class="ed__read" id="edHoldWrap" hidden><b id="edHoldCount">0</b> holds</span>
+    <span class="ed__read ed__read--sel" id="edSelWrap" hidden><b id="edSelCount">0</b> selected</span>
     <span class="ed__msg" id="edMsg"></span>
     <div class="ed__spacer"></div>
     <div class="field"><label for="edTitle">Title</label><input type="text" id="edTitle" placeholder="Track name"></div>
@@ -814,7 +821,7 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
 
   <canvas id="edcv"></canvas>
 
-  <p class="ed__help">Click a lane to place a note, or click and drag right to stretch it into a hold · drag a note to move it, drag the square on a tail to resize · H turns the selected note into a hold, Shift+←→ resizes it · double-click or right-click deletes · Space plays · R records your key presses · Ctrl+Z undoes · scroll to move, Ctrl+scroll to zoom</p>
+  <p class="ed__help"><b>Select</b> (1): click a note to pick it, drag a box to grab several, drag to move · <b>Draw</b> (2): click a lane to place a note, drag right for a hold · <b>Delete</b> a note by right-clicking it, double-clicking it, or selecting and pressing Delete · H turns the selection into holds, Shift+←→ resizes · Ctrl+A selects all, Ctrl+Z undoes · Space plays, R records taps · scroll to move, Ctrl+scroll to zoom</p>
 
   <div class="ed__bar ed__bar--foot">
     <button class="tool primary" id="edPlay">Play</button>
@@ -833,6 +840,7 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
     </div>
     <div class="ed__spacer"></div>
     <button class="tool" id="edAuto">Auto-chart mode</button>
+    <button class="tool" id="edDelete" disabled>Delete</button>
     <button class="tool" id="edHolds">Holds from gaps</button>
     <button class="tool" id="edClear">Clear mode</button>
     <button class="tool" id="edUndo">Undo</button>
@@ -3350,7 +3358,7 @@ async function showRating() {
    ========================================================================== */
 
 const ED = {
-  mode: 'ollie', notes: [], sel: null, drag: null, hover: null,
+  mode: 'ollie', notes: [], sel: [], drag: null, band: null, tool: 'select',
   zoom: 150, view: 0, snap: 2,
   ctx: null, src: null, playing: false, base: 0, t0: 0, pos: 0, rate: 1,
   rec: false, history: [], peaks: null, perSec: 100, token: 0
@@ -3402,11 +3410,35 @@ function edPush() {
   $('edUndo').disabled = false;
 }
 
+const isSel = (n) => ED.sel.indexOf(n) >= 0;
+
 function edCount() {
   $('edCount').textContent = ED.notes.length;
   const holds = ED.notes.filter((n) => n.d > 0).length;
   $('edHoldCount').textContent = holds;
   $('edHoldWrap').hidden = !holds;
+  $('edSelCount').textContent = ED.sel.length;
+  $('edSelWrap').hidden = !ED.sel.length;
+  $('edDelete').disabled = !ED.sel.length;
+}
+
+function setTool(tool) {
+  ED.tool = tool;
+  for (const b of $('edTools').children) b.setAttribute('aria-pressed', String(b.dataset.tool === tool));
+  edcv.style.cursor = tool === 'draw' ? 'copy' : 'default';
+  edMsg(tool === 'draw'
+    ? 'Draw: click a lane to add a note, drag right for a hold'
+    : 'Select: click notes to pick them, drag a box to grab several');
+}
+
+function edDelete() {
+  if (!ED.sel.length) return;
+  edPush();
+  const doomed = ED.sel.slice();
+  ED.notes = ED.notes.filter((n) => doomed.indexOf(n) < 0);
+  ED.sel = [];
+  edCount();
+  edMsg(doomed.length + (doomed.length === 1 ? ' note deleted' : ' notes deleted'));
 }
 
 function edMsg(text) {
@@ -3424,6 +3456,17 @@ function edResize() {
   edx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
+/** The toolbar wraps as readouts appear, which resizes the canvas without any
+ *  window resize firing. Left unnoticed, the backing store keeps its old size,
+ *  the browser scales the bitmap, and every click lands somewhere other than
+ *  where the note was drawn. */
+function edCheckSize() {
+  if (edcv.clientWidth !== eW || edcv.clientHeight !== eH) edResize();
+}
+if (window.ResizeObserver) {
+  new ResizeObserver(() => { if (G.screen === 'editor') edCheckSize(); }).observe(edcv);
+}
+
 async function openEditor() {
   const m = G.pack.meta;
   $('edTitle').value = m.title || '';
@@ -3433,8 +3476,10 @@ async function openEditor() {
 
   ED.mode = G.cfg.id;
   ED.notes = (G.pack.charts[ED.mode] || []).map((n) => ({ t: n.t, lane: n.lane, d: n.d || 0, s: n.s || 1.4 }));
-  ED.sel = null; ED.history = []; ED.pos = 0; ED.view = 0;
+  ED.sel = []; ED.history = []; ED.pos = 0; ED.view = 0;
   ED.peaks = peaksHi(G.pack.buffer, ED.perSec);
+  ED.band = null;
+  setTool('select');
   edMsg('');
   $('edUndo').disabled = true;
   $('emOllie').setAttribute('aria-pressed', String(ED.mode === 'ollie'));
@@ -3469,6 +3514,7 @@ function edSaveMode() {
 /* --------------------------------- draw ----------------------------------- */
 
 function edDraw() {
+  edCheckSize();
   const c = edx, cfg = MODES[ED.mode], lanes = cfg.lanes;
   const t = edTime();
   if (ED.playing) {
@@ -3561,7 +3607,7 @@ function edDraw() {
     const end = n.t + (n.d || 0);
     if (end < t0 - 0.4 || n.t > t1 + 0.4) continue;
     const x = timeToX(n.t), y = laneY(n.lane);
-    const selected = n === ED.sel;
+    const selected = isSel(n);
 
     if (n.d > 0) {
       const x2 = timeToX(end);
@@ -3573,11 +3619,28 @@ function edDraw() {
       c.fillRect(x2 - 2, y - r * 0.85, 4, r * 1.7);       // the grab handle
     }
 
+    if (selected) {
+      c.fillStyle = 'rgba(255,255,255,0.22)';
+      c.beginPath(); c.arc(x, y, r + 6, 0, TAU); c.fill();
+    }
     c.fillStyle = cfg.laneColors[n.lane];
     c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
     c.lineWidth = selected ? 3 : 1.5;
     c.strokeStyle = selected ? '#ffffff' : 'rgba(255,255,255,0.55)';
     c.stroke();
+  }
+
+  // rubber band
+  if (ED.band) {
+    const bx = Math.min(ED.band.x0, ED.band.x1), by = Math.min(ED.band.y0, ED.band.y1);
+    const bw = Math.abs(ED.band.x1 - ED.band.x0), bh = Math.abs(ED.band.y1 - ED.band.y0);
+    c.fillStyle = 'rgba(255,255,255,0.07)';
+    c.fillRect(bx, by, bw, bh);
+    c.strokeStyle = 'rgba(255,255,255,0.5)';
+    c.lineWidth = 1;
+    c.setLineDash([4, 3]);
+    c.strokeRect(bx + 0.5, by + 0.5, bw, bh);
+    c.setLineDash([]);
   }
 
   // playhead
@@ -3593,11 +3656,26 @@ function edDraw() {
 
 /* ------------------------------ interaction ------------------------------- */
 
+const noteR = () => Math.min(laneH() * 0.3, 15);
+
+/** Generous on purpose: clicking a note should always pick it, never drop a
+ *  new one on top of it. The whole body of a hold counts too. */
 function edHit(x, y) {
-  const lh = laneH(), r = Math.min(lh * 0.3, 15) + 4;
+  const r = noteR() + 7;
   let best = null, bestD = Infinity;
   for (const n of ED.notes) {
-    const dx = timeToX(n.t) - x, dy = laneY(n.lane) - y;
+    const ny = laneY(n.lane);
+    if (Math.abs(ny - y) > r) continue;
+    const nx = timeToX(n.t);
+    if (n.d > 0) {
+      const x2 = timeToX(n.t + n.d);
+      if (x >= nx - r && x <= x2 + r) {                 // anywhere along the bar
+        const d = Math.abs(ny - y);
+        if (d < bestD) { bestD = d; best = n; }
+        continue;
+      }
+    }
+    const dx = nx - x, dy = ny - y;
     const d = dx * dx + dy * dy;
     if (d < r * r && d < bestD) { bestD = d; best = n; }
   }
@@ -3606,11 +3684,11 @@ function edHit(x, y) {
 
 /** The square at the end of a sustain, for dragging its length. */
 function edTailHit(x, y) {
-  const lh = laneH(), r = Math.min(lh * 0.3, 15);
+  const r = noteR();
   for (const n of ED.notes) {
     if (!n.d) continue;
     if (Math.abs(laneY(n.lane) - y) > r) continue;
-    if (Math.abs(timeToX(n.t + n.d) - x) <= 7) return n;
+    if (Math.abs(timeToX(n.t + n.d) - x) <= 9) return n;
   }
   return null;
 }
@@ -3620,11 +3698,30 @@ function edLaneAt(y) {
   return l >= 0 && l < MODES[ED.mode].lanes ? l : -1;
 }
 
+const edLaneClamp = (y) => clamp(Math.floor((y - padTop()) / laneH()), 0, MODES[ED.mode].lanes - 1);
+
+function notesInBand(b) {
+  const t0 = xToTime(Math.min(b.x0, b.x1)), t1 = xToTime(Math.max(b.x0, b.x1));
+  const l0 = edLaneClamp(Math.min(b.y0, b.y1)), l1 = edLaneClamp(Math.max(b.y0, b.y1));
+  return ED.notes.filter((n) =>
+    n.lane >= l0 && n.lane <= l1 && n.t + (n.d || 0) >= t0 && n.t <= t1);
+}
+
+function beginMove(anchor, x, y) {
+  ED.drag = {
+    move: true,
+    anchorT: anchor.t,
+    startT: xToTime(x),
+    startLane: edLaneClamp(y),
+    orig: ED.sel.map((n) => ({ n: n, t: n.t, lane: n.lane }))
+  };
+}
+
 edcv.addEventListener('pointerdown', (e) => {
   const rect = edcv.getBoundingClientRect();
   const x = e.clientX - rect.left, y = e.clientY - rect.top;
 
-  if (y < padTop()) {                       // scrub on the ruler and waveform
+  if (y < padTop()) {                                   // scrub on the ruler
     edSeek(clamp(xToTime(x), 0, G.pack.meta.duration));
     ED.drag = { scrub: true };
     capture(e.pointerId);
@@ -3635,28 +3732,55 @@ edcv.addEventListener('pointerdown', (e) => {
 
   const tail = edTailHit(x, y);
   const hit = tail || edHit(x, y);
-  if (e.button === 2) { if (hit) { edPush(); ED.notes.splice(ED.notes.indexOf(hit), 1); edCount(); } return; }
+
+  // right-click or alt-click removes whatever is under the pointer
+  if (e.button === 2 || (e.altKey && hit)) {
+    if (hit) {
+      edPush();
+      ED.notes.splice(ED.notes.indexOf(hit), 1);
+      ED.sel = ED.sel.filter((n) => n !== hit);
+      edCount();
+      edMsg('Note deleted');
+    }
+    return;
+  }
+  if (e.button !== 0) return;
 
   if (tail) {
-    ED.sel = tail;
+    if (!isSel(tail)) ED.sel = [tail];
     edPush();
     ED.drag = { note: tail, resize: true };
+    edCount();
     capture(e.pointerId);
-  } else if (hit) {
-    ED.sel = hit;
-    edPush();
-    ED.drag = { note: hit, dx: timeToX(hit.t) - x };
-    capture(e.pointerId);
-  } else {
+    return;
+  }
+
+  if (hit) {
+    if (e.shiftKey) {
+      if (isSel(hit)) ED.sel = ED.sel.filter((n) => n !== hit);
+      else ED.sel = ED.sel.concat([hit]);
+    } else if (!isSel(hit)) {
+      ED.sel = [hit];
+    }
+    edCount();
+    if (isSel(hit)) { edPush(); beginMove(hit, x, y); capture(e.pointerId); }
+    return;
+  }
+
+  // empty space
+  if (ED.tool === 'draw') {
     edPush();
     const n = { t: snapTime(xToTime(x)), lane: lane, d: 0, s: 1.4 };
     ED.notes.push(n);
-    ED.sel = n;
-    // dragging right from here stretches it into a hold; releasing on the
-    // spot leaves it as a tap
-    ED.drag = { note: n, resize: true, fresh: true };
-    capture(e.pointerId);
+    ED.sel = [n];
+    ED.drag = { note: n, resize: true, fresh: true };   // drag right to stretch
     edCount();
+    capture(e.pointerId);
+  } else {
+    if (!e.shiftKey) { ED.sel = []; edCount(); }
+    ED.drag = { band: true };
+    ED.band = { x0: x, y0: y, x1: x, y1: y, add: ED.sel.slice() };
+    capture(e.pointerId);
   }
 });
 
@@ -3664,36 +3788,78 @@ edcv.addEventListener('pointermove', (e) => {
   if (!ED.drag) return;
   const rect = edcv.getBoundingClientRect();
   const x = e.clientX - rect.left, y = e.clientY - rect.top;
+
   if (ED.drag.scrub) { edSeek(clamp(xToTime(x), 0, G.pack.meta.duration)); return; }
-  const n = ED.drag.note;
+
+  if (ED.drag.band) {
+    ED.band.x1 = x; ED.band.y1 = y;
+    const inside = notesInBand(ED.band);
+    ED.sel = ED.band.add.concat(inside.filter((n) => ED.band.add.indexOf(n) < 0));
+    edCount();
+    return;
+  }
 
   if (ED.drag.resize) {
+    const n = ED.drag.note;
     const end = clamp(snapTime(xToTime(x)), 0, G.pack.meta.duration);
     n.d = Math.max(0, end - n.t);
     if (n.d < holdStep() * 0.5) n.d = 0;
     return;
   }
 
-  n.t = clamp(snapTime(xToTime(x + ED.drag.dx)), 0, G.pack.meta.duration);
-  const lane = edLaneAt(y);
-  if (lane >= 0) n.lane = lane;
+  if (ED.drag.move) {
+    const shift = snapTime(ED.drag.anchorT + (xToTime(x) - ED.drag.startT)) - ED.drag.anchorT;
+    let dLane = edLaneClamp(y) - ED.drag.startLane;
+    let lo = 99, hi = -99;
+    for (const o of ED.drag.orig) { lo = Math.min(lo, o.lane); hi = Math.max(hi, o.lane); }
+    dLane = clamp(dLane, -lo, MODES[ED.mode].lanes - 1 - hi);
+    for (const o of ED.drag.orig) {
+      o.n.t = clamp(o.t + shift, 0, G.pack.meta.duration);
+      o.n.lane = o.lane + dLane;
+    }
+  }
 });
 
 const edEndDrag = () => {
-  if (ED.drag && ED.drag.note) {
+  if (ED.drag && ED.drag.band) {
+    const n = ED.sel.length;
+    edMsg(n ? n + (n === 1 ? ' note selected' : ' notes selected — Delete removes them') : '');
+  } else if (ED.drag && ED.drag.note) {
     ED.notes.sort((a, b) => a.t - b.t);
-    edCount();                                   // the holds readout follows a resize
+    edCount();
     if (ED.drag.fresh && ED.drag.note.d > 0) edMsg('Hold added — drag the square on its tail to resize');
+  } else if (ED.drag && ED.drag.move) {
+    ED.notes.sort((a, b) => a.t - b.t);
   }
   ED.drag = null;
+  ED.band = null;
 };
 edcv.addEventListener('pointerup', edEndDrag);
 edcv.addEventListener('pointercancel', edEndDrag);
 edcv.addEventListener('contextmenu', (e) => e.preventDefault());
+
 edcv.addEventListener('dblclick', (e) => {
   const rect = edcv.getBoundingClientRect();
-  const hit = edHit(e.clientX - rect.left, e.clientY - rect.top);
-  if (hit) { edPush(); ED.notes.splice(ED.notes.indexOf(hit), 1); ED.sel = null; edCount(); }
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  if (y < padTop()) return;
+  const lane = edLaneAt(y);
+  if (lane < 0) return;
+  const hit = edHit(x, y);
+  if (hit) {
+    edPush();
+    ED.notes.splice(ED.notes.indexOf(hit), 1);
+    ED.sel = ED.sel.filter((n) => n !== hit);
+    edCount();
+    edMsg('Note deleted');
+  } else if (ED.tool === 'select') {
+    edPush();                                           // deliberate: two clicks to place
+    const n = { t: snapTime(xToTime(x)), lane: lane, d: 0, s: 1.4 };
+    ED.notes.push(n);
+    ED.notes.sort((a, b) => a.t - b.t);
+    ED.sel = [n];
+    edCount();
+    edMsg('Note added — switch to Draw to place them with one click');
+  }
 });
 
 edcv.addEventListener('wheel', (e) => {
@@ -3708,6 +3874,12 @@ edcv.addEventListener('wheel', (e) => {
     ED.view = clamp(ED.view + by, 0, Math.max(0, G.pack.meta.duration));
   }
 }, { passive: false });
+
+$('edTools').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (b) setTool(b.dataset.tool);
+});
+$('edDelete').addEventListener('click', edDelete);
 
 /* -------------------------------- transport -------------------------------- */
 
@@ -3778,7 +3950,7 @@ $('edModes').addEventListener('click', (e) => {
   ED.mode = next;
   setMode(next);
   ED.notes = (G.pack.charts[next] || []).map((n) => ({ t: n.t, lane: n.lane, d: n.d || 0, s: n.s || 1.4 }));
-  ED.sel = null; ED.history = [];
+  ED.sel = []; ED.history = [];
   $('edUndo').disabled = true;
   $('emOllie').setAttribute('aria-pressed', String(next === 'ollie'));
   $('emRue').setAttribute('aria-pressed', String(next === 'rue'));
@@ -3788,11 +3960,11 @@ $('edModes').addEventListener('click', (e) => {
 $('edUndo').addEventListener('click', () => {
   if (!ED.history.length) return;
   ED.notes = ED.history.pop();
-  ED.sel = null;
+  ED.sel = [];
   $('edUndo').disabled = !ED.history.length;
   edCount();
 });
-$('edClear').addEventListener('click', () => { edPush(); ED.notes = []; ED.sel = null; edCount(); edMsg(''); });
+$('edClear').addEventListener('click', () => { edPush(); ED.notes = []; ED.sel = []; edCount(); edMsg('Mode cleared'); });
 $('edHolds').addEventListener('click', () => {
   edPush();
   ED.notes.sort((a, b) => a.t - b.t);
@@ -3817,7 +3989,7 @@ $('edAuto').addEventListener('click', async () => {
   edPush();
   await ensureAnalysis();
   ED.notes = buildFor(ED.mode);
-  ED.sel = null;
+  ED.sel = [];
   edCount();
   edMsg('Re-charted from the audio');
 });
@@ -3854,29 +4026,44 @@ window.addEventListener('keydown', (e) => {
   }
 
   if (k === ' ') { e.preventDefault(); $('edPlay').click(); return; }
-  if (k === 'escape') { e.preventDefault(); edStop(); $('edDone').click(); return; }
-  if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); $('edUndo').click(); return; }
-  if (k === 'delete' || k === 'backspace') {
+  if (k === 'escape') {
     e.preventDefault();
-    if (ED.sel) { edPush(); ED.notes.splice(ED.notes.indexOf(ED.sel), 1); ED.sel = null; edCount(); }
+    if (ED.sel.length) { ED.sel = []; edCount(); edMsg(''); return; }
+    edStop(); $('edDone').click();
     return;
   }
+  if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); $('edUndo').click(); return; }
+  if (k === 'delete' || k === 'backspace') { e.preventDefault(); edDelete(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'a') {
+    e.preventDefault();
+    ED.sel = ED.notes.slice();
+    edCount();
+    edMsg(ED.sel.length + ' notes selected');
+    return;
+  }
+  if (k === '1') { e.preventDefault(); setTool('select'); return; }
+  if (k === '2') { e.preventDefault(); setTool('draw'); return; }
   if (k === 'h') {
     e.preventDefault();
-    if (ED.sel) {
+    if (ED.sel.length) {
       edPush();
-      ED.sel.d = ED.sel.d > 0 ? 0 : holdStep();
+      const makeHold = ED.sel.some((n) => !n.d);
+      for (const n of ED.sel) n.d = makeHold ? holdStep() : 0;
       edCount();
-      edMsg(ED.sel.d > 0 ? 'Turned into a hold — Shift+arrows resize it' : 'Back to a tap');
+      edMsg(makeHold
+        ? ED.sel.length + (ED.sel.length === 1 ? ' note is now a hold' : ' notes are now holds') + ' — Shift+arrows resize'
+        : 'Back to taps');
     }
     return;
   }
   if (e.shiftKey && (k === 'arrowleft' || k === 'arrowright')) {
     e.preventDefault();
-    if (ED.sel) {
+    if (ED.sel.length) {
       edPush();
-      ED.sel.d = Math.max(0, (ED.sel.d || 0) + (k === 'arrowright' ? holdStep() : -holdStep()));
-      if (ED.sel.d < holdStep() * 0.5) ED.sel.d = 0;
+      for (const n of ED.sel) {
+        n.d = Math.max(0, (n.d || 0) + (k === 'arrowright' ? holdStep() : -holdStep()));
+        if (n.d < holdStep() * 0.5) n.d = 0;
+      }
       edCount();
     }
     return;
