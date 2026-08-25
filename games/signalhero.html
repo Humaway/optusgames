@@ -1,0 +1,4274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Signal Hero — an Optus rhythm game</title>
+<style>
+/* ============================================================
+   SIGNAL HERO — design tokens
+   Display face: geometric friendly sans (Optus-adjacent)
+   Utility face: mono, used for all numbers and data
+   ============================================================ */
+:root{
+  --abyss:#001a1b;
+  --deep:#00302f;
+  --slate:#0a3d3c;
+  --teal:#009b93;
+  --bright:#00d6c4;
+  --yellow:#ffd200;
+  --amber:#ffab00;
+  --white:#ffffff;
+  --dim:rgba(255,255,255,.58);
+  --faint:rgba(255,255,255,.14);
+
+  --accent:var(--yellow);
+  --accent-2:var(--bright);
+  --field:radial-gradient(120% 90% at 50% 8%, #04524d 0%, #012c2c 45%, #001a1b 100%);
+
+  --display:"Gill Sans Nova","Futura","Avenir Next","Century Gothic","Trebuchet MS",system-ui,sans-serif;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
+
+  --r-lg:22px; --r-md:14px; --r-sm:9px;
+}
+body[data-mode="rue"]{
+  --accent:#ff2e7e;
+  --accent-2:#9b5cff;
+  --field:radial-gradient(120% 90% at 50% 6%, #2a0433 0%, #12001c 48%, #06000a 100%);
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;user-select:none;-webkit-user-select:none; background:var(--abyss); color:var(--white);
+  font-family:var(--body); overflow:hidden;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  -webkit-tap-highlight-color:transparent;
+}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:3px;border-radius:4px}
+
+/* ---------- screens ---------- */
+.screen{position:fixed;inset:0;display:block;overflow-y:auto;overscroll-behavior:contain}
+.screen[hidden]{display:none}
+#menu,#analysis,#ready{background:var(--field)}
+
+/* soft signal rings behind the menu */
+.rings{position:absolute;inset:0;pointer-events:none;opacity:.5;overflow:hidden}
+.rings i{
+  position:absolute;left:50%;bottom:-46vh;translate:-50% 0;
+  border:1px solid rgba(0,214,196,.20);border-radius:50%;
+  width:74vh;height:74vh;animation:swell 7s linear infinite;
+}
+.rings i:nth-child(2){animation-delay:2.33s}
+.rings i:nth-child(3){animation-delay:4.66s}
+@keyframes swell{from{transform:scale(.28);opacity:0}18%{opacity:.75}to{transform:scale(1.7);opacity:0}}
+
+/* ---------- menu ---------- */
+.wrap{position:relative;width:min(1020px,100%);margin:0 auto;padding:min(7vh,64px) 24px 64px}
+.eyebrow{display:flex;align-items:center;gap:12px;margin:0 0 26px}
+.yes{
+  display:inline-grid;place-items:center;width:46px;height:34px;border-radius:17px 17px 17px 4px;
+  background:var(--yellow);color:#00302f;font-family:var(--display);font-weight:800;
+  font-size:17px;letter-spacing:-.02em;box-shadow:0 6px 22px rgba(255,210,0,.28)
+}
+body[data-mode="rue"] .yes{background:var(--accent);color:#12001c;box-shadow:0 6px 22px rgba(255,46,126,.3)}
+.eyebrow span{font-family:var(--mono);font-size:11.5px;letter-spacing:.34em;text-transform:uppercase;color:var(--dim)}
+
+.title{
+  font-family:var(--display);font-weight:800;line-height:.84;letter-spacing:-.045em;
+  font-size:clamp(62px,15vw,168px);margin:0;text-transform:uppercase;
+}
+.title em{font-style:normal;display:block;color:var(--accent);text-shadow:0 0 60px rgba(255,210,0,.30)}
+body[data-mode="rue"] .title em{text-shadow:0 0 60px rgba(255,46,126,.4)}
+.lede{max-width:44ch;margin:22px 0 40px;font-size:17px;line-height:1.55;color:rgba(255,255,255,.76)}
+.lede b{color:var(--white);font-weight:600}
+
+.step{border-top:1px solid var(--faint);padding:26px 0 30px}
+.step__head{display:flex;align-items:baseline;gap:14px;margin-bottom:18px}
+.step__num{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.1em}
+.step__title{font-family:var(--display);font-size:19px;font-weight:700;letter-spacing:.01em;margin:0}
+.step__hint{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--dim);letter-spacing:.05em}
+
+/* file drop */
+.drop{
+  display:flex;align-items:center;gap:18px;width:100%;text-align:left;
+  padding:22px 24px;border:1.5px dashed rgba(0,214,196,.4);border-radius:var(--r-lg);
+  background:rgba(0,155,147,.09);transition:border-color .2s,background .2s,transform .12s
+}
+.drop:hover,.drop.is-over{border-color:var(--accent);background:rgba(0,155,147,.16)}
+.drop:active{transform:translateY(1px)}
+.drop.is-set{border-style:solid;border-color:rgba(0,214,196,.55)}
+.drop__icon{flex:none;width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:rgba(0,214,196,.16)}
+.drop__icon svg{width:22px;height:22px;fill:var(--accent-2)}
+.drop__main{min-width:0}
+.drop__name{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drop__sub{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:4px}
+
+/* mode cards */
+.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:16px}
+.mode{
+  position:relative;text-align:left;padding:24px;border-radius:var(--r-lg);
+  border:1.5px solid var(--faint);background:rgba(255,255,255,.035);
+  transition:border-color .18s,background .18s,transform .18s
+}
+.mode:hover{transform:translateY(-3px);background:rgba(255,255,255,.06)}
+.mode[aria-pressed="true"]{border-color:var(--mc);background:color-mix(in srgb,var(--mc) 12%,transparent)}
+.mode__dot{width:11px;height:11px;border-radius:50%;background:var(--mc);box-shadow:0 0 16px var(--mc)}
+.mode__top{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.mode__tag{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--mc)}
+.mode__name{font-family:var(--display);font-size:27px;font-weight:800;letter-spacing:-.02em;margin:0 0 8px}
+.mode__desc{font-size:14px;line-height:1.5;color:rgba(255,255,255,.7);margin:0 0 18px}
+.mode__keys{display:flex;gap:6px;flex-wrap:wrap}
+kbd{
+  font-family:var(--mono);font-size:12px;min-width:28px;text-align:center;padding:6px 8px;border-radius:7px;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-bottom-width:2px
+}
+.mode__specs{margin:16px 0 0;padding-top:14px;border-top:1px solid var(--faint);display:grid;gap:6px}
+.spec{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+.spec b{color:rgba(255,255,255,.85);font-weight:500}
+
+/* launch row */
+.launch{display:flex;align-items:center;gap:24px;flex-wrap:wrap;border-top:1px solid var(--faint);padding-top:26px}
+.sync{flex:1 1 240px;min-width:220px}
+.sync__row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.sync__label{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.sync__val{font-family:var(--mono);font-size:13px;color:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent);height:22px}
+.sync__hint{font-size:12px;color:var(--dim);margin-top:7px}
+.go{
+  display:inline-flex;align-items:center;gap:12px;padding:17px 30px;border-radius:100px;
+  background:var(--accent);color:#00302f;font-family:var(--display);font-weight:800;font-size:17px;
+  letter-spacing:.01em;box-shadow:0 10px 34px rgba(255,210,0,.26);transition:transform .14s,box-shadow .14s,filter .2s
+}
+body[data-mode="rue"] .go{color:#12001c;box-shadow:0 10px 34px rgba(255,46,126,.3)}
+.go:hover{transform:translateY(-2px);box-shadow:0 16px 40px rgba(255,210,0,.34)}
+.go[disabled]{filter:grayscale(1) brightness(.62);cursor:not-allowed;transform:none;box-shadow:none}
+.go svg{width:17px;height:17px;fill:currentColor}
+.err{margin-top:14px;font-size:14px;color:#ff7a7a}
+.foot{margin-top:38px;font-size:11.5px;line-height:1.7;color:rgba(255,255,255,.35)}
+
+/* ---------- analysis + ready ---------- */
+.panel{width:min(760px,100%);margin:0 auto;padding:max(48px,11vh) 24px 64px}
+.panel__kicker{font-family:var(--mono);font-size:11.5px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);margin-bottom:14px}
+.panel__title{font-family:var(--display);font-size:clamp(34px,6vw,54px);font-weight:800;letter-spacing:-.035em;margin:0 0 10px;line-height:1}
+.panel__sub{color:var(--dim);font-size:15px;margin:0 0 32px}
+.scope{width:100%;height:150px;display:block;border-radius:var(--r-md);background:rgba(0,0,0,.28);border:1px solid var(--faint)}
+.stages{list-style:none;margin:28px 0 0;padding:0;display:grid;gap:11px}
+.stages li{display:flex;align-items:center;gap:13px;font-family:var(--mono);font-size:13px;color:rgba(255,255,255,.34);transition:color .3s}
+.stages li::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.stages li.on{color:var(--accent-2)}
+.stages li.done{color:rgba(255,255,255,.66)}
+.bar{height:4px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:30px}
+.bar__fill{height:100%;width:0;background:var(--accent);transition:width .3s ease}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;background:var(--faint);border:1px solid var(--faint);border-radius:var(--r-md);overflow:hidden;margin:26px 0 32px}
+.stat{background:#02292a;padding:18px 16px}
+body[data-mode="rue"] .stat{background:#150220}
+.stat__v{font-family:var(--mono);font-size:25px;color:var(--accent);line-height:1}
+.stat__k{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-top:8px}
+.row{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.ghost{padding:15px 24px;border-radius:100px;border:1.5px solid rgba(255,255,255,.24);font-weight:600;font-size:15px;transition:border-color .16s,background .16s}
+.ghost:hover{border-color:var(--white);background:rgba(255,255,255,.07)}
+
+/* ---------- game ---------- */
+#game{position:fixed;inset:0}
+#game[hidden]{display:none}
+canvas#cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+.hud{position:absolute;inset:0;pointer-events:none;padding:18px 22px;display:grid;
+     grid-template-columns:1fr auto 1fr;align-items:start;gap:20px;font-family:var(--mono)}
+.hud[hidden]{display:none}
+.meter__label{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:9px}
+.bars{display:flex;align-items:flex-end;gap:4px;height:30px;margin-bottom:8px}
+.bars i{width:9px;border-radius:2px;background:rgba(255,255,255,.13);transition:background .18s,box-shadow .18s}
+.bars i:nth-child(1){height:34%}.bars i:nth-child(2){height:52%}.bars i:nth-child(3){height:70%}
+.bars i:nth-child(4){height:86%}.bars i:nth-child(5){height:100%}
+.bars i.lit{background:var(--accent-2);box-shadow:0 0 12px var(--accent-2)}
+.bars.low i.lit{background:#ff5a5a;box-shadow:0 0 14px rgba(255,90,90,.75)}
+.meter__track{width:172px;max-width:38vw;height:5px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden}
+.meter__fill{height:100%;width:65%;background:var(--accent-2);transition:width .12s linear,background .2s}
+.meter__fill.low{background:#ff5a5a}
+.hud__mid{text-align:center;min-width:min(320px,42vw)}
+.track-name{font-family:var(--body);font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.9}
+.prog{height:3px;border-radius:2px;background:rgba(255,255,255,.13);margin:9px 0 7px;overflow:hidden}
+.prog__fill{height:100%;width:0;background:var(--accent)}
+.hud__meta{display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.hud__right{text-align:right}
+.score{font-size:clamp(28px,5vw,44px);line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.acc{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:8px}
+.acc span{color:var(--accent)}
+
+/* overlays */
+.veil{position:absolute;inset:0;display:grid;place-items:center;padding:28px;
+      background:rgba(0,14,15,.86);backdrop-filter:blur(9px);text-align:center}
+body[data-mode="rue"] .veil{background:rgba(8,0,14,.88)}
+.veil[hidden]{display:none}
+.veil__inner{width:min(560px,100%)}
+.veil__kicker{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+.veil__title{font-family:var(--display);font-size:clamp(40px,9vw,74px);font-weight:800;letter-spacing:-.04em;margin:0 0 12px;line-height:.92}
+.veil__sub{color:var(--dim);font-size:15px;margin:0 0 30px}
+.rank{font-family:var(--display);font-size:clamp(74px,17vw,140px);font-weight:800;line-height:.8;color:var(--accent);letter-spacing:-.05em}
+.rank__name{font-family:var(--mono);font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:var(--dim);margin-top:14px}
+.tally{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--faint);border:1px solid var(--faint);
+       border-radius:var(--r-md);overflow:hidden;margin:30px 0}
+.tally div{background:rgba(0,0,0,.4);padding:15px 8px}
+.tally b{display:block;font-family:var(--mono);font-size:22px;font-weight:400;line-height:1}
+.tally span{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-top:7px;display:block}
+.tally .p b{color:var(--accent-2)} .tally .g b{color:var(--yellow)} .tally .m b{color:#ff6b6b}
+.veil .row{justify-content:center}
+.hint{font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.32);margin-top:26px;letter-spacing:.06em}
+
+/* ---------- top nav ---------- */
+.nav{position:absolute;top:0;right:24px;display:flex;gap:10px;padding-top:min(7vh,64px);z-index:3}
+.nav button{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+  padding:11px 17px;border-radius:100px;border:1px solid var(--faint);color:var(--dim);transition:color .16s,border-color .16s,background .16s}
+.nav button:hover{color:var(--white);border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.06)}
+
+/* ---------- app chrome ---------- */
+.chrome{position:fixed;top:0;left:0;right:0;height:62px;z-index:20;display:flex;align-items:center;gap:22px;
+  padding:0 22px;background:rgba(0,20,20,.82);backdrop-filter:blur(14px);border-bottom:1px solid var(--faint)}
+body[data-mode="rue"] .chrome{background:rgba(10,0,18,.84)}
+.chrome[hidden]{display:none}
+body.has-chrome .screen{top:62px}
+.brand{display:flex;align-items:center;gap:11px;flex:none}
+.brand .yes{width:38px;height:28px;font-size:14px;border-radius:14px 14px 14px 3px;box-shadow:none}
+.brand__name{font-family:var(--display);font-size:16px;font-weight:800;letter-spacing:-.01em;white-space:nowrap}
+.tabs{display:flex;gap:4px;flex:1 1 auto;min-width:0;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{padding:9px 15px;border-radius:100px;font-size:13.5px;font-weight:500;color:var(--dim);white-space:nowrap;
+  transition:color .15s,background .15s}
+.tab:hover{color:var(--white);background:rgba(255,255,255,.06)}
+.tab[aria-pressed="true"]{color:#00302f;background:var(--accent);font-weight:600}
+body[data-mode="rue"] .tab[aria-pressed="true"]{color:#12001c}
+.acct{display:flex;align-items:center;gap:10px;flex:none}
+.acct__who{display:flex;align-items:center;gap:9px;padding:6px 13px 6px 6px;border-radius:100px;
+  border:1px solid var(--faint)}
+.avatar{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--accent);
+  color:#00302f;font-family:var(--display);font-weight:800;font-size:12px;flex:none}
+body[data-mode="rue"] .avatar{color:#12001c}
+.acct__name{font-size:13px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct__btn{font-size:13px;padding:9px 15px;border-radius:100px;border:1px solid var(--faint);color:var(--dim);
+  transition:color .15s,border-color .15s}
+.acct__btn:hover{color:var(--white);border-color:rgba(255,255,255,.45)}
+.acct__btn.solid{background:var(--accent);border-color:var(--accent);color:#00302f;font-weight:600}
+body[data-mode="rue"] .acct__btn.solid{color:#12001c}
+@media (max-width:640px){ .brand__name,.acct__name{display:none} .chrome{gap:12px;padding:0 12px} }
+
+/* ---------- page headers ---------- */
+.wrap--wide{width:min(1240px,100%)}
+.page__head{display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:26px}
+.page__head>div{flex:1 1 auto}
+.page__title{font-family:var(--display);font-size:clamp(34px,6vw,50px);font-weight:800;letter-spacing:-.035em;
+  margin:0 0 8px;line-height:1}
+.page__sub{color:var(--dim);font-size:15px;margin:0;line-height:1.55}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:0 0 22px}
+.search{position:relative;flex:1 1 260px;min-width:210px}
+.search svg{position:absolute;left:14px;top:50%;translate:0 -50%;width:16px;height:16px;fill:var(--dim)}
+.search input{width:100%;padding:13px 15px 13px 40px;border-radius:100px;border:1px solid var(--faint);
+  background:rgba(0,0,0,.28);color:var(--white);font:inherit;font-size:14px}
+.search input:focus{outline:none;border-color:var(--accent)}
+.sorts{display:flex;gap:6px;flex-wrap:wrap}
+.sorts button{padding:11px 15px;border-radius:100px;border:1px solid var(--faint);font-family:var(--mono);
+  font-size:11.5px;letter-spacing:.06em;color:var(--dim);white-space:nowrap;transition:all .15s}
+.sorts button:hover{color:var(--white);border-color:rgba(255,255,255,.4)}
+.sorts button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#00302f}
+body[data-mode="rue"] .sorts button[aria-pressed="true"]{color:#12001c}
+
+/* ---------- track cards ---------- */
+.card__top{display:flex;align-items:flex-start;gap:10px;margin-bottom:5px}
+.card__title{flex:1 1 auto}
+.src{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;padding:4px 8px;
+  border-radius:100px;background:rgba(255,255,255,.09);color:var(--dim);flex:none;margin-top:3px}
+.src.cloud{background:color-mix(in srgb,var(--accent-2) 22%,transparent);color:var(--accent-2)}
+.card__rate{display:flex;align-items:center;gap:9px;margin:0 0 13px}
+.stars{display:flex;gap:2px}
+.stars svg{width:15px;height:15px;fill:rgba(255,255,255,.18)}
+.stars svg.on{fill:var(--accent)}
+.stars.big svg{width:34px;height:34px}
+.stars.act svg{cursor:pointer;transition:transform .12s}
+.stars.act svg:hover{transform:scale(1.18)}
+.card__rnum{font-family:var(--mono);font-size:11px;color:var(--dim)}
+
+/* ---------- modals ---------- */
+.modal{position:fixed;z-index:40}
+.modal__box{width:min(440px,100%);text-align:left;background:#02292a;border:1px solid var(--faint);
+  border-radius:var(--r-lg);padding:30px}
+body[data-mode="rue"] .modal__box{background:#160223}
+.modal__title{font-family:var(--display);font-size:27px;font-weight:800;letter-spacing:-.025em;margin:0 0 9px}
+.modal__sub{font-size:14px;line-height:1.6;color:var(--dim);margin:0 0 24px}
+.field2{display:block;margin:0 0 15px}
+.field2>span{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:7px}
+.field2 input{width:100%;padding:12px 14px;border-radius:var(--r-sm);border:1px solid var(--faint);
+  background:rgba(0,0,0,.32);color:var(--white);font:inherit;font-size:14.5px}
+.field2 input:focus{outline:none;border-color:var(--accent)}
+.modal .row{justify-content:flex-start}
+
+/* ---------- rating on results ---------- */
+.rate{border-top:1px solid var(--faint);border-bottom:1px solid var(--faint);padding:22px 0;margin:26px 0}
+.rate__label{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:14px}
+.rate .stars{justify-content:center}
+.rate__note{font-size:12.5px;color:var(--dim);margin:13px 0 0;min-height:18px}
+
+/* ---------- settings ---------- */
+.launch__note{font-size:13.5px;color:var(--dim);margin:0;flex:1 1 240px;min-width:210px;line-height:1.6}
+.launch__note b{color:var(--accent);font-family:var(--mono);font-size:13px}
+.linkish{color:var(--white);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--faint)}
+.linkish:hover{text-decoration-color:var(--accent);color:var(--accent)}
+.setgroup{border-top:1px solid var(--faint);padding:28px 0 8px}
+.setgroup__t{font-family:var(--display);font-size:21px;font-weight:700;letter-spacing:-.015em;margin:0 0 9px}
+.setgroup__p{font-size:14.5px;line-height:1.65;color:rgba(255,255,255,.68);margin:0 0 22px;max-width:62ch}
+.setgroup__p kbd,.calib__p kbd{font-size:11px;min-width:22px;padding:3px 6px}
+.delay{display:flex;align-items:center;justify-content:center;gap:20px;margin:0 0 16px}
+.nudge{width:64px;height:44px;border-radius:var(--r-sm);border:1px solid var(--faint);font-family:var(--mono);
+  font-size:14px;color:var(--dim);transition:border-color .15s,color .15s,background .15s}
+.nudge:hover{border-color:var(--accent);color:var(--accent);background:rgba(255,255,255,.05)}
+.delay__val{min-width:150px;text-align:center;font-family:var(--mono);font-size:38px;color:var(--accent);
+  line-height:1;font-variant-numeric:tabular-nums}
+.delay__val i{font-style:normal;font-size:14px;color:var(--dim);margin-left:5px}
+.delay__scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;
+  color:rgba(255,255,255,.32);margin-top:5px}
+.calib{border:1px solid var(--faint);border-radius:var(--r-md);padding:20px;margin:26px 0 4px;
+  background:rgba(255,255,255,.025)}
+.calib__head{display:flex;align-items:center;gap:14px;margin-bottom:9px;flex-wrap:wrap}
+.calib__t{font-family:var(--display);font-size:16px;font-weight:700;margin:0;flex:1 1 auto}
+.calib__p{font-size:13.5px;line-height:1.6;color:rgba(255,255,255,.66);margin:0}
+.calib__dots{display:flex;gap:7px;margin-top:16px;flex-wrap:wrap}
+.calib__dots i{width:11px;height:11px;border-radius:50%;background:rgba(255,255,255,.12);transition:background .15s}
+.calib__dots i.on{background:var(--accent);box-shadow:0 0 10px var(--accent)}
+.calib .row{margin-top:16px}
+.binder{margin:0 0 22px}
+.binder__head{display:flex;align-items:center;gap:11px;margin:0 0 12px;flex-wrap:wrap}
+.binder__t{font-family:var(--display);font-size:17px;font-weight:700;margin:0}
+.binder__n{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.caps{display:flex;gap:10px;flex-wrap:wrap}
+.keycap{position:relative;flex:1 1 96px;max-width:150px;padding:14px 10px 12px;border-radius:var(--r-md);
+  border:1.5px solid var(--faint);background:rgba(255,255,255,.03);text-align:center;overflow:hidden;
+  transition:border-color .15s,background .15s,transform .12s}
+.keycap::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:var(--lc)}
+.keycap:hover{border-color:var(--lc);background:rgba(255,255,255,.07);transform:translateY(-2px)}
+.keycap__lane{display:block;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:9px}
+.keycap__key{display:block;font-family:var(--mono);font-size:23px;line-height:1.1;color:var(--white);
+  overflow-wrap:anywhere}
+.keycap__hint{display:block;font-family:var(--mono);font-size:9.5px;color:rgba(255,255,255,.3);margin-top:9px}
+.keycap.listening{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,transparent);
+  animation:blip 1.1s ease-in-out infinite}
+.keycap.listening .keycap__key{color:var(--accent);font-size:14px;padding:5px 0}
+.bind__spacer{flex:1 1 auto}
+.bind__note{font-size:13px;line-height:1.6;color:var(--accent);margin:14px 0 0;min-height:20px}
+
+/* diagnostics in the empty state */
+.probe{list-style:none;margin:0 0 16px;padding:0;display:grid;gap:7px}
+.probe li{display:flex;gap:11px;align-items:baseline;font-family:var(--mono);font-size:12px;
+  color:rgba(255,255,255,.55)}
+.probe b{font-weight:400;color:var(--white);min-width:0;overflow-wrap:anywhere}
+.probe span{margin-left:auto;color:rgba(255,255,255,.4);white-space:nowrap;padding-left:12px}
+.probe li.hit{color:var(--accent-2)}
+.probe li.hit span{color:var(--accent-2)}
+#library.is-over::after{content:"Drop to add";position:fixed;inset:14px;border:2px dashed var(--accent);
+  border-radius:var(--r-lg);display:grid;place-items:center;font-family:var(--display);font-size:26px;
+  font-weight:700;color:var(--accent);background:rgba(0,0,0,.55);pointer-events:none;z-index:5}
+
+/* ---------- chart library ---------- */
+.lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(252px,1fr));gap:14px;margin:8px 0 30px}
+.card{position:relative;text-align:left;padding:20px;border-radius:var(--r-lg);border:1.5px solid var(--faint);
+  background:rgba(255,255,255,.035);transition:border-color .18s,background .18s,transform .18s}
+.card:hover{transform:translateY(-3px);border-color:var(--accent);background:rgba(255,255,255,.07)}
+.card__title{font-family:var(--display);font-size:21px;font-weight:700;letter-spacing:-.02em;margin:0 0 5px;
+  line-height:1.15;overflow-wrap:anywhere}
+.card__by{font-size:13px;color:rgba(255,255,255,.62);margin:0 0 15px;overflow-wrap:anywhere}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;padding:5px 9px;border-radius:100px;
+  background:rgba(255,255,255,.07);color:var(--dim)}
+.chip.on{background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--accent)}
+.card__charter{font-family:var(--mono);font-size:10.5px;color:rgba(255,255,255,.4);margin-top:14px;
+  letter-spacing:.06em;overflow-wrap:anywhere}
+.empty{border:1.5px dashed var(--faint);border-radius:var(--r-lg);padding:30px;margin:8px 0 26px}
+.empty h3{font-family:var(--display);font-size:19px;font-weight:700;margin:0 0 10px}
+.empty p{font-size:14.5px;line-height:1.62;color:rgba(255,255,255,.68);margin:0 0 14px;max-width:62ch}
+.empty ol{margin:0 0 16px;padding-left:20px;color:rgba(255,255,255,.68);font-size:14.5px;line-height:1.75}
+.empty code,.tree{font-family:var(--mono);font-size:12.5px;background:rgba(0,0,0,.36);border:1px solid var(--faint);
+  border-radius:var(--r-sm);color:var(--accent-2)}
+.empty code{padding:2px 7px;overflow-wrap:anywhere}
+.tree{display:block;padding:15px 17px;white-space:pre;overflow-x:auto;color:rgba(255,255,255,.72);line-height:1.7;margin:0 0 16px}
+.tree b{color:var(--accent);font-weight:400}
+
+/* ---------- editor ---------- */
+#editor{position:fixed;inset:0;background:var(--field);display:flex;flex-direction:column}
+#editor[hidden]{display:none}
+.ed__bar{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--faint);flex-wrap:wrap}
+.ed__bar--foot{border-bottom:0;border-top:1px solid var(--faint)}
+.ed__title{font-family:var(--display);font-size:17px;font-weight:700;letter-spacing:-.01em;margin-right:4px;white-space:nowrap}
+.ed__spacer{flex:1 1 auto}
+.field{display:flex;align-items:center;gap:8px}
+.field label{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.field input[type=text]{width:clamp(96px,15vw,190px);padding:8px 11px;border-radius:var(--r-sm);
+  border:1px solid var(--faint);background:rgba(0,0,0,.3);color:var(--white);font:inherit;font-size:13.5px}
+.field input[type=text]:focus{border-color:var(--accent);outline:none}
+.seg{display:flex;border:1px solid var(--faint);border-radius:100px;overflow:hidden}
+.seg button{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:9px 15px;
+  color:var(--dim);transition:background .15s,color .15s;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#00302f}
+body[data-mode="rue"] .seg button[aria-pressed="true"]{color:#12001c}
+.tool{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;padding:10px 15px;border-radius:100px;
+  border:1px solid var(--faint);color:var(--dim);white-space:nowrap;
+  transition:color .15s,border-color .15s,background .15s}
+.tool:hover{color:var(--white);border-color:rgba(255,255,255,.4)}
+.tool[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#00302f}
+body[data-mode="rue"] .tool[aria-pressed="true"]{color:#12001c}
+.tool.rec[aria-pressed="true"]{background:#ff3b3b;border-color:#ff3b3b;color:#fff;animation:blip 1.1s ease-in-out infinite}
+@keyframes blip{50%{opacity:.55}}
+.tool.primary{background:var(--accent);border-color:var(--accent);color:#00302f;font-weight:600}
+body[data-mode="rue"] .tool.primary{color:#12001c}
+.tool[disabled]{opacity:.38;cursor:not-allowed}
+#edcv{flex:1 1 auto;width:100%;display:block;touch-action:none;cursor:crosshair;min-height:0}
+.ed__read{font-family:var(--mono);font-size:11.5px;color:var(--dim);white-space:nowrap}
+.ed__read b{color:var(--white);font-weight:400;font-variant-numeric:tabular-nums}
+.ed__help{font-family:var(--mono);font-size:10.5px;color:rgba(255,255,255,.34);letter-spacing:.04em;
+  padding:0 18px 11px;line-height:1.7}
+@media (max-width:900px){ .ed__help{display:none} .ed__bar{gap:9px;padding:10px 12px} }
+
+/* download progress */
+.dl{max-width:420px;margin:0 auto}
+
+@media (max-width:720px){
+  .hud{grid-template-columns:1fr 1fr;gap:12px;padding:14px}
+  .hud__mid{grid-column:1/-1;order:3;min-width:0}
+  .meter__track{width:130px}
+}
+@media (prefers-reduced-motion:reduce){
+  .rings i{animation:none;opacity:.2}
+  .mode:hover,.go:hover{transform:none}
+}
+</style>
+</head>
+<body data-mode="ollie" data-app="signal-hero">
+<header class="chrome" id="chrome" hidden>
+  <button class="brand" id="brandBtn">
+    <span class="yes">yes</span>
+    <span class="brand__name">Signal Hero</span>
+  </button>
+  <nav class="tabs">
+    <button class="tab" id="tabPlay" aria-pressed="true">Play</button>
+    <button class="tab" id="tabCreate" aria-pressed="false">Create</button>
+    <button class="tab" id="tabSettings" aria-pressed="false">Settings</button>
+  </nav>
+  <div class="acct" id="acct"></div>
+</header>
+
+
+<!-- ================= MENU ================= -->
+<section class="screen" id="create" hidden>
+  <div class="rings" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="wrap">
+    <h1 class="page__title">Create a chart</h1>
+    <p class="page__sub" style="max-width:56ch">Load a song and the detector roughs out a chart from what it
+      hears. Fix it up in the editor, then publish it so it lands on the Play tab for everyone.</p>
+
+    <div class="step">
+      <div class="step__head">
+        <span class="step__num">01</span>
+        <h2 class="step__title">Pick a track</h2>
+        <span class="step__hint">MP3 · M4A · WAV · OGG · .signal</span>
+      </div>
+      <button class="drop" id="drop">
+        <span class="drop__icon"><svg viewBox="0 0 24 24"><path d="M12 3v10.6a4 4 0 1 0 2 3.4V7h5V3h-7z"/></svg></span>
+        <span class="drop__main">
+          <span class="drop__name" id="fileName">Choose a file, or drop one here</span>
+          <span class="drop__sub" id="fileMeta">An audio file gets charted for you · a .signal file opens straight away</span>
+        </span>
+      </button>
+      <input type="file" id="file" accept="audio/*,.mp3,.m4a,.wav,.ogg,.signal" hidden>
+      <p class="err" id="err" hidden></p>
+    </div>
+
+    <div class="step">
+      <div class="step__head">
+        <span class="step__num">02</span>
+        <h2 class="step__title">Pick a mode to chart first</h2>
+        <span class="step__hint">You can chart the other one in the editor</span>
+      </div>
+      <div class="modes">
+        <button class="mode" id="mOllie" aria-pressed="true" style="--mc:#ffd200">
+          <span class="mode__top"><span class="mode__dot"></span><span class="mode__tag">Medium – Hard</span></span>
+          <h3 class="mode__name">Ollie Mode</h3>
+          <p class="mode__desc">Four lanes, room to breathe. Only the beats that carry the song get a note.</p>
+          <div class="mode__keys" id="keysOllie"></div>
+          <div class="mode__specs">
+            <span class="spec">Read time<b>1.55 s</b></span>
+            <span class="spec">Perfect window<b>±70 ms</b></span>
+            <span class="spec">Note density<b>~2.1 / sec</b></span>
+          </div>
+        </button>
+        <button class="mode" id="mRue" aria-pressed="false" style="--mc:#ff2e7e">
+          <span class="mode__top"><span class="mode__dot"></span><span class="mode__tag">Expert</span></span>
+          <h3 class="mode__name">Rue Mode</h3>
+          <p class="mode__desc">Five lanes, twice the traffic. Catches hats, ghost notes and fills, then adds chords.</p>
+          <div class="mode__keys" id="keysRue"></div>
+          <div class="mode__specs">
+            <span class="spec">Read time<b>0.95 s</b></span>
+            <span class="spec">Perfect window<b>±45 ms</b></span>
+            <span class="spec">Note density<b>~4.4 / sec</b></span>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <div class="launch">
+      <button class="go" id="go" disabled>
+        Analyse track
+        <svg viewBox="0 0 24 24"><path d="M4 12h13l-5-5 1.5-1.5L21 12l-7.5 7.5L12 18l5-5H4z"/></svg>
+      </button>
+      <p class="launch__note">Audio delay <b id="menuDelay">0 ms</b> —
+        <button class="linkish" id="menuSettings">change it in Settings</button> if you keep hitting late.</p>
+    </div>
+
+    <p class="foot">A fan-made parody. Not affiliated with, endorsed by, or connected to Optus or Singtel Optus
+      Pty Ltd. All trade marks belong to their owners.</p>
+  </div>
+</section>
+
+<!-- ================= ANALYSIS ================= -->
+<section class="screen" id="analysis" hidden>
+  <div class="panel">
+    <div class="panel__kicker">Beat detection</div>
+    <h2 class="panel__title">Reading the track</h2>
+    <p class="panel__sub" id="anaSub">Splitting the audio into four frequency bands and looking for energy spikes in each.</p>
+    <canvas class="scope" id="scope" width="1400" height="300"></canvas>
+    <ul class="stages" id="stages"></ul>
+    <div class="bar"><div class="bar__fill" id="anaBar"></div></div>
+  </div>
+</section>
+
+<!-- ================= READY ================= -->
+<section class="screen" id="ready" hidden>
+  <div class="panel">
+    <div class="panel__kicker">Chart built</div>
+    <h2 class="panel__title" id="readyTitle">Ready to play</h2>
+    <p class="panel__sub" id="readySub"></p>
+    <canvas class="scope" id="scope2" width="1400" height="300"></canvas>
+    <div class="stats" id="stats"></div>
+    <div class="seg" id="readyModes" style="margin:0 0 22px;width:fit-content">
+      <button id="rmOllie" aria-pressed="true">Ollie Mode</button>
+      <button id="rmRue" aria-pressed="false">Rue Mode</button>
+    </div>
+    <div class="row">
+      <button class="go" id="play">
+        Drop in
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <button class="ghost" id="edit">Edit this chart</button>
+      <button class="ghost" id="publish">Publish</button>
+      <button class="ghost" id="export">Export .signal</button>
+      <button class="ghost" id="backMenu">Back</button>
+    </div>
+    <p class="hint">Esc pauses · [ and ] nudge the sync offset by 5 ms</p>
+  </div>
+</section>
+
+
+
+<!-- ================= SETTINGS ================= -->
+<section class="screen" id="settings" hidden>
+  <div class="panel">
+    <div class="panel__kicker">Settings</div>
+    <h2 class="panel__title">Settings</h2>
+    <p class="panel__sub">Delay and key bindings stay put while the tab is open, and ride along in the address
+      bar so a reload keeps them.</p>
+
+    <div class="setgroup">
+      <h3 class="setgroup__t">Audio delay</h3>
+      <p class="setgroup__p">Nudge this up if your hits keep reading as late. Bluetooth headphones usually need
+        somewhere between +80 and +180 ms. Works mid-song too, with <kbd>[</kbd> and <kbd>]</kbd>.</p>
+      <div class="delay">
+        <button class="nudge" id="delMinus" aria-label="Decrease delay by 5 milliseconds">−5</button>
+        <div class="delay__val"><span id="delVal">0</span><i>ms</i></div>
+        <button class="nudge" id="delPlus" aria-label="Increase delay by 5 milliseconds">+5</button>
+      </div>
+      <input type="range" id="delRange" min="-300" max="300" step="5" value="0" aria-label="Audio delay">
+      <div class="delay__scale"><span>−300</span><span>0</span><span>+300</span></div>
+
+      <div class="calib" id="calBox">
+        <div class="calib__head">
+          <h4 class="calib__t">Not sure what to set?</h4>
+          <button class="tool" id="calStart">Measure it</button>
+        </div>
+        <p class="calib__p" id="calCopy">A steady click plays. Tap <kbd>Space</kbd> in time with it about ten
+          times and the gap between the click and your tap becomes your delay.</p>
+        <div class="calib__dots" id="calDots" hidden></div>
+        <div class="row" id="calActions" hidden>
+          <button class="go" id="calApply">Apply</button>
+          <button class="ghost" id="calRedo">Try again</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="setgroup">
+      <h3 class="setgroup__t">Key bindings</h3>
+      <p class="setgroup__p">Click a lane and press the key you want. Or use <b>Set all</b> and press your keys
+        left to right in one go. The editor uses these when you record taps.</p>
+
+      <div class="binder">
+        <div class="binder__head">
+          <span class="mode__dot" style="--mc:#ffd200"></span>
+          <h4 class="binder__t">Ollie Mode</h4>
+          <span class="binder__n">4 lanes</span>
+          <span class="bind__spacer"></span>
+          <button class="tool" data-setall="ollie">Set all</button>
+          <button class="tool" data-reset="ollie">Reset</button>
+        </div>
+        <div class="caps" id="bindOllie"></div>
+      </div>
+
+      <div class="binder">
+        <div class="binder__head">
+          <span class="mode__dot" style="--mc:#ff2e7e"></span>
+          <h4 class="binder__t">Rue Mode</h4>
+          <span class="binder__n">5 lanes</span>
+          <span class="bind__spacer"></span>
+          <button class="tool" data-setall="rue">Set all</button>
+          <button class="tool" data-reset="rue">Reset</button>
+        </div>
+        <div class="caps" id="bindRue"></div>
+      </div>
+
+      <p class="bind__note" id="bindNote"></p>
+    </div>
+
+    <div class="row">
+      <button class="ghost" id="keysBack">Back to menu</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PLAY / TRACK SELECTOR ================= -->
+<section class="screen" id="browse" hidden>
+  <div class="wrap wrap--wide">
+    <div class="page__head">
+      <div>
+        <h1 class="page__title">Tracks</h1>
+        <p class="page__sub" id="libSub">Loading the track list…</p>
+      </div>
+      <button class="go" id="libCreate">
+        Create a chart
+        <svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
+      </button>
+    </div>
+
+    <div class="toolbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24"><path d="M10 2a8 8 0 1 1-4.9 14.3l-3.4 3.4-1.4-1.4 3.4-3.4A8 8 0 0 1 10 2zm0 2a6 6 0 1 0 0 12 6 6 0 0 0 0-12z"/></svg>
+        <input type="search" id="libSearch" placeholder="Search titles, artists, charters" aria-label="Search tracks">
+      </div>
+      <div class="sorts" id="libSorts">
+        <button data-sort="rating" aria-pressed="true">Highest rated</button>
+        <button data-sort="recent" aria-pressed="false">Most recent</button>
+        <button data-sort="plays" aria-pressed="false">Most played</button>
+        <button data-sort="title" aria-pressed="false">A–Z</button>
+      </div>
+    </div>
+
+    <div class="lib" id="libGrid"></div>
+    <div id="libEmpty" hidden></div>
+
+    <div class="row">
+      <button class="ghost" id="libRefresh">Refresh</button>
+      <button class="ghost" id="libLocal">Add .signal files from this device</button>
+    </div>
+    <p class="hint" id="libDropHint">Or drag .signal files anywhere onto this screen.</p>
+  </div>
+</section>
+
+<!-- ================= AUTH MODAL ================= -->
+<div class="veil modal" id="authModal" hidden>
+  <div class="modal__box">
+    <div class="seg" id="authTabs" style="margin-bottom:22px">
+      <button id="authIn" aria-pressed="true">Sign in</button>
+      <button id="authUp" aria-pressed="false">Create account</button>
+    </div>
+    <h2 class="modal__title" id="authTitle">Sign in</h2>
+    <p class="modal__sub" id="authSub">Signing in lets you publish charts and rate what other people make.</p>
+
+    <label class="field2" id="nameField" hidden>
+      <span>Display name</span>
+      <input type="text" id="authName" autocomplete="nickname" placeholder="Shown as the charter">
+    </label>
+    <label class="field2">
+      <span>Email</span>
+      <input type="email" id="authEmail" autocomplete="email" placeholder="you@example.com">
+    </label>
+    <label class="field2">
+      <span>Password</span>
+      <input type="password" id="authPass" autocomplete="current-password" placeholder="At least 6 characters">
+    </label>
+
+    <p class="err" id="authErr" hidden></p>
+    <div class="row" style="margin-top:22px">
+      <button class="go" id="authGo">Sign in</button>
+      <button class="ghost" id="authGuest">Keep playing as a guest</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= PUBLISH MODAL ================= -->
+<div class="veil modal" id="pubModal" hidden>
+  <div class="modal__box">
+    <h2 class="modal__title">Publish this chart</h2>
+    <p class="modal__sub">It goes up with the song inside it, so anyone can hit play straight from the track list.</p>
+
+    <label class="field2">
+      <span>Title</span>
+      <input type="text" id="pubTitle" placeholder="Track name">
+    </label>
+    <label class="field2">
+      <span>Artist</span>
+      <input type="text" id="pubArtist" placeholder="Who made the song">
+    </label>
+    <label class="field2">
+      <span>Charted by</span>
+      <input type="text" id="pubCharter" placeholder="Your name">
+    </label>
+
+    <div class="stats" id="pubStats" style="margin:22px 0"></div>
+    <div class="bar" id="pubBarWrap" hidden><div class="bar__fill" id="pubBar"></div></div>
+    <p class="err" id="pubErr" hidden></p>
+
+    <div class="row" style="margin-top:22px">
+      <button class="go" id="pubGo">Publish</button>
+      <button class="ghost" id="pubCancel">Not yet</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= EDITOR ================= -->
+<section id="editor" hidden>
+  <div class="ed__bar">
+    <span class="ed__title">Chart editor</span>
+    <div class="seg" id="edModes">
+      <button id="emOllie" aria-pressed="true">Ollie · 4 lanes</button>
+      <button id="emRue" aria-pressed="false">Rue · 5 lanes</button>
+    </div>
+    <span class="ed__read"><b id="edCount">0</b> notes</span>
+    <div class="ed__spacer"></div>
+    <div class="field"><label for="edTitle">Title</label><input type="text" id="edTitle" placeholder="Track name"></div>
+    <div class="field"><label for="edArtist">Artist</label><input type="text" id="edArtist" placeholder="Unknown"></div>
+    <div class="field"><label for="edCharter">Charter</label><input type="text" id="edCharter" placeholder="You"></div>
+  </div>
+
+  <canvas id="edcv"></canvas>
+
+  <p class="ed__help">Click a lane to place a note · drag to move · double-click or right-click to delete · Space plays · R records your key presses as notes · Ctrl+Z undoes · scroll to move, Ctrl+scroll to zoom</p>
+
+  <div class="ed__bar ed__bar--foot">
+    <button class="tool primary" id="edPlay">Play</button>
+    <span class="ed__read"><b id="edClock">0:00.00</b> / <span id="edDur">0:00</span></span>
+    <div class="seg" id="edRates">
+      <button data-rate="0.5">0.5×</button>
+      <button data-rate="0.75">0.75×</button>
+      <button data-rate="1" aria-pressed="true">1×</button>
+    </div>
+    <button class="tool rec" id="edRec" aria-pressed="false">Record taps</button>
+    <div class="seg" id="edSnaps">
+      <button data-snap="0">Free</button>
+      <button data-snap="1">1/4</button>
+      <button data-snap="2" aria-pressed="true">1/8</button>
+      <button data-snap="4">1/16</button>
+    </div>
+    <div class="ed__spacer"></div>
+    <button class="tool" id="edAuto">Auto-chart mode</button>
+    <button class="tool" id="edClear">Clear mode</button>
+    <button class="tool" id="edUndo">Undo</button>
+    <button class="tool" id="edTest">Test play</button>
+    <button class="tool" id="edExport">Export .signal</button>
+    <button class="tool primary" id="edPublish">Publish</button>
+    <button class="tool" id="edDone">Done</button>
+  </div>
+</section>
+
+<!-- ================= GAME ================= -->
+<section id="game" hidden>
+  <canvas id="cv"></canvas>
+
+  <div class="hud" id="hud">
+    <div class="hud__left">
+      <div class="meter__label">Signal strength</div>
+      <div class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="meter__track"><div class="meter__fill" id="hpFill"></div></div>
+    </div>
+    <div class="hud__mid">
+      <div class="track-name" id="hudTrack">—</div>
+      <div class="prog"><div class="prog__fill" id="progFill"></div></div>
+      <div class="hud__meta"><span id="hudMode">Ollie Mode</span><span id="hudTime">0:00</span></div>
+    </div>
+    <div class="hud__right">
+      <div class="score" id="scoreEl">0</div>
+      <div class="acc"><span id="accEl">100.0%</span> accuracy</div>
+    </div>
+  </div>
+
+  <div class="veil" id="pause" hidden>
+    <div class="veil__inner">
+      <div class="veil__kicker">On hold</div>
+      <h2 class="veil__title">Paused</h2>
+      <p class="veil__sub" id="pauseSub">Sync offset 0 ms</p>
+      <div class="row">
+        <button class="go" id="resume">Resume</button>
+        <button class="ghost" id="quit">Back to chart</button>
+      </div>
+      <p class="hint">[ and ] adjust the sync offset while paused</p>
+    </div>
+  </div>
+
+  <div class="veil" id="over" hidden>
+    <div class="veil__inner">
+      <div class="veil__kicker">Signal lost</div>
+      <h2 class="veil__title">Dropped out</h2>
+      <p class="veil__sub">Signal strength hit zero, so the music stopped. Misses drain it fast — hits build it back.</p>
+      <div class="tally">
+        <div class="p"><b id="oP">0</b><span>Perfect</span></div>
+        <div class="g"><b id="oG">0</b><span>Good</span></div>
+        <div class="m"><b id="oM">0</b><span>Miss</span></div>
+      </div>
+      <div class="row">
+        <button class="go" id="retry">Try again</button>
+        <button class="ghost" id="quit2">Back to chart</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="veil" id="results" hidden>
+    <div class="veil__inner">
+      <div class="veil__kicker" id="rKicker">Track complete</div>
+      <div class="rank" id="rRank">A</div>
+      <div class="rank__name" id="rRankName">Full bars</div>
+      <h2 class="veil__title" id="rScore" style="font-size:clamp(30px,7vw,52px);margin-top:22px">0</h2>
+      <p class="veil__sub" id="rSub">100.0% accuracy · 0 max combo</p>
+      <div class="tally">
+        <div class="p"><b id="rP">0</b><span>Perfect</span></div>
+        <div class="g"><b id="rG">0</b><span>Good</span></div>
+        <div class="m"><b id="rM">0</b><span>Miss</span></div>
+      </div>
+      <div class="rate" id="rateBox" hidden>
+        <div class="rate__label" id="rateLabel">Rate this chart</div>
+        <div class="stars" id="rateStars"></div>
+        <p class="rate__note" id="rateNote"></p>
+      </div>
+      <div class="row">
+        <button class="go" id="again">Play again</button>
+        <button class="ghost" id="quit3">Back to chart</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+(() => {
+'use strict';
+
+/* ============================================================================
+   SIGNAL HERO
+   A single-file rhythm game. Charts are generated at load time by analysing
+   the decoded audio buffer with the Web Audio API: the track is rendered four
+   times through band-pass filters, an energy envelope is taken per band, and
+   onsets are picked from the positive flux of those envelopes.
+   ========================================================================== */
+
+/* ------------------------------- config ---------------------------------- */
+
+const MODES = {
+  ollie: {
+    id: 'ollie',
+    name: 'Ollie Mode',
+    lanes: 4,
+    keys: ['a', 's', 'd', 'f'],
+    approach: 1.55,                                  // seconds, top of screen -> hit line
+    win: { perfect: 0.070, good: 0.135, miss: 0.190 },
+    minGap: 0.185,                                   // min seconds between any two notes
+    laneGap: 0.165,                                  // min seconds between notes in one lane
+    targetNPS: 2.1,                                  // notes per second the chart aims for
+    chordChance: 0.0,
+    hp: { perfect: 1.5, good: 0.85, miss: -5.0 },
+    laneColors: ['#ffd200', '#00d6c4', '#ffd200', '#00d6c4'],
+    rail: '#00d6c4',
+    grid: 'rgba(0,214,196,0.14)',
+    beat: 'rgba(255,210,0,0.20)'
+  },
+  rue: {
+    id: 'rue',
+    name: 'Rue Mode',
+    lanes: 5,
+    keys: ['a', 's', 'd', 'f', 'g'],
+    approach: 0.95,
+    win: { perfect: 0.045, good: 0.090, miss: 0.130 },
+    minGap: 0.088,
+    laneGap: 0.105,
+    targetNPS: 3.9,
+    chordChance: 0.17,
+    hp: { perfect: 0.95, good: 0.45, miss: -6.5 },
+    laneColors: ['#ff2e7e', '#ff8a00', '#ffe14d', '#22e6c8', '#9b5cff'],
+    rail: '#ff2e7e',
+    grid: 'rgba(155,92,255,0.16)',
+    beat: 'rgba(255,46,126,0.20)'
+  }
+};
+
+const SCORE = { perfect: 100, good: 55 };
+const RANKS = [
+  [96, 'S', 'Full bars'],
+  [92, 'A', '5G ultra'],
+  [85, 'B', '5G'],
+  [76, 'C', '4G'],
+  [65, 'D', '3G, if you stand still'],
+  [0,  'E', 'SOS only']
+];
+
+/* ------------------------------- helpers --------------------------------- */
+
+const TAU = Math.PI * 2;
+const $ = (id) => document.getElementById(id);
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const raf = () => new Promise((r) => requestAnimationFrame(() => r()));
+
+function mmss(s) {
+  s = Math.max(0, Math.floor(s));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
+function rgb(hex) {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+function rgba(hex, a) {
+  const c = rgb(hex);
+  return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')';
+}
+function shade(hex, amt) {
+  const c = rgb(hex).map((v) => clamp(Math.round(amt < 0 ? v * (1 + amt) : v + (255 - v) * amt), 0, 255));
+  return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
+}
+
+/** Small deterministic PRNG so the same track + mode always charts the same. */
+function mulberry(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* -------------------------------- state ---------------------------------- */
+
+const G = {
+  screen: 'menu',
+  cfg: MODES.ollie,
+  file: null,
+  buffer: null,
+  chart: null,
+  pack: null,          // { meta, charts:{ollie,rue}, audioBytes, buffer, wave }
+  playing: null,       // the track selector item this pack came from, if any
+  analysis: null,      // { cands, grid } cached per loaded audio
+  offset: 0,
+
+  ctx: null, source: null, gain: null, analyser: null, freqData: null,
+  startAt: 0, running: false, paused: false, finished: false,
+
+  notes: [], scanIdx: 0, drawIdx: 0,
+  score: 0, combo: 0, maxCombo: 0, mult: 1, hp: 65,
+  counts: { perfect: 0, good: 0, miss: 0 },
+
+  returnTo: 'menu',
+  held: [], flash: [], particles: [], judge: null,
+  shake: 0, missGlow: 0, hitPulse: 0,
+  lastFrame: 0, bass: 0, loop: 0
+};
+
+/* ------------------------------ DOM wiring -------------------------------- */
+
+const screens = {
+  browse: $('browse'), create: $('create'), analysis: $('analysis'), ready: $('ready'),
+  settings: $('settings'),
+  editor: $('editor'), game: $('game')
+};
+function show(name) {
+  G.screen = name;
+  for (const k in screens) { if (screens[k]) screens[k].hidden = k !== name; }
+  const chrome = CHROME_SCREENS.indexOf(name) >= 0;
+  $('chrome').hidden = !chrome;
+  document.body.classList.toggle('has-chrome', chrome);
+}
+
+const els = {
+  drop: $('drop'), file: $('file'), fileName: $('fileName'), fileMeta: $('fileMeta'), err: $('err'),
+  mOllie: $('mOllie'), mRue: $('mRue'), go: $('go'),
+  stages: $('stages'), anaBar: $('anaBar'), anaSub: $('anaSub'), scope: $('scope'), scope2: $('scope2'),
+  readyTitle: $('readyTitle'), readySub: $('readySub'), stats: $('stats'), play: $('play'), backMenu: $('backMenu'),
+  hud: $('hud'), bars: $('bars'), hpFill: $('hpFill'), hudTrack: $('hudTrack'), hudMode: $('hudMode'),
+  hudTime: $('hudTime'), progFill: $('progFill'), scoreEl: $('scoreEl'), accEl: $('accEl'),
+  pause: $('pause'), pauseSub: $('pauseSub'), over: $('over'), results: $('results'),
+  rmOllie: $('rmOllie'), rmRue: $('rmRue'),
+  edit: $('edit'), exportBtn: $('export'),
+  libGrid: $('libGrid'), libEmpty: $('libEmpty'), libSub: $('libSub'),
+  bindOllie: $('bindOllie'), bindRue: $('bindRue'), bindNote: $('bindNote'),
+  acct: $('acct')
+};
+
+function setMode(id) {
+  G.cfg = MODES[id];
+  document.body.dataset.mode = id;
+  els.mOllie.setAttribute('aria-pressed', String(id === 'ollie'));
+  els.mRue.setAttribute('aria-pressed', String(id === 'rue'));
+}
+els.mOllie.addEventListener('click', () => setMode('ollie'));
+els.mRue.addEventListener('click', () => setMode('rue'));
+
+els.drop.addEventListener('click', () => els.file.click());
+els.file.addEventListener('change', (e) => { if (e.target.files[0]) takeFile(e.target.files[0]); });
+['dragenter', 'dragover'].forEach((ev) =>
+  els.drop.addEventListener(ev, (e) => { e.preventDefault(); els.drop.classList.add('is-over'); }));
+['dragleave', 'drop'].forEach((ev) =>
+  els.drop.addEventListener(ev, (e) => { e.preventDefault(); els.drop.classList.remove('is-over'); }));
+els.drop.addEventListener('drop', (e) => {
+  const f = e.dataTransfer && e.dataTransfer.files[0];
+  if (f) takeFile(f);
+});
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => e.preventDefault());
+
+const isPack = (f) => /\.signal$/i.test(f.name);
+
+function takeFile(f) {
+  G.file = f;
+  els.err.hidden = true;
+  els.drop.classList.add('is-set');
+  els.fileName.textContent = f.name;
+  els.fileMeta.textContent = (f.size / 1048576).toFixed(1) + ' MB · '
+    + (isPack(f) ? 'chart and song in one file — ready to play' : 'stays on this device');
+  els.go.textContent = isPack(f) ? 'Open chart' : 'Analyse track';
+  els.go.appendChild(goArrow());
+  els.go.disabled = false;
+}
+
+function goArrow() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M4 12h13l-5-5 1.5-1.5L21 12l-7.5 7.5L12 18l5-5H4z');
+  svg.appendChild(path);
+  return svg;
+}
+
+function fail(msg) {
+  els.err.textContent = msg;
+  els.err.hidden = false;
+  goTab('create');
+}
+
+els.go.addEventListener('click', run);
+els.backMenu.addEventListener('click', () => { G.returnTo = 'menu'; goTab('play'); });
+
+
+
+/* ==========================================================================
+   FIREBASE
+
+   Paste your web app config below to turn on accounts, publishing and
+   ratings. Leave it blank and everything else still works — charts load from
+   a folder on the server or straight off the player's device.
+
+   In the Firebase console you need exactly two things switched on:
+     1. Authentication  ->  Sign-in method  ->  Email/Password
+     2. Firestore Database
+
+   No Cloud Storage bucket is needed. A published chart's audio is written
+   straight into Firestore as raw bytes, split across a blobs subcollection,
+   because a single document tops out at 1 MiB.
+
+   Firestore rules — paste these into Firestore Database -> Rules.
+   No Storage rules are needed, and the bucket can stay switched off.
+
+   rules_version = '2';
+
+   service cloud.firestore {
+     match /databases/{database}/documents {
+
+       match /charts/{chart} {
+
+         // anyone can browse and play, signed in or not
+         allow read: if true;
+
+         // you can only publish under your own account
+         allow create: if request.auth != null
+                       && request.resource.data.uid == request.auth.uid;
+
+         // the owner can edit their own chart; everyone else who is signed in
+         // may only move the rating totals and the play count
+         allow update: if request.auth != null
+                       && (
+                         resource.data.uid == request.auth.uid
+                         || request.resource.data.diff(resource.data).affectedKeys()
+                              .hasOnly(['ratingSum', 'ratingCount', 'ratingAvg', 'plays'])
+                       );
+
+         // only whoever published it can take it down
+         allow delete: if request.auth != null
+                       && resource.data.uid == request.auth.uid;
+
+         // the song itself, stored as 900 KB parts. create only, so an
+         // existing part can never be swapped out from under a chart
+         match /blobs/{part} {
+           allow read: if true;
+           allow create: if request.auth != null;
+           allow update, delete: if request.auth != null
+                                 && get(/databases/$(database)/documents/charts/$(chart))
+                                      .data.uid == request.auth.uid;
+         }
+
+         // one rating per account, and only you can write yours
+         match /ratings/{uid} {
+           allow read: if true;
+           allow write: if request.auth != null && request.auth.uid == uid;
+         }
+       }
+     }
+   }
+   ========================================================================== */
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBTdNQyquLwzA1Uo4PPpoGW4_4SVFSi19U",
+  authDomain: "signalhero-2a643.firebaseapp.com",
+  projectId: "signalhero-2a643",
+  storageBucket: "signalhero-2a643.firebasestorage.app",
+  messagingSenderId: "235869866141",
+  appId: "1:235869866141:web:8e2e5d62748dc0250c2c74",
+  measurementId: "G-PL2N9SSPRX"
+};                     // extra keys from the console are fine — they are ignored
+
+const FIREBASE_SDK = 'https://www.gstatic.com/firebasejs/12.18.0/';
+
+const FB = { state: 'idle', error: '', app: null, auth: null, db: null, mod: {}, user: null };
+
+/** Firestore caps a document at 1 MiB, so a published song is split across
+ *  this many bytes per part. */
+const CHUNK = 900000;
+const MAX_UPLOAD = 15 * 1048576;
+
+const fbConfigured = () => !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);
+const signedIn = () => !!(FB.user && !FB.user.isAnonymous);
+
+/** Loaded on demand so a game with no Firebase project never fetches the SDK. */
+async function fbInit() {
+  if (FB.state === 'ready') return true;
+  if (FB.state === 'failed') return false;
+  if (!fbConfigured()) { FB.state = 'failed'; FB.error = 'no-config'; return false; }
+
+  FB.state = 'loading';
+  try {
+    const [app, auth, fs] = await Promise.all([
+      import(FIREBASE_SDK + 'firebase-app.js'),
+      import(FIREBASE_SDK + 'firebase-auth.js'),
+      import(FIREBASE_SDK + 'firebase-firestore.js')
+    ]);
+    FB.mod = { app: app, auth: auth, fs: fs };
+    FB.app = app.initializeApp(FIREBASE_CONFIG);
+    FB.auth = auth.getAuth(FB.app);
+    FB.db = fs.getFirestore(FB.app);
+    auth.onAuthStateChanged(FB.auth, (u) => {
+      FB.user = u;
+      renderAccount();
+      if (G.screen === 'browse') renderLibrary();
+    });
+    FB.state = 'ready';
+    return true;
+  } catch (e) {
+    FB.state = 'failed';
+    FB.error = (e && e.message) || 'load-failed';
+    return false;
+  }
+}
+
+function fbStatusLine() {
+  if (!fbConfigured()) return 'No Firebase project is connected, so accounts, publishing and ratings are off. '
+    + 'Charts still load from the server folder and from your device.';
+  if (FB.state === 'ready') return signedIn()
+    ? 'Connected and signed in as ' + displayName() + '. You can publish and rate.'
+    : 'Connected. Sign in to publish charts and rate what other people make.';
+  if (FB.state === 'failed') return location.protocol === 'file:'
+    ? 'Firebase cannot load from a page opened off disk. Serve this folder over http and it will connect.'
+    : 'Firebase did not load: ' + FB.error;
+  return 'Connecting to Firebase\u2026';
+}
+
+const displayName = () => (FB.user && (FB.user.displayName || (FB.user.email || '').split('@')[0])) || 'Guest';
+
+/* ------------------------------- accounts -------------------------------- */
+
+function renderAccount() {
+  const box = $('acct');
+  box.innerHTML = '';
+  if (signedIn()) {
+    const who = document.createElement('div');
+    who.className = 'acct__who';
+    const av = document.createElement('span');
+    av.className = 'avatar';
+    av.textContent = displayName().charAt(0).toUpperCase();
+    const nm = document.createElement('span');
+    nm.className = 'acct__name';
+    nm.textContent = displayName();
+    who.appendChild(av); who.appendChild(nm);
+    const out = document.createElement('button');
+    out.className = 'acct__btn';
+    out.textContent = 'Sign out';
+    out.addEventListener('click', fbSignOut);
+    box.appendChild(who); box.appendChild(out);
+  } else {
+    const inBtn = document.createElement('button');
+    inBtn.className = 'acct__btn solid';
+    inBtn.textContent = 'Sign in';
+    inBtn.addEventListener('click', () => openAuth('in'));
+    const guest = document.createElement('span');
+    guest.className = 'acct__name';
+    guest.style.color = 'rgba(255,255,255,.4)';
+    guest.textContent = 'Playing as guest';
+    box.appendChild(guest); box.appendChild(inBtn);
+  }
+}
+
+async function fbSignOut() {
+  if (FB.state !== 'ready') return;
+  try { await FB.mod.auth.signOut(FB.auth); } catch (e) {}
+}
+
+let authMode = 'in';
+
+function openAuth(mode) {
+  authMode = mode || 'in';
+  paintAuth();
+  $('authErr').hidden = true;
+  $('authModal').hidden = false;
+  setTimeout(() => $('authEmail').focus(), 40);
+  fbInit().then(() => { if (FB.state === 'failed') authFail(fbStatusLine()); });
+}
+
+function paintAuth() {
+  const up = authMode === 'up';
+  $('authIn').setAttribute('aria-pressed', String(!up));
+  $('authUp').setAttribute('aria-pressed', String(up));
+  $('authTitle').textContent = up ? 'Create an account' : 'Sign in';
+  $('authSub').textContent = up
+    ? 'Your display name is what shows as the charter on anything you publish.'
+    : 'Signing in lets you publish charts and rate what other people make.';
+  $('authGo').textContent = up ? 'Create account' : 'Sign in';
+  $('nameField').hidden = !up;
+  $('authPass').setAttribute('autocomplete', up ? 'new-password' : 'current-password');
+}
+
+function authFail(msg) {
+  $('authErr').textContent = msg;
+  $('authErr').hidden = false;
+}
+
+async function authSubmit() {
+  const email = $('authEmail').value.trim();
+  const pass = $('authPass').value;
+  const name = $('authName').value.trim();
+  $('authErr').hidden = true;
+
+  if (!email || !pass) return authFail('Email and password are both needed.');
+  if (authMode === 'up' && pass.length < 6) return authFail('Passwords need at least 6 characters.');
+  if (authMode === 'up' && !name) return authFail('Pick a display name — it shows as the charter.');
+
+  if (!(await fbInit())) return authFail(fbStatusLine());
+
+  $('authGo').disabled = true;
+  try {
+    const a = FB.mod.auth;
+    if (authMode === 'up') {
+      const cred = await a.createUserWithEmailAndPassword(FB.auth, email, pass);
+      await a.updateProfile(cred.user, { displayName: name });
+      FB.user = cred.user;
+    } else {
+      await a.signInWithEmailAndPassword(FB.auth, email, pass);
+    }
+    $('authModal').hidden = true;
+    $('authPass').value = '';
+    renderAccount();
+    if (G.screen === 'browse') renderLibrary();
+  } catch (e) {
+    authFail(authMessage(e));
+  } finally {
+    $('authGo').disabled = false;
+  }
+}
+
+function authMessage(e) {
+  const code = (e && e.code) || '';
+  if (code.indexOf('email-already-in-use') >= 0) return 'That email already has an account — try signing in.';
+  if (code.indexOf('invalid-email') >= 0) return 'That email address does not look right.';
+  if (code.indexOf('weak-password') >= 0) return 'That password is too weak — six characters or more.';
+  if (code.indexOf('invalid-credential') >= 0 || code.indexOf('wrong-password') >= 0
+      || code.indexOf('user-not-found') >= 0) return 'That email and password do not match an account.';
+  if (code.indexOf('too-many-requests') >= 0) return 'Too many attempts. Wait a minute and try again.';
+  if (code.indexOf('operation-not-allowed') >= 0) return 'Email sign-in is switched off in the Firebase console.';
+  if (code.indexOf('network') >= 0) return 'Could not reach Firebase. Check the connection and try again.';
+  return (e && e.message) || 'That did not work.';
+}
+
+$('authIn').addEventListener('click', () => { authMode = 'in'; paintAuth(); });
+$('authUp').addEventListener('click', () => { authMode = 'up'; paintAuth(); });
+$('authGo').addEventListener('click', authSubmit);
+$('authGuest').addEventListener('click', () => { $('authModal').hidden = true; });
+$('authModal').addEventListener('click', (e) => { if (e.target === $('authModal')) $('authModal').hidden = true; });
+['authEmail', 'authPass', 'authName'].forEach((id) =>
+  $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); authSubmit(); } }));
+
+/* ------------------------------- published charts ------------------------- */
+
+const SORT_FIELD = { rating: 'ratingAvg', recent: 'createdAt', plays: 'plays', title: 'titleLower' };
+
+async function fbListCharts(sortKey) {
+  if (!(await fbInit())) return [];
+  const f = FB.mod.fs;
+  const field = SORT_FIELD[sortKey] || 'ratingAvg';
+  const q = f.query(f.collection(FB.db, 'charts'), f.orderBy(field, sortKey === 'title' ? 'asc' : 'desc'), f.limit(150));
+  const snap = await f.getDocs(q);
+  const out = [];
+  snap.forEach((docSnap) => {
+    const d = docSnap.data() || {};
+    out.push({
+      key: 'cloud:' + docSnap.id,
+      id: docSnap.id,
+      source: 'cloud',
+      title: d.title || 'Untitled',
+      artist: d.artist || '',
+      charter: d.charter || '',
+      duration: d.duration || 0,
+      bpm: d.bpm || 0,
+      modes: d.modes || {},
+      bytes: d.bytes || 0,
+      rating: { avg: d.ratingAvg || 0, count: d.ratingCount || 0 },
+      plays: d.plays || 0,
+      createdAt: d.createdAt && d.createdAt.toMillis ? d.createdAt.toMillis() : 0,
+      chunks: d.chunks || 0,
+      open: function (onProgress) { return fbLoadChunks(this.id, this.chunks, onProgress); }
+    });
+  });
+  return out;
+}
+
+async function fbPublish(meta, bytes, onProgress) {
+  if (!(await fbInit())) throw new Error(fbStatusLine());
+  if (!signedIn()) throw new Error('Sign in first.');
+  const f = FB.mod.fs;
+
+  const id = (window.crypto && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+
+  const total = Math.ceil(bytes.length / CHUNK);
+
+  // Parts go in first and the chart document last, so a half-finished upload
+  // never shows up in the track list.
+  for (let i = 0; i < total; i++) {
+    const part = bytes.slice(i * CHUNK, Math.min(bytes.length, (i + 1) * CHUNK));
+    await f.setDoc(f.doc(FB.db, 'charts', id, 'blobs', String(i)),
+      { i: i, data: f.Bytes.fromUint8Array(part) });
+    onProgress((i + 1) / (total + 1));
+  }
+
+  const modes = {};
+  for (const m of ['ollie', 'rue']) {
+    if (meta.charts && meta.charts[m]) modes[m] = meta.charts[m].length;
+  }
+
+  await f.setDoc(f.doc(FB.db, 'charts', id), {
+    uid: FB.user.uid,
+    title: meta.title,
+    titleLower: (meta.title || '').toLowerCase(),
+    artist: meta.artist || '',
+    charter: meta.charter || displayName(),
+    duration: meta.duration || 0,
+    bpm: meta.grid ? Math.round(meta.grid.bpm) : 0,
+    modes: modes,
+    bytes: bytes.length,
+    chunks: total,
+    ratingSum: 0, ratingCount: 0, ratingAvg: 0,
+    plays: 0,
+    createdAt: f.serverTimestamp()
+  });
+  onProgress(1);
+  return id;
+}
+
+/** Pull the parts back in parallel and stitch them into the original file. */
+async function fbLoadChunks(id, count, onProgress) {
+  const f = FB.mod.fs;
+  let done = 0;
+  const parts = await Promise.all(
+    Array.from({ length: count }, (unused, i) =>
+      f.getDoc(f.doc(FB.db, 'charts', id, 'blobs', String(i))).then((snap) => {
+        if (!snap.exists()) throw new Error('part ' + (i + 1) + ' of ' + count + ' is missing');
+        done++;
+        if (onProgress) onProgress(done / count);
+        return snap.data().data.toUint8Array();
+      })
+    )
+  );
+
+  let size = 0;
+  for (const part of parts) size += part.length;
+  const out = new Uint8Array(size);
+  let at = 0;
+  for (const part of parts) { out.set(part, at); at += part.length; }
+  return out.buffer;
+}
+
+/** One rating per account. Re-rating replaces the old value rather than adding
+ *  a second one, so the average stays honest. */
+async function fbRate(chartId, value) {
+  if (!(await fbInit())) throw new Error(fbStatusLine());
+  if (!signedIn()) throw new Error('Sign in to rate.');
+  const f = FB.mod.fs;
+  const chartRef = f.doc(FB.db, 'charts', chartId);
+  const mineRef = f.doc(FB.db, 'charts', chartId, 'ratings', FB.user.uid);
+
+  return f.runTransaction(FB.db, async (tx) => {
+    const chartSnap = await tx.get(chartRef);
+    const mineSnap = await tx.get(mineRef);
+    if (!chartSnap.exists()) throw new Error('That chart is gone.');
+    const d = chartSnap.data();
+    let sum = d.ratingSum || 0, count = d.ratingCount || 0;
+    if (mineSnap.exists()) sum -= (mineSnap.data().value || 0);
+    else count += 1;
+    sum += value;
+    const avg = count ? sum / count : 0;
+    tx.set(mineRef, { value: value, at: f.serverTimestamp() });
+    tx.update(chartRef, { ratingSum: sum, ratingCount: count, ratingAvg: avg });
+    return { avg: avg, count: count };
+  });
+}
+
+async function fbMyRating(chartId) {
+  if (FB.state !== 'ready' || !signedIn()) return 0;
+  try {
+    const f = FB.mod.fs;
+    const snap = await f.getDoc(f.doc(FB.db, 'charts', chartId, 'ratings', FB.user.uid));
+    return snap.exists() ? (snap.data().value || 0) : 0;
+  } catch (e) { return 0; }
+}
+
+async function fbBumpPlays(chartId) {
+  if (FB.state !== 'ready') return;
+  try {
+    const f = FB.mod.fs;
+    await f.setDoc(f.doc(FB.db, 'charts', chartId), { plays: f.increment(1) }, { merge: true });
+  } catch (e) { /* a play count is not worth interrupting anything for */ }
+}
+
+/* ==========================================================================
+   SETTINGS — audio delay and key bindings
+   MODES[id].keys is the single source of truth for bindings and is read at
+   press time, so a rebind takes effect immediately everywhere: judging, the
+   receptors on the highway, and the editor's tap recording.
+   ========================================================================== */
+
+const KEY_DEFAULTS = { ollie: ['a', 's', 'd', 'f'], rue: ['a', 's', 'd', 'f', 'g'] };
+const RESERVED = ['escape', '[', ']'];
+const MODIFIERS = ['shift', 'control', 'alt', 'meta', 'capslock', 'tab'];
+const ARROWS = { arrowleft: '\u2190', arrowright: '\u2192', arrowup: '\u2191', arrowdown: '\u2193' };
+
+function keyLabel(k) {
+  if (k === ' ') return 'Space';
+  if (ARROWS[k]) return ARROWS[k];
+  if (k.length === 1) return k.toUpperCase();
+  return k.charAt(0).toUpperCase() + k.slice(1);
+}
+
+/* ------------------------------ audio delay ------------------------------- */
+
+function setOffset(ms) {
+  G.offset = clamp(Math.round(ms), -300, 300) / 1000;
+  renderOffset();
+  saveSettings();
+}
+
+function renderOffset() {
+  const ms = Math.round(G.offset * 1000);
+  const label = (ms > 0 ? '+' : '') + ms;
+  $('delVal').textContent = label;
+  $('delRange').value = ms;
+  $('menuDelay').textContent = label + ' ms';
+  els.pauseSub.textContent = 'Audio delay ' + label + ' ms';
+}
+
+$('delRange').addEventListener('input', () => setOffset(Number($('delRange').value)));
+$('delMinus').addEventListener('click', () => setOffset(G.offset * 1000 - 5));
+$('delPlus').addEventListener('click', () => setOffset(G.offset * 1000 + 5));
+$('menuSettings').addEventListener('click', () => openSettings());
+
+/* --------------------------- delay calibration ---------------------------- */
+
+const CAL = { ctx: null, running: false, startAt: 0, period: 0.6, taps: [], want: 10, result: 0 };
+
+function calDots() {
+  const box = $('calDots');
+  box.hidden = false;
+  box.innerHTML = '';
+  for (let i = 0; i < CAL.want; i++) {
+    const dot = document.createElement('i');
+    if (i < CAL.taps.length) dot.className = 'on';
+    box.appendChild(dot);
+  }
+}
+
+function calClick(at) {
+  const osc = CAL.ctx.createOscillator();
+  const gain = CAL.ctx.createGain();
+  osc.frequency.value = 1400;
+  gain.gain.setValueAtTime(0.0001, at);
+  gain.gain.exponentialRampToValueAtTime(0.5, at + 0.002);
+  gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.05);
+  osc.connect(gain); gain.connect(CAL.ctx.destination);
+  osc.start(at); osc.stop(at + 0.06);
+}
+
+function calBegin() {
+  calEnd();
+  CAL.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (CAL.ctx.state === 'suspended') CAL.ctx.resume();
+  CAL.taps = [];
+  CAL.running = true;
+  CAL.startAt = CAL.ctx.currentTime + 0.9;
+  for (let i = 0; i < CAL.want + 8; i++) calClick(CAL.startAt + i * CAL.period);
+  $('calCopy').textContent = 'Tap Space on every click. Keep going until the dots fill up.';
+  $('calStart').textContent = 'Stop';
+  $('calActions').hidden = true;
+  calDots();
+}
+
+function calTap() {
+  if (!CAL.running) return;
+  const t = CAL.ctx.currentTime - CAL.startAt;
+  if (t < -0.2) return;
+  const k = Math.round(t / CAL.period);
+  const err = t - k * CAL.period;
+  if (Math.abs(err) > CAL.period * 0.45) return;      // nowhere near a click — ignore
+  CAL.taps.push(err);
+  calDots();
+  if (CAL.taps.length >= CAL.want) calFinish();
+}
+
+function calFinish() {
+  const sorted = CAL.taps.slice().sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  CAL.result = clamp(Math.round(median * 1000), -300, 300);
+  calEnd();
+
+  const spread = Math.round((sorted[sorted.length - 1] - sorted[0]) * 1000);
+  $('calCopy').textContent = CAL.result >= 0
+    ? 'Your taps landed ' + CAL.result + ' ms after the click, spread over ' + spread + ' ms. '
+      + 'Applying that sets the delay to +' + CAL.result + ' ms.'
+    : 'Your taps landed ' + Math.abs(CAL.result) + ' ms before the click, spread over ' + spread + ' ms. '
+      + 'Applying that sets the delay to ' + CAL.result + ' ms.';
+  $('calActions').hidden = false;
+}
+
+function calEnd() {
+  CAL.running = false;
+  $('calStart').textContent = 'Measure it';
+  if (CAL.ctx) { try { CAL.ctx.close(); } catch (e) {} CAL.ctx = null; }
+}
+
+$('calStart').addEventListener('click', () => { if (CAL.running) { calEnd(); calReset(); } else calBegin(); });
+$('calRedo').addEventListener('click', calBegin);
+$('calApply').addEventListener('click', () => {
+  setOffset(CAL.result);
+  $('calActions').hidden = true;
+  $('calCopy').textContent = 'Delay set to ' + (G.offset > 0 ? '+' : '') + Math.round(G.offset * 1000)
+    + ' ms. Measure again any time.';
+});
+
+function calReset() {
+  $('calDots').hidden = true;
+  $('calActions').hidden = true;
+  $('calCopy').textContent = 'A steady click plays. Tap Space in time with it about ten times and the gap '
+    + 'between the click and your tap becomes your delay.';
+}
+
+/* ------------------------------ key bindings ------------------------------ */
+
+let listening = null;   // { mode, lane, seq, used }
+
+function renderModeKeys() {
+  for (const id of ['ollie', 'rue']) {
+    const host = $(id === 'ollie' ? 'keysOllie' : 'keysRue');
+    host.innerHTML = '';
+    for (const k of MODES[id].keys) {
+      const kbd = document.createElement('kbd');
+      kbd.textContent = keyLabel(k);
+      host.appendChild(kbd);
+    }
+  }
+}
+
+function renderBinds() {
+  for (const id of ['ollie', 'rue']) {
+    const host = id === 'ollie' ? els.bindOllie : els.bindRue;
+    host.innerHTML = '';
+    MODES[id].keys.forEach((k, lane) => {
+      const cap = document.createElement('button');
+      cap.className = 'keycap';
+      cap.style.setProperty('--lc', MODES[id].laneColors[lane]);
+
+      const who = document.createElement('span');
+      who.className = 'keycap__lane';
+      who.textContent = 'Lane ' + (lane + 1);
+
+      const val = document.createElement('span');
+      val.className = 'keycap__key';
+      val.textContent = keyLabel(k);
+
+      const hint = document.createElement('span');
+      hint.className = 'keycap__hint';
+      hint.textContent = 'click to change';
+
+      cap.appendChild(who); cap.appendChild(val); cap.appendChild(hint);
+      cap.addEventListener('click', () => beginBind(id, lane, false));
+      host.appendChild(cap);
+    });
+  }
+  paintListening();
+}
+
+function paintListening() {
+  for (const id of ['ollie', 'rue']) {
+    const host = id === 'ollie' ? els.bindOllie : els.bindRue;
+    Array.prototype.forEach.call(host.children, (cap, lane) => {
+      const on = listening && listening.mode === id && listening.lane === lane;
+      cap.classList.toggle('listening', !!on);
+      if (on) {
+        cap.querySelector('.keycap__key').textContent = 'Press a key';
+        cap.querySelector('.keycap__hint').textContent = 'Esc to cancel';
+      }
+    });
+  }
+}
+
+function beginBind(mode, lane, seq) {
+  listening = { mode: mode, lane: lane, seq: seq, used: seq ? [] : null };
+  renderBinds();
+  els.bindNote.textContent = seq
+    ? 'Press the key for lane ' + (lane + 1) + ' of ' + MODES[mode].lanes + '.'
+    : 'Press the key you want for lane ' + (lane + 1) + '.';
+  window.addEventListener('keydown', onBindKey, true);
+}
+
+function endBind() {
+  window.removeEventListener('keydown', onBindKey, true);
+  listening = null;
+  renderBinds();
+}
+
+function onBindKey(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const k = e.key.toLowerCase();
+  const at = listening;
+  if (!at) return;
+
+  if (k === 'escape') { endBind(); els.bindNote.textContent = 'Left as it was.'; return; }
+  if (MODIFIERS.indexOf(k) >= 0) return;
+  if (RESERVED.indexOf(k) >= 0) {
+    els.bindNote.textContent = keyLabel(k) + ' is reserved — Esc pauses, [ and ] nudge the delay. Pick another.';
+    return;
+  }
+
+  const keys = MODES[at.mode].keys;
+
+  if (at.seq) {
+    if (at.used.indexOf(k) >= 0) {
+      els.bindNote.textContent = keyLabel(k) + ' is already taken by an earlier lane. Pick another.';
+      return;
+    }
+    keys[at.lane] = k;
+    at.used.push(k);
+    renderModeKeys();
+    if (at.lane + 1 < MODES[at.mode].lanes) {
+      window.removeEventListener('keydown', onBindKey, true);
+      const next = at.lane + 1;
+      beginBind(at.mode, next, true);
+      listening.used = at.used;
+      return;
+    }
+    endBind();
+    saveSettings();
+    els.bindNote.textContent = MODES[at.mode].name + ' is now ' + keys.map(keyLabel).join(' ') + '.';
+    return;
+  }
+
+  const clash = keys.indexOf(k);
+  if (clash >= 0 && clash !== at.lane) keys[clash] = keys[at.lane];   // swap the two lanes
+  keys[at.lane] = k;
+
+  endBind();
+  renderModeKeys();
+  saveSettings();
+  els.bindNote.textContent = clash >= 0 && clash !== at.lane
+    ? 'Lane ' + (at.lane + 1) + ' is now ' + keyLabel(k) + ', swapped with lane ' + (clash + 1) + '.'
+    : 'Lane ' + (at.lane + 1) + ' is now ' + keyLabel(k) + '.';
+}
+
+document.addEventListener('click', (e) => {
+  const setall = e.target.closest && e.target.closest('[data-setall]');
+  if (setall) { beginBind(setall.dataset.setall, 0, true); return; }
+  const reset = e.target.closest && e.target.closest('[data-reset]');
+  if (reset) {
+    const id = reset.dataset.reset;
+    endBind();
+    MODES[id].keys = KEY_DEFAULTS[id].slice();
+    renderBinds(); renderModeKeys(); saveSettings();
+    els.bindNote.textContent = MODES[id].name + ' is back to ' + MODES[id].keys.map(keyLabel).join(' ') + '.';
+  }
+});
+
+function openSettings() {
+  renderBinds();
+  renderOffset();
+  calReset();
+  els.bindNote.textContent = '';
+  show('settings');
+}
+
+$('keysBack').addEventListener('click', () => { endBind(); calEnd(); goTab('play'); });
+
+/* ---------------------- persistence via the URL fragment ------------------- */
+
+function saveSettings() {
+  try {
+    const bits = [];
+    const custom = ['ollie', 'rue'].some((id) => MODES[id].keys.join() !== KEY_DEFAULTS[id].join());
+    if (custom) {
+      bits.push('k=' + ['ollie', 'rue'].map((id) => MODES[id].keys.map(encodeURIComponent).join(',')).join('|'));
+    }
+    if (G.offset) bits.push('d=' + Math.round(G.offset * 1000));
+    history.replaceState(null, '', location.pathname + location.search + (bits.length ? '#' + bits.join('&') : ''));
+  } catch (e) { /* fragment writing unavailable — settings still apply this session */ }
+}
+
+function loadSettings() {
+  try {
+    const d = /[#&]d=(-?\d+)/.exec(location.hash);
+    if (d) G.offset = clamp(Number(d[1]), -300, 300) / 1000;
+
+    const m = /[#&]k=([^&]*)/.exec(location.hash);
+    if (m) {
+      const parts = m[1].split('|');
+      ['ollie', 'rue'].forEach((id, i) => {
+        if (!parts[i]) return;
+        const got = parts[i].split(',').map(decodeURIComponent);
+        if (got.length !== MODES[id].lanes) return;
+        if (got.some((k) => !k || RESERVED.indexOf(k) >= 0)) return;
+        if (new Set(got).size !== got.length) return;
+        MODES[id].keys = got;
+      });
+    }
+  } catch (e) { /* malformed fragment — defaults stand */ }
+}
+
+/* ==========================================================================
+   BEAT DETECTION
+   ========================================================================== */
+
+const SR = 22050;      // analysis sample rate
+const WIN = 1024;      // energy window, samples
+const HOP = 256;       // ~11.6 ms per frame at 22.05 kHz
+
+const BANDS = [
+  { key: 'kick', lo: 25,   hi: 130,  label: 'Scanning 25–130 Hz · kick',        weight: 1.35, gap: 0.115 },
+  { key: 'body', lo: 130,  hi: 500,  label: 'Scanning 130–500 Hz · bass & snare', weight: 1.15, gap: 0.100 },
+  { key: 'mid',  lo: 500,  hi: 2200, label: 'Scanning 500 Hz–2.2 kHz · body',   weight: 1.00, gap: 0.095 },
+  { key: 'air',  lo: 2200, hi: 9000, label: 'Scanning 2.2–9 kHz · hats & air',  weight: 0.85, gap: 0.070 }
+];
+
+const STAGE_LABELS = ['Decoding audio']
+  .concat(BANDS.map((b) => b.label))
+  .concat(['Estimating tempo', 'Building the chart']);
+
+function paintStages(active) {
+  els.stages.innerHTML = '';
+  STAGE_LABELS.forEach((label, i) => {
+    const li = document.createElement('li');
+    li.textContent = label;
+    if (i < active) li.className = 'done';
+    else if (i === active) li.className = 'on';
+    els.stages.appendChild(li);
+  });
+  els.anaBar.style.width = (active / STAGE_LABELS.length) * 100 + '%';
+}
+
+/** Render the buffer through a band-pass pair and hand back mono samples. */
+async function renderBand(buffer, band) {
+  const length = Math.max(1, Math.ceil(buffer.duration * SR));
+  const OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const oc = new OAC(1, length, SR);
+  const src = oc.createBufferSource();
+  src.buffer = buffer;
+
+  const hp = oc.createBiquadFilter();
+  hp.type = 'highpass'; hp.frequency.value = band.lo; hp.Q.value = 0.7;
+  const lp = oc.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = Math.min(band.hi, SR / 2 - 500); lp.Q.value = 0.7;
+
+  src.connect(hp); hp.connect(lp); lp.connect(oc.destination);
+  src.start(0);
+  const out = await oc.startRendering();
+  return out.getChannelData(0);
+}
+
+/** RMS energy per frame. */
+function envelope(data) {
+  const n = Math.max(0, Math.floor((data.length - WIN) / HOP));
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const o = i * HOP;
+    let s = 0;
+    for (let j = 0; j < WIN; j++) { const v = data[o + j]; s += v * v; }
+    out[i] = Math.sqrt(s / WIN);
+  }
+  return out;
+}
+
+/**
+ * Onsets from the positive flux of an envelope, scored against a local mean so
+ * that quiet passages still register and loud ones do not spam.
+ */
+function onsets(env, band) {
+  const n = env.length;
+  if (n < 8) return [];
+
+  const flux = new Float32Array(n);
+  let peak = 0;
+  for (let i = 1; i < n; i++) {
+    flux[i] = Math.max(0, env[i] - env[i - 1]);
+    if (env[i] > peak) peak = env[i];
+  }
+
+  // moving average of flux over ~1 s, via prefix sums
+  const W = 43;
+  const pre = new Float64Array(n + 1);
+  for (let i = 0; i < n; i++) pre[i + 1] = pre[i] + flux[i];
+
+  const floor = peak * 0.045;
+  const minFrames = Math.max(2, Math.round((band.gap * SR) / HOP));
+  const found = [];
+  let last = -1e9;
+
+  for (let i = 2; i < n - 2; i++) {
+    const f = flux[i];
+    if (f <= 0 || env[i] < floor) continue;
+    if (f < flux[i - 1] || f < flux[i + 1] || f < flux[i - 2] || f < flux[i + 2]) continue;
+
+    const a = Math.max(0, i - W), b = Math.min(n, i + W);
+    const mean = (pre[b] - pre[a]) / (b - a);
+    if (mean <= 0) continue;
+
+    const ratio = f / (mean + 1e-9);
+    if (ratio < 1.25) continue;
+    if (i - last < minFrames) {
+      // keep whichever spike in this cluster is stronger
+      const prev = found[found.length - 1];
+      if (prev && ratio > prev.raw) { prev.raw = ratio; prev.t = (i * HOP) / SR; last = i; }
+      continue;
+    }
+    last = i;
+    found.push({ t: (i * HOP) / SR, raw: ratio, band: band.key, w: band.weight });
+  }
+  return found;
+}
+
+/** Autocorrelation of summed flux to guess a beat period and phase. */
+function estimateTempo(envs, duration) {
+  const n = Math.min.apply(null, envs.map((e) => e.length));
+  if (n < 200) return null;
+
+  const flux = new Float32Array(n);
+  for (const env of envs) {
+    for (let i = 1; i < n; i++) flux[i] += Math.max(0, env[i] - env[i - 1]);
+  }
+  let mean = 0;
+  for (let i = 0; i < n; i++) mean += flux[i];
+  mean /= n;
+  for (let i = 0; i < n; i++) flux[i] = Math.max(0, flux[i] - mean);
+
+  let energy = 0;
+  for (let i = 0; i < n; i++) energy += flux[i] * flux[i];
+  energy /= n;
+  if (energy <= 1e-12) return null;
+
+  const fps = SR / HOP;
+  const minLag = Math.floor((60 / 190) * fps);
+  const maxLag = Math.ceil((60 / 62) * fps);
+  const ac = new Float64Array(maxLag + 2);
+  let bestLag = 0, bestScore = 0;
+
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    let s = 0;
+    for (let i = lag; i < n; i++) s += flux[i] * flux[i - lag];
+    s /= (n - lag);
+    ac[lag] = s;
+    if (s > bestScore) { bestScore = s; bestLag = lag; }
+  }
+  if (!bestLag) return null;
+
+  // A whole-frame lag is out by up to 11 ms per beat, which compounds into
+  // seconds of drift by the end of a track. Autocorrelation peaks are too
+  // sharp to interpolate reliably, so refine lag and phase together by
+  // scoring an actual beat comb against the flux — the thing we care about.
+  const span = Math.min(n, Math.round(fps * 120));
+  const comb = (lag, phase) => {
+    let s = 0;
+    for (let i = phase; i < span; i += lag) {
+      const f = Math.round(i);
+      s += (flux[f] || 0) + 0.55 * ((flux[f - 1] || 0) + (flux[f + 1] || 0));
+    }
+    return s / Math.max(1, span / lag);
+  };
+
+  let lag = bestLag, bestPhase = 0, bestComb = -1;
+  for (let d = -1.5; d <= 1.5001; d += 0.05) {
+    const tryLag = bestLag + d;
+    if (tryLag < 8) continue;
+    const step = tryLag / 48;
+    for (let ph = 0; ph < tryLag; ph += step) {
+      const v = comb(tryLag, ph);
+      if (v > bestComb) { bestComb = v; lag = tryLag; bestPhase = ph; }
+    }
+  }
+
+  while (60 / (lag / fps) < 78) { lag /= 2; }
+  while (60 / (lag / fps) > 190) { lag *= 2; }
+
+  const period = lag / fps;
+  return {
+    period: period,
+    phase: (bestPhase / fps) % period,
+    bpm: 60 / period,
+    confidence: clamp((bestScore / energy) * 1.6, 0, 1),
+    fit: 0
+  };
+}
+
+/**
+ * How well the detected onsets actually sit on the grid we guessed. If the
+ * tempo or phase is wrong, snapping would drag notes off the beat and wreck
+ * the sync, so everything downstream is gated on this.
+ */
+function gridFit(cands, grid, div) {
+  if (!grid) return 0;
+  const strong = cands.slice().sort((a, b) => b.raw - a.raw).slice(0, 400);
+  if (strong.length < 20) return 0;
+  const tol = div * 0.22;
+  let on = 0;
+  for (const c of strong) {
+    const k = Math.round((c.t - grid.phase) / div);
+    if (Math.abs(grid.phase + k * div - c.t) <= tol) on++;
+  }
+  return on / strong.length;
+}
+/* ==========================================================================
+   CHART BUILDING
+   ========================================================================== */
+
+/**
+ * Greedy selection: sort every candidate onset by strength, take the strongest
+ * first, and skip anything that lands too close to a note already taken. That
+ * makes the chart adapt to the track instead of to a fixed threshold, so a
+ * gentle hold-music loop and a loud rock mix both come out playable.
+ */
+function selectNotes(cands, cfg, grid, duration) {
+  const target = Math.max(12, Math.round(duration * cfg.targetNPS));
+  const gap = cfg.minGap;
+
+  const div = cfg.id === 'ollie' ? (grid ? grid.period / 2 : 0) : (grid ? grid.period / 4 : 0);
+  const useGrid = !!grid && grid.confidence > 0.12 && gridFit(cands, grid, div) > 0.5;
+  if (grid) grid.fit = useGrid ? 1 : 0;
+
+  // weight onsets by band, and nudge on-grid hits up so the chart sits on the pulse
+  for (const c of cands) {
+    let s = c.raw * c.w;
+    if (useGrid) {
+      const beats = (c.t - grid.phase) / grid.period;
+      const dBeat = Math.abs(beats - Math.round(beats)) * grid.period;
+      const half = Math.abs(beats * 2 - Math.round(beats * 2)) * grid.period;
+      if (dBeat < 0.055) s *= 1.55;
+      else if (half < 0.055) s *= 1.22;
+      else if (cfg.id === 'ollie') s *= 0.72;   // Ollie stays on the obvious beats
+    }
+    c.s = s;
+  }
+
+  cands.sort((a, b) => b.s - a.s);
+
+  const buckets = new Map();
+  const keep = [];
+  const bucketOf = (t) => Math.floor(t / gap);
+
+  for (const c of cands) {
+    if (keep.length >= target) break;
+    const k = bucketOf(c.t);
+    let clash = false;
+    for (let d = -1; d <= 1 && !clash; d++) {
+      const arr = buckets.get(k + d);
+      if (!arr) continue;
+      for (const t of arr) { if (Math.abs(t - c.t) < gap) { clash = true; break; } }
+    }
+    if (clash) continue;
+    if (!buckets.has(k)) buckets.set(k, []);
+    buckets.get(k).push(c.t);
+    keep.push(c);
+  }
+
+  keep.sort((a, b) => a.t - b.t);
+
+  // snap to the beat grid where the move is small enough to be an improvement
+  if (useGrid) {
+    const tol = Math.min(0.045, div * 0.3);
+    for (const c of keep) {
+      const k = Math.round((c.t - grid.phase) / div);
+      const snapped = grid.phase + k * div;
+      if (snapped > 0 && Math.abs(snapped - c.t) <= tol) c.t = snapped;
+    }
+    keep.sort((a, b) => a.t - b.t);
+
+    // snapping can pull two notes together — drop the weaker of any pair that
+    // ended up inside the minimum gap
+    const spaced = [];
+    for (const c of keep) {
+      const prev = spaced[spaced.length - 1];
+      if (prev && c.t - prev.t < gap) {
+        if (c.s > prev.s) spaced[spaced.length - 1] = c;
+        continue;
+      }
+      spaced.push(c);
+    }
+    return spaced;
+  }
+
+  return keep;
+}
+
+/** Turn selected onsets into lane assignments, avoiding unfair repeats. */
+function assignLanes(picked, cfg, rng) {
+  const L = cfg.lanes;
+  const lastInLane = new Array(L).fill(-99);
+  const usage = new Array(L).fill(0);
+  const notes = [];
+  const bandLane = { kick: 0, body: 1, mid: 2, air: 3 };
+  let prevLane = -1, prevT = -99, prevGap = 0, dir = 1, run = 0;
+
+  for (let i = 0; i < picked.length; i++) {
+    const c = picked[i];
+    const home = Math.round((bandLane[c.band] / 3) * (L - 1));
+    const dt = c.t - prevT;
+
+    // even spacing reads as a fill or a run, so walk the lanes in one direction
+    let runLane = -1;
+    if (prevLane >= 0 && Math.abs(dt - prevGap) < 0.03 && dt < 0.5) {
+      run++;
+      if (run > 4 && rng() < 0.55) { dir *= -1; run = 0; }
+      runLane = prevLane + dir;
+      if (runLane < 0 || runLane >= L) { dir *= -1; runLane = prevLane + dir; }
+    } else {
+      run = 0;
+      if (rng() < 0.3) dir *= -1;
+    }
+
+    let lane = -1, bestScore = Infinity;
+    for (let l = 0; l < L; l++) {
+      if (c.t - lastInLane[l] < cfg.laneGap) continue;
+      let sc = Math.abs(l - home) * 0.8;
+      sc += (usage[l] / Math.max(1, i)) * L * 1.15;             // keep lanes even
+      if (l === prevLane) sc += dt < cfg.laneGap * 1.8 ? 3 : 0.7;
+      if (l === runLane) sc -= 1.5;
+      sc += rng() * 0.5;
+      if (sc < bestScore) { bestScore = sc; lane = l; }
+    }
+    if (lane < 0) {
+      lane = 0;
+      for (let l = 1; l < L; l++) if (lastInLane[l] < lastInLane[lane]) lane = l;
+    }
+
+    lastInLane[lane] = c.t; usage[lane]++;
+    notes.push({ t: c.t, lane: lane, s: c.s, judged: false, hit: false });
+
+    // Rue mode throws in chords on the strongest simultaneous hits
+    if (cfg.chordChance > 0 && rng() < cfg.chordChance && c.s > 1.6) {
+      let alt = -1, altScore = Infinity;
+      for (let l = 0; l < L; l++) {
+        if (l === lane || Math.abs(l - lane) < 2) continue;
+        if (c.t - lastInLane[l] < cfg.laneGap) continue;
+        const sc = usage[l] + rng();
+        if (sc < altScore) { altScore = sc; alt = l; }
+      }
+      if (alt >= 0) {
+        lastInLane[alt] = c.t; usage[alt]++;
+        notes.push({ t: c.t, lane: alt, s: c.s, judged: false, hit: false });
+      }
+    }
+
+    prevLane = lane; prevGap = dt; prevT = c.t;
+  }
+
+  notes.sort((a, b) => (a.t - b.t) || (a.lane - b.lane));
+  return notes;
+}
+
+/* -------------------------- waveform preview ------------------------------ */
+
+function peaks(buffer, n) {
+  const d = buffer.getChannelData(0);
+  const step = Math.max(1, Math.floor(d.length / n));
+  const out = new Float32Array(n);
+  const sub = Math.max(1, Math.floor(step / 48));
+  for (let i = 0; i < n; i++) {
+    let m = 0;
+    const o = i * step;
+    for (let j = 0; j < step; j += sub) { const v = Math.abs(d[o + j] || 0); if (v > m) m = v; }
+    out[i] = m;
+  }
+  return out;
+}
+
+function drawScope(canvas, wave, notes, duration, sweep) {
+  const c = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height, mid = H / 2;
+  const accent = getComputedStyle(document.body).getPropertyValue('--accent').trim() || '#ffd200';
+  const teal = G.cfg.id === 'rue' ? '#9b5cff' : '#00d6c4';
+
+  c.clearRect(0, 0, W, H);
+  c.fillStyle = 'rgba(255,255,255,.05)';
+  c.fillRect(0, mid - 0.5, W, 1);
+
+  let max = 0.0001;
+  for (let i = 0; i < wave.length; i++) if (wave[i] > max) max = wave[i];
+
+  const bw = W / wave.length;
+  for (let i = 0; i < wave.length; i++) {
+    const h = Math.max(1.5, (wave[i] / max) * (H * 0.44));
+    const lit = sweep === undefined || i / wave.length <= sweep;
+    c.fillStyle = lit ? teal : 'rgba(255,255,255,.10)';
+    c.fillRect(i * bw, mid - h, Math.max(1, bw - 0.6), h * 2);
+  }
+
+  if (notes && notes.length) {
+    c.fillStyle = accent;
+    for (const n of notes) {
+      const x = (n.t / duration) * W;
+      c.fillRect(x, H - 26, 1.4, 20);
+    }
+    c.fillStyle = 'rgba(255,255,255,.28)';
+    c.fillRect(0, H - 6, W, 1);
+  }
+
+  if (sweep !== undefined) {
+    const x = sweep * W;
+    c.fillStyle = accent;
+    c.fillRect(x - 1, 0, 2, H);
+  }
+}
+
+/* ==========================================================================
+   .signal PACK FORMAT
+
+   [0..3]   magic "SGHR"
+   [4..7]   uint32 version
+   [8..11]  uint32 metadata length
+   [12..15] uint32 audio length
+   [16..]   metadata JSON, then the original audio bytes verbatim
+
+   The audio is stored as-is rather than base64'd into JSON, so a pack is the
+   size of the song plus a few KB. Metadata sits at the front so the library
+   can read a chart's details with a small range request instead of pulling
+   down the whole song.
+   ========================================================================== */
+
+const PACK_MAGIC = [0x53, 0x47, 0x48, 0x52];
+const PACK_VERSION = 1;
+const HEADER = 16;
+
+function encodePack(meta, audioBytes) {
+  const json = new TextEncoder().encode(JSON.stringify(meta));
+  const audio = new Uint8Array(audioBytes);
+  const out = new Uint8Array(HEADER + json.length + audio.length);
+  const dv = new DataView(out.buffer);
+  out.set(PACK_MAGIC, 0);
+  dv.setUint32(4, PACK_VERSION, true);
+  dv.setUint32(8, json.length, true);
+  dv.setUint32(12, audio.length, true);
+  out.set(json, HEADER);
+  out.set(audio, HEADER + json.length);
+  return out;
+}
+
+/** Reads just the header. Returns null if this is not a pack, or {short:n} if
+ *  the caller only fetched part of the metadata and needs n bytes. */
+function readPackHeader(buf) {
+  if (buf.byteLength < HEADER) return null;
+  const u8 = new Uint8Array(buf);
+  for (let i = 0; i < 4; i++) if (u8[i] !== PACK_MAGIC[i]) return null;
+  const dv = new DataView(buf);
+  if (dv.getUint32(4, true) > PACK_VERSION) return null;
+  const metaLen = dv.getUint32(8, true);
+  const audioLen = dv.getUint32(12, true);
+  if (metaLen > 8 << 20) return null;
+  if (buf.byteLength < HEADER + metaLen) return { short: HEADER + metaLen };
+  let meta;
+  try {
+    meta = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, HEADER, metaLen)));
+  } catch (e) { return null; }
+  return { meta: meta, metaLen: metaLen, audioLen: audioLen };
+}
+
+function decodePack(buf) {
+  const head = readPackHeader(buf);
+  if (!head || head.short) return null;
+  const from = HEADER + head.metaLen;
+  return { meta: head.meta, audio: buf.slice(from, from + head.audioLen) };
+}
+
+function slug(str) {
+  return (str || 'chart').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'chart';
+}
+
+function downloadBytes(bytes, filename) {
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+/* ------------------------- loading audio and packs ------------------------ */
+
+/** decodeAudioData detaches the buffer it is handed, so always give it a copy
+ *  — the originals are what get written back out into a pack. */
+function decodeAudio(bytes) {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  return new Promise((res, rej) => {
+    const p = ctx.decodeAudioData(bytes.slice(0), res, rej);
+    if (p && p.then) p.then(res, rej);
+  }).then((buf) => { try { ctx.close(); } catch (e) {} return buf; });
+}
+
+function packFromAudio(name, mime, buffer, audioBytes) {
+  return {
+    meta: {
+      title: name.replace(/\.[^.]+$/, ''),
+      artist: '', charter: '', source: 'auto',
+      mime: mime || 'audio/mpeg',
+      filename: name,
+      duration: buffer.duration,
+      grid: null
+    },
+    charts: {},
+    audioBytes: audioBytes,
+    buffer: buffer,
+    wave: peaks(buffer, 700)
+  };
+}
+
+/** The expensive pass — run once per loaded song and cached, so re-charting a
+ *  mode or hitting auto-chart in the editor is instant. */
+async function ensureAnalysis() {
+  if (G.analysis) return G.analysis;
+
+  const buffer = G.pack.buffer;
+  const wave = G.pack.wave;
+  const back = G.screen;
+  show('analysis');
+  paintStages(1);
+  els.anaSub.textContent = 'Splitting the audio into four frequency bands.';
+  drawScope(els.scope, wave, null, buffer.duration, 0);
+  await raf();
+
+  const envs = [];
+  let cands = [];
+  for (let i = 0; i < BANDS.length; i++) {
+    paintStages(i + 1);
+    els.anaSub.textContent = BANDS[i].label.replace('Scanning', 'Isolating') + '.';
+    drawScope(els.scope, wave, null, buffer.duration, (i + 1) / BANDS.length);
+    await raf(); await raf();
+    const env = envelope(await renderBand(buffer, BANDS[i]));
+    envs.push(env);
+    cands = cands.concat(onsets(env, BANDS[i]));
+  }
+
+  paintStages(5);
+  els.anaSub.textContent = 'Looking for a steady pulse across all four bands.';
+  await raf(); await raf();
+  const grid = estimateTempo(envs, buffer.duration);
+
+  paintStages(6);
+  els.anaSub.textContent = 'Placing notes and spreading them across the lanes.';
+  await raf(); await raf();
+
+  G.analysis = { cands: cands, grid: grid };
+  if (grid && !G.pack.meta.grid) {
+    G.pack.meta.grid = { period: grid.period, phase: grid.phase, bpm: grid.bpm, fit: grid.fit };
+  }
+  if (back === 'editor') edResume();
+  return G.analysis;
+}
+
+/** Chart one mode from the cached analysis. selectNotes rewrites candidate
+ *  times when it snaps, so every call works on fresh copies. */
+function buildFor(modeId) {
+  const cfg = MODES[modeId];
+  const dur = G.pack.meta.duration;
+  const clone = G.analysis.cands.map((c) => ({ t: c.t, raw: c.raw, band: c.band, w: c.w }));
+  const grid = G.analysis.grid;
+  const picked = selectNotes(clone, cfg, grid, dur);
+  if (grid && G.pack.meta.grid) G.pack.meta.grid.fit = grid.fit;
+  const rng = mulberry(Math.round(dur * 1000) ^ (cfg.lanes * 2654435761));
+  return assignLanes(picked, cfg, rng);
+}
+
+function packGrid() {
+  const g = G.pack.meta.grid;
+  if (!g) return null;
+  return { period: g.period, phase: g.phase, bpm: g.bpm, fit: g.fit, confidence: 1 };
+}
+
+/** Make a mode playable: use the chart in the pack, or generate one. */
+async function useMode(modeId) {
+  setMode(modeId);
+  let notes = G.pack.charts[modeId];
+  if (!notes || !notes.length) {
+    await ensureAnalysis();
+    notes = buildFor(modeId);
+    if (notes.length < 8) {
+      fail('Not enough rhythmic detail in that track to build a chart. Try something with a clearer beat.');
+      return false;
+    }
+    G.pack.charts[modeId] = notes;
+  }
+  G.chart = { notes: notes, grid: packGrid(), duration: G.pack.meta.duration, wave: G.pack.wave };
+  G.buffer = G.pack.buffer;
+  return true;
+}
+
+/* -------------------------------- entry ----------------------------------- */
+
+async function run() {
+  if (!G.file) return;
+  els.err.hidden = true;
+  if (isPack(G.file)) await openPackFile(G.file);
+  else await openAudioFile(G.file);
+}
+
+async function openAudioFile(file) {
+  G.playing = null;
+  show('analysis');
+  paintStages(0);
+  els.anaSub.textContent = 'Decoding ' + file.name;
+  await raf();
+
+  let bytes, buffer;
+  try {
+    bytes = await file.arrayBuffer();
+    buffer = await decodeAudio(bytes);
+  } catch (e) {
+    fail('That file would not decode. Try an MP3, M4A, WAV or OGG exported at a standard bitrate.');
+    return;
+  }
+  if (buffer.duration < 3) { fail('That track is under 3 seconds — too short to chart.'); return; }
+
+  G.pack = packFromAudio(file.name, file.type, buffer, bytes);
+  G.analysis = null;
+  if (await useMode(G.cfg.id)) showReady();
+}
+
+async function openPackFile(file) {
+  G.playing = null;
+  show('analysis');
+  els.stages.innerHTML = '';
+  els.anaBar.style.width = '30%';
+  els.anaSub.textContent = 'Opening ' + file.name;
+  await raf();
+  const buf = await file.arrayBuffer();
+  await openPackBuffer(buf, file.name);
+}
+
+async function openPackBuffer(buf, label) {
+  const pack = decodePack(buf);
+  if (!pack) { fail('That .signal file is damaged or was made by a newer version of the game.'); return; }
+
+  els.anaBar.style.width = '70%';
+  els.anaSub.textContent = 'Decoding the song inside ' + (pack.meta.title || label);
+  await raf();
+
+  let buffer;
+  try { buffer = await decodeAudio(pack.audio); }
+  catch (e) { fail('The song inside that .signal file would not decode.'); return; }
+
+  G.pack = {
+    meta: Object.assign({ title: label, artist: '', charter: '', source: 'custom', duration: buffer.duration }, pack.meta),
+    charts: {
+      ollie: (pack.meta.charts && pack.meta.charts.ollie) ? pack.meta.charts.ollie.map((n) => ({ t: n[0] / 1000, lane: n[1], s: 1.4 })) : null,
+      rue: (pack.meta.charts && pack.meta.charts.rue) ? pack.meta.charts.rue.map((n) => ({ t: n[0] / 1000, lane: n[1], s: 1.4 })) : null
+    },
+    audioBytes: pack.audio,
+    buffer: buffer,
+    wave: peaks(buffer, 700)
+  };
+  G.pack.meta.duration = buffer.duration;
+  delete G.pack.meta.charts;
+  G.analysis = null;
+
+  // open on a mode the pack actually has
+  let want = G.cfg.id;
+  if (!G.pack.charts[want]) want = G.pack.charts.ollie ? 'ollie' : (G.pack.charts.rue ? 'rue' : want);
+  els.anaBar.style.width = '100%';
+  if (await useMode(want)) showReady();
+}
+
+function packMeta() {
+  const m = G.pack.meta;
+  const meta = {
+    title: m.title || 'Untitled', artist: m.artist || '', charter: m.charter || '',
+    source: m.source || 'auto', mime: m.mime || 'audio/mpeg', filename: m.filename || '',
+    duration: m.duration, grid: m.grid, game: 'Signal Hero', created: new Date().toISOString().slice(0, 10),
+    charts: {}
+  };
+  for (const id of ['ollie', 'rue']) {
+    const notes = G.pack.charts[id];
+    if (notes && notes.length) {
+      meta.charts[id] = notes.map((n) => [Math.round(n.t * 1000), n.lane]);
+    }
+  }
+  return meta;
+}
+
+function exportPack() {
+  const meta = packMeta();
+  if (!Object.keys(meta.charts).length) return false;
+  downloadBytes(encodePack(meta, G.pack.audioBytes), slug(meta.title) + '.signal');
+  return true;
+}
+
+/* ------------------------------ ready screen ------------------------------ */
+
+function showReady() {
+  const ch = G.chart, m = G.pack.meta;
+  const nps = ch.notes.length / ch.duration;
+  const custom = m.source === 'custom' || m.charter;
+
+  els.readyTitle.textContent = m.title || 'Ready to play';
+  els.readySub.textContent = custom
+    ? (m.artist ? m.artist + ' · ' : '') + 'charted by ' + (m.charter || 'someone') + '. Yellow ticks are the notes.'
+    : 'Charted from the audio for ' + G.cfg.name + '. Yellow ticks are the notes — open the editor if any of them are in the wrong place.';
+
+  els.rmOllie.setAttribute('aria-pressed', String(G.cfg.id === 'ollie'));
+  els.rmRue.setAttribute('aria-pressed', String(G.cfg.id === 'rue'));
+  els.rmOllie.textContent = 'Ollie Mode' + (G.pack.charts.ollie ? '' : ' · auto');
+  els.rmRue.textContent = 'Rue Mode' + (G.pack.charts.rue ? '' : ' · auto');
+
+  els.stats.innerHTML = '';
+  const rows = [
+    [ch.notes.length.toLocaleString(), 'Notes'],
+    [m.grid ? Math.round(m.grid.bpm) : '—', 'BPM'],
+    [nps.toFixed(1), 'Notes / sec'],
+    [mmss(ch.duration), 'Length'],
+    [G.cfg.lanes, 'Lanes']
+  ];
+  for (const r of rows) {
+    const d = document.createElement('div');
+    d.className = 'stat';
+    d.innerHTML = '<div class="stat__v"></div><div class="stat__k"></div>';
+    d.firstChild.textContent = r[0];
+    d.lastChild.textContent = r[1];
+    els.stats.appendChild(d);
+  }
+
+  show('ready');
+  requestAnimationFrame(() => drawScope(els.scope2, ch.wave, ch.notes, ch.duration));
+}
+
+els.rmOllie.addEventListener('click', async () => { if (await useMode('ollie')) showReady(); });
+els.rmRue.addEventListener('click', async () => { if (await useMode('rue')) showReady(); });
+els.exportBtn.addEventListener('click', () => {
+  if (!exportPack()) els.readySub.textContent = 'Nothing to export yet — chart a mode first.';
+});
+$('publish').addEventListener('click', openPublish);
+
+
+/* ==========================================================================
+   CHART LIBRARY
+
+   Charts are looked for in the folder index.html sits in and in a few likely
+   subfolders. A server answers a request for the folder holding index.html
+   with index.html itself rather than a file listing, so charts sitting beside
+   the game have to be named in a manifest; a subfolder has no index file in
+   the way and lists fine. Every probe is recorded either way, so an empty
+   library can say what it actually tried.
+   ========================================================================== */
+
+const BASE_DIR = location.href.replace(/[?#].*$/, '').replace(/[^/]*$/, '');
+const LIB_SUBDIRS = ['', 'charts/', 'songs/', 'music/', 'tracks/'];
+const MANIFESTS = ['index.json', 'charts.json', 'signal.json'];
+let libProbes = [];
+
+function parseListing(html) {
+  if (/data-app="signal-hero"/.test(html)) return null;   // our own page came back, not a listing
+  const out = [];
+  const re = /href\s*=\s*["']([^"']+\.signal)["']/gi;
+  let m;
+  while ((m = re.exec(html))) {
+    let href = m[1];
+    try { href = decodeURIComponent(href); } catch (e) {}
+    out.push(href.split('/').pop());
+  }
+  return out;
+}
+
+function readManifest(json) {
+  const list = Array.isArray(json) ? json : (json && Array.isArray(json.charts) ? json.charts : []);
+  return list
+    .map((e) => (typeof e === 'string' ? { file: e } : e))
+    .filter((e) => e && typeof e.file === 'string' && /\.signal$/i.test(e.file));
+}
+
+const shortUrl = (u) => u.replace(BASE_DIR, '') || './';
+
+async function scanDir(dir) {
+  const out = [];
+
+  for (const name of MANIFESTS) {
+    const url = dir + name;
+    try {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) { libProbes.push({ url: shortUrl(url), note: 'not found', hit: false }); continue; }
+      const found = readManifest(await r.json());
+      libProbes.push({ url: shortUrl(url), note: found.length ? found.length + ' listed' : 'no charts listed', hit: found.length > 0 });
+      if (found.length) return found;
+    } catch (e) {
+      libProbes.push({ url: shortUrl(url), note: 'not found', hit: false });
+    }
+  }
+
+  try {
+    const r = await fetch(dir, { cache: 'no-store' });
+    if (!r.ok) { libProbes.push({ url: shortUrl(dir), note: 'not found', hit: false }); return out; }
+    const names = parseListing(await r.text());
+    if (names === null) {
+      libProbes.push({ url: shortUrl(dir), note: 'served index.html, no listing', hit: false });
+      return out;
+    }
+    libProbes.push({ url: shortUrl(dir), note: names.length ? names.length + ' in listing' : 'listing has no .signal files', hit: names.length > 0 });
+    return names.map((f) => ({ file: f }));
+  } catch (e) {
+    libProbes.push({ url: shortUrl(dir), note: 'unreachable', hit: false });
+  }
+  return out;
+}
+
+async function findCharts() {
+  libProbes = [];
+  const found = new Map();
+  for (const sub of LIB_SUBDIRS) {
+    const dir = BASE_DIR + sub;
+    for (const e of await scanDir(dir)) {
+      if (!found.has(e.file)) found.set(e.file, Object.assign({ dir: dir }, e));
+    }
+  }
+  return Array.from(found.values()).slice(0, 160);
+}
+
+/** Read forward only as far as the metadata, then abort the transfer. A range
+ *  request is asked for first, but plenty of servers ignore it and start
+ *  sending the whole song — cancelling the stream keeps browsing cheap either
+ *  way, which matters when a library holds a few hundred MB of music. */
+async function readEnough(reader) {
+  const chunks = [];
+  let got = 0, need = 0;
+  const merge = () => {
+    const a = new Uint8Array(got);
+    let at = 0;
+    for (const c of chunks) { a.set(c, at); at += c.length; }
+    return a;
+  };
+  for (;;) {
+    const step = await reader.read();
+    if (step.done) break;
+    chunks.push(step.value);
+    got += step.value.length;
+
+    if (!need && got >= HEADER) {
+      const head = merge();
+      for (let i = 0; i < 4; i++) {
+        if (head[i] !== PACK_MAGIC[i]) { reader.cancel(); return null; }
+      }
+      need = HEADER + new DataView(head.buffer).getUint32(8, true);
+      if (need > (8 << 20)) { reader.cancel(); return null; }
+    }
+    if (need && got >= need) { reader.cancel(); return merge().buffer; }
+  }
+  return merge().buffer;
+}
+
+async function fetchChartMeta(entry) {
+  const url = entry.dir + encodeURIComponent(entry.file);
+  try {
+    const r = await fetch(url, { headers: { Range: 'bytes=0-65535' }, cache: 'no-store' });
+    if (!r.ok && r.status !== 206) return null;
+
+    let buf;
+    if (r.status === 206 || !r.body || !r.body.getReader) buf = await r.arrayBuffer();
+    else buf = await readEnough(r.body.getReader());
+    if (!buf) return null;
+
+    let head = readPackHeader(buf);
+    if (head && head.short) {
+      const r2 = await fetch(url, { headers: { Range: 'bytes=0-' + (head.short + 64) }, cache: 'no-store' });
+      head = readPackHeader(await r2.arrayBuffer());
+    }
+    if (!head || head.short) return null;
+    return Object.assign({}, entry, { url: url, meta: head.meta, bytes: head.audioLen + head.metaLen + HEADER });
+  } catch (e) { return null; }
+}
+/* ==========================================================================
+   TRACK SELECTOR
+   Charts arrive from three places — published to Firebase, sitting in a folder
+   on the server, or dropped in from the player's device. Each is normalised to
+   the same shape with an open() that hands back the pack bytes, so sorting,
+   searching and playing do not care where a chart came from.
+   ========================================================================== */
+
+let cloudCharts = [];
+let serverCharts = [];
+const localCharts = [];
+let sortKey = 'rating';
+let searchText = '';
+let libLoaded = false;
+
+function serverItem(entry) {
+  const m = entry.meta || {};
+  return {
+    key: 'server:' + entry.dir + entry.file,
+    source: 'server',
+    title: m.title || entry.file,
+    artist: m.artist || '',
+    charter: m.charter || '',
+    duration: m.duration || 0,
+    bpm: m.grid && m.grid.bpm ? Math.round(m.grid.bpm) : 0,
+    modes: {
+      ollie: m.charts && m.charts.ollie ? m.charts.ollie.length : 0,
+      rue: m.charts && m.charts.rue ? m.charts.rue.length : 0
+    },
+    bytes: entry.bytes || 0,
+    rating: null, plays: 0, createdAt: 0,
+    where: entry.dir === BASE_DIR ? 'beside index.html' : shortUrl(entry.dir),
+    open: async function () {
+      const r = await fetch(entry.url, { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.arrayBuffer();
+    }
+  };
+}
+
+function localItem(file, meta) {
+  return {
+    key: 'local:' + file.name + ':' + file.size,
+    source: 'local',
+    title: meta.title || file.name,
+    artist: meta.artist || '',
+    charter: meta.charter || '',
+    duration: meta.duration || 0,
+    bpm: meta.grid && meta.grid.bpm ? Math.round(meta.grid.bpm) : 0,
+    modes: {
+      ollie: meta.charts && meta.charts.ollie ? meta.charts.ollie.length : 0,
+      rue: meta.charts && meta.charts.rue ? meta.charts.rue.length : 0
+    },
+    bytes: file.size,
+    rating: null, plays: 0, createdAt: file.lastModified || 0,
+    where: 'on this device',
+    open: () => file.arrayBuffer()
+  };
+}
+
+async function addLocalFiles(files) {
+  let added = 0, skipped = 0;
+  for (const f of files) {
+    if (!/\.signal$/i.test(f.name)) { skipped++; continue; }
+    try {
+      let head = readPackHeader(await f.slice(0, 65536).arrayBuffer());
+      if (head && head.short) head = readPackHeader(await f.slice(0, head.short + 64).arrayBuffer());
+      if (!head || head.short) { skipped++; continue; }
+      const item = localItem(f, head.meta);
+      if (localCharts.some((c) => c.key === item.key)) continue;
+      localCharts.push(item);
+      added++;
+    } catch (e) { skipped++; }
+  }
+  renderLibrary();
+  els.libSub.textContent = added
+    ? added + (added === 1 ? ' chart' : ' charts') + ' added from this device'
+      + (skipped ? ' — ' + skipped + ' skipped, not a .signal file.' : '.')
+    : 'Nothing added — those were not .signal files.';
+  return added;
+}
+
+/* -------------------------------- rendering ------------------------------- */
+
+function starRow(value, opts) {
+  const box = document.createElement('div');
+  box.className = 'stars' + (opts && opts.big ? ' big' : '') + (opts && opts.onPick ? ' act' : '');
+  for (let i = 1; i <= 5; i++) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z');
+    svg.appendChild(path);
+    if (i <= Math.round(value)) svg.classList.add('on');
+    if (opts && opts.onPick) {
+      svg.addEventListener('click', () => opts.onPick(i));
+      svg.setAttribute('role', 'button');
+      svg.setAttribute('aria-label', i + ' out of 5');
+    }
+    box.appendChild(svg);
+  }
+  return box;
+}
+
+function chartCard(item) {
+  const card = document.createElement('button');
+  card.className = 'card';
+
+  const top = document.createElement('div');
+  top.className = 'card__top';
+  const h = document.createElement('h3');
+  h.className = 'card__title';
+  h.textContent = item.title;
+  const src = document.createElement('span');
+  src.className = 'src' + (item.source === 'cloud' ? ' cloud' : '');
+  src.textContent = item.source === 'cloud' ? 'published' : item.source === 'local' ? 'device' : 'server';
+  top.appendChild(h); top.appendChild(src);
+  card.appendChild(top);
+
+  const by = document.createElement('p');
+  by.className = 'card__by';
+  by.textContent = item.artist || 'Unknown artist';
+  card.appendChild(by);
+
+  if (item.rating) {
+    const row = document.createElement('div');
+    row.className = 'card__rate';
+    row.appendChild(starRow(item.rating.avg));
+    const num = document.createElement('span');
+    num.className = 'card__rnum';
+    num.textContent = item.rating.count
+      ? item.rating.avg.toFixed(1) + ' · ' + item.rating.count + (item.rating.count === 1 ? ' rating' : ' ratings')
+      : 'Not rated yet';
+    row.appendChild(num);
+    card.appendChild(row);
+  }
+
+  const chips = document.createElement('div');
+  chips.className = 'chips';
+  const add = (text, on) => {
+    const c = document.createElement('span');
+    c.className = 'chip' + (on ? ' on' : '');
+    c.textContent = text;
+    chips.appendChild(c);
+  };
+  if (item.modes.ollie) add('Ollie · ' + item.modes.ollie, true);
+  if (item.modes.rue) add('Rue · ' + item.modes.rue, true);
+  if (item.duration) add(mmss(item.duration));
+  if (item.bpm) add(item.bpm + ' BPM');
+  if (item.plays) add(item.plays + (item.plays === 1 ? ' play' : ' plays'));
+  if (item.bytes) add((item.bytes / 1048576).toFixed(1) + ' MB');
+  card.appendChild(chips);
+
+  const foot = document.createElement('div');
+  foot.className = 'card__charter';
+  foot.textContent = (item.charter ? 'Charted by ' + item.charter : 'Auto-charted')
+    + (item.where ? ' · ' + item.where : '');
+  card.appendChild(foot);
+
+  card.addEventListener('click', () => openTrack(item));
+  return card;
+}
+
+function sortItems(list) {
+  const by = {
+    rating: (a, b) => (b.rating ? b.rating.avg : -1) - (a.rating ? a.rating.avg : -1)
+      || (b.rating ? b.rating.count : 0) - (a.rating ? a.rating.count : 0),
+    recent: (a, b) => b.createdAt - a.createdAt,
+    plays: (a, b) => b.plays - a.plays,
+    title: (a, b) => a.title.localeCompare(b.title)
+  };
+  return list.slice().sort(by[sortKey] || by.rating);
+}
+
+function matches(item) {
+  if (!searchText) return true;
+  const hay = (item.title + ' ' + item.artist + ' ' + item.charter).toLowerCase();
+  return hay.indexOf(searchText) >= 0;
+}
+
+function probeList() {
+  const ul = document.createElement('ul');
+  ul.className = 'probe';
+  for (const p of libProbes) {
+    const li = document.createElement('li');
+    if (p.hit) li.className = 'hit';
+    const b = document.createElement('b');
+    b.textContent = p.url;
+    const n = document.createElement('span');
+    n.textContent = p.note;
+    li.appendChild(b); li.appendChild(n);
+    ul.appendChild(li);
+  }
+  return ul;
+}
+
+function libEmptyState() {
+  const box = document.createElement('div');
+  box.className = 'empty';
+  const h = document.createElement('h3');
+  const p1 = document.createElement('p');
+  const p2 = document.createElement('p');
+
+  if (searchText) {
+    h.textContent = 'Nothing matches that search';
+    p1.textContent = 'Try a different title, artist or charter name.';
+    box.appendChild(h); box.appendChild(p1);
+    return box;
+  }
+
+  h.textContent = 'No tracks yet';
+  p1.textContent = fbConfigured()
+    ? 'Nothing has been published yet. Head to the Create tab, chart a song, and publish it — it lands here for everyone.'
+    : 'Head to the Create tab and chart a song. To let people publish charts from inside the game, fill in '
+      + 'FIREBASE_CONFIG near the top of this file.';
+  p2.textContent = 'Charts also load from a charts folder on the server, or you can drag .signal files onto this screen.';
+  box.appendChild(h); box.appendChild(p1); box.appendChild(p2);
+
+  if (libProbes.length) {
+    const h2 = document.createElement('h3');
+    h2.textContent = 'Where the server was checked';
+    h2.style.marginTop = '26px';
+    box.appendChild(h2);
+    box.appendChild(probeList());
+  }
+  return box;
+}
+
+function renderLibrary() {
+  els.libGrid.innerHTML = '';
+  els.libEmpty.hidden = true;
+  els.libEmpty.innerHTML = '';
+
+  const all = sortItems(cloudCharts.concat(serverCharts, localCharts).filter(matches));
+  for (const item of all) els.libGrid.appendChild(chartCard(item));
+
+  if (!all.length) {
+    els.libEmpty.hidden = false;
+    els.libEmpty.appendChild(libEmptyState());
+  }
+  return all.length;
+}
+
+function libCount() {
+  const bits = [];
+  if (cloudCharts.length) bits.push(cloudCharts.length + ' published');
+  if (serverCharts.length) bits.push(serverCharts.length + ' on the server');
+  if (localCharts.length) bits.push(localCharts.length + ' from this device');
+  return bits.join(' · ');
+}
+
+async function loadLibrary(force) {
+  if (libLoaded && !force) { renderLibrary(); return; }
+  els.libSub.textContent = 'Loading the track list\u2026';
+  els.libGrid.innerHTML = '';
+  els.libEmpty.hidden = true;
+
+  if (fbConfigured()) {
+    try { cloudCharts = await fbListCharts(sortKey); }
+    catch (e) { cloudCharts = []; }
+  }
+
+  const entries = await findCharts();
+  const found = [];
+  for (const e of entries) {
+    const item = await fetchChartMeta(e);
+    if (item) found.push(serverItem(item));
+  }
+  serverCharts = found;
+  libLoaded = true;
+
+  const n = renderLibrary();
+  els.libSub.textContent = n
+    ? n + (n === 1 ? ' track' : ' tracks') + ' — ' + libCount() + '.'
+    : (fbConfigured() && FB.state === 'failed' ? fbStatusLine() : 'No tracks yet.');
+}
+
+async function openTrack(item) {
+  show('analysis');
+  els.stages.innerHTML = '';
+  els.anaSub.textContent = 'Opening ' + item.title;
+  els.anaBar.style.width = item.source === 'cloud' ? '10%' : '45%';
+  await raf();
+
+  let buf;
+  try {
+    buf = await item.open((frac) => {
+      els.anaBar.style.width = (10 + frac * 70).toFixed(0) + '%';
+      els.anaSub.textContent = 'Downloading ' + item.title
+        + ' — ' + Math.round(frac * (item.chunks || 1)) + ' of ' + (item.chunks || 1) + ' parts';
+    });
+  } catch (e) {
+    show('browse');
+    els.libSub.textContent = 'Could not open ' + item.title + ': ' + e.message;
+    return;
+  }
+  els.anaBar.style.width = '80%';
+  G.playing = item;
+  await openPackBuffer(buf, item.title);
+}
+
+/* --------------------------------- wiring --------------------------------- */
+
+$('libRefresh').addEventListener('click', () => loadLibrary(true));
+$('libCreate').addEventListener('click', () => goTab('create'));
+$('libLocal').addEventListener('click', () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.signal';
+  input.multiple = true;
+  input.addEventListener('change', () => { if (input.files.length) addLocalFiles(input.files); });
+  input.click();
+});
+$('libSearch').addEventListener('input', (e) => { searchText = e.target.value.trim().toLowerCase(); renderLibrary(); });
+$('libSorts').addEventListener('click', async (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  sortKey = b.dataset.sort;
+  for (const x of $('libSorts').children) x.setAttribute('aria-pressed', String(x === b));
+  if (fbConfigured() && FB.state === 'ready') {
+    try { cloudCharts = await fbListCharts(sortKey); } catch (err) {}
+  }
+  renderLibrary();
+});
+
+const libScreen = $('browse');
+['dragenter', 'dragover'].forEach((ev) =>
+  libScreen.addEventListener(ev, (e) => { e.preventDefault(); libScreen.classList.add('is-over'); }));
+['dragleave', 'drop'].forEach((ev) =>
+  libScreen.addEventListener(ev, (e) => { e.preventDefault(); libScreen.classList.remove('is-over'); }));
+libScreen.addEventListener('drop', (e) => {
+  const files = e.dataTransfer && e.dataTransfer.files;
+  if (files && files.length) addLocalFiles(files);
+});
+
+
+/* ==========================================================================
+   TABS, PUBLISHING AND RATING
+   ========================================================================== */
+
+const TAB_SCREEN = { play: 'browse', create: 'create', settings: 'settings' };
+const CHROME_SCREENS = ['browse', 'create', 'settings'];
+
+function goTab(tab) {
+  const screen = TAB_SCREEN[tab] || 'browse';
+  for (const t of ['play', 'create', 'settings']) {
+    $('tab' + t.charAt(0).toUpperCase() + t.slice(1)).setAttribute('aria-pressed', String(t === tab));
+  }
+  if (tab === 'settings') { renderBinds(); renderOffset(); calReset(); els.bindNote.textContent = ''; }
+  show(screen);
+  if (tab === 'play') loadLibrary(false);
+  else calEnd();
+}
+
+$('tabPlay').addEventListener('click', () => goTab('play'));
+$('tabCreate').addEventListener('click', () => goTab('create'));
+$('tabSettings').addEventListener('click', () => goTab('settings'));
+$('brandBtn').addEventListener('click', () => goTab('play'));
+
+/* -------------------------------- publishing ------------------------------ */
+
+function openPublish() {
+  if (!fbConfigured()) {
+    $('pubErr').textContent = 'No Firebase project is connected, so there is nowhere to publish to yet. '
+      + 'Fill in FIREBASE_CONFIG near the top of this file to switch publishing on. You can still export '
+      + 'a .signal file and share it directly.';
+    $('pubErr').hidden = false;
+    $('pubModal').hidden = false;
+    $('pubGo').disabled = true;
+    return;
+  }
+  if (!signedIn()) { openAuth('up'); return; }
+
+  const m = G.pack.meta;
+  $('pubTitle').value = m.title || '';
+  $('pubArtist').value = m.artist || '';
+  $('pubCharter').value = m.charter || displayName();
+  $('pubErr').hidden = true;
+  $('pubGo').disabled = false;
+  $('pubGo').textContent = 'Publish';
+  $('pubBarWrap').hidden = true;
+  $('pubBar').style.width = '0%';
+
+  const counts = [];
+  for (const id of ['ollie', 'rue']) {
+    const c = G.pack.charts[id];
+    if (c && c.length) counts.push([c.length.toLocaleString(), MODES[id].name.replace(' Mode', '') + ' notes']);
+  }
+  const bytes = encodePack({ charts: {} }, G.pack.audioBytes).length;
+  counts.push([(bytes / 1048576).toFixed(1) + ' MB', 'Upload size']);
+  counts.push([Math.ceil(bytes / CHUNK), 'Parts']);
+  counts.push([mmss(m.duration), 'Length']);
+
+  $('pubStats').innerHTML = '';
+  for (const r of counts) {
+    const d = document.createElement('div');
+    d.className = 'stat';
+    d.innerHTML = '<div class="stat__v"></div><div class="stat__k"></div>';
+    d.firstChild.textContent = r[0];
+    d.lastChild.textContent = r[1];
+    $('pubStats').appendChild(d);
+  }
+  $('pubModal').hidden = false;
+}
+
+async function doPublish() {
+  const title = $('pubTitle').value.trim();
+  if (!title) { $('pubErr').textContent = 'Give it a title first.'; $('pubErr').hidden = false; return; }
+
+  G.pack.meta.title = title;
+  G.pack.meta.artist = $('pubArtist').value.trim();
+  G.pack.meta.charter = $('pubCharter').value.trim() || displayName();
+  G.pack.meta.source = 'custom';
+
+  const meta = packMeta();
+  if (!Object.keys(meta.charts).length) {
+    $('pubErr').textContent = 'There are no notes to publish yet.';
+    $('pubErr').hidden = false;
+    return;
+  }
+  const bytes = encodePack(meta, G.pack.audioBytes);
+  if (bytes.length > MAX_UPLOAD) {
+    $('pubErr').textContent = 'That comes to ' + (bytes.length / 1048576).toFixed(1)
+      + ' MB, over the ' + (MAX_UPLOAD / 1048576) + ' MB limit. Re-exporting the song at a lower bitrate '
+      + 'is the quickest way down.';
+    $('pubErr').hidden = false;
+    return;
+  }
+
+  $('pubErr').hidden = true;
+  $('pubGo').disabled = true;
+  $('pubGo').textContent = 'Publishing\u2026';
+  $('pubBarWrap').hidden = false;
+
+  try {
+    await fbPublish(meta, bytes, (frac) => { $('pubBar').style.width = (frac * 100).toFixed(0) + '%'; });
+    $('pubModal').hidden = true;
+    libLoaded = false;
+    goTab('play');
+    await loadLibrary(true);
+    els.libSub.textContent = '"' + title + '" is live. It shows for everyone now.';
+  } catch (e) {
+    $('pubErr').textContent = 'Upload failed: ' + ((e && e.message) || 'unknown error');
+    $('pubErr').hidden = false;
+    $('pubGo').disabled = false;
+    $('pubGo').textContent = 'Publish';
+  }
+}
+
+$('pubGo').addEventListener('click', doPublish);
+$('pubCancel').addEventListener('click', () => { $('pubModal').hidden = true; });
+$('pubModal').addEventListener('click', (e) => { if (e.target === $('pubModal')) $('pubModal').hidden = true; });
+
+/* --------------------------------- rating --------------------------------- */
+
+async function showRating() {
+  const box = $('rateBox');
+  const item = G.playing;
+  box.hidden = false;
+  $('rateStars').innerHTML = '';
+
+  if (!item || item.source !== 'cloud') {
+    $('rateLabel').textContent = 'Rating';
+    $('rateNote').textContent = 'Ratings are for published charts. Publish this one and people can rate it.';
+    return;
+  }
+  if (!signedIn()) {
+    $('rateLabel').textContent = 'Rate this chart';
+    $('rateStars').appendChild(starRow(item.rating ? item.rating.avg : 0));
+    $('rateNote').textContent = 'Sign in to add your rating — it counts towards the average everyone sees.';
+    return;
+  }
+
+  const mine = await fbMyRating(item.id);
+  $('rateLabel').textContent = mine ? 'Your rating' : 'Rate this chart';
+  const paint = (value) => {
+    $('rateStars').innerHTML = '';
+    $('rateStars').appendChild(starRow(value, { big: true, onPick: submit }));
+  };
+  const submit = async (value) => {
+    paint(value);
+    $('rateNote').textContent = 'Saving\u2026';
+    try {
+      const res = await fbRate(item.id, value);
+      item.rating = { avg: res.avg, count: res.count };
+      $('rateLabel').textContent = 'Your rating';
+      $('rateNote').textContent = 'Saved. This chart now averages ' + res.avg.toFixed(1)
+        + ' from ' + res.count + (res.count === 1 ? ' rating' : ' ratings') + '.';
+      renderLibrary();
+    } catch (e) {
+      $('rateNote').textContent = 'Could not save that: ' + ((e && e.message) || 'unknown error');
+    }
+  };
+  paint(mine || (item.rating ? item.rating.avg : 0));
+  $('rateNote').textContent = mine
+    ? 'Tap a different star to change it.'
+    : (item.rating && item.rating.count
+        ? 'Averaging ' + item.rating.avg.toFixed(1) + ' from ' + item.rating.count + ' so far.'
+        : 'Be the first to rate it.');
+}
+
+/* ==========================================================================
+   CHART EDITOR
+   ========================================================================== */
+
+const ED = {
+  mode: 'ollie', notes: [], sel: null, drag: null, hover: null,
+  zoom: 150, view: 0, snap: 2,
+  ctx: null, src: null, playing: false, base: 0, t0: 0, pos: 0, rate: 1,
+  rec: false, history: [], peaks: null, perSec: 100, token: 0
+};
+
+const edcv = $('edcv');
+const edx = edcv.getContext('2d');
+let eW = 0, eH = 0, padL = 58, rulerH = 30, waveH = 42;
+const padTop = () => rulerH + waveH;
+
+function peaksHi(buffer, perSec) {
+  const d = buffer.getChannelData(0);
+  const n = Math.max(1, Math.ceil(buffer.duration * perSec));
+  const step = Math.max(1, Math.floor(d.length / n));
+  const sub = Math.max(1, Math.floor(step / 24));
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let m = 0;
+    const o = i * step;
+    for (let j = 0; j < step; j += sub) { const v = Math.abs(d[o + j] || 0); if (v > m) m = v; }
+    out[i] = m;
+  }
+  return out;
+}
+
+const edTime = () => (ED.playing ? ED.base + (ED.ctx.currentTime - ED.t0) * ED.rate : ED.pos);
+const timeToX = (t) => padL + (t - ED.view) * ED.zoom;
+const xToTime = (x) => ED.view + (x - padL) / ED.zoom;
+const laneH = () => (eH - padTop()) / MODES[ED.mode].lanes;
+const laneY = (l) => padTop() + laneH() * (l + 0.5);
+
+function snapTime(t) {
+  const g = G.pack.meta.grid;
+  if (!ED.snap || !g) return Math.max(0, t);
+  const div = g.period / ED.snap;
+  const k = Math.round((t - g.phase) / div);
+  return Math.max(0, g.phase + k * div);
+}
+
+function edPush() {
+  ED.history.push(ED.notes.map((n) => ({ t: n.t, lane: n.lane, s: n.s })));
+  if (ED.history.length > 80) ED.history.shift();
+  $('edUndo').disabled = false;
+}
+
+function edCount() {
+  $('edCount').textContent = ED.notes.length;
+}
+
+function edResize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  eW = edcv.clientWidth; eH = edcv.clientHeight;
+  edcv.width = Math.round(eW * dpr); edcv.height = Math.round(eH * dpr);
+  edx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+async function openEditor() {
+  const m = G.pack.meta;
+  $('edTitle').value = m.title || '';
+  $('edArtist').value = m.artist || '';
+  $('edCharter').value = m.charter || '';
+  $('edDur').textContent = mmss(m.duration);
+
+  ED.mode = G.cfg.id;
+  ED.notes = (G.pack.charts[ED.mode] || []).map((n) => ({ t: n.t, lane: n.lane, s: n.s || 1.4 }));
+  ED.sel = null; ED.history = []; ED.pos = 0; ED.view = 0;
+  ED.peaks = peaksHi(G.pack.buffer, ED.perSec);
+  $('edUndo').disabled = true;
+  $('emOllie').setAttribute('aria-pressed', String(ED.mode === 'ollie'));
+  $('emRue').setAttribute('aria-pressed', String(ED.mode === 'rue'));
+
+  edCount();
+  edResume();
+}
+
+function edResume() {
+  show('editor');
+  edResize();
+  const token = ++ED.token;
+  const loop = () => {
+    if (G.screen !== 'editor' || token !== ED.token) return;
+    edDraw();
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+
+function edSaveMode() {
+  ED.notes.sort((a, b) => a.t - b.t);
+  G.pack.charts[ED.mode] = ED.notes.map((n) => ({ t: n.t, lane: n.lane, s: n.s }));
+  const m = G.pack.meta;
+  m.title = $('edTitle').value.trim() || m.title || 'Untitled';
+  m.artist = $('edArtist').value.trim();
+  m.charter = $('edCharter').value.trim();
+  if (m.charter) m.source = 'custom';
+}
+
+/* --------------------------------- draw ----------------------------------- */
+
+function edDraw() {
+  const c = edx, cfg = MODES[ED.mode], lanes = cfg.lanes;
+  const t = edTime();
+  if (ED.playing) {
+    if (t >= G.pack.meta.duration) { edStop(); }
+    ED.view = clamp(t - (eW - padL) / ED.zoom * 0.32, 0, Math.max(0, G.pack.meta.duration - 0.5));
+  }
+
+  c.clearRect(0, 0, eW, eH);
+  c.fillStyle = cfg.id === 'rue' ? '#12001c' : '#01221f';
+  c.fillRect(0, 0, eW, eH);
+
+  const lh = laneH(), top = padTop();
+  const t0 = xToTime(padL), t1 = xToTime(eW);
+
+  // lane rows
+  for (let l = 0; l < lanes; l++) {
+    c.fillStyle = l % 2 ? 'rgba(255,255,255,0.035)' : 'rgba(255,255,255,0.015)';
+    c.fillRect(padL, top + l * lh, eW - padL, lh);
+    c.strokeStyle = 'rgba(255,255,255,0.07)';
+    c.lineWidth = 1;
+    c.beginPath(); c.moveTo(padL, top + l * lh); c.lineTo(eW, top + l * lh); c.stroke();
+  }
+
+  // beat grid
+  const g = G.pack.meta.grid;
+  if (g) {
+    const div = g.period / (ED.snap || 1);
+    const k0 = Math.floor((t0 - g.phase) / div) - 1;
+    const k1 = Math.ceil((t1 - g.phase) / div) + 1;
+    if (k1 - k0 < 4000) {
+      for (let k = k0; k <= k1; k++) {
+        const time = g.phase + k * div;
+        if (time < 0) continue;
+        const x = timeToX(time);
+        const beats = (time - g.phase) / g.period;
+        const onBeat = Math.abs(beats - Math.round(beats)) < 1e-6;
+        const onBar = onBeat && Math.abs(beats / 4 - Math.round(beats / 4)) < 1e-6;
+        c.strokeStyle = onBar ? 'rgba(255,255,255,0.28)' : onBeat ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)';
+        c.lineWidth = onBar ? 1.5 : 1;
+        c.beginPath(); c.moveTo(x, top); c.lineTo(x, eH); c.stroke();
+      }
+    }
+  }
+
+  // waveform strip
+  c.fillStyle = 'rgba(0,0,0,0.35)';
+  c.fillRect(padL, rulerH, eW - padL, waveH);
+  let wmax = 0.0001;
+  for (let i = 0; i < ED.peaks.length; i++) if (ED.peaks[i] > wmax) wmax = ED.peaks[i];
+  c.fillStyle = cfg.id === 'rue' ? 'rgba(155,92,255,0.75)' : 'rgba(0,214,196,0.7)';
+  const mid = rulerH + waveH / 2;
+  for (let x = padL; x < eW; x++) {
+    const i = Math.floor(xToTime(x) * ED.perSec);
+    if (i < 0 || i >= ED.peaks.length) continue;
+    const h = Math.max(0.7, (ED.peaks[i] / wmax) * (waveH / 2 - 3));
+    c.fillRect(x, mid - h, 1, h * 2);
+  }
+
+  // ruler
+  c.fillStyle = 'rgba(0,0,0,0.45)';
+  c.fillRect(0, 0, eW, rulerH);
+  c.font = '400 10px ui-monospace, Menlo, monospace';
+  c.textBaseline = 'middle';
+  c.textAlign = 'left';
+  const secStep = ED.zoom > 260 ? 0.5 : ED.zoom > 90 ? 1 : ED.zoom > 34 ? 5 : 15;
+  for (let sec = Math.floor(t0 / secStep) * secStep; sec < t1; sec += secStep) {
+    if (sec < 0) continue;
+    const x = timeToX(sec);
+    c.strokeStyle = 'rgba(255,255,255,0.18)';
+    c.beginPath(); c.moveTo(x, rulerH - 7); c.lineTo(x, rulerH); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,0.5)';
+    c.fillText(mmss(sec), x + 4, rulerH / 2);
+  }
+
+  // lane gutter
+  c.fillStyle = cfg.id === 'rue' ? '#12001c' : '#01221f';
+  c.fillRect(0, top, padL, eH - top);
+  for (let l = 0; l < lanes; l++) {
+    c.fillStyle = cfg.laneColors[l];
+    c.globalAlpha = 0.9;
+    c.font = '600 15px ui-monospace, Menlo, monospace';
+    c.textAlign = 'center';
+    c.fillText(keyLabel(cfg.keys[l]), padL / 2, laneY(l));
+    c.globalAlpha = 1;
+  }
+
+  // notes
+  const r = Math.min(lh * 0.3, 15);
+  for (const n of ED.notes) {
+    if (n.t < t0 - 0.4 || n.t > t1 + 0.4) continue;
+    const x = timeToX(n.t), y = laneY(n.lane);
+    const selected = n === ED.sel;
+    c.fillStyle = cfg.laneColors[n.lane];
+    c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+    c.lineWidth = selected ? 3 : 1.5;
+    c.strokeStyle = selected ? '#ffffff' : 'rgba(255,255,255,0.55)';
+    c.stroke();
+  }
+
+  // playhead
+  const px = timeToX(t);
+  if (px >= padL - 1 && px <= eW) {
+    c.strokeStyle = ED.rec ? '#ff3b3b' : '#ffffff';
+    c.lineWidth = 2;
+    c.beginPath(); c.moveTo(px, rulerH); c.lineTo(px, eH); c.stroke();
+  }
+
+  $('edClock').textContent = mmss(t) + '.' + String(Math.floor((t % 1) * 100)).padStart(2, '0');
+}
+
+/* ------------------------------ interaction ------------------------------- */
+
+function edHit(x, y) {
+  const lh = laneH(), r = Math.min(lh * 0.3, 15) + 4;
+  let best = null, bestD = Infinity;
+  for (const n of ED.notes) {
+    const dx = timeToX(n.t) - x, dy = laneY(n.lane) - y;
+    const d = dx * dx + dy * dy;
+    if (d < r * r && d < bestD) { bestD = d; best = n; }
+  }
+  return best;
+}
+
+function edLaneAt(y) {
+  const l = Math.floor((y - padTop()) / laneH());
+  return l >= 0 && l < MODES[ED.mode].lanes ? l : -1;
+}
+
+edcv.addEventListener('pointerdown', (e) => {
+  const rect = edcv.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+
+  if (y < padTop()) {                       // scrub on the ruler and waveform
+    edSeek(clamp(xToTime(x), 0, G.pack.meta.duration));
+    ED.drag = { scrub: true };
+    edcv.setPointerCapture(e.pointerId);
+    return;
+  }
+  const lane = edLaneAt(y);
+  if (lane < 0) return;
+
+  const hit = edHit(x, y);
+  if (e.button === 2) { if (hit) { edPush(); ED.notes.splice(ED.notes.indexOf(hit), 1); edCount(); } return; }
+
+  if (hit) {
+    ED.sel = hit;
+    edPush();
+    ED.drag = { note: hit, dx: timeToX(hit.t) - x };
+    edcv.setPointerCapture(e.pointerId);
+  } else {
+    edPush();
+    const n = { t: snapTime(xToTime(x)), lane: lane, s: 1.4 };
+    ED.notes.push(n);
+    ED.sel = n;
+    ED.drag = { note: n, dx: 0 };
+    edcv.setPointerCapture(e.pointerId);
+    edCount();
+  }
+});
+
+edcv.addEventListener('pointermove', (e) => {
+  if (!ED.drag) return;
+  const rect = edcv.getBoundingClientRect();
+  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  if (ED.drag.scrub) { edSeek(clamp(xToTime(x), 0, G.pack.meta.duration)); return; }
+  const n = ED.drag.note;
+  n.t = clamp(snapTime(xToTime(x + ED.drag.dx)), 0, G.pack.meta.duration);
+  const lane = edLaneAt(y);
+  if (lane >= 0) n.lane = lane;
+});
+
+const edEndDrag = () => {
+  if (ED.drag && ED.drag.note) ED.notes.sort((a, b) => a.t - b.t);
+  ED.drag = null;
+};
+edcv.addEventListener('pointerup', edEndDrag);
+edcv.addEventListener('pointercancel', edEndDrag);
+edcv.addEventListener('contextmenu', (e) => e.preventDefault());
+edcv.addEventListener('dblclick', (e) => {
+  const rect = edcv.getBoundingClientRect();
+  const hit = edHit(e.clientX - rect.left, e.clientY - rect.top);
+  if (hit) { edPush(); ED.notes.splice(ED.notes.indexOf(hit), 1); ED.sel = null; edCount(); }
+});
+
+edcv.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  if (e.ctrlKey || e.metaKey) {
+    const rect = edcv.getBoundingClientRect();
+    const at = xToTime(e.clientX - rect.left);
+    ED.zoom = clamp(ED.zoom * (e.deltaY < 0 ? 1.16 : 0.86), 12, 900);
+    ED.view = clamp(at - (e.clientX - rect.left - padL) / ED.zoom, 0, Math.max(0, G.pack.meta.duration));
+  } else {
+    const by = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) / ED.zoom;
+    ED.view = clamp(ED.view + by, 0, Math.max(0, G.pack.meta.duration));
+  }
+}, { passive: false });
+
+/* -------------------------------- transport -------------------------------- */
+
+function edEnsureCtx() {
+  if (!ED.ctx) ED.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ED.ctx.state === 'suspended') ED.ctx.resume();
+  return ED.ctx;
+}
+
+function edStart(from) {
+  edEnsureCtx();
+  edStopSource();
+  ED.src = ED.ctx.createBufferSource();
+  ED.src.buffer = G.pack.buffer;
+  ED.src.playbackRate.value = ED.rate;
+  ED.src.connect(ED.ctx.destination);
+  ED.base = from;
+  ED.t0 = ED.ctx.currentTime;
+  ED.src.start(0, from);
+  ED.playing = true;
+  ED.recTouched = false;
+  $('edPlay').textContent = 'Pause';
+}
+
+function edStopSource() {
+  if (ED.src) { try { ED.src.stop(); } catch (e) {} ED.src.disconnect(); ED.src = null; }
+}
+
+function edStop() {
+  if (ED.playing) ED.pos = clamp(edTime(), 0, G.pack.meta.duration);
+  edStopSource();
+  ED.playing = false;
+  $('edPlay').textContent = 'Play';
+}
+
+function edSeek(t) {
+  ED.pos = t;
+  if (ED.playing) edStart(t);
+  else ED.view = clamp(t - (eW - padL) / ED.zoom * 0.32, 0, Math.max(0, G.pack.meta.duration));
+}
+
+$('edPlay').addEventListener('click', () => {
+  if (ED.playing) { edStop(); return; }
+  if (ED.pos >= G.pack.meta.duration - 0.05) ED.pos = 0;
+  edStart(ED.pos);
+});
+$('edRec').addEventListener('click', () => {
+  ED.rec = !ED.rec;
+  ED.recTouched = false;
+  $('edRec').setAttribute('aria-pressed', String(ED.rec));
+});
+$('edRates').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  ED.rate = Number(b.dataset.rate);
+  for (const x of $('edRates').children) x.setAttribute('aria-pressed', String(x === b));
+  if (ED.playing) edStart(clamp(edTime(), 0, G.pack.meta.duration));
+});
+$('edSnaps').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  ED.snap = Number(b.dataset.snap);
+  for (const x of $('edSnaps').children) x.setAttribute('aria-pressed', String(x === b));
+});
+$('edModes').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  const next = b.id === 'emRue' ? 'rue' : 'ollie';
+  if (next === ED.mode) return;
+  edSaveMode();
+  ED.mode = next;
+  setMode(next);
+  ED.notes = (G.pack.charts[next] || []).map((n) => ({ t: n.t, lane: n.lane, s: n.s || 1.4 }));
+  ED.sel = null; ED.history = [];
+  $('edUndo').disabled = true;
+  $('emOllie').setAttribute('aria-pressed', String(next === 'ollie'));
+  $('emRue').setAttribute('aria-pressed', String(next === 'rue'));
+  edCount();
+});
+
+$('edUndo').addEventListener('click', () => {
+  if (!ED.history.length) return;
+  ED.notes = ED.history.pop();
+  ED.sel = null;
+  $('edUndo').disabled = !ED.history.length;
+  edCount();
+});
+$('edClear').addEventListener('click', () => { edPush(); ED.notes = []; ED.sel = null; edCount(); });
+$('edAuto').addEventListener('click', async () => {
+  edPush();
+  await ensureAnalysis();
+  ED.notes = buildFor(ED.mode);
+  ED.sel = null;
+  edCount();
+});
+$('edExport').addEventListener('click', () => { edSaveMode(); exportPack(); });
+$('edPublish').addEventListener('click', () => { edStop(); edSaveMode(); openPublish(); });
+$('edDone').addEventListener('click', async () => {
+  edStop();
+  edSaveMode();
+  if (await useMode(ED.mode)) showReady();
+});
+$('edTest').addEventListener('click', async () => {
+  edStop();
+  edSaveMode();
+  G.returnTo = 'editor';
+  if (await useMode(ED.mode)) startGame();
+});
+
+window.addEventListener('resize', () => { if (G.screen === 'editor') edResize(); });
+
+window.addEventListener('keydown', (e) => {
+  if (G.screen !== 'editor') return;
+  if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+  const k = e.key.toLowerCase();
+
+  // a lane key mid-take is a note first, whatever else it might be bound to
+  const recLane = MODES[ED.mode].keys.indexOf(k);
+  if (recLane >= 0 && ED.rec && ED.playing) {
+    e.preventDefault();
+    if (e.repeat) return;
+    if (!ED.recTouched) { edPush(); ED.recTouched = true; }
+    ED.notes.push({ t: clamp(snapTime(edTime() - G.offset), 0, G.pack.meta.duration), lane: recLane, s: 1.4 });
+    edCount();
+    return;
+  }
+
+  if (k === ' ') { e.preventDefault(); $('edPlay').click(); return; }
+  if (k === 'escape') { e.preventDefault(); edStop(); $('edDone').click(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); $('edUndo').click(); return; }
+  if (k === 'delete' || k === 'backspace') {
+    e.preventDefault();
+    if (ED.sel) { edPush(); ED.notes.splice(ED.notes.indexOf(ED.sel), 1); ED.sel = null; edCount(); }
+    return;
+  }
+  if (k === 'r') { e.preventDefault(); $('edRec').click(); return; }
+  if (k === 'home') { e.preventDefault(); edSeek(0); return; }
+  if (k === 'arrowleft') { e.preventDefault(); edSeek(clamp(edTime() - (e.shiftKey ? 5 : 1), 0, G.pack.meta.duration)); return; }
+  if (k === 'arrowright') { e.preventDefault(); edSeek(clamp(edTime() + (e.shiftKey ? 5 : 1), 0, G.pack.meta.duration)); return; }
+  if (k === '=' || k === '+') { ED.zoom = clamp(ED.zoom * 1.25, 12, 900); return; }
+  if (k === '-') { ED.zoom = clamp(ED.zoom / 1.25, 12, 900); return; }
+
+});
+
+els.edit.addEventListener('click', openEditor);
+
+/* ==========================================================================
+   PLAY
+   ========================================================================== */
+
+const cv = $('cv');
+const ctx2d = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+let hitY = 0, topY = 0, laneW = 0, cx = 0, pxPerSec = 0;
+
+function layout() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ctx2d.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  hitY = H - Math.max(96, H * 0.15);
+  topY = 0;
+  cx = W / 2;
+  const maxWidth = Math.min(W * 0.86, 128 * G.cfg.lanes + 60);
+  laneW = maxWidth / G.cfg.lanes;
+  pxPerSec = (hitY + 60) / G.cfg.approach;
+}
+window.addEventListener('resize', () => { if (G.screen === 'game') layout(); });
+
+const perspective = (y) => lerp(0.36, 1, clamp(y / hitY, 0, 1.35));
+function laneX(lane, y) {
+  const off = (lane - (G.cfg.lanes - 1) / 2) * laneW;
+  return cx + off * perspective(y);
+}
+
+function songTime() {
+  if (!G.ctx) return 0;
+  return G.ctx.currentTime - G.startAt - G.offset;
+}
+function audioTime() {
+  if (!G.ctx) return 0;
+  return G.ctx.currentTime - G.startAt;
+}
+
+async function startGame() {
+  const cfg = G.cfg;
+
+  G.notes = G.chart.notes.map((n) => ({ t: n.t, lane: n.lane, s: n.s, judged: false, hit: false }));
+  G.scanIdx = 0; G.drawIdx = 0;
+  G.score = 0; G.combo = 0; G.maxCombo = 0; G.mult = 1; G.hp = 65;
+  G.counts = { perfect: 0, good: 0, miss: 0 };
+  G.held = new Array(cfg.lanes).fill(false);
+  G.flash = new Array(cfg.lanes).fill(-99);
+  G.particles = []; G.judge = null;
+  G.shake = 0; G.missGlow = 0; G.hitPulse = 0; G.finished = false; G.paused = false;
+
+  els.pause.hidden = true; els.over.hidden = true; els.results.hidden = true;
+  els.hud.hidden = false;
+  els.hudTrack.textContent = G.pack.meta.title || 'Untitled';
+  els.hudMode.textContent = cfg.name;
+  show('game');
+  layout();
+  syncHud();
+
+  stopAudio();
+  if (G.ctx) { try { G.ctx.close(); } catch (e) {} }
+  G.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (G.ctx.state === 'suspended') await G.ctx.resume();
+
+  G.source = G.ctx.createBufferSource();
+  G.source.buffer = G.buffer;
+  G.gain = G.ctx.createGain();
+  G.analyser = G.ctx.createAnalyser();
+  G.analyser.fftSize = 512;
+  G.analyser.smoothingTimeConstant = 0.72;
+  G.freqData = new Uint8Array(G.analyser.frequencyBinCount);
+
+  G.source.connect(G.gain);
+  G.gain.connect(G.analyser);
+  G.analyser.connect(G.ctx.destination);
+
+  const leadIn = cfg.approach + 1.9;
+  G.startAt = G.ctx.currentTime + leadIn;
+  G.source.start(G.startAt);
+  G.running = true;
+  G.lastFrame = performance.now();
+  const token = ++G.loop;
+  requestAnimationFrame((now) => frame(now, token));
+}
+
+function stopAudio() {
+  G.running = false;
+  if (G.source) {
+    try { G.source.stop(); } catch (e) {}
+    G.source.disconnect();
+    G.source = null;
+  }
+}
+
+function leaveGame() {
+  stopAudio();
+  if (G.ctx) { try { G.ctx.close(); } catch (e) {} G.ctx = null; }
+  els.hud.hidden = true;
+  els.pause.hidden = true; els.over.hidden = true; els.results.hidden = true;
+  if (G.returnTo === 'editor') { G.returnTo = 'menu'; edResume(); }
+  else if (G.pack) showReady();
+  else goTab('play');
+}
+
+/* ------------------------------ judging ---------------------------------- */
+
+function multiplierFor(combo) {
+  if (combo >= 30) return 4;
+  if (combo >= 20) return 3;
+  if (combo >= 10) return 2;
+  return 1;
+}
+
+function syncHud() {
+  els.scoreEl.textContent = G.score.toLocaleString();
+  const done = G.counts.perfect + G.counts.good + G.counts.miss;
+  const acc = done ? ((G.counts.perfect + G.counts.good * 0.55) / done) * 100 : 100;
+  els.accEl.textContent = acc.toFixed(1) + '%';
+
+  const pct = clamp(G.hp, 0, 100);
+  els.hpFill.style.width = pct + '%';
+  const low = pct < 30;
+  els.hpFill.classList.toggle('low', low);
+  els.bars.classList.toggle('low', low);
+  const lit = Math.ceil(pct / 20);
+  const bars = els.bars.children;
+  for (let i = 0; i < bars.length; i++) bars[i].classList.toggle('lit', i < lit);
+}
+
+function accuracyPct() {
+  const done = G.counts.perfect + G.counts.good + G.counts.miss;
+  return done ? ((G.counts.perfect + G.counts.good * 0.55) / done) * 100 : 100;
+}
+
+function burst(lane, colour, strong) {
+  const y = hitY;
+  const x = laneX(lane, y);
+  const count = strong ? 22 : 12;
+  for (let i = 0; i < count; i++) {
+    const a = -Math.PI / 2 + (Math.random() - 0.5) * (strong ? 2.6 : 1.9);
+    const sp = (strong ? 190 : 120) * (0.35 + Math.random());
+    G.particles.push({
+      x: x, y: y,
+      vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+      life: 1, decay: 1.6 + Math.random(),
+      r: (strong ? 4.4 : 3.2) * (0.5 + Math.random()),
+      c: colour
+    });
+  }
+  if (G.particles.length > 420) G.particles.splice(0, G.particles.length - 420);
+}
+
+function judgeNote(note, delta) {
+  const cfg = G.cfg;
+  const ad = Math.abs(delta);
+  note.judged = true;
+  note.hit = true;
+
+  const perfect = ad <= cfg.win.perfect;
+  const colour = cfg.laneColors[note.lane];
+
+  if (perfect) { G.counts.perfect++; G.hp = clamp(G.hp + cfg.hp.perfect, 0, 100); }
+  else { G.counts.good++; G.hp = clamp(G.hp + cfg.hp.good, 0, 100); }
+
+  G.combo++;
+  if (G.combo > G.maxCombo) G.maxCombo = G.combo;
+  G.mult = multiplierFor(G.combo);
+  G.score += Math.round((perfect ? SCORE.perfect : SCORE.good) * G.mult);
+
+  G.judge = { text: perfect ? 'PERFECT' : 'GOOD', colour: perfect ? colour : '#ffffff', t: performance.now(), early: delta > 0 ? 'late' : 'early', ms: ad };
+  G.hitPulse = perfect ? 1 : 0.6;
+  burst(note.lane, colour, perfect);
+  syncHud();
+}
+
+function registerMiss(note) {
+  const cfg = G.cfg;
+  if (note) { note.judged = true; note.hit = false; }
+  G.counts.miss++;
+  G.combo = 0; G.mult = 1;
+  G.hp = clamp(G.hp + cfg.hp.miss, 0, 100);
+  G.judge = { text: 'MISS', colour: '#ff5a5a', t: performance.now() };
+  G.missGlow = 1;
+  G.shake = Math.min(1, G.shake + 0.55);
+  syncHud();
+  if (G.hp <= 0) gameOver();
+}
+
+function press(lane) {
+  if (!G.running || G.paused || G.finished) return;
+  const cfg = G.cfg;
+  G.held[lane] = true;
+  G.flash[lane] = performance.now();
+
+  const t = songTime();
+  let best = null, bestD = Infinity;
+  for (let i = G.scanIdx; i < G.notes.length; i++) {
+    const n = G.notes[i];
+    if (n.t - t > cfg.win.miss) break;
+    if (n.judged || n.lane !== lane) continue;
+    const d = n.t - t;
+    if (Math.abs(d) < Math.abs(bestD)) { bestD = d; best = n; }
+  }
+  if (best && Math.abs(bestD) <= cfg.win.miss) judgeNote(best, bestD);
+}
+
+function release(lane) { G.held[lane] = false; }
+
+/* ------------------------------- input ----------------------------------- */
+
+window.addEventListener('keydown', (e) => {
+  if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+  const k = e.key.toLowerCase();
+
+  if (k === '[' || k === ']') {
+    setOffset(G.offset * 1000 + (k === '[' ? -5 : 5));
+    if (G.screen === 'game' && !G.paused && !G.finished) {
+      G.judge = { text: (G.offset > 0 ? '+' : '') + Math.round(G.offset * 1000) + ' MS', colour: '#ffffff', t: performance.now() };
+    }
+    return;
+  }
+
+  if (G.screen === 'settings') {
+    if (k === ' ' && CAL.running) { e.preventDefault(); calTap(); }
+    return;
+  }
+  if (G.screen === 'ready' && (k === 'enter' || k === ' ')) {
+    if (document.activeElement && document.activeElement.tagName === 'BUTTON') return;
+    e.preventDefault(); startGame(); return;
+  }
+  if (G.screen !== 'game') return;
+
+  const lane = G.cfg.keys.indexOf(k);
+  if (lane >= 0 && !G.finished && !G.paused) {
+    e.preventDefault();
+    if (!e.repeat) press(lane);
+    return;
+  }
+  if (k === 'escape' || k === 'p') { e.preventDefault(); togglePause(); }
+});
+
+window.addEventListener('keyup', (e) => {
+  if (G.screen !== 'game') return;
+  const lane = G.cfg.keys.indexOf(e.key.toLowerCase());
+  if (lane >= 0) release(lane);
+});
+
+// touch / pointer: the lower third of the screen is split into lane columns
+const activePointers = new Map();
+function laneFromX(x) {
+  const half = (G.cfg.lanes * laneW) / 2;
+  const rel = x - (cx - half);
+  const lane = Math.floor(rel / laneW);
+  return lane >= 0 && lane < G.cfg.lanes ? lane : -1;
+}
+cv.addEventListener('pointerdown', (e) => {
+  if (G.screen !== 'game' || G.paused || G.finished) return;
+  const r = cv.getBoundingClientRect();
+  const lane = laneFromX(e.clientX - r.left);
+  if (lane >= 0) { activePointers.set(e.pointerId, lane); press(lane); }
+});
+cv.addEventListener('pointerup', (e) => {
+  const lane = activePointers.get(e.pointerId);
+  if (lane !== undefined) { release(lane); activePointers.delete(e.pointerId); }
+});
+cv.addEventListener('pointercancel', (e) => {
+  const lane = activePointers.get(e.pointerId);
+  if (lane !== undefined) { release(lane); activePointers.delete(e.pointerId); }
+});
+
+/* ==========================================================================
+   RENDER LOOP
+   ========================================================================== */
+
+let bgGrad = null, bgKey = '';
+
+function frame(now, token) {
+  if (G.screen !== 'game' || token !== G.loop) return;
+  requestAnimationFrame((n) => frame(n, token));
+
+  const dt = Math.min(0.05, (now - G.lastFrame) / 1000);
+  G.lastFrame = now;
+
+  if (!G.paused && G.running) update(dt);
+  draw(now, dt);
+}
+
+function update(dt) {
+  const cfg = G.cfg;
+  const t = songTime();
+
+  // notes that slipped past the window
+  while (G.scanIdx < G.notes.length) {
+    const n = G.notes[G.scanIdx];
+    if (n.judged) { G.scanIdx++; continue; }
+    if (n.t < t - cfg.win.miss) {
+      n.missAt = t; registerMiss(n); G.scanIdx++;
+      if (G.finished) break;
+      continue;
+    }
+    break;
+  }
+  while (G.drawIdx < G.notes.length && G.notes[G.drawIdx].t < t - 0.6) G.drawIdx++;
+
+  for (let i = G.particles.length - 1; i >= 0; i--) {
+    const p = G.particles[i];
+    p.life -= p.decay * dt;
+    if (p.life <= 0) { G.particles.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vy += 460 * dt; p.vx *= 0.97;
+  }
+
+  G.shake = Math.max(0, G.shake - dt * 2.6);
+  G.missGlow = Math.max(0, G.missGlow - dt * 1.8);
+  G.hitPulse = Math.max(0, G.hitPulse - dt * 3.4);
+
+  if (G.analyser) {
+    G.analyser.getByteFrequencyData(G.freqData);
+    let s = 0;
+    for (let i = 0; i < 10; i++) s += G.freqData[i];
+    G.bass = lerp(G.bass, s / 10 / 255, 0.24);
+  }
+
+  const at = audioTime();
+  if (at > 0) {
+    els.progFill.style.width = clamp((at / G.chart.duration) * 100, 0, 100) + '%';
+    els.hudTime.textContent = mmss(Math.min(at, G.chart.duration));
+  }
+  if (!G.finished && at > G.chart.duration + 0.6) finish();
+}
+
+/* --------------------------------- draw ----------------------------------- */
+
+function draw(now) {
+  const cfg = G.cfg;
+  const c = ctx2d;
+  const t = songTime();
+
+  c.save();
+  if (G.shake > 0) {
+    c.translate((Math.random() - 0.5) * 9 * G.shake, (Math.random() - 0.5) * 9 * G.shake);
+  }
+
+  // ---- background
+  const key = W + 'x' + H + cfg.id;
+  if (key !== bgKey) {
+    bgKey = key;
+    bgGrad = c.createLinearGradient(0, 0, 0, H);
+    if (cfg.id === 'rue') {
+      bgGrad.addColorStop(0, '#22032b'); bgGrad.addColorStop(0.55, '#0d0016'); bgGrad.addColorStop(1, '#05000a');
+    } else {
+      bgGrad.addColorStop(0, '#044f4a'); bgGrad.addColorStop(0.55, '#012b2b'); bgGrad.addColorStop(1, '#00191a');
+    }
+  }
+  c.fillStyle = bgGrad;
+  c.fillRect(-20, -20, W + 40, H + 40);
+
+  // ambient signal rings, breathing with the low end
+  const pulse = 0.35 + G.bass * 0.9;
+  c.lineWidth = 1.5;
+  for (let i = 0; i < 4; i++) {
+    const r = (H * 0.22) * (i + 1) * (0.9 + G.bass * 0.16);
+    c.strokeStyle = rgba(cfg.rail, 0.06 + 0.05 * pulse * (1 - i / 5));
+    c.beginPath(); c.arc(cx, hitY, r, Math.PI, TAU); c.stroke();
+  }
+
+  drawHighway(c, t, now);
+  drawNotes(c, t);
+  drawReceptors(c, now);
+  drawParticles(c);
+  drawOverlayText(c, now, t);
+
+  // miss vignette
+  if (G.missGlow > 0) {
+    const g = c.createRadialGradient(cx, hitY, H * 0.2, cx, hitY, H * 0.95);
+    g.addColorStop(0, 'rgba(255,60,60,0)');
+    g.addColorStop(1, 'rgba(255,40,40,' + (0.34 * G.missGlow).toFixed(3) + ')');
+    c.fillStyle = g;
+    c.fillRect(0, 0, W, H);
+  }
+
+  c.restore();
+}
+
+function drawHighway(c, t, now) {
+  const cfg = G.cfg;
+  const half = (cfg.lanes * laneW) / 2;
+  const pTop = perspective(topY);
+  const lT = cx - half * pTop, rT = cx + half * pTop;
+  const lB = cx - half, rB = cx + half;
+
+  // deck
+  const g = c.createLinearGradient(0, topY, 0, hitY);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(1, cfg.id === 'rue' ? 'rgba(155,92,255,0.10)' : 'rgba(0,214,196,0.10)');
+  c.fillStyle = g;
+  c.beginPath();
+  c.moveTo(lT, topY); c.lineTo(rT, topY); c.lineTo(rB, hitY); c.lineTo(lB, hitY); c.closePath();
+  c.fill();
+
+  // tempo grid — lines travel at exactly the note speed, so they land on the beat
+  const grid = G.chart.grid;
+  if (grid && grid.fit) {
+    const period = grid.period;
+    const first = Math.floor((t - 0.4 - grid.phase) / period);
+    const span = cfg.approach + 0.4;
+    for (let k = first; k < first + Math.ceil(span / period) + 3; k++) {
+      const bt = grid.phase + k * period;
+      const y = hitY - (bt - t) * pxPerSec;
+      if (y < topY - 10 || y > hitY + 2) continue;
+      const p = perspective(y);
+      const strong = ((k % 4) + 4) % 4 === 0;
+      c.strokeStyle = strong ? cfg.beat : cfg.grid;
+      c.lineWidth = strong ? 2 : 1;
+      c.beginPath();
+      c.moveTo(cx - half * p, y); c.lineTo(cx + half * p, y); c.stroke();
+    }
+  }
+
+  // lane dividers
+  c.lineWidth = 1;
+  for (let i = 0; i <= cfg.lanes; i++) {
+    const off = (i - cfg.lanes / 2) * laneW;
+    const edge = i === 0 || i === cfg.lanes;
+    c.strokeStyle = edge ? rgba(cfg.rail, 0.55) : 'rgba(255,255,255,0.09)';
+    c.lineWidth = edge ? 2 : 1;
+    c.beginPath();
+    c.moveTo(cx + off * pTop, topY);
+    c.lineTo(cx + off, hitY);
+    c.stroke();
+  }
+
+  // hit line
+  const glow = 0.32 + G.hitPulse * 0.5;
+  c.strokeStyle = rgba(cfg.rail, glow);
+  c.lineWidth = 3;
+  c.beginPath(); c.moveTo(lB - 14, hitY); c.lineTo(rB + 14, hitY); c.stroke();
+  c.shadowBlur = 0;
+}
+
+function drawNote(c, x, y, r, colour) {
+  const halo = c.createRadialGradient(x, y, r * 0.1, x, y, r * 2.1);
+  halo.addColorStop(0, rgba(colour, 0.5));
+  halo.addColorStop(0.45, rgba(colour, 0.16));
+  halo.addColorStop(1, rgba(colour, 0));
+  c.fillStyle = halo;
+  c.beginPath(); c.arc(x, y, r * 2.1, 0, TAU); c.fill();
+
+  const body = c.createLinearGradient(x, y - r, x, y + r);
+  body.addColorStop(0, '#ffffff');
+  body.addColorStop(0.34, colour);
+  body.addColorStop(1, shade(colour, -0.5));
+  c.fillStyle = body;
+  c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+
+  c.lineWidth = Math.max(1.4, r * 0.15);
+  c.strokeStyle = 'rgba(255,255,255,0.92)';
+  c.stroke();
+
+  c.fillStyle = 'rgba(255,255,255,0.55)';
+  c.beginPath();
+  c.ellipse(x - r * 0.24, y - r * 0.34, r * 0.30, r * 0.19, -0.5, 0, TAU);
+  c.fill();
+}
+
+function drawNotes(c, t) {
+  const cfg = G.cfg;
+  const limit = cfg.approach + 0.25;
+  for (let i = G.drawIdx; i < G.notes.length; i++) {
+    const n = G.notes[i];
+    if (n.t - t > limit) break;
+    if (n.judged && n.hit) continue;
+
+    const y = hitY - (n.t - t) * pxPerSec;
+    if (y < topY - 40) continue;
+
+    const p = perspective(y);
+    const x = laneX(n.lane, y);
+    const r = laneW * 0.31 * p * (1 + Math.min(0.16, (n.s - 1) * 0.05));
+    const colour = cfg.laneColors[n.lane];
+
+    if (n.judged && !n.hit) {
+      const age = t - (n.missAt || t);
+      if (age > 0.35) continue;
+      c.globalAlpha = clamp(1 - age / 0.35, 0, 1) * 0.4;
+      drawNote(c, x, y + age * pxPerSec * 0.35, r, '#6b7a7a');
+      c.globalAlpha = 1;
+      continue;
+    }
+    drawNote(c, x, y, r, colour);
+  }
+}
+
+function drawReceptors(c, now) {
+  const cfg = G.cfg;
+  for (let l = 0; l < cfg.lanes; l++) {
+    const x = laneX(l, hitY);
+    const r = laneW * 0.32;
+    const colour = cfg.laneColors[l];
+    const since = (now - G.flash[l]) / 1000;
+    const lit = G.held[l] || since < 0.09;
+    const ring = since < 0.32 ? 1 - since / 0.32 : 0;
+
+    // well
+    c.fillStyle = lit ? rgba(colour, 0.30) : 'rgba(255,255,255,0.045)';
+    c.beginPath(); c.arc(x, hitY, r, 0, TAU); c.fill();
+
+    c.lineWidth = lit ? 4 : 2.5;
+    c.strokeStyle = lit ? '#ffffff' : rgba(colour, 0.75);
+    c.beginPath(); c.arc(x, hitY, r, 0, TAU); c.stroke();
+
+    if (ring > 0) {
+      c.lineWidth = 3 * ring;
+      c.strokeStyle = rgba(colour, ring * 0.75);
+      c.beginPath(); c.arc(x, hitY, r + (1 - ring) * r * 1.5, 0, TAU); c.stroke();
+    }
+
+    if (lit) {
+      const g = c.createRadialGradient(x, hitY, r * 0.2, x, hitY, r * 2.4);
+      g.addColorStop(0, rgba(colour, 0.34));
+      g.addColorStop(1, rgba(colour, 0));
+      c.fillStyle = g;
+      c.beginPath(); c.arc(x, hitY, r * 2.4, 0, TAU); c.fill();
+    }
+
+    // key label
+    c.fillStyle = lit ? '#ffffff' : 'rgba(255,255,255,0.45)';
+    c.font = '600 ' + Math.round(laneW * 0.2) + 'px ui-monospace, Menlo, monospace';
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(keyLabel(cfg.keys[l]), x, hitY + r + Math.max(20, laneW * 0.22));
+  }
+}
+
+function drawParticles(c) {
+  for (const p of G.particles) {
+    c.globalAlpha = clamp(p.life, 0, 1);
+    c.fillStyle = p.c;
+    c.beginPath(); c.arc(p.x, p.y, p.r * p.life, 0, TAU); c.fill();
+  }
+  c.globalAlpha = 1;
+}
+
+function drawOverlayText(c, now, t) {
+  const cfg = G.cfg;
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+
+  // combo
+  if (G.combo > 1) {
+    const bump = clamp(1 + G.hitPulse * 0.16, 1, 1.2);
+    const y = hitY - Math.max(150, H * 0.28);
+    c.save();
+    c.translate(cx, y);
+    c.scale(bump, bump);
+    c.fillStyle = '#ffffff';
+    c.font = '800 ' + Math.round(Math.min(72, W * 0.09)) + 'px "Gill Sans Nova", Futura, "Avenir Next", "Century Gothic", system-ui, sans-serif';
+    c.fillText(G.combo, 0, 0);
+    c.fillStyle = G.mult > 1 ? cfg.laneColors[0] : 'rgba(255,255,255,0.5)';
+    c.font = '600 ' + Math.round(Math.min(22, W * 0.03)) + 'px ui-monospace, Menlo, monospace';
+    c.fillText(G.mult + '× MULTIPLIER', 0, Math.min(50, W * 0.062));
+    c.restore();
+  }
+
+  // judgement
+  if (G.judge) {
+    const age = (now - G.judge.t) / 1000;
+    if (age < 0.55) {
+      const k = age / 0.55;
+      c.globalAlpha = 1 - k * k;
+      c.fillStyle = G.judge.colour;
+      c.font = '800 ' + Math.round(Math.min(38, W * 0.05)) + 'px "Gill Sans Nova", Futura, "Avenir Next", system-ui, sans-serif';
+      c.fillText(G.judge.text, cx, hitY - Math.max(74, H * 0.13) - k * 22);
+      if (G.judge.ms !== undefined && G.judge.text !== 'PERFECT') {
+        c.font = '400 12px ui-monospace, Menlo, monospace';
+        c.fillStyle = 'rgba(255,255,255,0.6)';
+        c.fillText(Math.round(G.judge.ms * 1000) + ' ms ' + G.judge.early, cx, hitY - Math.max(50, H * 0.095) - k * 22);
+      }
+      c.globalAlpha = 1;
+    } else G.judge = null;
+  }
+
+  // lead-in countdown
+  const at = audioTime();
+  if (at < 0) {
+    const n = Math.ceil(-at);
+    c.fillStyle = 'rgba(255,255,255,0.85)';
+    c.font = '400 13px ui-monospace, Menlo, monospace';
+    c.fillText('GET READY', cx, H * 0.30);
+    if (n <= 3) {
+      const frac = 1 - (-at - (n - 1));
+      c.globalAlpha = clamp(1 - frac * 0.7, 0, 1);
+      c.fillStyle = cfg.laneColors[0];
+      c.font = '800 ' + Math.round(Math.min(120, W * 0.16)) + 'px "Gill Sans Nova", Futura, "Avenir Next", system-ui, sans-serif';
+      c.fillText(String(n), cx, H * 0.42);
+      c.globalAlpha = 1;
+    }
+    c.fillStyle = 'rgba(255,255,255,0.45)';
+    c.font = '400 12px ui-monospace, Menlo, monospace';
+    c.fillText(cfg.keys.map(keyLabel).join('   '), cx, H * 0.52);
+  }
+}
+
+/* ==========================================================================
+   PAUSE · GAME OVER · RESULTS
+   ========================================================================== */
+
+async function togglePause() {
+  if (G.finished || !G.ctx) return;
+  if (!G.paused) {
+    G.paused = true;
+    els.pause.hidden = false;
+    renderOffset();
+    try { await G.ctx.suspend(); } catch (e) {}
+  } else {
+    els.pause.hidden = true;
+    try { await G.ctx.resume(); } catch (e) {}
+    G.paused = false;
+    G.lastFrame = performance.now();
+  }
+}
+
+function gameOver() {
+  if (G.finished) return;
+  G.finished = true;
+  stopAudio();
+  $('oP').textContent = G.counts.perfect;
+  $('oG').textContent = G.counts.good;
+  $('oM').textContent = G.counts.miss;
+  els.over.hidden = false;
+}
+
+function finish() {
+  if (G.finished) return;
+  G.finished = true;
+  stopAudio();
+
+  const acc = accuracyPct();
+  let rank = RANKS[RANKS.length - 1];
+  for (const r of RANKS) { if (acc >= r[0]) { rank = r; break; } }
+
+  const fullCombo = G.counts.miss === 0;
+  $('rKicker').textContent = fullCombo ? 'Full combo — not one dropped' : 'Track complete';
+  $('rRank').textContent = rank[1];
+  $('rRankName').textContent = rank[2];
+  $('rScore').textContent = G.score.toLocaleString();
+  $('rSub').textContent = acc.toFixed(1) + '% accuracy · ' + G.maxCombo + ' max combo · ' + G.cfg.name;
+  $('rP').textContent = G.counts.perfect;
+  $('rG').textContent = G.counts.good;
+  $('rM').textContent = G.counts.miss;
+  els.results.hidden = false;
+  showRating();
+  if (G.playing && G.playing.source === 'cloud') fbBumpPlays(G.playing.id);
+}
+
+els.play.addEventListener('click', startGame);
+$('resume').addEventListener('click', togglePause);
+$('retry').addEventListener('click', startGame);
+$('again').addEventListener('click', startGame);
+$('quit').addEventListener('click', leaveGame);
+$('quit2').addEventListener('click', leaveGame);
+$('quit3').addEventListener('click', leaveGame);
+
+window.addEventListener('blur', () => {
+  if (G.screen === 'game' && G.running && !G.paused && !G.finished) togglePause();
+});
+
+/* ------------------------------- boot ------------------------------------ */
+
+loadSettings();
+renderModeKeys();
+renderBinds();
+renderOffset();
+renderAccount();
+calReset();
+setMode('ollie');
+paintStages(0);
+goTab('play');
+if (fbConfigured()) fbInit();
+
+})();
+</script>
+</body>
+</html>
