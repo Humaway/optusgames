@@ -314,6 +314,35 @@ body[data-mode="rue"] .modal__box{background:#160223}
 .rate .stars{justify-content:center}
 .rate__note{font-size:12.5px;color:var(--dim);margin:13px 0 0;min-height:18px}
 
+/* ---------- leaderboard ---------- */
+.board{border:1px solid var(--faint);border-radius:var(--r-md);padding:16px 18px;margin:0 0 22px;
+  background:rgba(0,0,0,.24);text-align:left}
+.board[hidden]{display:none}
+.board__head{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+.board__title{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+.board__mode{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--accent);text-align:right}
+.board__row{display:flex;align-items:baseline;gap:11px;padding:7px 0;border-top:1px solid rgba(255,255,255,.06);
+  font-family:var(--mono);font-size:12.5px}
+.board__row:first-child{border-top:0}
+.board__row.me{color:var(--accent)}
+.board__rank{width:30px;color:var(--dim);flex:none}
+.board__row.me .board__rank{color:var(--accent)}
+.board__name{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--body);font-size:13.5px}
+.board__acc{color:var(--dim);font-size:11px;white-space:nowrap}
+.board__row.me .board__acc{color:var(--accent)}
+.board__score{font-variant-numeric:tabular-nums;min-width:66px;text-align:right}
+.board__empty{font-family:var(--mono);font-size:12px;color:var(--dim);margin:4px 0}
+.ownernote{font-size:13px;line-height:1.6;color:var(--accent);margin:0 0 20px;text-align:left}
+.tally--3{grid-template-columns:repeat(2,1fr)}
+.tally--4{grid-template-columns:repeat(4,1fr)}
+.tally .o b{color:#ff9f43} .tally .h b{color:var(--accent-2)}
+.ghost[disabled],.go[disabled]{opacity:.4;cursor:not-allowed}
+.switchrow{display:flex;align-items:flex-start;gap:18px;padding:16px;border:1px solid var(--faint);
+  border-radius:var(--r-md);background:rgba(255,255,255,.025)}
+.switchrow__t{font-size:15px;font-weight:600;margin-bottom:6px}
+.switchrow__p{font-size:13px;line-height:1.6;color:var(--dim);margin:0;max-width:52ch}
+.switchrow .tool{flex:none;min-width:64px;text-align:center}
+
 /* ---------- settings ---------- */
 .launch__note{font-size:13.5px;color:var(--dim);margin:0;flex:1 1 240px;min-width:210px;line-height:1.6}
 .launch__note b{color:var(--accent);font-family:var(--mono);font-size:13px}
@@ -429,6 +458,7 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
 #edcv{flex:1 1 auto;width:100%;display:block;touch-action:none;cursor:crosshair;min-height:0}
 .ed__read{font-family:var(--mono);font-size:11.5px;color:var(--dim);white-space:nowrap}
 .ed__read b{color:var(--white);font-weight:400;font-variant-numeric:tabular-nums}
+.ed__msg{font-family:var(--mono);font-size:11.5px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38vw}
 .ed__help{font-family:var(--mono);font-size:10.5px;color:rgba(255,255,255,.34);letter-spacing:.04em;
   padding:0 18px 11px;line-height:1.7}
 @media (max-width:900px){ .ed__help{display:none} .ed__bar{gap:9px;padding:10px 12px} }
@@ -553,6 +583,14 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
     <p class="panel__sub" id="readySub"></p>
     <canvas class="scope" id="scope2" width="1400" height="300"></canvas>
     <div class="stats" id="stats"></div>
+    <div class="board" id="board" hidden>
+      <div class="board__head">
+        <span class="board__title">High scores</span>
+        <span class="board__mode" id="boardMode">Ollie Mode</span>
+      </div>
+      <div id="boardRows"></div>
+    </div>
+    <p class="ownernote" id="ownerNote" hidden></p>
     <div class="seg" id="readyModes" style="margin:0 0 22px;width:fit-content">
       <button id="rmOllie" aria-pressed="true">Ollie Mode</button>
       <button id="rmRue" aria-pressed="false">Rue Mode</button>
@@ -605,6 +643,18 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
           <button class="go" id="calApply">Apply</button>
           <button class="ghost" id="calRedo">Try again</button>
         </div>
+      </div>
+    </div>
+
+    <div class="setgroup">
+      <h3 class="setgroup__t">Gameplay</h3>
+      <div class="switchrow">
+        <div>
+          <div class="switchrow__t">Punish overstrumming</div>
+          <p class="switchrow__p">Hitting a lane with no note there breaks your combo and costs signal, so
+            mashing every key is worse than playing the chart.</p>
+        </div>
+        <button class="tool" id="overToggle" aria-pressed="true">On</button>
       </div>
     </div>
 
@@ -754,6 +804,8 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
       <button id="emRue" aria-pressed="false">Rue · 5 lanes</button>
     </div>
     <span class="ed__read"><b id="edCount">0</b> notes</span>
+    <span class="ed__read" id="edHoldWrap" hidden><b id="edHoldCount">0</b> holds</span>
+    <span class="ed__msg" id="edMsg"></span>
     <div class="ed__spacer"></div>
     <div class="field"><label for="edTitle">Title</label><input type="text" id="edTitle" placeholder="Track name"></div>
     <div class="field"><label for="edArtist">Artist</label><input type="text" id="edArtist" placeholder="Unknown"></div>
@@ -762,7 +814,7 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
 
   <canvas id="edcv"></canvas>
 
-  <p class="ed__help">Click a lane to place a note · drag to move · double-click or right-click to delete · Space plays · R records your key presses as notes · Ctrl+Z undoes · scroll to move, Ctrl+scroll to zoom</p>
+  <p class="ed__help">Click a lane to place a note, or click and drag right to stretch it into a hold · drag a note to move it, drag the square on a tail to resize · H turns the selected note into a hold, Shift+←→ resizes it · double-click or right-click deletes · Space plays · R records your key presses · Ctrl+Z undoes · scroll to move, Ctrl+scroll to zoom</p>
 
   <div class="ed__bar ed__bar--foot">
     <button class="tool primary" id="edPlay">Play</button>
@@ -781,6 +833,7 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
     </div>
     <div class="ed__spacer"></div>
     <button class="tool" id="edAuto">Auto-chart mode</button>
+    <button class="tool" id="edHolds">Holds from gaps</button>
     <button class="tool" id="edClear">Clear mode</button>
     <button class="tool" id="edUndo">Undo</button>
     <button class="tool" id="edTest">Test play</button>
@@ -829,10 +882,11 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
       <div class="veil__kicker">Signal lost</div>
       <h2 class="veil__title">Dropped out</h2>
       <p class="veil__sub">Signal strength hit zero, so the music stopped. Misses drain it fast — hits build it back.</p>
-      <div class="tally">
+      <div class="tally tally--4">
         <div class="p"><b id="oP">0</b><span>Perfect</span></div>
         <div class="g"><b id="oG">0</b><span>Good</span></div>
         <div class="m"><b id="oM">0</b><span>Miss</span></div>
+        <div class="o"><b id="oO">0</b><span>Overstrum</span></div>
       </div>
       <div class="row">
         <button class="go" id="retry">Try again</button>
@@ -852,6 +906,17 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
         <div class="p"><b id="rP">0</b><span>Perfect</span></div>
         <div class="g"><b id="rG">0</b><span>Good</span></div>
         <div class="m"><b id="rM">0</b><span>Miss</span></div>
+      </div>
+      <div class="tally tally--3" id="rExtra" hidden>
+        <div class="o"><b id="rOver">0</b><span>Overstrums</span></div>
+        <div class="h"><b id="rHold">0</b><span>Holds kept</span></div>
+      </div>
+      <div class="board" id="boardResult" hidden>
+        <div class="board__head">
+          <span class="board__title">High scores</span>
+          <span class="board__mode" id="boardNote"></span>
+        </div>
+        <div id="boardResRows"></div>
       </div>
       <div class="rate" id="rateBox" hidden>
         <div class="rate__label" id="rateLabel">Rate this chart</div>
@@ -892,7 +957,7 @@ const MODES = {
     laneGap: 0.165,                                  // min seconds between notes in one lane
     targetNPS: 2.1,                                  // notes per second the chart aims for
     chordChance: 0.0,
-    hp: { perfect: 1.5, good: 0.85, miss: -5.0 },
+    hp: { perfect: 1.5, good: 0.85, miss: -5.0, overstrum: -2.2, sustain: 0.5 },
     laneColors: ['#ffd200', '#00d6c4', '#ffd200', '#00d6c4'],
     rail: '#00d6c4',
     grid: 'rgba(0,214,196,0.14)',
@@ -909,7 +974,7 @@ const MODES = {
     laneGap: 0.105,
     targetNPS: 3.9,
     chordChance: 0.17,
-    hp: { perfect: 0.95, good: 0.45, miss: -6.5 },
+    hp: { perfect: 0.95, good: 0.45, miss: -6.5, overstrum: -3.0, sustain: 0.35 },
     laneColors: ['#ff2e7e', '#ff8a00', '#ffe14d', '#22e6c8', '#9b5cff'],
     rail: '#ff2e7e',
     grid: 'rgba(155,92,255,0.16)',
@@ -917,7 +982,7 @@ const MODES = {
   }
 };
 
-const SCORE = { perfect: 100, good: 55 };
+const SCORE = { perfect: 100, good: 55, sustainPerSec: 130, sustainBonus: 40 };
 const RANKS = [
   [96, 'S', 'Full bars'],
   [92, 'A', '5G ultra'],
@@ -982,10 +1047,11 @@ const G = {
 
   notes: [], scanIdx: 0, drawIdx: 0,
   score: 0, combo: 0, maxCombo: 0, mult: 1, hp: 65,
-  counts: { perfect: 0, good: 0, miss: 0 },
+  counts: { perfect: 0, good: 0, miss: 0, over: 0, holds: 0, dropped: 0 },
 
   returnTo: 'menu',
-  held: [], flash: [], particles: [], judge: null,
+  held: [], flash: [], particles: [], judge: null, lastHit: [],
+  punishOverstrum: true,
   shake: 0, missGlow: 0, hitPulse: 0,
   lastFrame: 0, bass: 0, loop: 0
 };
@@ -1133,6 +1199,12 @@ els.backMenu.addEventListener('click', () => { G.returnTo = 'menu'; goTab('play'
 
          // one rating per account, and only you can write yours
          match /ratings/{uid} {
+           allow read: if true;
+           allow write: if request.auth != null && request.auth.uid == uid;
+         }
+
+         // the leaderboard — everyone reads it, you only write your own row
+         match /scores/{uid} {
            allow read: if true;
            allow write: if request.auth != null && request.auth.uid == uid;
          }
@@ -1349,6 +1421,7 @@ async function fbListCharts(sortKey) {
       title: d.title || 'Untitled',
       artist: d.artist || '',
       charter: d.charter || '',
+      uid: d.uid || '',
       duration: d.duration || 0,
       bpm: d.bpm || 0,
       modes: d.modes || {},
@@ -1464,6 +1537,41 @@ async function fbMyRating(chartId) {
   } catch (e) { return 0; }
 }
 
+/** One score document per player per chart, holding their best run in each
+ *  mode. Ordering on a nested field needs no composite index. */
+async function fbTopScores(chartId, mode) {
+  if (!(await fbInit())) return [];
+  const f = FB.mod.fs;
+  const q = f.query(f.collection(FB.db, 'charts', chartId, 'scores'),
+    f.orderBy(mode + '.score', 'desc'), f.limit(20));
+  const snap = await f.getDocs(q);
+  const out = [];
+  snap.forEach((d) => {
+    const row = (d.data() || {})[mode];
+    if (row && row.score) out.push({ uid: d.id, name: d.data().name || 'Someone', score: row.score,
+      accuracy: row.accuracy || 0, maxCombo: row.maxCombo || 0 });
+  });
+  return out;
+}
+
+async function fbSubmitScore(chartId, mode, run) {
+  if (!(await fbInit())) throw new Error(fbStatusLine());
+  if (!signedIn()) throw new Error('Sign in to save scores.');
+  const f = FB.mod.fs;
+  const ref = f.doc(FB.db, 'charts', chartId, 'scores', FB.user.uid);
+
+  return f.runTransaction(FB.db, async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.exists() ? snap.data() : {};
+    const prev = data[mode];
+    if (prev && prev.score >= run.score) return { saved: false, best: prev.score };
+    const next = Object.assign({}, data, { name: displayName() });
+    next[mode] = { score: run.score, accuracy: run.accuracy, maxCombo: run.maxCombo, at: f.serverTimestamp() };
+    tx.set(ref, next);
+    return { saved: true, best: run.score, previous: prev ? prev.score : 0 };
+  });
+}
+
 async function fbBumpPlays(chartId) {
   if (FB.state !== 'ready') return;
   try {
@@ -1509,6 +1617,11 @@ function renderOffset() {
 }
 
 $('delRange').addEventListener('input', () => setOffset(Number($('delRange').value)));
+$('overToggle').addEventListener('click', () => {
+  G.punishOverstrum = !G.punishOverstrum;
+  $('overToggle').setAttribute('aria-pressed', String(G.punishOverstrum));
+  $('overToggle').textContent = G.punishOverstrum ? 'On' : 'Off';
+});
 $('delMinus').addEventListener('click', () => setOffset(G.offset * 1000 - 5));
 $('delPlus').addEventListener('click', () => setOffset(G.offset * 1000 + 5));
 $('menuSettings').addEventListener('click', () => openSettings());
@@ -2107,7 +2220,7 @@ function assignLanes(picked, cfg, rng) {
     }
 
     lastInLane[lane] = c.t; usage[lane]++;
-    notes.push({ t: c.t, lane: lane, s: c.s, judged: false, hit: false });
+    notes.push({ t: c.t, lane: lane, d: 0, s: c.s, judged: false, hit: false });
 
     // Rue mode throws in chords on the strongest simultaneous hits
     if (cfg.chordChance > 0 && rng() < cfg.chordChance && c.s > 1.6) {
@@ -2120,7 +2233,7 @@ function assignLanes(picked, cfg, rng) {
       }
       if (alt >= 0) {
         lastInLane[alt] = c.t; usage[alt]++;
-        notes.push({ t: c.t, lane: alt, s: c.s, judged: false, hit: false });
+        notes.push({ t: c.t, lane: alt, d: 0, s: c.s, judged: false, hit: false });
       }
     }
 
@@ -2242,6 +2355,23 @@ function decodePack(buf) {
   if (!head || head.short) return null;
   const from = HEADER + head.metaLen;
   return { meta: head.meta, audio: buf.slice(from, from + head.audioLen) };
+}
+
+/** [ms, lane] is a tap and [ms, lane, holdMs] is a sustain. Charts written
+ *  before sustains existed are all two-element, so they read straight through. */
+function readNotes(list) {
+  if (!list) return null;
+  return list.map((n) => ({
+    t: n[0] / 1000,
+    lane: n[1],
+    d: n.length > 2 && n[2] > 0 ? n[2] / 1000 : 0,
+    s: 1.4
+  }));
+}
+
+function writeNote(n) {
+  const ms = Math.round(n.t * 1000);
+  return n.d > 0 ? [ms, n.lane, Math.round(n.d * 1000)] : [ms, n.lane];
 }
 
 function slug(str) {
@@ -2422,8 +2552,8 @@ async function openPackBuffer(buf, label) {
   G.pack = {
     meta: Object.assign({ title: label, artist: '', charter: '', source: 'custom', duration: buffer.duration }, pack.meta),
     charts: {
-      ollie: (pack.meta.charts && pack.meta.charts.ollie) ? pack.meta.charts.ollie.map((n) => ({ t: n[0] / 1000, lane: n[1], s: 1.4 })) : null,
-      rue: (pack.meta.charts && pack.meta.charts.rue) ? pack.meta.charts.rue.map((n) => ({ t: n[0] / 1000, lane: n[1], s: 1.4 })) : null
+      ollie: readNotes(pack.meta.charts && pack.meta.charts.ollie),
+      rue: readNotes(pack.meta.charts && pack.meta.charts.rue)
     },
     audioBytes: pack.audio,
     buffer: buffer,
@@ -2451,7 +2581,7 @@ function packMeta() {
   for (const id of ['ollie', 'rue']) {
     const notes = G.pack.charts[id];
     if (notes && notes.length) {
-      meta.charts[id] = notes.map((n) => [Math.round(n.t * 1000), n.lane]);
+      meta.charts[id] = notes.map(writeNote);
     }
   }
   return meta;
@@ -2465,6 +2595,14 @@ function exportPack() {
 }
 
 /* ------------------------------ ready screen ------------------------------ */
+
+/** A chart published by somebody else is theirs — you can play and rate it,
+ *  but not rewrite it or push a new version over the top. */
+function chartIsMine() {
+  const item = G.playing;
+  if (!item || item.source !== 'cloud') return true;
+  return signedIn() && item.uid === FB.user.uid;
+}
 
 function showReady() {
   const ch = G.chart, m = G.pack.meta;
@@ -2498,8 +2636,70 @@ function showReady() {
     els.stats.appendChild(d);
   }
 
+  const mine = chartIsMine();
+  els.edit.disabled = !mine;
+  $('publish').disabled = !mine;
+  els.edit.title = mine ? '' : 'Published by ' + (m.charter || 'someone else') + ' — theirs to edit';
+  $('publish').title = els.edit.title;
+  $('ownerNote').hidden = mine;
+  if (!mine) {
+    $('ownerNote').textContent = 'Published by ' + (m.charter || 'someone else')
+      + ', so editing and re-publishing are locked. You can still play it, rate it and export a copy.';
+  }
+
   show('ready');
+  loadBoard();
   requestAnimationFrame(() => drawScope(els.scope2, ch.wave, ch.notes, ch.duration));
+}
+
+/* ------------------------------ leaderboard ------------------------------- */
+
+function boardRows(host, rows, highlightUid) {
+  host.innerHTML = '';
+  if (!rows.length) {
+    const p = document.createElement('p');
+    p.className = 'board__empty';
+    p.textContent = 'No scores yet — first run sets the bar.';
+    host.appendChild(p);
+    return;
+  }
+  rows.slice(0, 10).forEach((r, i) => {
+    const row = document.createElement('div');
+    row.className = 'board__row' + (highlightUid && r.uid === highlightUid ? ' me' : '');
+    const rank = document.createElement('span');
+    rank.className = 'board__rank';
+    rank.textContent = '#' + (i + 1);
+    const name = document.createElement('span');
+    name.className = 'board__name';
+    name.textContent = r.name;
+    const acc = document.createElement('span');
+    acc.className = 'board__acc';
+    acc.textContent = (r.accuracy || 0).toFixed(1) + '% · ' + r.maxCombo + 'x';
+    const score = document.createElement('span');
+    score.className = 'board__score';
+    score.textContent = r.score.toLocaleString();
+    row.appendChild(rank); row.appendChild(name); row.appendChild(acc); row.appendChild(score);
+    host.appendChild(row);
+  });
+}
+
+async function loadBoard() {
+  const item = G.playing;
+  const box = $('board');
+  if (!item || item.source !== 'cloud') { box.hidden = true; return; }
+  box.hidden = false;
+  $('boardMode').textContent = G.cfg.name;
+  $('boardRows').innerHTML = '<p class="board__empty">Loading\u2026</p>';
+  try {
+    const rows = await fbTopScores(item.id, G.cfg.id);
+    boardRows($('boardRows'), rows, signedIn() ? FB.user.uid : '');
+  } catch (e) {
+    $('boardRows').innerHTML = '';
+    const p = document.createElement('p');
+    p.className = 'board__empty';
+    p.textContent = 'Could not load the leaderboard.';
+    $('boardRows').appendChild(p);
+  }
 }
 
 els.rmOllie.addEventListener('click', async () => { if (await useMode('ollie')) showReady(); });
@@ -3190,14 +3390,31 @@ function snapTime(t) {
   return Math.max(0, g.phase + k * div);
 }
 
+function holdStep() {
+  const g = G.pack.meta.grid;
+  if (!g) return 0.33;
+  return g.period / (ED.snap >= 2 ? ED.snap : 2);
+}
+
 function edPush() {
-  ED.history.push(ED.notes.map((n) => ({ t: n.t, lane: n.lane, s: n.s })));
+  ED.history.push(ED.notes.map((n) => ({ t: n.t, lane: n.lane, d: n.d || 0, s: n.s })));
   if (ED.history.length > 80) ED.history.shift();
   $('edUndo').disabled = false;
 }
 
 function edCount() {
   $('edCount').textContent = ED.notes.length;
+  const holds = ED.notes.filter((n) => n.d > 0).length;
+  $('edHoldCount').textContent = holds;
+  $('edHoldWrap').hidden = !holds;
+}
+
+function edMsg(text) {
+  $('edMsg').textContent = text || '';
+}
+
+function capture(id) {
+  try { if (edcv.setPointerCapture) edcv.setPointerCapture(id); } catch (e) { /* optional */ }
 }
 
 function edResize() {
@@ -3215,9 +3432,10 @@ async function openEditor() {
   $('edDur').textContent = mmss(m.duration);
 
   ED.mode = G.cfg.id;
-  ED.notes = (G.pack.charts[ED.mode] || []).map((n) => ({ t: n.t, lane: n.lane, s: n.s || 1.4 }));
+  ED.notes = (G.pack.charts[ED.mode] || []).map((n) => ({ t: n.t, lane: n.lane, d: n.d || 0, s: n.s || 1.4 }));
   ED.sel = null; ED.history = []; ED.pos = 0; ED.view = 0;
   ED.peaks = peaksHi(G.pack.buffer, ED.perSec);
+  edMsg('');
   $('edUndo').disabled = true;
   $('emOllie').setAttribute('aria-pressed', String(ED.mode === 'ollie'));
   $('emRue').setAttribute('aria-pressed', String(ED.mode === 'rue'));
@@ -3240,7 +3458,7 @@ function edResume() {
 
 function edSaveMode() {
   ED.notes.sort((a, b) => a.t - b.t);
-  G.pack.charts[ED.mode] = ED.notes.map((n) => ({ t: n.t, lane: n.lane, s: n.s }));
+  G.pack.charts[ED.mode] = ED.notes.map((n) => ({ t: n.t, lane: n.lane, d: n.d || 0, s: n.s }));
   const m = G.pack.meta;
   m.title = $('edTitle').value.trim() || m.title || 'Untitled';
   m.artist = $('edArtist').value.trim();
@@ -3337,12 +3555,24 @@ function edDraw() {
     c.globalAlpha = 1;
   }
 
-  // notes
+  // notes, tail first so heads sit on top
   const r = Math.min(lh * 0.3, 15);
   for (const n of ED.notes) {
-    if (n.t < t0 - 0.4 || n.t > t1 + 0.4) continue;
+    const end = n.t + (n.d || 0);
+    if (end < t0 - 0.4 || n.t > t1 + 0.4) continue;
     const x = timeToX(n.t), y = laneY(n.lane);
     const selected = n === ED.sel;
+
+    if (n.d > 0) {
+      const x2 = timeToX(end);
+      c.fillStyle = cfg.laneColors[n.lane];
+      c.globalAlpha = selected ? 0.65 : 0.4;
+      c.fillRect(x, y - r * 0.5, Math.max(2, x2 - x), r);
+      c.globalAlpha = 1;
+      c.fillStyle = selected ? '#ffffff' : cfg.laneColors[n.lane];
+      c.fillRect(x2 - 2, y - r * 0.85, 4, r * 1.7);       // the grab handle
+    }
+
     c.fillStyle = cfg.laneColors[n.lane];
     c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
     c.lineWidth = selected ? 3 : 1.5;
@@ -3374,6 +3604,17 @@ function edHit(x, y) {
   return best;
 }
 
+/** The square at the end of a sustain, for dragging its length. */
+function edTailHit(x, y) {
+  const lh = laneH(), r = Math.min(lh * 0.3, 15);
+  for (const n of ED.notes) {
+    if (!n.d) continue;
+    if (Math.abs(laneY(n.lane) - y) > r) continue;
+    if (Math.abs(timeToX(n.t + n.d) - x) <= 7) return n;
+  }
+  return null;
+}
+
 function edLaneAt(y) {
   const l = Math.floor((y - padTop()) / laneH());
   return l >= 0 && l < MODES[ED.mode].lanes ? l : -1;
@@ -3386,27 +3627,35 @@ edcv.addEventListener('pointerdown', (e) => {
   if (y < padTop()) {                       // scrub on the ruler and waveform
     edSeek(clamp(xToTime(x), 0, G.pack.meta.duration));
     ED.drag = { scrub: true };
-    edcv.setPointerCapture(e.pointerId);
+    capture(e.pointerId);
     return;
   }
   const lane = edLaneAt(y);
   if (lane < 0) return;
 
-  const hit = edHit(x, y);
+  const tail = edTailHit(x, y);
+  const hit = tail || edHit(x, y);
   if (e.button === 2) { if (hit) { edPush(); ED.notes.splice(ED.notes.indexOf(hit), 1); edCount(); } return; }
 
-  if (hit) {
+  if (tail) {
+    ED.sel = tail;
+    edPush();
+    ED.drag = { note: tail, resize: true };
+    capture(e.pointerId);
+  } else if (hit) {
     ED.sel = hit;
     edPush();
     ED.drag = { note: hit, dx: timeToX(hit.t) - x };
-    edcv.setPointerCapture(e.pointerId);
+    capture(e.pointerId);
   } else {
     edPush();
-    const n = { t: snapTime(xToTime(x)), lane: lane, s: 1.4 };
+    const n = { t: snapTime(xToTime(x)), lane: lane, d: 0, s: 1.4 };
     ED.notes.push(n);
     ED.sel = n;
-    ED.drag = { note: n, dx: 0 };
-    edcv.setPointerCapture(e.pointerId);
+    // dragging right from here stretches it into a hold; releasing on the
+    // spot leaves it as a tap
+    ED.drag = { note: n, resize: true, fresh: true };
+    capture(e.pointerId);
     edCount();
   }
 });
@@ -3417,13 +3666,25 @@ edcv.addEventListener('pointermove', (e) => {
   const x = e.clientX - rect.left, y = e.clientY - rect.top;
   if (ED.drag.scrub) { edSeek(clamp(xToTime(x), 0, G.pack.meta.duration)); return; }
   const n = ED.drag.note;
+
+  if (ED.drag.resize) {
+    const end = clamp(snapTime(xToTime(x)), 0, G.pack.meta.duration);
+    n.d = Math.max(0, end - n.t);
+    if (n.d < holdStep() * 0.5) n.d = 0;
+    return;
+  }
+
   n.t = clamp(snapTime(xToTime(x + ED.drag.dx)), 0, G.pack.meta.duration);
   const lane = edLaneAt(y);
   if (lane >= 0) n.lane = lane;
 });
 
 const edEndDrag = () => {
-  if (ED.drag && ED.drag.note) ED.notes.sort((a, b) => a.t - b.t);
+  if (ED.drag && ED.drag.note) {
+    ED.notes.sort((a, b) => a.t - b.t);
+    edCount();                                   // the holds readout follows a resize
+    if (ED.drag.fresh && ED.drag.note.d > 0) edMsg('Hold added — drag the square on its tail to resize');
+  }
   ED.drag = null;
 };
 edcv.addEventListener('pointerup', edEndDrag);
@@ -3516,7 +3777,7 @@ $('edModes').addEventListener('click', (e) => {
   edSaveMode();
   ED.mode = next;
   setMode(next);
-  ED.notes = (G.pack.charts[next] || []).map((n) => ({ t: n.t, lane: n.lane, s: n.s || 1.4 }));
+  ED.notes = (G.pack.charts[next] || []).map((n) => ({ t: n.t, lane: n.lane, d: n.d || 0, s: n.s || 1.4 }));
   ED.sel = null; ED.history = [];
   $('edUndo').disabled = true;
   $('emOllie').setAttribute('aria-pressed', String(next === 'ollie'));
@@ -3531,13 +3792,34 @@ $('edUndo').addEventListener('click', () => {
   $('edUndo').disabled = !ED.history.length;
   edCount();
 });
-$('edClear').addEventListener('click', () => { edPush(); ED.notes = []; ED.sel = null; edCount(); });
+$('edClear').addEventListener('click', () => { edPush(); ED.notes = []; ED.sel = null; edCount(); edMsg(''); });
+$('edHolds').addEventListener('click', () => {
+  edPush();
+  ED.notes.sort((a, b) => a.t - b.t);
+  const step = holdStep();
+  const minGap = Math.max(0.9, step * 4);          // roughly two beats of nothing
+  let made = 0;
+  for (let i = 0; i < ED.notes.length; i++) {
+    const n = ED.notes[i];
+    let next = G.pack.meta.duration;
+    for (let j = i + 1; j < ED.notes.length; j++) {
+      if (ED.notes[j].t > n.t + 0.02) { next = ED.notes[j].t; break; }
+    }
+    const room = next - n.t;
+    if (room >= minGap) { n.d = Math.max(step, room - step); made++; }
+  }
+  edCount();
+  edMsg(made
+    ? made + (made === 1 ? ' hold added' : ' holds added') + ' where the chart goes quiet'
+    : 'No gaps longer than ' + minGap.toFixed(1) + 's — this chart is too busy for automatic holds');
+});
 $('edAuto').addEventListener('click', async () => {
   edPush();
   await ensureAnalysis();
   ED.notes = buildFor(ED.mode);
   ED.sel = null;
   edCount();
+  edMsg('Re-charted from the audio');
 });
 $('edExport').addEventListener('click', () => { edSaveMode(); exportPack(); });
 $('edPublish').addEventListener('click', () => { edStop(); edSaveMode(); openPublish(); });
@@ -3577,6 +3859,26 @@ window.addEventListener('keydown', (e) => {
   if (k === 'delete' || k === 'backspace') {
     e.preventDefault();
     if (ED.sel) { edPush(); ED.notes.splice(ED.notes.indexOf(ED.sel), 1); ED.sel = null; edCount(); }
+    return;
+  }
+  if (k === 'h') {
+    e.preventDefault();
+    if (ED.sel) {
+      edPush();
+      ED.sel.d = ED.sel.d > 0 ? 0 : holdStep();
+      edCount();
+      edMsg(ED.sel.d > 0 ? 'Turned into a hold — Shift+arrows resize it' : 'Back to a tap');
+    }
+    return;
+  }
+  if (e.shiftKey && (k === 'arrowleft' || k === 'arrowright')) {
+    e.preventDefault();
+    if (ED.sel) {
+      edPush();
+      ED.sel.d = Math.max(0, (ED.sel.d || 0) + (k === 'arrowright' ? holdStep() : -holdStep()));
+      if (ED.sel.d < holdStep() * 0.5) ED.sel.d = 0;
+      edCount();
+    }
     return;
   }
   if (k === 'r') { e.preventDefault(); $('edRec').click(); return; }
@@ -3632,10 +3934,14 @@ function audioTime() {
 async function startGame() {
   const cfg = G.cfg;
 
-  G.notes = G.chart.notes.map((n) => ({ t: n.t, lane: n.lane, s: n.s, judged: false, hit: false }));
+  G.notes = G.chart.notes.map((n) => ({
+    t: n.t, lane: n.lane, d: n.d || 0, s: n.s,
+    judged: false, hit: false, holding: false, dropped: false, credit: 0
+  }));
   G.scanIdx = 0; G.drawIdx = 0;
   G.score = 0; G.combo = 0; G.maxCombo = 0; G.mult = 1; G.hp = 65;
-  G.counts = { perfect: 0, good: 0, miss: 0 };
+  G.counts = { perfect: 0, good: 0, miss: 0, over: 0, holds: 0, dropped: 0 };
+  G.lastHit = new Array(cfg.lanes).fill(-99);
   G.held = new Array(cfg.lanes).fill(false);
   G.flash = new Array(cfg.lanes).fill(-99);
   G.particles = []; G.judge = null;
@@ -3761,8 +4067,29 @@ function judgeNote(note, delta) {
 
   G.judge = { text: perfect ? 'PERFECT' : 'GOOD', colour: perfect ? colour : '#ffffff', t: performance.now(), early: delta > 0 ? 'late' : 'early', ms: ad };
   G.hitPulse = perfect ? 1 : 0.6;
+  G.lastHit[note.lane] = songTime();
   burst(note.lane, colour, perfect);
+  if (note.d > 0) { note.holding = true; note.credit = 0; }
   syncHud();
+}
+
+/** Hitting nothing. Breaks the combo and costs a little signal, so mashing
+ *  every lane is worse than playing the chart. */
+function overstrum(lane) {
+  const t = songTime();
+  if (!G.punishOverstrum || t < 0 || G.finished) return;
+  if (t - (G.lastHit[lane] || -99) < 0.12) return;       // a bounce right after a real hit
+  for (const n of G.notes) {
+    if (n.lane === lane && n.holding) return;            // already holding this lane
+  }
+  G.counts.over++;
+  G.combo = 0;
+  G.mult = 1;
+  G.hp = clamp(G.hp + G.cfg.hp.overstrum, 0, 100);
+  G.judge = { text: 'OVERSTRUM', colour: '#ff9f43', t: performance.now() };
+  G.shake = Math.min(1, G.shake + 0.3);
+  syncHud();
+  if (G.hp <= 0) gameOver();
 }
 
 function registerMiss(note) {
@@ -3794,9 +4121,34 @@ function press(lane) {
     if (Math.abs(d) < Math.abs(bestD)) { bestD = d; best = n; }
   }
   if (best && Math.abs(bestD) <= cfg.win.miss) judgeNote(best, bestD);
+  else overstrum(lane);
 }
 
-function release(lane) { G.held[lane] = false; }
+function release(lane) {
+  G.held[lane] = false;
+  const t = songTime();
+  for (const n of G.notes) {
+    if (n.lane !== lane || !n.holding) continue;
+    if (t < n.t + n.d - 0.09) {                          // let go early
+      n.holding = false;
+      n.dropped = true;
+      G.counts.dropped++;
+      G.judge = { text: 'DROPPED', colour: '#9aa5a5', t: performance.now() };
+    } else {
+      completeHold(n);
+    }
+  }
+}
+
+function completeHold(n) {
+  n.holding = false;
+  n.done = true;
+  G.counts.holds++;
+  G.score += Math.round(SCORE.sustainBonus * G.mult);
+  G.hp = clamp(G.hp + G.cfg.hp.good, 0, 100);
+  burst(n.lane, G.cfg.laneColors[n.lane], true);
+  syncHud();
+}
 
 /* ------------------------------- input ----------------------------------- */
 
@@ -3885,6 +4237,7 @@ function update(dt) {
   while (G.scanIdx < G.notes.length) {
     const n = G.notes[G.scanIdx];
     if (n.judged) { G.scanIdx++; continue; }
+    if (n.holding) { G.scanIdx++; continue; }
     if (n.t < t - cfg.win.miss) {
       n.missAt = t; registerMiss(n); G.scanIdx++;
       if (G.finished) break;
@@ -3892,7 +4245,27 @@ function update(dt) {
     }
     break;
   }
-  while (G.drawIdx < G.notes.length && G.notes[G.drawIdx].t < t - 0.6) G.drawIdx++;
+  while (G.drawIdx < G.notes.length && G.notes[G.drawIdx].t + (G.notes[G.drawIdx].d || 0) < t - 0.6) G.drawIdx++;
+
+  // sustains pay out over time while the lane stays down
+  for (let i = G.drawIdx; i < G.notes.length; i++) {
+    const n = G.notes[i];
+    if (n.t > t + 0.2) break;
+    if (!n.holding) continue;
+    if (!G.held[n.lane]) continue;                       // release() handles letting go
+    const end = n.t + n.d;
+    const upto = Math.min(t, end);
+    const gained = Math.max(0, upto - Math.max(n.t, t - dt));
+    if (gained > 0) {
+      n.credit += gained;
+      G.score += Math.round(SCORE.sustainPerSec * gained * G.mult);
+      G.hp = clamp(G.hp + cfg.hp.sustain * gained, 0, 100);
+      G.hitPulse = Math.max(G.hitPulse, 0.35);
+      if (Math.random() < gained * 14) burst(n.lane, cfg.laneColors[n.lane], false);
+    }
+    if (t >= end) completeHold(n);
+  }
+  if (G.notes.length) syncHud();
 
   for (let i = G.particles.length - 1; i >= 0; i--) {
     const p = G.particles[i];
@@ -4055,21 +4428,61 @@ function drawNote(c, x, y, r, colour) {
   c.fill();
 }
 
+function drawTail(c, lane, yTop, yBottom, colour, alpha) {
+  if (yBottom <= yTop) return;
+  const steps = Math.max(2, Math.min(26, Math.ceil((yBottom - yTop) / 26)));
+  c.globalAlpha = alpha;
+  for (let i = 0; i < steps; i++) {
+    const a = yTop + ((yBottom - yTop) * i) / steps;
+    const b = yTop + ((yBottom - yTop) * (i + 1)) / steps;
+    const pa = perspective(a), pb = perspective(b);
+    const w = laneW * 0.17;
+    const xa = laneX(lane, a), xb = laneX(lane, b);
+    c.fillStyle = colour;
+    c.beginPath();
+    c.moveTo(xa - w * pa, a);
+    c.lineTo(xa + w * pa, a);
+    c.lineTo(xb + w * pb, b);
+    c.lineTo(xb - w * pb, b);
+    c.closePath();
+    c.fill();
+  }
+  c.globalAlpha = 1;
+}
+
 function drawNotes(c, t) {
   const cfg = G.cfg;
   const limit = cfg.approach + 0.25;
   for (let i = G.drawIdx; i < G.notes.length; i++) {
     const n = G.notes[i];
     if (n.t - t > limit) break;
-    if (n.judged && n.hit) continue;
+    if (n.judged && n.hit && !n.holding && !n.d) continue;
+    if (n.done && !n.holding) continue;
 
     const y = hitY - (n.t - t) * pxPerSec;
-    if (y < topY - 40) continue;
+    const yEnd = n.d > 0 ? hitY - (n.t + n.d - t) * pxPerSec : y;
+    if (Math.max(y, yEnd) < topY - 40) continue;
+
+    const colour = cfg.laneColors[n.lane];
+
+    if (n.d > 0) {
+      const top = clamp(yEnd, topY - 30, hitY);
+      const bottom = clamp(n.holding ? hitY : y, topY - 30, hitY);
+      const alpha = n.dropped ? 0.16 : n.holding ? 0.85 : 0.5;
+      drawTail(c, n.lane, top, bottom, n.dropped ? '#6b7a7a' : colour, alpha);
+      if (n.holding) {
+        c.globalAlpha = 0.55;
+        drawTail(c, n.lane, Math.max(top, hitY - 46), hitY, '#ffffff', 0.5);
+        c.globalAlpha = 1;
+      }
+    }
+
+    if (n.holding) continue;                        // head is pinned at the line
+    if (n.judged && n.hit) continue;
 
     const p = perspective(y);
     const x = laneX(n.lane, y);
     const r = laneW * 0.31 * p * (1 + Math.min(0.16, (n.s - 1) * 0.05));
-    const colour = cfg.laneColors[n.lane];
 
     if (n.judged && !n.hit) {
       const age = t - (n.missAt || t);
@@ -4079,7 +4492,7 @@ function drawNotes(c, t) {
       c.globalAlpha = 1;
       continue;
     }
-    drawNote(c, x, y, r, colour);
+    if (y >= topY - 40) drawNote(c, x, y, r, colour);
   }
 }
 
@@ -4217,6 +4630,7 @@ function gameOver() {
   $('oP').textContent = G.counts.perfect;
   $('oG').textContent = G.counts.good;
   $('oM').textContent = G.counts.miss;
+  $('oO').textContent = G.counts.over;
   els.over.hidden = false;
 }
 
@@ -4238,9 +4652,46 @@ function finish() {
   $('rP').textContent = G.counts.perfect;
   $('rG').textContent = G.counts.good;
   $('rM').textContent = G.counts.miss;
+  $('rOver').textContent = G.counts.over;
+  $('rHold').textContent = G.counts.holds + (G.counts.dropped ? ' / ' + (G.counts.holds + G.counts.dropped) : '');
+  $('rExtra').hidden = !(G.counts.over || G.counts.holds || G.counts.dropped);
   els.results.hidden = false;
   showRating();
+  submitRun(acc);
   if (G.playing && G.playing.source === 'cloud') fbBumpPlays(G.playing.id);
+}
+
+async function submitRun(acc) {
+  const item = G.playing;
+  const box = $('boardResult');
+  if (!item || item.source !== 'cloud') { box.hidden = true; return; }
+  box.hidden = false;
+  $('boardNote').textContent = '';
+
+  if (!signedIn()) {
+    $('boardResRows').innerHTML = '';
+    $('boardNote').textContent = 'Sign in to put this score on the board.';
+    try { boardRows($('boardResRows'), await fbTopScores(item.id, G.cfg.id), ''); } catch (e) {}
+    return;
+  }
+
+  $('boardResRows').innerHTML = '<p class="board__empty">Saving\u2026</p>';
+  try {
+    const res = await fbSubmitScore(item.id, G.cfg.id,
+      { score: G.score, accuracy: acc, maxCombo: G.maxCombo });
+    const rows = await fbTopScores(item.id, G.cfg.id);
+    boardRows($('boardResRows'), rows, FB.user.uid);
+    const place = rows.findIndex((r) => r.uid === FB.user.uid);
+    if (res.saved) {
+      $('boardNote').textContent = (res.previous ? 'New personal best, up from ' + res.previous.toLocaleString() : 'First run saved')
+        + (place >= 0 ? ' — #' + (place + 1) + ' on this chart.' : '.');
+    } else {
+      $('boardNote').textContent = 'Your best on this chart is still ' + res.best.toLocaleString() + '.';
+    }
+  } catch (e) {
+    $('boardResRows').innerHTML = '';
+    $('boardNote').textContent = 'Could not save that score: ' + ((e && e.message) || 'unknown error');
+  }
 }
 
 els.play.addEventListener('click', startGame);
