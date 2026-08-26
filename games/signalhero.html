@@ -314,6 +314,31 @@ body[data-mode="rue"] .modal__box{background:#160223}
 .rate .stars{justify-content:center}
 .rate__note{font-size:12.5px;color:var(--dim);margin:13px 0 0;min-height:18px}
 
+.go.danger{background:#ff4d4d;color:#fff;box-shadow:0 10px 34px rgba(255,77,77,.28)}
+.go.danger:hover{box-shadow:0 16px 40px rgba(255,77,77,.36)}
+.ghost.danger{border-color:rgba(255,90,90,.55);color:#ff8a8a}
+.ghost.danger:hover{border-color:#ff5a5a;background:rgba(255,90,90,.12);color:#ff9f9f}
+
+/* ---------- modifiers ---------- */
+.mods{border:1px solid var(--faint);border-radius:var(--r-md);padding:16px 18px;margin:0 0 22px;
+  background:rgba(0,0,0,.2);text-align:left}
+.mods__head{display:flex;align-items:baseline;gap:12px;margin-bottom:13px}
+.mods__title{font-family:var(--mono);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+.mods__mult{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--accent)}
+.mods__row{display:grid;grid-template-columns:repeat(auto-fit,minmax(184px,1fr));gap:10px}
+.mod{position:relative;text-align:left;padding:13px 15px;border-radius:var(--r-sm);border:1px solid var(--faint);
+  background:rgba(255,255,255,.03);transition:border-color .15s,background .15s}
+button.mod:hover{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.06)}
+.mod[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.mod__name{display:block;font-size:14.5px;font-weight:600;margin-bottom:4px}
+.mod[aria-pressed="true"] .mod__name{color:var(--accent)}
+.mod__desc{display:block;font-size:12px;color:var(--dim);line-height:1.45}
+.mod__mult{position:absolute;top:12px;right:14px;font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+.mod--speed{display:flex;flex-direction:column;gap:4px}
+.seg--sm{margin-top:8px;width:fit-content}
+.seg--sm button{padding:6px 11px;font-size:10.5px}
+.runmods{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:var(--accent);margin:0 0 4px}
+
 /* ---------- leaderboard ---------- */
 .board{border:1px solid var(--faint);border-radius:var(--r-md);padding:16px 18px;margin:0 0 22px;
   background:rgba(0,0,0,.24);text-align:left}
@@ -585,6 +610,35 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
     <p class="panel__sub" id="readySub"></p>
     <canvas class="scope" id="scope2" width="1400" height="300"></canvas>
     <div class="stats" id="stats"></div>
+    <div class="mods">
+      <div class="mods__head">
+        <span class="mods__title">Modifiers</span>
+        <span class="mods__mult" id="modsMult">Score ×1.00</span>
+      </div>
+      <div class="mods__row">
+        <button class="mod" id="modChill" aria-pressed="false">
+          <span class="mod__name">Chill</span>
+          <span class="mod__desc">Can't fail, gentler drain</span>
+          <span class="mod__mult">×0.7</span>
+        </button>
+        <button class="mod" id="modMirror" aria-pressed="false">
+          <span class="mod__name">Mirror</span>
+          <span class="mod__desc">Lanes flipped left to right</span>
+          <span class="mod__mult">×1.05</span>
+        </button>
+        <div class="mod mod--speed">
+          <span class="mod__name">Speed</span>
+          <span class="mod__desc">Faster song, faster notes</span>
+          <div class="seg seg--sm" id="speedSeg">
+            <button data-speed="1" aria-pressed="true">1×</button>
+            <button data-speed="1.25" aria-pressed="false">1.25×</button>
+            <button data-speed="1.5" aria-pressed="false">1.5×</button>
+            <button data-speed="2" aria-pressed="false">2×</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="board" id="board" hidden>
       <div class="board__head">
         <span class="board__title">High scores</span>
@@ -605,6 +659,7 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
       <button class="ghost" id="edit">Edit this chart</button>
       <button class="ghost" id="publish">Publish</button>
       <button class="ghost" id="export">Export .signal</button>
+      <button class="ghost" id="deleteTrack" hidden>Delete track</button>
       <button class="ghost" id="backMenu">Back</button>
     </div>
     <p class="hint">Esc pauses · [ and ] nudge the sync offset by 5 ms</p>
@@ -767,6 +822,19 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
   </div>
 </div>
 
+<!-- ================= CONFIRM ================= -->
+<div class="veil modal" id="confModal" hidden>
+  <div class="modal__box">
+    <h2 class="modal__title" id="confTitle">Are you sure?</h2>
+    <p class="modal__sub" id="confBody"></p>
+    <p class="err" id="confErr" hidden></p>
+    <div class="row">
+      <button class="go danger" id="confGo">Delete</button>
+      <button class="ghost" id="confNo">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ================= PUBLISH MODAL ================= -->
 <div class="veil modal" id="pubModal" hidden>
   <div class="modal__box">
@@ -792,6 +860,7 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
 
     <div class="row" style="margin-top:22px">
       <button class="go" id="pubGo">Publish</button>
+      <button class="ghost" id="pubNew" hidden>Publish as a copy</button>
       <button class="ghost" id="pubCancel">Not yet</button>
     </div>
   </div>
@@ -917,6 +986,7 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
         <div class="g"><b id="rG">0</b><span>Good</span></div>
         <div class="m"><b id="rM">0</b><span>Miss</span></div>
       </div>
+      <p class="runmods" id="runMods" hidden></p>
       <div class="tally tally--3" id="rExtra" hidden>
         <div class="o"><b id="rOver">0</b><span>Overstrums</span></div>
         <div class="h"><b id="rHold">0</b><span>Holds kept</span></div>
@@ -993,6 +1063,25 @@ const MODES = {
 };
 
 const SCORE = { perfect: 100, good: 55, sustainPerSec: 130, sustainBonus: 40 };
+
+/** Pre-song modifiers. Harder settings pay more, easier ones pay less, and
+ *  whatever was switched on rides along with the score onto the leaderboard. */
+const SPEED_MULT = { 1: 1, 1.25: 1.15, 1.5: 1.3, 2: 1.6 };
+
+function modMultiplier(mods) {
+  let m = SPEED_MULT[mods.speed] || 1;
+  if (mods.chill) m *= 0.7;
+  if (mods.mirror) m *= 1.05;
+  return m;
+}
+
+function modLabel(mods) {
+  const bits = [];
+  if (mods.chill) bits.push('Chill');
+  if (mods.speed !== 1) bits.push(mods.speed + '\u00d7');
+  if (mods.mirror) bits.push('Mirror');
+  return bits.join(' · ');
+}
 const RANKS = [
   [96, 'S', 'Full bars'],
   [92, 'A', '5G ultra'],
@@ -1060,6 +1149,8 @@ const G = {
   counts: { perfect: 0, good: 0, miss: 0, over: 0, holds: 0, dropped: 0 },
 
   returnTo: 'menu',
+  mods: { chill: false, speed: 1, mirror: false },
+  rate: 1, modMult: 1,
   held: [], flash: [], particles: [], judge: null, lastHit: [],
   punishOverstrum: true,
   shake: 0, missGlow: 0, hitPulse: 0,
@@ -1207,17 +1298,23 @@ els.backMenu.addEventListener('click', () => { G.returnTo = 'menu'; goTab('play'
                                       .data.uid == request.auth.uid;
          }
 
-         // one rating per account, and only you can write yours
+         // one rating per account, and only you can write yours — but the
+         // person who published the chart can clear them when deleting it
          match /ratings/{uid} {
            allow read: if true;
            allow write: if request.auth != null && request.auth.uid == uid;
+           allow delete: if request.auth != null
+                         && get(/databases/$(database)/documents/charts/$(chart))
+                              .data.uid == request.auth.uid;
          }
 
-         // the leaderboard — everyone reads it, you only write your own row
-         match /scores/{uid} {
-           allow read: if true;
-           allow write: if request.auth != null && request.auth.uid == uid;
-         }
+       }
+
+       // high scores, one board per chart. Charts that were never published
+       // get a board too, keyed by what the chart is.
+       match /boards/{board}/scores/{uid} {
+         allow read: if true;
+         allow write: if request.auth != null && request.auth.uid == uid;
        }
      }
    }
@@ -1547,28 +1644,58 @@ async function fbMyRating(chartId) {
   } catch (e) { return 0; }
 }
 
-/** One score document per player per chart, holding their best run in each
- *  mode. Ordering on a nested field needs no composite index. */
-async function fbTopScores(chartId, mode) {
-  if (!(await fbInit())) return [];
+/** Every chart gets a board, published or not. A chart that came from
+ *  Firebase uses its document id; anything else is keyed by what the chart
+ *  actually is, so the same .signal file lands on the same board wherever it
+ *  is opened from. */
+function hashKey(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
+function chartKey() {
+  const item = G.playing;
+  if (item && item.source === 'cloud' && item.id) return 'c_' + item.id;
+  if (!G.pack) return '';
+  const m = G.pack.meta;
+  const o = (G.pack.charts.ollie || []).length;
+  const r = (G.pack.charts.rue || []).length;
+  return 'k_' + hashKey([m.title || '', Math.round((m.duration || 0) * 10), o, r].join('|'));
+}
+
+/** One document per player per board, holding their best run in each mode
+ *  along with whatever modifiers were switched on for it. */
+async function fbTopScores(key, mode) {
+  if (!key || !(await fbInit())) return [];
   const f = FB.mod.fs;
-  const q = f.query(f.collection(FB.db, 'charts', chartId, 'scores'),
+  const q = f.query(f.collection(FB.db, 'boards', key, 'scores'),
     f.orderBy(mode + '.score', 'desc'), f.limit(20));
   const snap = await f.getDocs(q);
   const out = [];
   snap.forEach((d) => {
-    const row = (d.data() || {})[mode];
-    if (row && row.score) out.push({ uid: d.id, name: d.data().name || 'Someone', score: row.score,
-      accuracy: row.accuracy || 0, maxCombo: row.maxCombo || 0 });
+    const data = d.data() || {};
+    const row = data[mode];
+    if (row && row.score) {
+      out.push({
+        uid: d.id, name: data.name || 'Someone', score: row.score,
+        accuracy: row.accuracy || 0, maxCombo: row.maxCombo || 0,
+        mods: row.mods || null
+      });
+    }
   });
   return out;
 }
 
-async function fbSubmitScore(chartId, mode, run) {
+async function fbSubmitScore(key, mode, run) {
   if (!(await fbInit())) throw new Error(fbStatusLine());
   if (!signedIn()) throw new Error('Sign in to save scores.');
+  if (!key) throw new Error('This chart has no board.');
   const f = FB.mod.fs;
-  const ref = f.doc(FB.db, 'charts', chartId, 'scores', FB.user.uid);
+  const ref = f.doc(FB.db, 'boards', key, 'scores', FB.user.uid);
 
   return f.runTransaction(FB.db, async (tx) => {
     const snap = await tx.get(ref);
@@ -1576,10 +1703,74 @@ async function fbSubmitScore(chartId, mode, run) {
     const prev = data[mode];
     if (prev && prev.score >= run.score) return { saved: false, best: prev.score };
     const next = Object.assign({}, data, { name: displayName() });
-    next[mode] = { score: run.score, accuracy: run.accuracy, maxCombo: run.maxCombo, at: f.serverTimestamp() };
+    next[mode] = {
+      score: run.score, accuracy: run.accuracy, maxCombo: run.maxCombo,
+      mods: run.mods, at: f.serverTimestamp()
+    };
     tx.set(ref, next);
     return { saved: true, best: run.score, previous: prev ? prev.score : 0 };
   });
+}
+
+/** Republish over the same document so ratings, plays and the leaderboard
+ *  survive an edit. Surplus parts from a longer previous version are removed
+ *  after the new ones are written. */
+async function fbUpdateChart(id, prevChunks, meta, bytes, onProgress) {
+  if (!(await fbInit())) throw new Error(fbStatusLine());
+  if (!signedIn()) throw new Error('Sign in first.');
+  const f = FB.mod.fs;
+  const total = Math.ceil(bytes.length / CHUNK);
+
+  for (let i = 0; i < total; i++) {
+    const part = bytes.slice(i * CHUNK, Math.min(bytes.length, (i + 1) * CHUNK));
+    await f.setDoc(f.doc(FB.db, 'charts', id, 'blobs', String(i)),
+      { i: i, data: f.Bytes.fromUint8Array(part) });
+    onProgress((i + 1) / (total + 1));
+  }
+  for (let i = total; i < Math.max(prevChunks || 0, total); i++) {
+    try { await f.deleteDoc(f.doc(FB.db, 'charts', id, 'blobs', String(i))); } catch (e) { /* already gone */ }
+  }
+
+  const modes = {};
+  for (const m of ['ollie', 'rue']) {
+    if (meta.charts && meta.charts[m]) modes[m] = meta.charts[m].length;
+  }
+
+  // merge, so uid, ratings, plays and createdAt are left alone
+  await f.setDoc(f.doc(FB.db, 'charts', id), {
+    title: meta.title,
+    titleLower: (meta.title || '').toLowerCase(),
+    artist: meta.artist || '',
+    charter: meta.charter || displayName(),
+    duration: meta.duration || 0,
+    bpm: meta.grid ? Math.round(meta.grid.bpm) : 0,
+    modes: modes,
+    bytes: bytes.length,
+    chunks: total,
+    updatedAt: f.serverTimestamp()
+  }, { merge: true });
+  onProgress(1);
+  return id;
+}
+
+/** Parts and ratings go before the chart document, because their rules read
+ *  the chart to check who owns it. */
+async function fbDeleteChart(id, chunks) {
+  if (!(await fbInit())) throw new Error(fbStatusLine());
+  if (!signedIn()) throw new Error('Sign in first.');
+  const f = FB.mod.fs;
+
+  for (let i = 0; i < (chunks || 0) + 4; i++) {
+    try { await f.deleteDoc(f.doc(FB.db, 'charts', id, 'blobs', String(i))); } catch (e) { /* already gone */ }
+  }
+  try {
+    const snap = await f.getDocs(f.collection(FB.db, 'charts', id, 'ratings'));
+    const jobs = [];
+    snap.forEach((docSnap) => jobs.push(f.deleteDoc(f.doc(FB.db, 'charts', id, 'ratings', docSnap.id))));
+    await Promise.all(jobs);
+  } catch (e) { /* ratings may already be gone */ }
+
+  await f.deleteDoc(f.doc(FB.db, 'charts', id));
 }
 
 async function fbBumpPlays(chartId) {
@@ -2608,11 +2799,35 @@ function exportPack() {
 
 /** A chart published by somebody else is theirs — you can play and rate it,
  *  but not rewrite it or push a new version over the top. */
+function ownedTrack() {
+  const it = G.playing;
+  if (!it || it.source !== 'cloud' || !it.id) return null;
+  return (signedIn() && it.uid === FB.user.uid) ? it : null;
+}
+
 function chartIsMine() {
   const item = G.playing;
   if (!item || item.source !== 'cloud') return true;
   return signedIn() && item.uid === FB.user.uid;
 }
+
+function renderMods() {
+  $('modChill').setAttribute('aria-pressed', String(G.mods.chill));
+  $('modMirror').setAttribute('aria-pressed', String(G.mods.mirror));
+  for (const b of $('speedSeg').children) {
+    b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === G.mods.speed));
+  }
+  $('modsMult').textContent = 'Score \u00d7' + modMultiplier(G.mods).toFixed(2);
+}
+
+$('modChill').addEventListener('click', () => { G.mods.chill = !G.mods.chill; renderMods(); });
+$('modMirror').addEventListener('click', () => { G.mods.mirror = !G.mods.mirror; renderMods(); });
+$('speedSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  G.mods.speed = Number(b.dataset.speed);
+  renderMods();
+});
 
 function showReady() {
   const ch = G.chart, m = G.pack.meta;
@@ -2652,11 +2867,13 @@ function showReady() {
   els.edit.title = mine ? '' : 'Published by ' + (m.charter || 'someone else') + ' — theirs to edit';
   $('publish').title = els.edit.title;
   $('ownerNote').hidden = mine;
+  $('deleteTrack').hidden = !ownedTrack();
   if (!mine) {
     $('ownerNote').textContent = 'Published by ' + (m.charter || 'someone else')
       + ', so editing and re-publishing are locked. You can still play it, rate it and export a copy.';
   }
 
+  renderMods();
   show('ready');
   loadBoard();
   requestAnimationFrame(() => drawScope(els.scope2, ch.wave, ch.notes, ch.duration));
@@ -2684,7 +2901,9 @@ function boardRows(host, rows, highlightUid) {
     name.textContent = r.name;
     const acc = document.createElement('span');
     acc.className = 'board__acc';
-    acc.textContent = (r.accuracy || 0).toFixed(1) + '% · ' + r.maxCombo + 'x';
+    const label = r.mods ? modLabel(r.mods) : '';
+    acc.textContent = (r.accuracy || 0).toFixed(1) + '% · ' + r.maxCombo + 'x'
+      + (label ? ' · ' + label : '');
     const score = document.createElement('span');
     score.className = 'board__score';
     score.textContent = r.score.toLocaleString();
@@ -2694,14 +2913,24 @@ function boardRows(host, rows, highlightUid) {
 }
 
 async function loadBoard() {
-  const item = G.playing;
   const box = $('board');
-  if (!item || item.source !== 'cloud') { box.hidden = true; return; }
+  const key = chartKey();
+  if (!key) { box.hidden = true; return; }
   box.hidden = false;
   $('boardMode').textContent = G.cfg.name;
+
+  if (!fbConfigured()) {
+    $('boardRows').innerHTML = '';
+    const p = document.createElement('p');
+    p.className = 'board__empty';
+    p.textContent = 'Connect a Firebase project to keep high scores.';
+    $('boardRows').appendChild(p);
+    return;
+  }
+
   $('boardRows').innerHTML = '<p class="board__empty">Loading\u2026</p>';
   try {
-    const rows = await fbTopScores(item.id, G.cfg.id);
+    const rows = await fbTopScores(key, G.cfg.id);
     boardRows($('boardRows'), rows, signedIn() ? FB.user.uid : '');
   } catch (e) {
     $('boardRows').innerHTML = '';
@@ -3215,6 +3444,52 @@ $('brandBtn').addEventListener('click', () => goTab('play'));
 
 /* -------------------------------- publishing ------------------------------ */
 
+function askConfirm(title, body, label) {
+  return new Promise((resolve) => {
+    $('confTitle').textContent = title;
+    $('confBody').textContent = body;
+    $('confGo').textContent = label;
+    $('confErr').hidden = true;
+    $('confGo').disabled = false;
+    $('confModal').hidden = false;
+
+    const finish = (value) => {
+      $('confGo').removeEventListener('click', yes);
+      $('confNo').removeEventListener('click', no);
+      if (value !== 'keep-open') $('confModal').hidden = true;
+      resolve(value);
+    };
+    const yes = () => finish(true);
+    const no = () => finish(false);
+    $('confGo').addEventListener('click', yes);
+    $('confNo').addEventListener('click', no);
+  });
+}
+
+async function deleteTrack() {
+  const own = ownedTrack();
+  if (!own) return;
+  const ok = await askConfirm('Delete this track?',
+    '"' + own.title + '" comes off the track list for everyone, along with its ratings. '
+    + 'High scores are kept. This cannot be undone.', 'Delete it');
+  if (!ok) return;
+
+  els.readySub.textContent = 'Deleting \u2026';
+  try {
+    await fbDeleteChart(own.id, own.chunks);
+    cloudCharts = cloudCharts.filter((c) => c.id !== own.id);
+    libLoaded = false;
+    G.playing = null;
+    goTab('play');
+    await loadLibrary(true);
+    els.libSub.textContent = '"' + own.title + '" deleted.';
+  } catch (e) {
+    els.readySub.textContent = 'Could not delete that: ' + ((e && e.message) || 'unknown error');
+  }
+}
+
+$('deleteTrack').addEventListener('click', deleteTrack);
+
 function openPublish() {
   if (!fbConfigured()) {
     $('pubErr').textContent = 'No Firebase project is connected, so there is nowhere to publish to yet. '
@@ -3233,9 +3508,16 @@ function openPublish() {
   $('pubCharter').value = m.charter || displayName();
   $('pubErr').hidden = true;
   $('pubGo').disabled = false;
-  $('pubGo').textContent = 'Publish';
   $('pubBarWrap').hidden = true;
   $('pubBar').style.width = '0%';
+
+  const own = ownedTrack();
+  $('pubNew').hidden = !own;
+  $('pubGo').textContent = own ? 'Update this track' : 'Publish';
+  document.querySelector('#pubModal .modal__title').textContent = own ? 'Update this track' : 'Publish this chart';
+  document.querySelector('#pubModal .modal__sub').textContent = own
+    ? 'This replaces "' + own.title + '" in place, so its ratings, plays and high scores carry over.'
+    : 'It goes up with the song inside it, so anyone can hit play straight from the track list.';
 
   const counts = [];
   for (const id of ['ollie', 'rue']) {
@@ -3259,7 +3541,7 @@ function openPublish() {
   $('pubModal').hidden = false;
 }
 
-async function doPublish() {
+async function doPublish(forceNew) {
   const title = $('pubTitle').value.trim();
   if (!title) { $('pubErr').textContent = 'Give it a title first.'; $('pubErr').hidden = false; return; }
 
@@ -3283,27 +3565,35 @@ async function doPublish() {
     return;
   }
 
+  const own = forceNew ? null : ownedTrack();
   $('pubErr').hidden = true;
   $('pubGo').disabled = true;
-  $('pubGo').textContent = 'Publishing\u2026';
+  $('pubNew').disabled = true;
+  $('pubGo').textContent = own ? 'Updating\u2026' : 'Publishing\u2026';
   $('pubBarWrap').hidden = false;
+  const step = (frac) => { $('pubBar').style.width = (frac * 100).toFixed(0) + '%'; };
 
   try {
-    await fbPublish(meta, bytes, (frac) => { $('pubBar').style.width = (frac * 100).toFixed(0) + '%'; });
+    if (own) await fbUpdateChart(own.id, own.chunks, meta, bytes, step);
+    else await fbPublish(meta, bytes, step);
     $('pubModal').hidden = true;
     libLoaded = false;
     goTab('play');
     await loadLibrary(true);
-    els.libSub.textContent = '"' + title + '" is live. It shows for everyone now.';
+    els.libSub.textContent = own
+      ? '"' + title + '" updated. Its ratings and high scores carried over.'
+      : '"' + title + '" is live. It shows for everyone now.';
   } catch (e) {
-    $('pubErr').textContent = 'Upload failed: ' + ((e && e.message) || 'unknown error');
+    $('pubErr').textContent = (own ? 'Update failed: ' : 'Upload failed: ') + ((e && e.message) || 'unknown error');
     $('pubErr').hidden = false;
     $('pubGo').disabled = false;
-    $('pubGo').textContent = 'Publish';
+    $('pubNew').disabled = false;
+    $('pubGo').textContent = own ? 'Update this track' : 'Publish';
   }
 }
 
-$('pubGo').addEventListener('click', doPublish);
+$('pubGo').addEventListener('click', () => doPublish(false));
+$('pubNew').addEventListener('click', () => doPublish(true));
 $('pubCancel').addEventListener('click', () => { $('pubModal').hidden = true; });
 $('pubModal').addEventListener('click', (e) => { if (e.target === $('pubModal')) $('pubModal').hidden = true; });
 
@@ -4189,22 +4479,34 @@ function laneX(lane, y) {
   return cx + off * perspective(y);
 }
 
+/** Song position in seconds. At double speed the audio covers two seconds of
+ *  song per real second, so everything downstream — note travel, the progress
+ *  bar, the end-of-song check — scales from here. */
 function songTime() {
   if (!G.ctx) return 0;
-  return G.ctx.currentTime - G.startAt - G.offset;
+  return (G.ctx.currentTime - G.startAt - G.offset) * G.rate;
 }
 function audioTime() {
   if (!G.ctx) return 0;
-  return G.ctx.currentTime - G.startAt;
+  return (G.ctx.currentTime - G.startAt) * G.rate;
+}
+/** Real seconds until the music starts, for the countdown. */
+function leadLeft() {
+  if (!G.ctx) return 0;
+  return G.startAt - G.ctx.currentTime;
 }
 
 async function startGame() {
   const cfg = G.cfg;
 
+  G.rate = G.mods.speed;
+  G.modMult = modMultiplier(G.mods);
+  const flip = G.mods.mirror;
   G.notes = G.chart.notes.map((n) => ({
-    t: n.t, lane: n.lane, d: n.d || 0, s: n.s,
+    t: n.t, lane: flip ? cfg.lanes - 1 - n.lane : n.lane, d: n.d || 0, s: n.s,
     judged: false, hit: false, holding: false, dropped: false, credit: 0
   }));
+  G.notes.sort((a, b) => (a.t - b.t) || (a.lane - b.lane));
   G.scanIdx = 0; G.drawIdx = 0;
   G.score = 0; G.combo = 0; G.maxCombo = 0; G.mult = 1; G.hp = 65;
   G.counts = { perfect: 0, good: 0, miss: 0, over: 0, holds: 0, dropped: 0 };
@@ -4217,7 +4519,7 @@ async function startGame() {
   els.pause.hidden = true; els.over.hidden = true; els.results.hidden = true;
   els.hud.hidden = false;
   els.hudTrack.textContent = G.pack.meta.title || 'Untitled';
-  els.hudMode.textContent = cfg.name;
+  els.hudMode.textContent = cfg.name + (modLabel(G.mods) ? ' · ' + modLabel(G.mods) : '');
   show('game');
   layout();
   syncHud();
@@ -4239,7 +4541,8 @@ async function startGame() {
   G.gain.connect(G.analyser);
   G.analyser.connect(G.ctx.destination);
 
-  const leadIn = cfg.approach + 1.9;
+  G.source.playbackRate.value = G.rate;
+  const leadIn = cfg.approach / G.rate + 1.9;
   G.startAt = G.ctx.currentTime + leadIn;
   G.source.start(G.startAt);
   G.running = true;
@@ -4330,7 +4633,7 @@ function judgeNote(note, delta) {
   G.combo++;
   if (G.combo > G.maxCombo) G.maxCombo = G.combo;
   G.mult = multiplierFor(G.combo);
-  G.score += Math.round((perfect ? SCORE.perfect : SCORE.good) * G.mult);
+  G.score += Math.round((perfect ? SCORE.perfect : SCORE.good) * G.mult * G.modMult);
 
   G.judge = { text: perfect ? 'PERFECT' : 'GOOD', colour: perfect ? colour : '#ffffff', t: performance.now(), early: delta > 0 ? 'late' : 'early', ms: ad };
   G.hitPulse = perfect ? 1 : 0.6;
@@ -4352,11 +4655,11 @@ function overstrum(lane) {
   G.counts.over++;
   G.combo = 0;
   G.mult = 1;
-  G.hp = clamp(G.hp + G.cfg.hp.overstrum, 0, 100);
+  G.hp = clamp(G.hp + G.cfg.hp.overstrum * (G.mods.chill ? 0.5 : 1), 0, 100);
   G.judge = { text: 'OVERSTRUM', colour: '#ff9f43', t: performance.now() };
   G.shake = Math.min(1, G.shake + 0.3);
   syncHud();
-  if (G.hp <= 0) gameOver();
+  if (G.hp <= 0 && !G.mods.chill) gameOver();
 }
 
 function registerMiss(note) {
@@ -4364,12 +4667,12 @@ function registerMiss(note) {
   if (note) { note.judged = true; note.hit = false; }
   G.counts.miss++;
   G.combo = 0; G.mult = 1;
-  G.hp = clamp(G.hp + cfg.hp.miss, 0, 100);
+  G.hp = clamp(G.hp + cfg.hp.miss * (G.mods.chill ? 0.5 : 1), 0, 100);
   G.judge = { text: 'MISS', colour: '#ff5a5a', t: performance.now() };
   G.missGlow = 1;
   G.shake = Math.min(1, G.shake + 0.55);
   syncHud();
-  if (G.hp <= 0) gameOver();
+  if (G.hp <= 0 && !G.mods.chill) gameOver();
 }
 
 function press(lane) {
@@ -4411,7 +4714,7 @@ function completeHold(n) {
   n.holding = false;
   n.done = true;
   G.counts.holds++;
-  G.score += Math.round(SCORE.sustainBonus * G.mult);
+  G.score += Math.round(SCORE.sustainBonus * G.mult * G.modMult);
   G.hp = clamp(G.hp + G.cfg.hp.good, 0, 100);
   burst(n.lane, G.cfg.laneColors[n.lane], true);
   syncHud();
@@ -4525,7 +4828,7 @@ function update(dt) {
     const gained = Math.max(0, upto - Math.max(n.t, t - dt));
     if (gained > 0) {
       n.credit += gained;
-      G.score += Math.round(SCORE.sustainPerSec * gained * G.mult);
+      G.score += Math.round(SCORE.sustainPerSec * gained * G.mult * G.modMult);
       G.hp = clamp(G.hp + cfg.hp.sustain * gained, 0, 100);
       G.hitPulse = Math.max(G.hitPulse, 0.35);
       if (Math.random() < gained * 14) burst(n.lane, cfg.laneColors[n.lane], false);
@@ -4851,14 +5154,14 @@ function drawOverlayText(c, now, t) {
   }
 
   // lead-in countdown
-  const at = audioTime();
-  if (at < 0) {
-    const n = Math.ceil(-at);
+  const left = leadLeft();
+  if (left > 0) {
+    const n = Math.ceil(left);
     c.fillStyle = 'rgba(255,255,255,0.85)';
     c.font = '400 13px ui-monospace, Menlo, monospace';
     c.fillText('GET READY', cx, H * 0.30);
     if (n <= 3) {
-      const frac = 1 - (-at - (n - 1));
+      const frac = 1 - (left - (n - 1));
       c.globalAlpha = clamp(1 - frac * 0.7, 0, 1);
       c.fillStyle = cfg.laneColors[0];
       c.font = '800 ' + Math.round(Math.min(120, W * 0.16)) + 'px "Gill Sans Nova", Futura, "Avenir Next", system-ui, sans-serif';
@@ -4922,6 +5225,9 @@ function finish() {
   $('rOver').textContent = G.counts.over;
   $('rHold').textContent = G.counts.holds + (G.counts.dropped ? ' / ' + (G.counts.holds + G.counts.dropped) : '');
   $('rExtra').hidden = !(G.counts.over || G.counts.holds || G.counts.dropped);
+  const label = modLabel(G.mods);
+  $('runMods').textContent = label ? label + ' \u00b7 score \u00d7' + G.modMult.toFixed(2) : '';
+  $('runMods').hidden = !label;
   els.results.hidden = false;
   showRating();
   submitRun(acc);
@@ -4929,24 +5235,26 @@ function finish() {
 }
 
 async function submitRun(acc) {
-  const item = G.playing;
   const box = $('boardResult');
-  if (!item || item.source !== 'cloud') { box.hidden = true; return; }
+  const key = chartKey();
+  if (!key || !fbConfigured()) { box.hidden = true; return; }
   box.hidden = false;
   $('boardNote').textContent = '';
 
   if (!signedIn()) {
     $('boardResRows').innerHTML = '';
     $('boardNote').textContent = 'Sign in to put this score on the board.';
-    try { boardRows($('boardResRows'), await fbTopScores(item.id, G.cfg.id), ''); } catch (e) {}
+    try { boardRows($('boardResRows'), await fbTopScores(key, G.cfg.id), ''); } catch (e) {}
     return;
   }
 
   $('boardResRows').innerHTML = '<p class="board__empty">Saving\u2026</p>';
   try {
-    const res = await fbSubmitScore(item.id, G.cfg.id,
-      { score: G.score, accuracy: acc, maxCombo: G.maxCombo });
-    const rows = await fbTopScores(item.id, G.cfg.id);
+    const res = await fbSubmitScore(key, G.cfg.id, {
+      score: G.score, accuracy: acc, maxCombo: G.maxCombo,
+      mods: { chill: !!G.mods.chill, speed: G.mods.speed, mirror: !!G.mods.mirror }
+    });
+    const rows = await fbTopScores(key, G.cfg.id);
     boardRows($('boardResRows'), rows, FB.user.uid);
     const place = rows.findIndex((r) => r.uid === FB.user.uid);
     if (res.saved) {
