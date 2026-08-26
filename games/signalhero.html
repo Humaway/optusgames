@@ -821,7 +821,7 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
 
   <canvas id="edcv"></canvas>
 
-  <p class="ed__help"><b>Select</b> (1): click a note to pick it, drag a box to grab several, drag to move · <b>Draw</b> (2): click a lane to place a note, drag right for a hold · <b>Delete</b> a note by right-clicking it, double-clicking it, or selecting and pressing Delete · H turns the selection into holds, Shift+←→ resizes · Ctrl+A selects all, Ctrl+Z undoes · Space plays, R records taps · scroll to move, Ctrl+scroll to zoom</p>
+  <p class="ed__help"><b>Select</b> (1): click a note to pick it, drag a box to grab several, drag to move · <b>Draw</b> (2): click a lane to place a note, drag right for a hold · <b>Delete</b> a note by right-clicking it, double-clicking it, or selecting and pressing Delete · H turns the selection into holds, Shift+←→ resizes · Ctrl+C copies and Ctrl+V pastes at the playhead, Ctrl+X cuts, Ctrl+D repeats the selection · Ctrl+A selects all, Ctrl+Z undoes · Space plays, R records taps · scroll to move, Ctrl+scroll to zoom</p>
 
   <div class="ed__bar ed__bar--foot">
     <button class="tool primary" id="edPlay">Play</button>
@@ -840,6 +840,8 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
     </div>
     <div class="ed__spacer"></div>
     <button class="tool" id="edAuto">Auto-chart mode</button>
+    <button class="tool" id="edCopy" disabled>Copy</button>
+    <button class="tool" id="edPaste" disabled>Paste</button>
     <button class="tool" id="edDelete" disabled>Delete</button>
     <button class="tool" id="edHolds">Holds from gaps</button>
     <button class="tool" id="edClear">Clear mode</button>
@@ -3358,7 +3360,7 @@ async function showRating() {
    ========================================================================== */
 
 const ED = {
-  mode: 'ollie', notes: [], sel: [], drag: null, band: null, tool: 'select',
+  mode: 'ollie', notes: [], sel: [], drag: null, band: null, tool: 'select', clip: null,
   zoom: 150, view: 0, snap: 2,
   ctx: null, src: null, playing: false, base: 0, t0: 0, pos: 0, rate: 1,
   rec: false, history: [], peaks: null, perSec: 100, token: 0
@@ -3420,6 +3422,8 @@ function edCount() {
   $('edSelCount').textContent = ED.sel.length;
   $('edSelWrap').hidden = !ED.sel.length;
   $('edDelete').disabled = !ED.sel.length;
+  $('edCopy').disabled = !ED.sel.length;
+  $('edPaste').disabled = !(ED.clip && ED.clip.notes.length);
 }
 
 function setTool(tool) {
@@ -3431,14 +3435,84 @@ function setTool(tool) {
     : 'Select: click notes to pick them, drag a box to grab several');
 }
 
-function edDelete() {
+/** Times are stored relative to the earliest note in the selection, so a
+ *  copied phrase can drop in anywhere — including in the other mode, where
+ *  lanes are clamped to fit. */
+function edCopy(cut) {
+  if (!ED.sel.length) { edMsg('Select some notes first'); return; }
+  const from = ED.sel.slice().sort((a, b) => a.t - b.t);
+  const base = from[0].t;
+  let end = 0;
+  for (const n of from) end = Math.max(end, n.t + (n.d || 0));
+  ED.clip = {
+    notes: from.map((n) => ({ dt: n.t - base, lane: n.lane, d: n.d || 0 })),
+    span: end - base,
+    lanes: MODES[ED.mode].lanes
+  };
+  const count = from.length;
+  if (cut) {
+    edDelete(true);
+    edMsg(count + (count === 1 ? ' note cut' : ' notes cut') + ' — Ctrl+V drops it at the playhead');
+  } else {
+    edMsg(count + (count === 1 ? ' note copied' : ' notes copied') + ' — Ctrl+V drops it at the playhead');
+  }
+  edCount();
+}
+
+function pasteAt(base, label) {
+  if (!ED.clip || !ED.clip.notes.length) { edMsg('Nothing copied yet'); return; }
+  const lanes = MODES[ED.mode].lanes;
+  const dur = G.pack.meta.duration;
+  edPush();
+
+  const made = [];
+  let past = 0, dupes = 0;
+  for (const c of ED.clip.notes) {
+    const t = base + c.dt;
+    if (t > dur) { past++; continue; }
+    const lane = clamp(c.lane, 0, lanes - 1);
+    if (ED.notes.some((n) => n.lane === lane && Math.abs(n.t - t) < 0.006)) { dupes++; continue; }
+    const n = { t: t, lane: lane, d: Math.min(c.d, Math.max(0, dur - t)), s: 1.4 };
+    ED.notes.push(n);
+    made.push(n);
+  }
+  ED.notes.sort((a, b) => a.t - b.t);
+  if (made.length) {
+    ED.sel = made;                       // ready to nudge straight away
+  } else {
+    ED.history.pop();                    // nothing changed, so don't clutter undo
+    $('edUndo').disabled = !ED.history.length;
+  }
+  edCount();
+
+  const notes = made.length;
+  const extra = [];
+  if (dupes) extra.push(dupes + ' already there');
+  if (past) extra.push(past + ' past the end');
+  if (ED.clip.lanes > lanes) extra.push('lanes folded in from ' + ED.clip.lanes);
+  edMsg(notes
+    ? label + ' ' + notes + (notes === 1 ? ' note' : ' notes') + (extra.length ? ' — ' + extra.join(', ') : '')
+    : 'Nothing pasted — ' + (extra.join(', ') || 'no room here'));
+}
+
+function edPaste() { pasteAt(snapTime(edTime()), 'Pasted'); }
+
+function edDuplicate() {
+  if (!ED.sel.length) { edMsg('Select some notes to duplicate'); return; }
+  edCopy(false);
+  const step = Math.max(ED.clip.span, holdStep());
+  const from = ED.sel.slice().sort((a, b) => a.t - b.t);
+  pasteAt(snapTime(from[0].t + step), 'Duplicated');
+}
+
+function edDelete(quiet) {
   if (!ED.sel.length) return;
   edPush();
   const doomed = ED.sel.slice();
   ED.notes = ED.notes.filter((n) => doomed.indexOf(n) < 0);
   ED.sel = [];
   edCount();
-  edMsg(doomed.length + (doomed.length === 1 ? ' note deleted' : ' notes deleted'));
+  if (!quiet) edMsg(doomed.length + (doomed.length === 1 ? ' note deleted' : ' notes deleted'));
 }
 
 function edMsg(text) {
@@ -3879,7 +3953,9 @@ $('edTools').addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (b) setTool(b.dataset.tool);
 });
-$('edDelete').addEventListener('click', edDelete);
+$('edDelete').addEventListener('click', () => edDelete(false));
+$('edCopy').addEventListener('click', () => edCopy(false));
+$('edPaste').addEventListener('click', edPaste);
 
 /* -------------------------------- transport -------------------------------- */
 
@@ -4034,6 +4110,10 @@ window.addEventListener('keydown', (e) => {
   }
   if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); $('edUndo').click(); return; }
   if (k === 'delete' || k === 'backspace') { e.preventDefault(); edDelete(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'c') { e.preventDefault(); edCopy(false); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'x') { e.preventDefault(); edCopy(true); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'v') { e.preventDefault(); edPaste(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'd') { e.preventDefault(); edDuplicate(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'a') {
     e.preventDefault();
     ED.sel = ED.notes.slice();
