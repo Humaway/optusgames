@@ -319,6 +319,21 @@ body[data-mode="rue"] .modal__box{background:#160223}
 .ghost.danger{border-color:rgba(255,90,90,.55);color:#ff8a8a}
 .ghost.danger:hover{border-color:#ff5a5a;background:rgba(255,90,90,.12);color:#ff9f9f}
 
+/* ---------- leaderboards tab ---------- */
+.lbwrap{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr);gap:18px;align-items:start}
+.lbwrap.solo{grid-template-columns:minmax(0,1fr)}
+.lblist{display:grid;gap:6px;max-height:64vh;overflow-y:auto;padding-right:4px}
+.lbitem{text-align:left;padding:11px 13px;border-radius:var(--r-sm);border:1px solid var(--faint);
+  background:rgba(255,255,255,.03);transition:border-color .15s,background .15s}
+.lbitem:hover{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.07)}
+.lbitem[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 13%,transparent)}
+.lbitem b{display:block;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lbitem span{display:block;font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:4px}
+.lbmain .board{margin:0}
+.lbmain .board__row{padding:9px 0}
+.hits{font-family:var(--mono);font-size:12px;color:var(--dim);margin:-18px 0 26px}
+@media (max-width:760px){ .lbwrap{grid-template-columns:minmax(0,1fr)} .lblist{max-height:34vh} }
+
 /* ---------- modifiers ---------- */
 .mods{border:1px solid var(--faint);border-radius:var(--r-md);padding:16px 18px;margin:0 0 22px;
   background:rgba(0,0,0,.2);text-align:left}
@@ -512,6 +527,7 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
   </button>
   <nav class="tabs">
     <button class="tab" id="tabPlay" aria-pressed="true">Play</button>
+    <button class="tab" id="tabBoards" aria-pressed="false">Leaderboards</button>
     <button class="tab" id="tabCreate" aria-pressed="false">Create</button>
     <button class="tab" id="tabSettings" aria-pressed="false">Settings</button>
   </nav>
@@ -547,32 +563,22 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
     <div class="step">
       <div class="step__head">
         <span class="step__num">02</span>
-        <h2 class="step__title">Pick a mode to chart first</h2>
-        <span class="step__hint">You can chart the other one in the editor</span>
+        <h2 class="step__title">What gets built</h2>
+        <span class="step__hint">Five lanes</span>
       </div>
       <div class="modes">
-        <button class="mode" id="mOllie" aria-pressed="true" style="--mc:#ffd200">
-          <span class="mode__top"><span class="mode__dot"></span><span class="mode__tag">Medium – Hard</span></span>
-          <h3 class="mode__name">Ollie Mode</h3>
-          <p class="mode__desc">Four lanes, room to breathe. Only the beats that carry the song get a note.</p>
-          <div class="mode__keys" id="keysOllie"></div>
-          <div class="mode__specs">
-            <span class="spec">Read time<b>1.55 s</b></span>
-            <span class="spec">Perfect window<b>±70 ms</b></span>
-            <span class="spec">Note density<b>~2.1 / sec</b></span>
-          </div>
-        </button>
-        <button class="mode" id="mRue" aria-pressed="false" style="--mc:#ff2e7e">
+        <div class="mode" style="--mc:#ff2e7e">
           <span class="mode__top"><span class="mode__dot"></span><span class="mode__tag">Expert</span></span>
           <h3 class="mode__name">Rue Mode</h3>
-          <p class="mode__desc">Five lanes, twice the traffic. Catches hats, ghost notes and fills, then adds chords.</p>
+          <p class="mode__desc">Five lanes, dense traffic. The detector catches hats, ghost notes and fills,
+            then throws chords at you. Fix any of it in the editor afterwards.</p>
           <div class="mode__keys" id="keysRue"></div>
           <div class="mode__specs">
             <span class="spec">Read time<b>0.95 s</b></span>
             <span class="spec">Perfect window<b>±45 ms</b></span>
-            <span class="spec">Note density<b>~4.4 / sec</b></span>
+            <span class="spec">Note density<b>~3.9 / sec</b></span>
           </div>
-        </button>
+        </div>
       </div>
     </div>
 
@@ -621,6 +627,21 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
           <span class="mod__desc">Can't fail, gentler drain</span>
           <span class="mod__mult">×0.7</span>
         </button>
+        <button class="mod" id="modSudden" aria-pressed="false">
+          <span class="mod__name">Sudden Death</span>
+          <span class="mod__desc">One miss and the run is over</span>
+          <span class="mod__mult">×2</span>
+        </button>
+        <button class="mod" id="modHidden" aria-pressed="false">
+          <span class="mod__name">Hidden</span>
+          <span class="mod__desc">Notes fade out before the line</span>
+          <span class="mod__mult">×1.35</span>
+        </button>
+        <button class="mod" id="modShuffle" aria-pressed="false">
+          <span class="mod__name">Shuffle</span>
+          <span class="mod__desc">Lanes reordered for this track</span>
+          <span class="mod__mult">×1.1</span>
+        </button>
         <button class="mod" id="modMirror" aria-pressed="false">
           <span class="mod__name">Mirror</span>
           <span class="mod__desc">Lanes flipped left to right</span>
@@ -647,10 +668,6 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
       <div id="boardRows"></div>
     </div>
     <p class="ownernote" id="ownerNote" hidden></p>
-    <div class="seg" id="readyModes" style="margin:0 0 22px;width:fit-content">
-      <button id="rmOllie" aria-pressed="true">Ollie Mode</button>
-      <button id="rmRue" aria-pressed="false">Rue Mode</button>
-    </div>
     <div class="row">
       <button class="go" id="play">
         Drop in
@@ -667,6 +684,35 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
 </section>
 
 
+
+<!-- ================= LEADERBOARDS ================= -->
+<section class="screen" id="boards" hidden>
+  <div class="wrap wrap--wide">
+    <div class="page__head">
+      <div>
+        <h1 class="page__title">Leaderboards</h1>
+        <p class="page__sub" id="lbSub">Best run per player on each track.</p>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="sorts" id="lbViews">
+        <button data-view="overall" aria-pressed="true">Overall</button>
+        <button data-view="track" aria-pressed="false">By track</button>
+      </div>
+      <div class="search" id="lbPickWrap" hidden>
+        <svg viewBox="0 0 24 24"><path d="M10 2a8 8 0 1 1-4.9 14.3l-3.4 3.4-1.4-1.4 3.4-3.4A8 8 0 0 1 10 2zm0 2a6 6 0 1 0 0 12 6 6 0 0 0 0-12z"/></svg>
+        <input type="search" id="lbSearch" placeholder="Filter tracks" aria-label="Filter tracks">
+      </div>
+      <button class="ghost" id="lbRefresh">Refresh</button>
+    </div>
+
+    <div class="lbwrap">
+      <div class="lblist" id="lbList" hidden></div>
+      <div class="lbmain" id="lbMain"></div>
+    </div>
+  </div>
+</section>
 
 <!-- ================= SETTINGS ================= -->
 <section class="screen" id="settings" hidden>
@@ -722,21 +768,9 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
 
       <div class="binder">
         <div class="binder__head">
-          <span class="mode__dot" style="--mc:#ffd200"></span>
-          <h4 class="binder__t">Ollie Mode</h4>
-          <span class="binder__n">4 lanes</span>
-          <span class="bind__spacer"></span>
-          <button class="tool" data-setall="ollie">Set all</button>
-          <button class="tool" data-reset="ollie">Reset</button>
-        </div>
-        <div class="caps" id="bindOllie"></div>
-      </div>
-
-      <div class="binder">
-        <div class="binder__head">
           <span class="mode__dot" style="--mc:#ff2e7e"></span>
-          <h4 class="binder__t">Rue Mode</h4>
-          <span class="binder__n">5 lanes</span>
+          <h4 class="binder__t">Lanes</h4>
+          <span class="binder__n">Five keys, left to right</span>
           <span class="bind__spacer"></span>
           <button class="tool" data-setall="rue">Set all</button>
           <button class="tool" data-reset="rue">Reset</button>
@@ -870,10 +904,6 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
 <section id="editor" hidden>
   <div class="ed__bar">
     <span class="ed__title">Chart editor</span>
-    <div class="seg" id="edModes">
-      <button id="emOllie" aria-pressed="true">Ollie · 4 lanes</button>
-      <button id="emRue" aria-pressed="false">Rue · 5 lanes</button>
-    </div>
     <div class="seg" id="edTools">
       <button data-tool="select" aria-pressed="true">Select</button>
       <button data-tool="draw" aria-pressed="false">Draw</button>
@@ -981,6 +1011,7 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
       <div class="rank__name" id="rRankName">Full bars</div>
       <h2 class="veil__title" id="rScore" style="font-size:clamp(30px,7vw,52px);margin-top:22px">0</h2>
       <p class="veil__sub" id="rSub">100.0% accuracy · 0 max combo</p>
+      <p class="hits" id="rHits"></p>
       <div class="tally">
         <div class="p"><b id="rP">0</b><span>Perfect</span></div>
         <div class="g"><b id="rG">0</b><span>Good</span></div>
@@ -1025,29 +1056,14 @@ body[data-mode="rue"] .tool.primary{color:#12001c}
 
 /* ------------------------------- config ---------------------------------- */
 
+const MODE = 'rue';
+
 const MODES = {
-  ollie: {
-    id: 'ollie',
-    name: 'Ollie Mode',
-    lanes: 4,
-    keys: ['a', 's', 'd', 'f'],
-    approach: 1.55,                                  // seconds, top of screen -> hit line
-    win: { perfect: 0.070, good: 0.135, miss: 0.190 },
-    minGap: 0.185,                                   // min seconds between any two notes
-    laneGap: 0.165,                                  // min seconds between notes in one lane
-    targetNPS: 2.1,                                  // notes per second the chart aims for
-    chordChance: 0.0,
-    hp: { perfect: 1.5, good: 0.85, miss: -5.0, overstrum: -2.2, sustain: 0.5 },
-    laneColors: ['#ffd200', '#00d6c4', '#ffd200', '#00d6c4'],
-    rail: '#00d6c4',
-    grid: 'rgba(0,214,196,0.14)',
-    beat: 'rgba(255,210,0,0.20)'
-  },
   rue: {
     id: 'rue',
     name: 'Rue Mode',
     lanes: 5,
-    keys: ['a', 's', 'd', 'f', 'g'],
+    keys: ['a', 's', 'j', 'k', 'l'],
     approach: 0.95,
     win: { perfect: 0.045, good: 0.090, miss: 0.130 },
     minGap: 0.088,
@@ -1072,15 +1088,34 @@ function modMultiplier(mods) {
   let m = SPEED_MULT[mods.speed] || 1;
   if (mods.chill) m *= 0.7;
   if (mods.mirror) m *= 1.05;
+  if (mods.shuffle) m *= 1.1;
+  if (mods.hidden) m *= 1.35;
+  if (mods.sudden) m *= 2;
   return m;
 }
 
 function modLabel(mods) {
   const bits = [];
   if (mods.chill) bits.push('Chill');
+  if (mods.sudden) bits.push('Sudden Death');
   if (mods.speed !== 1) bits.push(mods.speed + '\u00d7');
   if (mods.mirror) bits.push('Mirror');
+  if (mods.shuffle) bits.push('Shuffle');
+  if (mods.hidden) bits.push('Hidden');
   return bits.join(' · ');
+}
+
+/** Shuffle is seeded from the chart, so everyone playing the same track gets
+ *  the same lane order and the board stays comparable. */
+function shuffleLanes(lanes, seed) {
+  const order = [];
+  for (let i = 0; i < lanes; i++) order.push(i);
+  const rng = mulberry(seed);
+  for (let i = lanes - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const t = order[i]; order[i] = order[j]; order[j] = t;
+  }
+  return order;
 }
 const RANKS = [
   [96, 'S', 'Full bars'],
@@ -1132,11 +1167,11 @@ function mulberry(seed) {
 
 const G = {
   screen: 'menu',
-  cfg: MODES.ollie,
+  cfg: MODES.rue,
   file: null,
   buffer: null,
   chart: null,
-  pack: null,          // { meta, charts:{ollie,rue}, audioBytes, buffer, wave }
+  pack: null,          // { meta, charts:{rue}, audioBytes, buffer, wave }
   playing: null,       // the track selector item this pack came from, if any
   analysis: null,      // { cands, grid } cached per loaded audio
   offset: 0,
@@ -1149,7 +1184,7 @@ const G = {
   counts: { perfect: 0, good: 0, miss: 0, over: 0, holds: 0, dropped: 0 },
 
   returnTo: 'menu',
-  mods: { chill: false, speed: 1, mirror: false },
+  mods: { chill: false, sudden: false, speed: 1, mirror: false, shuffle: false, hidden: false },
   rate: 1, modMult: 1,
   held: [], flash: [], particles: [], judge: null, lastHit: [],
   punishOverstrum: true,
@@ -1160,7 +1195,8 @@ const G = {
 /* ------------------------------ DOM wiring -------------------------------- */
 
 const screens = {
-  browse: $('browse'), create: $('create'), analysis: $('analysis'), ready: $('ready'),
+  browse: $('browse'), boards: $('boards'), create: $('create'),
+  analysis: $('analysis'), ready: $('ready'),
   settings: $('settings'),
   editor: $('editor'), game: $('game')
 };
@@ -1174,27 +1210,22 @@ function show(name) {
 
 const els = {
   drop: $('drop'), file: $('file'), fileName: $('fileName'), fileMeta: $('fileMeta'), err: $('err'),
-  mOllie: $('mOllie'), mRue: $('mRue'), go: $('go'),
+  go: $('go'),
   stages: $('stages'), anaBar: $('anaBar'), anaSub: $('anaSub'), scope: $('scope'), scope2: $('scope2'),
   readyTitle: $('readyTitle'), readySub: $('readySub'), stats: $('stats'), play: $('play'), backMenu: $('backMenu'),
   hud: $('hud'), bars: $('bars'), hpFill: $('hpFill'), hudTrack: $('hudTrack'), hudMode: $('hudMode'),
   hudTime: $('hudTime'), progFill: $('progFill'), scoreEl: $('scoreEl'), accEl: $('accEl'),
   pause: $('pause'), pauseSub: $('pauseSub'), over: $('over'), results: $('results'),
-  rmOllie: $('rmOllie'), rmRue: $('rmRue'),
   edit: $('edit'), exportBtn: $('export'),
   libGrid: $('libGrid'), libEmpty: $('libEmpty'), libSub: $('libSub'),
-  bindOllie: $('bindOllie'), bindRue: $('bindRue'), bindNote: $('bindNote'),
+  bindRue: $('bindRue'), bindNote: $('bindNote'),
   acct: $('acct')
 };
 
-function setMode(id) {
-  G.cfg = MODES[id];
-  document.body.dataset.mode = id;
-  els.mOllie.setAttribute('aria-pressed', String(id === 'ollie'));
-  els.mRue.setAttribute('aria-pressed', String(id === 'rue'));
+function setMode() {
+  G.cfg = MODES[MODE];
+  document.body.dataset.mode = MODE;
 }
-els.mOllie.addEventListener('click', () => setMode('ollie'));
-els.mRue.addEventListener('click', () => setMode('rue'));
 
 els.drop.addEventListener('click', () => els.file.click());
 els.file.addEventListener('change', (e) => { if (e.target.files[0]) takeFile(e.target.files[0]); });
@@ -1258,7 +1289,12 @@ els.backMenu.addEventListener('click', () => { G.returnTo = 'menu'; goTab('play'
    straight into Firestore as raw bytes, split across a blobs subcollection,
    because a single document tops out at 1 MiB.
 
-   Firestore rules — paste these into Firestore Database -> Rules.
+   Firestore rules — replace EVERYTHING in Firestore Database -> Rules with
+   the block below, then press Publish. Scores live in a top-level `boards`
+   collection, so that match has to sit OUTSIDE `match /charts/{chart}` — if
+   it ends up nested inside, saving a score fails with "Missing or
+   insufficient permissions".
+
    No Storage rules are needed, and the bucket can stay switched off.
 
    rules_version = '2';
@@ -1371,6 +1407,27 @@ async function fbInit() {
     FB.error = (e && e.message) || 'load-failed';
     return false;
   }
+}
+
+/** Firebase's own wording for a rules denial is "Missing or insufficient
+ *  permissions", which says nothing about which rule is missing. Name the
+ *  path so it can be matched against the ruleset. */
+function fbErrorText(e, what) {
+  const code = String((e && e.code) || '');
+  const msg = String((e && e.message) || 'unknown error');
+  if (code.indexOf('permission-denied') >= 0 || /insufficient permissions/i.test(msg)) {
+    return 'Firestore refused that: its rules have no entry for ' + what + '. '
+      + 'Copy the ruleset from the comment at the top of this file into '
+      + 'Firestore Database \u2192 Rules, then press Publish.';
+  }
+  if (code.indexOf('unauthenticated') >= 0) return 'You have been signed out — sign in and try again.';
+  if (code.indexOf('failed-precondition') >= 0) {
+    return 'Firestore wants an index for this query. The browser console has a link that builds it in one click.';
+  }
+  if (code.indexOf('unavailable') >= 0 || code.indexOf('network') >= 0) {
+    return 'Could not reach Firestore. Check the connection and try again.';
+  }
+  return msg;
 }
 
 function fbStatusLine() {
@@ -1564,7 +1621,7 @@ async function fbPublish(meta, bytes, onProgress) {
   }
 
   const modes = {};
-  for (const m of ['ollie', 'rue']) {
+  for (const m of [MODE]) {
     if (meta.charts && meta.charts[m]) modes[m] = meta.charts[m].length;
   }
 
@@ -1662,9 +1719,8 @@ function chartKey() {
   if (item && item.source === 'cloud' && item.id) return 'c_' + item.id;
   if (!G.pack) return '';
   const m = G.pack.meta;
-  const o = (G.pack.charts.ollie || []).length;
   const r = (G.pack.charts.rue || []).length;
-  return 'k_' + hashKey([m.title || '', Math.round((m.duration || 0) * 10), o, r].join('|'));
+  return 'k_' + hashKey([m.title || '', Math.round((m.duration || 0) * 10), r].join('|'));
 }
 
 /** One document per player per board, holding their best run in each mode
@@ -1732,7 +1788,7 @@ async function fbUpdateChart(id, prevChunks, meta, bytes, onProgress) {
   }
 
   const modes = {};
-  for (const m of ['ollie', 'rue']) {
+  for (const m of [MODE]) {
     if (meta.charts && meta.charts[m]) modes[m] = meta.charts[m].length;
   }
 
@@ -1788,7 +1844,7 @@ async function fbBumpPlays(chartId) {
    receptors on the highway, and the editor's tap recording.
    ========================================================================== */
 
-const KEY_DEFAULTS = { ollie: ['a', 's', 'd', 'f'], rue: ['a', 's', 'd', 'f', 'g'] };
+const KEY_DEFAULTS = { rue: ['a', 's', 'j', 'k', 'l'] };
 const RESERVED = ['escape', '[', ']'];
 const MODIFIERS = ['shift', 'control', 'alt', 'meta', 'capslock', 'tab'];
 const ARROWS = { arrowleft: '\u2190', arrowright: '\u2192', arrowup: '\u2191', arrowdown: '\u2193' };
@@ -1922,8 +1978,8 @@ function calReset() {
 let listening = null;   // { mode, lane, seq, used }
 
 function renderModeKeys() {
-  for (const id of ['ollie', 'rue']) {
-    const host = $(id === 'ollie' ? 'keysOllie' : 'keysRue');
+  for (const id of [MODE]) {
+    const host = $('keysRue');
     host.innerHTML = '';
     for (const k of MODES[id].keys) {
       const kbd = document.createElement('kbd');
@@ -1934,8 +1990,8 @@ function renderModeKeys() {
 }
 
 function renderBinds() {
-  for (const id of ['ollie', 'rue']) {
-    const host = id === 'ollie' ? els.bindOllie : els.bindRue;
+  for (const id of [MODE]) {
+    const host = els.bindRue;
     host.innerHTML = '';
     MODES[id].keys.forEach((k, lane) => {
       const cap = document.createElement('button');
@@ -1963,8 +2019,8 @@ function renderBinds() {
 }
 
 function paintListening() {
-  for (const id of ['ollie', 'rue']) {
-    const host = id === 'ollie' ? els.bindOllie : els.bindRue;
+  for (const id of [MODE]) {
+    const host = els.bindRue;
     Array.prototype.forEach.call(host.children, (cap, lane) => {
       const on = listening && listening.mode === id && listening.lane === lane;
       cap.classList.toggle('listening', !!on);
@@ -2068,9 +2124,9 @@ $('keysBack').addEventListener('click', () => { endBind(); calEnd(); goTab('play
 function saveSettings() {
   try {
     const bits = [];
-    const custom = ['ollie', 'rue'].some((id) => MODES[id].keys.join() !== KEY_DEFAULTS[id].join());
+    const custom = [MODE].some((id) => MODES[id].keys.join() !== KEY_DEFAULTS[id].join());
     if (custom) {
-      bits.push('k=' + ['ollie', 'rue'].map((id) => MODES[id].keys.map(encodeURIComponent).join(',')).join('|'));
+      bits.push('k=' + [MODE].map((id) => MODES[id].keys.map(encodeURIComponent).join(',')).join('|'));
     }
     if (G.offset) bits.push('d=' + Math.round(G.offset * 1000));
     history.replaceState(null, '', location.pathname + location.search + (bits.length ? '#' + bits.join('&') : ''));
@@ -2085,7 +2141,7 @@ function loadSettings() {
     const m = /[#&]k=([^&]*)/.exec(location.hash);
     if (m) {
       const parts = m[1].split('|');
-      ['ollie', 'rue'].forEach((id, i) => {
+      [MODE].forEach((id, i) => {
         if (!parts[i]) return;
         const got = parts[i].split(',').map(decodeURIComponent);
         if (got.length !== MODES[id].lanes) return;
@@ -2311,7 +2367,7 @@ function selectNotes(cands, cfg, grid, duration) {
   const target = Math.max(12, Math.round(duration * cfg.targetNPS));
   const gap = cfg.minGap;
 
-  const div = cfg.id === 'ollie' ? (grid ? grid.period / 2 : 0) : (grid ? grid.period / 4 : 0);
+  const div = grid ? grid.period / 4 : 0;
   const useGrid = !!grid && grid.confidence > 0.12 && gridFit(cands, grid, div) > 0.5;
   if (grid) grid.fit = useGrid ? 1 : 0;
 
@@ -2324,7 +2380,6 @@ function selectNotes(cands, cfg, grid, duration) {
       const half = Math.abs(beats * 2 - Math.round(beats * 2)) * grid.period;
       if (dBeat < 0.055) s *= 1.55;
       else if (half < 0.055) s *= 1.22;
-      else if (cfg.id === 'ollie') s *= 0.72;   // Ollie stays on the obvious beats
     }
     c.s = s;
   }
@@ -2679,8 +2734,9 @@ function packGrid() {
 }
 
 /** Make a mode playable: use the chart in the pack, or generate one. */
-async function useMode(modeId) {
-  setMode(modeId);
+async function useMode() {
+  setMode();
+  const modeId = MODE;
   let notes = G.pack.charts[modeId];
   if (!notes || !notes.length) {
     await ensureAnalysis();
@@ -2724,7 +2780,7 @@ async function openAudioFile(file) {
 
   G.pack = packFromAudio(file.name, file.type, buffer, bytes);
   G.analysis = null;
-  if (await useMode(G.cfg.id)) showReady();
+  if (await useMode()) showReady();
 }
 
 async function openPackFile(file) {
@@ -2753,8 +2809,7 @@ async function openPackBuffer(buf, label) {
   G.pack = {
     meta: Object.assign({ title: label, artist: '', charter: '', source: 'custom', duration: buffer.duration }, pack.meta),
     charts: {
-      ollie: readNotes(pack.meta.charts && pack.meta.charts.ollie),
-      rue: readNotes(pack.meta.charts && pack.meta.charts.rue)
+      rue: readNotes(pack.meta.charts && (pack.meta.charts.rue || pack.meta.charts.ollie))
     },
     audioBytes: pack.audio,
     buffer: buffer,
@@ -2765,10 +2820,8 @@ async function openPackBuffer(buf, label) {
   G.analysis = null;
 
   // open on a mode the pack actually has
-  let want = G.cfg.id;
-  if (!G.pack.charts[want]) want = G.pack.charts.ollie ? 'ollie' : (G.pack.charts.rue ? 'rue' : want);
   els.anaBar.style.width = '100%';
-  if (await useMode(want)) showReady();
+  if (await useMode()) showReady();
 }
 
 function packMeta() {
@@ -2779,7 +2832,7 @@ function packMeta() {
     duration: m.duration, grid: m.grid, game: 'Signal Hero', created: new Date().toISOString().slice(0, 10),
     charts: {}
   };
-  for (const id of ['ollie', 'rue']) {
+  for (const id of [MODE]) {
     const notes = G.pack.charts[id];
     if (notes && notes.length) {
       meta.charts[id] = notes.map(writeNote);
@@ -2813,6 +2866,9 @@ function chartIsMine() {
 
 function renderMods() {
   $('modChill').setAttribute('aria-pressed', String(G.mods.chill));
+  $('modSudden').setAttribute('aria-pressed', String(G.mods.sudden));
+  $('modHidden').setAttribute('aria-pressed', String(G.mods.hidden));
+  $('modShuffle').setAttribute('aria-pressed', String(G.mods.shuffle));
   $('modMirror').setAttribute('aria-pressed', String(G.mods.mirror));
   for (const b of $('speedSeg').children) {
     b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === G.mods.speed));
@@ -2820,7 +2876,18 @@ function renderMods() {
   $('modsMult').textContent = 'Score \u00d7' + modMultiplier(G.mods).toFixed(2);
 }
 
-$('modChill').addEventListener('click', () => { G.mods.chill = !G.mods.chill; renderMods(); });
+$('modChill').addEventListener('click', () => {
+  G.mods.chill = !G.mods.chill;
+  if (G.mods.chill) G.mods.sudden = false;      // one says never fail, the other fails instantly
+  renderMods();
+});
+$('modSudden').addEventListener('click', () => {
+  G.mods.sudden = !G.mods.sudden;
+  if (G.mods.sudden) G.mods.chill = false;
+  renderMods();
+});
+$('modHidden').addEventListener('click', () => { G.mods.hidden = !G.mods.hidden; renderMods(); });
+$('modShuffle').addEventListener('click', () => { G.mods.shuffle = !G.mods.shuffle; renderMods(); });
 $('modMirror').addEventListener('click', () => { G.mods.mirror = !G.mods.mirror; renderMods(); });
 $('speedSeg').addEventListener('click', (e) => {
   const b = e.target.closest('button');
@@ -2838,11 +2905,6 @@ function showReady() {
   els.readySub.textContent = custom
     ? (m.artist ? m.artist + ' · ' : '') + 'charted by ' + (m.charter || 'someone') + '. Yellow ticks are the notes.'
     : 'Charted from the audio for ' + G.cfg.name + '. Yellow ticks are the notes — open the editor if any of them are in the wrong place.';
-
-  els.rmOllie.setAttribute('aria-pressed', String(G.cfg.id === 'ollie'));
-  els.rmRue.setAttribute('aria-pressed', String(G.cfg.id === 'rue'));
-  els.rmOllie.textContent = 'Ollie Mode' + (G.pack.charts.ollie ? '' : ' · auto');
-  els.rmRue.textContent = 'Rue Mode' + (G.pack.charts.rue ? '' : ' · auto');
 
   els.stats.innerHTML = '';
   const rows = [
@@ -2936,13 +2998,11 @@ async function loadBoard() {
     $('boardRows').innerHTML = '';
     const p = document.createElement('p');
     p.className = 'board__empty';
-    p.textContent = 'Could not load the leaderboard.';
+    p.textContent = fbErrorText(e, 'boards/\u2026/scores');
     $('boardRows').appendChild(p);
   }
 }
 
-els.rmOllie.addEventListener('click', async () => { if (await useMode('ollie')) showReady(); });
-els.rmRue.addEventListener('click', async () => { if (await useMode('rue')) showReady(); });
 els.exportBtn.addEventListener('click', () => {
   if (!exportPack()) els.readySub.textContent = 'Nothing to export yet — chart a mode first.';
 });
@@ -3109,8 +3169,7 @@ function serverItem(entry) {
     duration: m.duration || 0,
     bpm: m.grid && m.grid.bpm ? Math.round(m.grid.bpm) : 0,
     modes: {
-      ollie: m.charts && m.charts.ollie ? m.charts.ollie.length : 0,
-      rue: m.charts && m.charts.rue ? m.charts.rue.length : 0
+      rue: (m.charts && (m.charts.rue || m.charts.ollie) || []).length
     },
     bytes: entry.bytes || 0,
     rating: null, plays: 0, createdAt: 0,
@@ -3133,8 +3192,7 @@ function localItem(file, meta) {
     duration: meta.duration || 0,
     bpm: meta.grid && meta.grid.bpm ? Math.round(meta.grid.bpm) : 0,
     modes: {
-      ollie: meta.charts && meta.charts.ollie ? meta.charts.ollie.length : 0,
-      rue: meta.charts && meta.charts.rue ? meta.charts.rue.length : 0
+      rue: (meta.charts && (meta.charts.rue || meta.charts.ollie) || []).length
     },
     bytes: file.size,
     rating: null, plays: 0, createdAt: file.lastModified || 0,
@@ -3228,8 +3286,8 @@ function chartCard(item) {
     c.textContent = text;
     chips.appendChild(c);
   };
-  if (item.modes.ollie) add('Ollie · ' + item.modes.ollie, true);
-  if (item.modes.rue) add('Rue · ' + item.modes.rue, true);
+  const noteCount = item.modes.rue || item.modes.ollie || 0;
+  if (noteCount) add(noteCount + ' notes', true);
   if (item.duration) add(mmss(item.duration));
   if (item.bpm) add(item.bpm + ' BPM');
   if (item.plays) add(item.plays + (item.plays === 1 ? ' play' : ' plays'));
@@ -3423,21 +3481,23 @@ libScreen.addEventListener('drop', (e) => {
    TABS, PUBLISHING AND RATING
    ========================================================================== */
 
-const TAB_SCREEN = { play: 'browse', create: 'create', settings: 'settings' };
-const CHROME_SCREENS = ['browse', 'create', 'settings'];
+const TAB_SCREEN = { play: 'browse', boards: 'boards', create: 'create', settings: 'settings' };
+const CHROME_SCREENS = ['browse', 'boards', 'create', 'settings'];
 
 function goTab(tab) {
   const screen = TAB_SCREEN[tab] || 'browse';
-  for (const t of ['play', 'create', 'settings']) {
+  for (const t of ['play', 'boards', 'create', 'settings']) {
     $('tab' + t.charAt(0).toUpperCase() + t.slice(1)).setAttribute('aria-pressed', String(t === tab));
   }
   if (tab === 'settings') { renderBinds(); renderOffset(); calReset(); els.bindNote.textContent = ''; }
   show(screen);
   if (tab === 'play') loadLibrary(false);
+  else if (tab === 'boards') loadBoardsTab(false);
   else calEnd();
 }
 
 $('tabPlay').addEventListener('click', () => goTab('play'));
+$('tabBoards').addEventListener('click', () => goTab('boards'));
 $('tabCreate').addEventListener('click', () => goTab('create'));
 $('tabSettings').addEventListener('click', () => goTab('settings'));
 $('brandBtn').addEventListener('click', () => goTab('play'));
@@ -3484,7 +3544,7 @@ async function deleteTrack() {
     await loadLibrary(true);
     els.libSub.textContent = '"' + own.title + '" deleted.';
   } catch (e) {
-    els.readySub.textContent = 'Could not delete that: ' + ((e && e.message) || 'unknown error');
+    els.readySub.textContent = 'Could not delete that. ' + fbErrorText(e, 'charts, charts/\u2026/blobs and charts/\u2026/ratings');
   }
 }
 
@@ -3520,7 +3580,7 @@ function openPublish() {
     : 'It goes up with the song inside it, so anyone can hit play straight from the track list.';
 
   const counts = [];
-  for (const id of ['ollie', 'rue']) {
+  for (const id of [MODE]) {
     const c = G.pack.charts[id];
     if (c && c.length) counts.push([c.length.toLocaleString(), MODES[id].name.replace(' Mode', '') + ' notes']);
   }
@@ -3584,7 +3644,7 @@ async function doPublish(forceNew) {
       ? '"' + title + '" updated. Its ratings and high scores carried over.'
       : '"' + title + '" is live. It shows for everyone now.';
   } catch (e) {
-    $('pubErr').textContent = (own ? 'Update failed: ' : 'Upload failed: ') + ((e && e.message) || 'unknown error');
+    $('pubErr').textContent = (own ? 'Update failed. ' : 'Upload failed. ') + fbErrorText(e, 'charts and charts/\u2026/blobs');
     $('pubErr').hidden = false;
     $('pubGo').disabled = false;
     $('pubNew').disabled = false;
@@ -3596,6 +3656,183 @@ $('pubGo').addEventListener('click', () => doPublish(false));
 $('pubNew').addEventListener('click', () => doPublish(true));
 $('pubCancel').addEventListener('click', () => { $('pubModal').hidden = true; });
 $('pubModal').addEventListener('click', (e) => { if (e.target === $('pubModal')) $('pubModal').hidden = true; });
+
+/* ------------------------------ leaderboards ------------------------------ */
+
+const LB = { view: 'overall', pick: null, filter: '', loaded: false, tracks: [] };
+
+/** Every track the player can see, each with the board key its scores live
+ *  under. Local files count — their key is derived from the chart itself. */
+function boardTracks() {
+  const out = [];
+  for (const c of cloudCharts) out.push({ key: 'c_' + c.id, title: c.title, artist: c.artist, charter: c.charter });
+  for (const c of serverCharts.concat(localCharts)) {
+    const notes = c.modes.rue || c.modes.ollie || 0;
+    out.push({
+      key: 'k_' + hashKey([c.title || '', Math.round((c.duration || 0) * 10), notes].join('|')),
+      title: c.title, artist: c.artist, charter: c.charter
+    });
+  }
+  const seen = new Set();
+  return out.filter((t) => !seen.has(t.key) && seen.add(t.key));
+}
+
+function lbMessage(text) {
+  $('lbMain').innerHTML = '';
+  const box = document.createElement('div');
+  box.className = 'board';
+  const p = document.createElement('p');
+  p.className = 'board__empty';
+  p.textContent = text;
+  box.appendChild(p);
+  $('lbMain').appendChild(box);
+}
+
+function lbPanel(title, note) {
+  $('lbMain').innerHTML = '';
+  const box = document.createElement('div');
+  box.className = 'board';
+  const head = document.createElement('div');
+  head.className = 'board__head';
+  const t = document.createElement('span');
+  t.className = 'board__title';
+  t.textContent = title;
+  const n = document.createElement('span');
+  n.className = 'board__mode';
+  n.textContent = note || '';
+  head.appendChild(t); head.appendChild(n);
+  const rows = document.createElement('div');
+  box.appendChild(head); box.appendChild(rows);
+  $('lbMain').appendChild(box);
+  return rows;
+}
+
+async function showTrackBoard(track) {
+  LB.pick = track.key;
+  for (const b of $('lbList').children) b.setAttribute('aria-pressed', String(b.dataset.key === track.key));
+  const rows = lbPanel(track.title, track.artist || '');
+  rows.innerHTML = '<p class="board__empty">Loading\u2026</p>';
+  try {
+    const list = await fbTopScores(track.key, MODE);
+    boardRows(rows, list, signedIn() ? FB.user.uid : '');
+  } catch (e) {
+    rows.innerHTML = '';
+    const p = document.createElement('p');
+    p.className = 'board__empty';
+    p.textContent = fbErrorText(e, 'boards/\u2026/scores');
+    rows.appendChild(p);
+  }
+}
+
+/** Overall adds up each player's best run on every track, so it rewards
+ *  breadth rather than one lucky attempt. */
+async function showOverall(tracks) {
+  const rows = lbPanel('Overall', 'best run on each track, added up');
+  rows.innerHTML = '<p class="board__empty">Reading ' + tracks.length + ' boards\u2026</p>';
+
+  const totals = new Map();
+  let failed = 0;
+  for (const t of tracks.slice(0, 30)) {
+    let list = [];
+    try { list = await fbTopScores(t.key, MODE); } catch (e) { failed++; continue; }
+    for (const r of list) {
+      const cur = totals.get(r.uid) || { uid: r.uid, name: r.name, score: 0, maxCombo: 0, tracks: 0, accSum: 0 };
+      cur.score += r.score;
+      cur.tracks += 1;
+      cur.accSum += r.accuracy || 0;
+      cur.maxCombo = Math.max(cur.maxCombo, r.maxCombo || 0);
+      cur.name = r.name;
+      totals.set(r.uid, cur);
+    }
+  }
+  const list = Array.from(totals.values()).sort((a, b) => b.score - a.score)
+    .map((r) => ({ uid: r.uid, name: r.name, score: r.score, maxCombo: r.tracks,
+                   accuracy: r.tracks ? r.accSum / r.tracks : 0, mods: null }));
+  rows.innerHTML = '';
+  if (!list.length) {
+    const p = document.createElement('p');
+    p.className = 'board__empty';
+    p.textContent = failed ? fbErrorText({ code: 'permission-denied' }, 'boards/\u2026/scores')
+      : 'No scores anywhere yet. Play a track and you are on the board.';
+    rows.appendChild(p);
+    return;
+  }
+  boardRows(rows, list, signedIn() ? FB.user.uid : '');
+  const foot = document.createElement('p');
+  foot.className = 'board__empty';
+  foot.textContent = 'Combo column shows how many tracks each player has a score on.';
+  rows.appendChild(foot);
+}
+
+function renderTrackList() {
+  const host = $('lbList');
+  host.innerHTML = '';
+  const f = LB.filter;
+  const list = LB.tracks.filter((t) =>
+    !f || (t.title + ' ' + (t.artist || '') + ' ' + (t.charter || '')).toLowerCase().indexOf(f) >= 0);
+  for (const t of list) {
+    const b = document.createElement('button');
+    b.className = 'lbitem';
+    b.dataset.key = t.key;
+    b.setAttribute('aria-pressed', String(t.key === LB.pick));
+    const name = document.createElement('b');
+    name.textContent = t.title;
+    const sub = document.createElement('span');
+    sub.textContent = t.artist || 'Unknown artist';
+    b.appendChild(name); b.appendChild(sub);
+    b.addEventListener('click', () => showTrackBoard(t));
+    host.appendChild(b);
+  }
+  if (!list.length) {
+    const p = document.createElement('p');
+    p.className = 'board__empty';
+    p.textContent = 'No tracks match that.';
+    host.appendChild(p);
+  }
+  return list;
+}
+
+async function loadBoardsTab(force) {
+  const byTrack = LB.view === 'track';
+  $('lbPickWrap').hidden = !byTrack;
+  $('lbList').hidden = !byTrack;
+  document.querySelector('.lbwrap').classList.toggle('solo', !byTrack);
+  for (const b of $('lbViews').children) b.setAttribute('aria-pressed', String(b.dataset.view === LB.view));
+
+  if (!fbConfigured()) {
+    $('lbSub').textContent = 'Leaderboards need a Firebase project.';
+    lbMessage('Fill in FIREBASE_CONFIG near the top of this file to keep high scores.');
+    return;
+  }
+
+  if (!LB.loaded || force) {
+    if (!libLoaded || force) await loadLibrary(force);
+    LB.tracks = boardTracks();
+    LB.loaded = true;
+  }
+  $('lbSub').textContent = LB.tracks.length
+    ? LB.tracks.length + (LB.tracks.length === 1 ? ' track' : ' tracks') + ' with a board.'
+    : 'No tracks yet.';
+
+  if (!LB.tracks.length) { lbMessage('Nothing to rank yet — add a track on the Play tab.'); return; }
+
+  if (byTrack) {
+    const list = renderTrackList();
+    const pick = LB.tracks.find((t) => t.key === LB.pick) || list[0] || LB.tracks[0];
+    if (pick) await showTrackBoard(pick);
+  } else {
+    await showOverall(LB.tracks);
+  }
+}
+
+$('lbViews').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  LB.view = b.dataset.view;
+  loadBoardsTab(false);
+});
+$('lbSearch').addEventListener('input', (e) => { LB.filter = e.target.value.trim().toLowerCase(); renderTrackList(); });
+$('lbRefresh').addEventListener('click', () => { LB.loaded = false; loadBoardsTab(true); });
 
 /* --------------------------------- rating --------------------------------- */
 
@@ -3634,7 +3871,7 @@ async function showRating() {
         + ' from ' + res.count + (res.count === 1 ? ' rating' : ' ratings') + '.';
       renderLibrary();
     } catch (e) {
-      $('rateNote').textContent = 'Could not save that: ' + ((e && e.message) || 'unknown error');
+      $('rateNote').textContent = fbErrorText(e, 'charts/\u2026/ratings');
     }
   };
   paint(mine || (item.rating ? item.rating.avg : 0));
@@ -3650,7 +3887,7 @@ async function showRating() {
    ========================================================================== */
 
 const ED = {
-  mode: 'ollie', notes: [], sel: [], drag: null, band: null, tool: 'select', clip: null,
+  mode: MODE, notes: [], sel: [], drag: null, band: null, tool: 'select', clip: null,
   zoom: 150, view: 0, snap: 2,
   ctx: null, src: null, playing: false, base: 0, t0: 0, pos: 0, rate: 1,
   rec: false, history: [], peaks: null, perSec: 100, token: 0
@@ -3838,7 +4075,7 @@ async function openEditor() {
   $('edCharter').value = m.charter || '';
   $('edDur').textContent = mmss(m.duration);
 
-  ED.mode = G.cfg.id;
+  ED.mode = MODE;
   ED.notes = (G.pack.charts[ED.mode] || []).map((n) => ({ t: n.t, lane: n.lane, d: n.d || 0, s: n.s || 1.4 }));
   ED.sel = []; ED.history = []; ED.pos = 0; ED.view = 0;
   ED.peaks = peaksHi(G.pack.buffer, ED.perSec);
@@ -3846,8 +4083,6 @@ async function openEditor() {
   setTool('select');
   edMsg('');
   $('edUndo').disabled = true;
-  $('emOllie').setAttribute('aria-pressed', String(ED.mode === 'ollie'));
-  $('emRue').setAttribute('aria-pressed', String(ED.mode === 'rue'));
 
   edCount();
   edResume();
@@ -4308,21 +4543,6 @@ $('edSnaps').addEventListener('click', (e) => {
   ED.snap = Number(b.dataset.snap);
   for (const x of $('edSnaps').children) x.setAttribute('aria-pressed', String(x === b));
 });
-$('edModes').addEventListener('click', (e) => {
-  const b = e.target.closest('button'); if (!b) return;
-  const next = b.id === 'emRue' ? 'rue' : 'ollie';
-  if (next === ED.mode) return;
-  edSaveMode();
-  ED.mode = next;
-  setMode(next);
-  ED.notes = (G.pack.charts[next] || []).map((n) => ({ t: n.t, lane: n.lane, d: n.d || 0, s: n.s || 1.4 }));
-  ED.sel = []; ED.history = [];
-  $('edUndo').disabled = true;
-  $('emOllie').setAttribute('aria-pressed', String(next === 'ollie'));
-  $('emRue').setAttribute('aria-pressed', String(next === 'rue'));
-  edCount();
-});
-
 $('edUndo').addEventListener('click', () => {
   if (!ED.history.length) return;
   ED.notes = ED.history.pop();
@@ -4364,13 +4584,13 @@ $('edPublish').addEventListener('click', () => { edStop(); edSaveMode(); openPub
 $('edDone').addEventListener('click', async () => {
   edStop();
   edSaveMode();
-  if (await useMode(ED.mode)) showReady();
+  if (await useMode()) showReady();
 });
 $('edTest').addEventListener('click', async () => {
   edStop();
   edSaveMode();
   G.returnTo = 'editor';
-  if (await useMode(ED.mode)) startGame();
+  if (await useMode()) startGame();
 });
 
 window.addEventListener('resize', () => { if (G.screen === 'editor') edResize(); });
@@ -4501,9 +4721,17 @@ async function startGame() {
 
   G.rate = G.mods.speed;
   G.modMult = modMultiplier(G.mods);
-  const flip = G.mods.mirror;
+  const order = G.mods.shuffle
+    ? shuffleLanes(cfg.lanes, (hashKey(chartKey() || 'x') + '0').split('').reduce((a, c) => a + c.charCodeAt(0), 7))
+    : null;
+  const remap = (lane) => {
+    let l = lane;
+    if (order) l = order[l];
+    if (G.mods.mirror) l = cfg.lanes - 1 - l;
+    return l;
+  };
   G.notes = G.chart.notes.map((n) => ({
-    t: n.t, lane: flip ? cfg.lanes - 1 - n.lane : n.lane, d: n.d || 0, s: n.s,
+    t: n.t, lane: remap(n.lane), d: n.d || 0, s: n.s,
     judged: false, hit: false, holding: false, dropped: false, credit: 0
   }));
   G.notes.sort((a, b) => (a.t - b.t) || (a.lane - b.lane));
@@ -4515,6 +4743,7 @@ async function startGame() {
   G.flash = new Array(cfg.lanes).fill(-99);
   G.particles = []; G.judge = null;
   G.shake = 0; G.missGlow = 0; G.hitPulse = 0; G.finished = false; G.paused = false;
+  G.suddenEnd = false;
 
   els.pause.hidden = true; els.over.hidden = true; els.results.hidden = true;
   els.hud.hidden = false;
@@ -4581,9 +4810,7 @@ function multiplierFor(combo) {
 
 function syncHud() {
   els.scoreEl.textContent = G.score.toLocaleString();
-  const done = G.counts.perfect + G.counts.good + G.counts.miss;
-  const acc = done ? ((G.counts.perfect + G.counts.good * 0.55) / done) * 100 : 100;
-  els.accEl.textContent = acc.toFixed(1) + '%';
+  els.accEl.textContent = accuracyPct().toFixed(1) + '%';
 
   const pct = clamp(G.hp, 0, 100);
   els.hpFill.style.width = pct + '%';
@@ -4595,9 +4822,12 @@ function syncHud() {
   for (let i = 0; i < bars.length; i++) bars[i].classList.toggle('lit', i < lit);
 }
 
+/** Share of notes hit, counting a Good the same as a Perfect. Every note is
+ *  judged by the end of a run, so this settles at hits over total notes. */
 function accuracyPct() {
-  const done = G.counts.perfect + G.counts.good + G.counts.miss;
-  return done ? ((G.counts.perfect + G.counts.good * 0.55) / done) * 100 : 100;
+  const hits = G.counts.perfect + G.counts.good;
+  const done = hits + G.counts.miss;
+  return done ? (hits / done) * 100 : 100;
 }
 
 function burst(lane, colour, strong) {
@@ -4672,6 +4902,7 @@ function registerMiss(note) {
   G.missGlow = 1;
   G.shake = Math.min(1, G.shake + 0.55);
   syncHud();
+  if (G.mods.sudden) { G.suddenEnd = true; gameOver(); return; }
   if (G.hp <= 0 && !G.mods.chill) gameOver();
 }
 
@@ -5062,7 +5293,19 @@ function drawNotes(c, t) {
       c.globalAlpha = 1;
       continue;
     }
-    if (y >= topY - 40) drawNote(c, x, y, r, colour);
+    if (y >= topY - 40) {
+      if (G.mods.hidden) {
+        // gone by the time it reaches the line, so the chart has to be read early
+        const k = clamp((y - hitY * 0.42) / (hitY * 0.5), 0, 1);
+        const a = 1 - k;
+        if (a <= 0.02) continue;
+        c.globalAlpha = a;
+        drawNote(c, x, y, r, colour);
+        c.globalAlpha = 1;
+      } else {
+        drawNote(c, x, y, r, colour);
+      }
+    }
   }
 }
 
@@ -5196,6 +5439,11 @@ async function togglePause() {
 function gameOver() {
   if (G.finished) return;
   G.finished = true;
+  document.querySelector('#over .veil__kicker').textContent = G.suddenEnd ? 'Sudden Death' : 'Signal lost';
+  document.querySelector('#over .veil__title').textContent = G.suddenEnd ? 'One and done' : 'Dropped out';
+  document.querySelector('#over .veil__sub').textContent = G.suddenEnd
+    ? 'Sudden Death ends the run on the first missed note.'
+    : 'Signal strength hit zero, so the music stopped. Misses drain it fast — hits build it back.';
   stopAudio();
   $('oP').textContent = G.counts.perfect;
   $('oG').textContent = G.counts.good;
@@ -5218,7 +5466,9 @@ function finish() {
   $('rRank').textContent = rank[1];
   $('rRankName').textContent = rank[2];
   $('rScore').textContent = G.score.toLocaleString();
-  $('rSub').textContent = acc.toFixed(1) + '% accuracy · ' + G.maxCombo + ' max combo · ' + G.cfg.name;
+  const hits = G.counts.perfect + G.counts.good;
+  $('rSub').textContent = acc.toFixed(1) + '% of notes hit · ' + G.maxCombo + ' max combo';
+  $('rHits').textContent = hits.toLocaleString() + ' of ' + G.notes.length.toLocaleString() + ' notes';
   $('rP').textContent = G.counts.perfect;
   $('rG').textContent = G.counts.good;
   $('rM').textContent = G.counts.miss;
@@ -5265,7 +5515,7 @@ async function submitRun(acc) {
     }
   } catch (e) {
     $('boardResRows').innerHTML = '';
-    $('boardNote').textContent = 'Could not save that score: ' + ((e && e.message) || 'unknown error');
+    $('boardNote').textContent = fbErrorText(e, 'boards/\u2026/scores');
   }
 }
 
@@ -5289,7 +5539,7 @@ renderBinds();
 renderOffset();
 renderAccount();
 calReset();
-setMode('ollie');
+setMode();
 paintStages(0);
 goTab('play');
 if (fbConfigured()) fbInit();
