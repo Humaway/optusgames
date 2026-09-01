@@ -135,6 +135,33 @@
   .hint{font-size:11px;color:var(--grey);margin-top:10px;line-height:1.5}
 
   .chips{display:flex;gap:8px}
+  .chips.tabs .chip{padding:8px 6px;font-size:12px}
+  .sect2{font-size:11.5px;font-weight:700;color:var(--grey);margin:14px 0 7px}
+  .bindrow{display:grid;grid-template-columns:58px 46px 1fr auto auto;gap:8px;align-items:center;
+     padding:7px 0;font-size:12px}
+  .bindrow+.bindrow{border-top:1px solid var(--line)}
+  .bindrow .axn{font-family:var(--mono);font-size:11px;color:var(--teal-d);background:var(--wash);
+     border-radius:7px;padding:3px 0;text-align:center}
+  .bindrow .track{position:relative;background:#eef4f4;height:8px}
+  .bindrow .track i{position:absolute;left:50%;width:0;background:var(--teal)}
+  .bindrow .track i.fromleft{left:0}
+  .mini{border:1px solid var(--line);background:var(--paper);border-radius:9px;padding:5px 9px;
+     font-size:11px;font-weight:700;color:var(--teal-d);cursor:pointer;font-family:var(--sans)}
+  .mini:hover{background:var(--wash)}
+  .mini.wide{width:100%;margin-top:10px;padding:9px}
+  .mini.armed{background:var(--yellow);border-color:var(--yellow);color:#04100f}
+  .sw.sm{width:36px;height:21px}
+  .sw.sm i{width:15px;height:15px;top:3px;left:3px}
+  .sw.sm.on i{left:18px}
+  .keyrow{display:grid;grid-template-columns:1fr 92px;gap:8px;align-items:center;padding:6px 0;font-size:12.5px}
+  .keyrow+.keyrow{border-top:1px solid var(--line)}
+  .keycap{font-family:var(--mono);font-size:11.5px}
+  .raterow{display:grid;grid-template-columns:74px 1fr 60px;gap:9px;align-items:center;
+     padding:7px 0;font-size:12.5px}
+  .raterow b{font-family:var(--mono);font-size:11.5px;text-align:right;color:var(--teal-d)}
+  input[type=range]{width:100%;accent-color:var(--teal);height:20px}
+  .newflight{display:block;width:100%;background:none;border:0;color:var(--grey);font-size:12px;
+     padding:10px 0 0;cursor:pointer;text-decoration:underline;font-family:var(--sans)}
   .chip{flex:1;border:1.5px solid var(--line);background:var(--paper);border-radius:14px;padding:10px 6px;
      text-align:center;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--grey)}
   .chip small{display:block;font-weight:500;font-size:10px;margin-top:3px;opacity:.85}
@@ -191,10 +218,7 @@
   <div class="blk br" id="hudBR"></div>
   <div id="banner"></div>
   <div id="subbanner"></div>
-  <div id="keyhelp">
-    W/S throttle &nbsp;·&nbsp; A/D yaw &nbsp;·&nbsp; arrows pitch + roll &nbsp;·&nbsp; SPACE flight mode<br>
-    R respawn &nbsp;·&nbsp; C camera &nbsp;·&nbsp; [ ] camera tilt &nbsp;·&nbsp; H hide this &nbsp;·&nbsp; ESC menu
-  </div>
+  <div id="keyhelp"></div>
 </div>
 <div id="toast"></div>
 
@@ -243,17 +267,65 @@
         <div class="dots" id="dDots"></div>
       </div>
 
-      <div class="sect">Controller</div>
+      <div class="sect">Sticks and keys</div>
       <div class="card">
         <div class="pill" id="padPill"><span class="dot"></span><span id="padText">Looking for a controller…</span></div>
-        <div class="axes">
-          <div class="ax">Throttle<div class="track"><i id="axT"></i></div></div>
-          <div class="ax">Yaw<div class="track"><i id="axY"></i></div></div>
-          <div class="ax">Pitch<div class="track"><i id="axP"></i></div></div>
-          <div class="ax">Roll<div class="track"><i id="axR"></i></div></div>
+        <div class="chips tabs" id="stickTabs" style="margin-top:12px">
+          <div class="chip on" data-tab="pad">Controller</div>
+          <div class="chip" data-tab="key">Keyboard</div>
         </div>
-        <div class="hint">Plug in an RC transmitter in USB joystick mode (Radiomaster, Jumper, TX12) or any
-          gamepad, then move a stick to wake it up. Keyboard works if you'd rather not.</div>
+
+        <div id="tabPad">
+          <div class="sect2">Channel mapping</div>
+          <div class="bindrow"><span>Throttle</span><span class="axn" id="axn-throttle">—</span>
+            <span class="track"><i id="axT" class="fromleft"></i></span>
+            <button class="mini" data-detect="throttle">Detect</button>
+            <span class="sw sm" data-inv="throttle"><i></i></span></div>
+          <div class="bindrow"><span>Yaw</span><span class="axn" id="axn-yaw">—</span>
+            <span class="track"><i id="axY"></i></span>
+            <button class="mini" data-detect="yaw">Detect</button>
+            <span class="sw sm" data-inv="yaw"><i></i></span></div>
+          <div class="bindrow"><span>Pitch</span><span class="axn" id="axn-pitch">—</span>
+            <span class="track"><i id="axP"></i></span>
+            <button class="mini" data-detect="pitch">Detect</button>
+            <span class="sw sm" data-inv="pitch"><i></i></span></div>
+          <div class="bindrow"><span>Roll</span><span class="axn" id="axn-roll">—</span>
+            <span class="track"><i id="axR"></i></span>
+            <button class="mini" data-detect="roll">Detect</button>
+            <span class="sw sm" data-inv="roll"><i></i></span></div>
+          <div class="hint">Press Detect, then move that stick to its extreme — throttle up, yaw right,
+            pitch forward, roll right. The switch on the right flips a channel if it ends up backwards.</div>
+
+          <div class="sect2">Throttle zero point</div>
+          <div class="chips" id="thrZero">
+            <div class="chip on" data-z="full">Full travel<small>stick down = 0%</small></div>
+            <div class="chip" data-z="upper">Upper half<small>centre = 0%</small></div>
+          </div>
+          <div class="hint">Transmitters have a ratcheted throttle that stays put, so use full travel:
+            all the way down is motors off. A gamepad stick springs back to centre, which on full travel
+            leaves you at 50% — pick upper half if you'd rather have it drop to idle when you let go.</div>
+
+          <div class="sect2">Stick feel</div>
+          <div class="raterow"><span>Deadzone</span><input type="range" id="rDead" min="0" max="25" step="1"><b id="vDead"></b></div>
+          <div class="raterow"><span>Expo</span><input type="range" id="rExpo" min="0" max="90" step="5"><b id="vExpo"></b></div>
+        </div>
+
+        <div id="tabKey" style="display:none">
+          <div class="sect2">Key bindings</div>
+          <div id="keyList"></div>
+          <div class="hint">Click a key, then press the one you want. Esc cancels.</div>
+        </div>
+      </div>
+
+      <div class="sect">Rates <span id="rateFor" style="font-weight:500"></span></div>
+      <div class="card">
+        <div class="raterow"><span>Roll</span><input type="range" id="rRoll" min="100" max="1600" step="10"><b id="vRoll"></b></div>
+        <div class="raterow"><span>Pitch</span><input type="range" id="rPitch" min="100" max="1600" step="10"><b id="vPitch"></b></div>
+        <div class="raterow"><span>Yaw</span><input type="range" id="rYaw" min="60" max="1000" step="10"><b id="vYaw"></b></div>
+        <div class="raterow"><span>Max tilt</span><input type="range" id="rAngle" min="10" max="75" step="1"><b id="vAngle"></b></div>
+        <button class="mini wide" id="ratesReset">Reset this airframe to stock</button>
+        <div class="hint">Degrees per second at full stick, per airframe. Max tilt only applies in Angle
+          and Horizon. Changes take effect immediately, so pause mid-flight with Esc and tune.</div>
       </div>
 
       <div class="sect">Flight mode</div>
@@ -267,11 +339,11 @@
       <div class="card">
         <div class="row">Gate course timer <div class="sw on" id="swCourse"><i></i></div></div>
         <div class="row">Shadows <div class="sw on" id="swShadow"><i></i></div></div>
-        <div class="row">Invert throttle axis <div class="sw" id="swInv"><i></i></div></div>
         <div class="row">Smash shop windows <div class="sw on" id="swGlass"><i></i></div></div>
       </div>
 
       <button class="cta" id="fly">Fly now</button>
+      <button class="newflight" id="newFlight" style="display:none">Start a new flight instead</button>
       <div class="fine">Parody. Not affiliated with, endorsed by or connected to Optus or Singtel.
         Coverage, physics and battery life are fictional. Yes.</div>
     </div>
@@ -1238,8 +1310,45 @@ function flightControl(dt) {
 /* ------------------------------------------------------- 7. input handling */
 var input = { throttle: 0, yaw: 0, pitch: 0, roll: 0 };
 var keys = Object.create(null);
-var pad = { index: null, id: '', connected: false, axes: [0, 0, 0, 0] };
-var opts = { course: true, shadows: true, invertThrottle: false, glass: true };
+var pad = { index: null, id: '', connected: false, ch: { throttle: -1, yaw: 0, pitch: 0, roll: 0 } };
+var opts = { course: true, shadows: true, glass: true };
+
+/* Channel -> gamepad axis. Defaults are mode 2 on a standard pad; every one of
+   them is re-bindable because transmitters in USB joystick mode order their
+   axes however they feel like on the day. `inv` makes the stick read positive
+   in the natural direction: throttle up, yaw right, pitch forward, roll right. */
+var bind = {
+  throttle: { axis: 1, inv: true },
+  yaw:      { axis: 0, inv: false },
+  pitch:    { axis: 3, inv: true },
+  roll:     { axis: 2, inv: false }
+};
+var CHANNELS = ['throttle', 'yaw', 'pitch', 'roll'];
+
+/* throttleZero: 'full'  = whole stick travel, bottom is 0% (a real transmitter)
+                 'upper' = only above centre counts, so a self-centring gamepad
+                           stick falls back to idle instead of parking at 50% */
+var tune = { throttleZero: 'full', deadzone: 0.06, expo: 0.35 };
+
+var keyBind = {
+  thrUp: 'w', thrDn: 's', yawL: 'a', yawR: 'd',
+  pitchF: 'arrowup', pitchB: 'arrowdown', rollL: 'arrowleft', rollR: 'arrowright',
+  mode: ' ', respawn: 'r', camera: 'c'
+};
+var KEY_LABELS = [
+  ['thrUp', 'Throttle up'], ['thrDn', 'Throttle down'],
+  ['yawL', 'Yaw left'], ['yawR', 'Yaw right'],
+  ['pitchF', 'Pitch forward'], ['pitchB', 'Pitch back'],
+  ['rollL', 'Roll left'], ['rollR', 'Roll right'],
+  ['mode', 'Cycle flight mode'], ['respawn', 'Respawn'], ['camera', 'Camera view']
+];
+function keyName(k) {
+  if (k === ' ') return 'Space';
+  if (k.indexOf('arrow') === 0) return { arrowup: '↑', arrowdown: '↓', arrowleft: '←', arrowright: '→' }[k];
+  return k.length === 1 ? k.toUpperCase() : k;
+}
+var detect = null;      // in-progress axis detection
+var keyCapture = null;  // in-progress key rebind
 
 function expo(v, e) { return v * (1 - e) + e * v * v * v; }
 function deadzone(v, dz) {
@@ -1266,6 +1375,34 @@ function pollGamepad() {
   return gp;
 }
 
+/* Axis detection: snapshot every axis, then take whichever one the pilot moves
+   furthest. The direction they moved it also tells us the inversion. */
+function startDetect(ch) {
+  var gp = pollGamepad();
+  if (!gp) { toast('Connect a controller first'); return; }
+  detect = { ch: ch, base: Array.prototype.slice.call(gp.axes), t: performance.now() };
+  renderBinds();
+}
+function pumpDetect(gp) {
+  if (!detect) return;
+  if (!gp) { detect = null; renderBinds(); return; }
+  var best = 0, bi = -1;
+  for (var i = 0; i < gp.axes.length; i++) {
+    var d = gp.axes[i] - (detect.base[i] || 0);
+    if (Math.abs(d) > best) { best = Math.abs(d); bi = i; }
+  }
+  if (best > 0.45 && bi >= 0) {
+    var ch = detect.ch;
+    bind[ch].axis = bi;
+    bind[ch].inv = (gp.axes[bi] - detect.base[bi]) < 0;
+    detect = null;
+    renderBinds();
+    toast(ch + ' \u2192 axis ' + bi + (bind[ch].inv ? ' (inverted)' : ''));
+    return;
+  }
+  if (performance.now() - detect.t > 8000) { detect = null; renderBinds(); toast('Nothing moved — cancelled'); }
+}
+
 function shortPadName(id) {
   var m = id.replace(/\(.*?\)/g, '').trim();
   return m.length > 30 ? m.slice(0, 30) + '…' : (m || 'Generic controller');
@@ -1274,17 +1411,26 @@ function shortPadName(id) {
 /* Mode-2 mapping, which is what nearly every transmitter and gamepad ships with:
    left stick  = throttle (up/down) + yaw (left/right)
    right stick = pitch (up/down) + roll (left/right)  */
-function readGamepad(gp) {
-  var ax = gp.axes;
-  var lY = ax.length > 1 ? ax[1] : 0, lX = ax.length > 0 ? ax[0] : 0;
-  var rX = ax.length > 2 ? ax[2] : 0, rY = ax.length > 3 ? ax[3] : 0;
-  if (opts.invertThrottle) lY = -lY;
-  pad.axes = [lY, lX, rY, rX];
+function axisOf(gp, ch) {
+  var b = bind[ch], v = gp.axes[b.axis];
+  if (typeof v !== 'number' || v !== v) return 0;
+  return clamp(b.inv ? -v : v, -1, 1);
+}
 
-  input.throttle = clamp((-lY + 1) / 2, 0, 1);         // stick up = more throttle
-  input.yaw   = expo(deadzone(lX, .06), .30);
-  input.pitch = expo(deadzone(-rY, .06), .35);        // stick forward = nose down = fly forward
-  input.roll  = expo(deadzone(rX, .06), .35);
+// Stick position (-1 bottom .. +1 top) -> commanded throttle 0..1
+function mapThrottle(v) {
+  return tune.throttleZero === 'upper' ? clamp(v, 0, 1) : clamp((v + 1) / 2, 0, 1);
+}
+
+function readGamepad(gp) {
+  var t = axisOf(gp, 'throttle'), y = axisOf(gp, 'yaw'),
+      p = axisOf(gp, 'pitch'), r = axisOf(gp, 'roll');
+  pad.ch = { throttle: t, yaw: y, pitch: p, roll: r };
+
+  input.throttle = mapThrottle(t);
+  input.yaw   = expo(deadzone(y, tune.deadzone), tune.expo * 0.85);
+  input.pitch = expo(deadzone(p, tune.deadzone), tune.expo);   // stick forward = fly forward
+  input.roll  = expo(deadzone(r, tune.deadzone), tune.expo);
   // shoulder buttons make handy mode / respawn switches on a real TX
   var b4 = !!(gp.buttons[4] && gp.buttons[4].pressed);
   var b5 = !!(gp.buttons[5] && gp.buttons[5].pressed);
@@ -1296,31 +1442,40 @@ function readGamepad(gp) {
 function readKeyboard(dt) {
   // Throttle is sticky, like a real transmitter — it holds where you leave it.
   var t = input.throttle;
-  if (keys['w']) t += 0.95 * dt;
-  if (keys['s']) t -= 1.25 * dt;
+  if (keys[keyBind.thrUp]) t += 0.95 * dt;
+  if (keys[keyBind.thrDn]) t -= 1.25 * dt;
   input.throttle = clamp(t, 0, 1);
 
-  var tgtYaw = (keys['d'] ? 1 : 0) - (keys['a'] ? 1 : 0);
-  var tgtPitch = (keys['arrowup'] ? 1 : 0) - (keys['arrowdown'] ? 1 : 0);
-  var tgtRoll = (keys['arrowright'] ? 1 : 0) - (keys['arrowleft'] ? 1 : 0);
+  var tgtYaw = (keys[keyBind.yawR] ? 1 : 0) - (keys[keyBind.yawL] ? 1 : 0);
+  var tgtPitch = (keys[keyBind.pitchF] ? 1 : 0) - (keys[keyBind.pitchB] ? 1 : 0);
+  var tgtRoll = (keys[keyBind.rollR] ? 1 : 0) - (keys[keyBind.rollL] ? 1 : 0);
   input.yaw = approach(input.yaw, tgtYaw, tgtYaw ? 5 : 8, dt);
   input.pitch = approach(input.pitch, tgtPitch, tgtPitch ? 5 : 8, dt);
   input.roll = approach(input.roll, tgtRoll, tgtRoll ? 5 : 8, dt);
-  pad.axes = [-(input.throttle * 2 - 1), input.yaw, -input.pitch, input.roll];
+  pad.ch = { throttle: input.throttle * 2 - 1, yaw: input.yaw, pitch: input.pitch, roll: input.roll };
 }
 
 addEventListener('keydown', function (e) {
   var k = e.key.toLowerCase();
+  if (keyCapture) {                       // rebinding: swallow the key
+    e.preventDefault();
+    if (k !== 'escape') {
+      for (var other in keyBind) if (keyBind[other] === k && other !== keyCapture) keyBind[other] = '';
+      keyBind[keyCapture] = k;
+    }
+    keyCapture = null; renderKeys();
+    return;
+  }
   keys[k] = true;
   if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].indexOf(k) >= 0) e.preventDefault();
-  if (!game.running) { if (k === 'enter') startGame(); return; }
-  if (k === ' ') cycleMode();
-  if (k === 'r') respawn(true);
-  if (k === 'c') chaseCam = !chaseCam;
+  if (!game.running) { if (k === 'enter') document.getElementById('fly').onclick(); return; }
+  if (k === keyBind.mode) cycleMode();
+  if (k === keyBind.respawn) respawn(true);
+  if (k === keyBind.camera) chaseCam = !chaseCam;
   if (k === '[') game.camTilt = clamp(game.camTilt - 3, 0, 60);
   if (k === ']') game.camTilt = clamp(game.camTilt + 3, 0, 60);
   if (k === 'h') { var kh = document.getElementById('keyhelp'); kh.style.display = kh.style.display === 'none' ? 'block' : 'none'; }
-  if (k === 'escape') toMenu();
+  if (k === 'escape') pauseGame();
 });
 addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
 
@@ -1333,6 +1488,11 @@ var game = {
   droneIdx: 0, nextGate: 0, dtAcc: 0
 };
 var MODES = ['ACRO', 'ANGLE', 'HORIZON'];
+
+// Keep a pristine copy of every airframe's tuning so the sliders can be undone.
+DRONES.forEach(function (d) {
+  d.stock = { roll: d.rates.roll, pitch: d.rates.pitch, yaw: d.rates.yaw, angleMax: d.angleMax };
+});
 
 function cycleMode() {
   game.modeIdx = (game.modeIdx + 1) % 3;
@@ -1650,7 +1810,9 @@ function drawHUD() {
     Math.round(game.throttle * 100) + '%\n' +
     'GATE ' + (opts.course ? (game.nextGate + 1) + '/' + gates.length : '—') +
     '   SMASHED ' + game.smashed + '\n' +
-    'CAM ' + Math.round(game.camTilt) + '°   ' + (chaseCam ? 'CHASE' : 'FPV');
+    'CAM ' + Math.round(game.camTilt) + '°   ' + (chaseCam ? 'CHASE' : 'FPV') + '\n' +
+    'RATE ' + Math.round(spec.rates.roll) + '/' + Math.round(spec.rates.pitch) + '/' +
+    Math.round(spec.rates.yaw) + (game.mode === 'ACRO' ? '' : '  TILT ' + Math.round(spec.angleMax) + '°');
 
   document.getElementById('hudBR').innerHTML =
     Math.round(spd) + ' km/h\n' +
@@ -1709,7 +1871,8 @@ function frameBody(now) {
   last = now;
 
   var gp = pollGamepad();
-  if (gp) readGamepad(gp);                    // also drives the menu's live stick bars
+  pumpDetect(gp);
+  if (gp && !detect) readGamepad(gp);         // also drives the menu's live stick bars
   if (game.running) {
     if (!gp) readKeyboard(dt);
     game.throttle = input.throttle;
@@ -1755,6 +1918,7 @@ function frameBody(now) {
 }
 
 function endRun() {
+  game.inFlight = false;
   game.best = Math.max(game.best, game.score);
   document.getElementById('sb1').textContent = 'Score ' + game.score + '   ·   best ' + game.best;
   document.getElementById('sb2').textContent = 'Gates ' + game.gatesDone + '   ·   windows ' + game.smashed;
@@ -1834,14 +1998,13 @@ function renderMenuBits(dt, now) {
   pv.pivot.rotation.x = Math.sin(now / 2200) * 0.12 + 0.18;
   drawPreview(now);
   // live stick bars, so you can prove the transmitter is talking
-  var ids = ['axT', 'axY', 'axP', 'axR'];
-  var vals = [ (-pad.axes[0] + 1) / 2 * 2 - 1, pad.axes[1], -pad.axes[2], pad.axes[3] ];
-  for (var i = 0; i < 4; i++) {
-    var el = document.getElementById(ids[i]);
-    var v = clamp(vals[i] || 0, -1, 1);
+  var thr = document.getElementById('axT');
+  thr.style.width = (mapThrottle(clamp(pad.ch.throttle, -1, 1)) * 100) + '%';
+  [['axY', pad.ch.yaw], ['axP', pad.ch.pitch], ['axR', pad.ch.roll]].forEach(function (p) {
+    var el = document.getElementById(p[0]), v = clamp(p[1] || 0, -1, 1);
     el.style.width = Math.abs(v) * 50 + '%';
     el.style.left = v >= 0 ? '50%' : (50 - Math.abs(v) * 50) + '%';
-  }
+  });
   var t = new Date();
   document.getElementById('clock').textContent =
     ((t.getHours() % 12) || 12) + ':' + (t.getMinutes() < 10 ? '0' : '') + t.getMinutes();
@@ -1859,10 +2022,59 @@ function refreshPadUI() {
   }
 }
 
+function renderBinds() {
+  CHANNELS.forEach(function (ch) {
+    var lab = document.getElementById('axn-' + ch);
+    lab.textContent = (detect && detect.ch === ch) ? 'move…' : ('ax ' + bind[ch].axis);
+    var btn = document.querySelector('[data-detect="' + ch + '"]');
+    btn.classList.toggle('armed', !!(detect && detect.ch === ch));
+    btn.textContent = (detect && detect.ch === ch) ? 'Waiting' : 'Detect';
+    document.querySelector('[data-inv="' + ch + '"]').classList.toggle('on', bind[ch].inv);
+  });
+  var zs = document.querySelectorAll('#thrZero .chip');
+  for (var i = 0; i < zs.length; i++) zs[i].classList.toggle('on', zs[i].dataset.z === tune.throttleZero);
+  document.getElementById('rDead').value = Math.round(tune.deadzone * 100);
+  document.getElementById('vDead').textContent = Math.round(tune.deadzone * 100) + '%';
+  document.getElementById('rExpo').value = Math.round(tune.expo * 100);
+  document.getElementById('vExpo').textContent = Math.round(tune.expo * 100) + '%';
+}
+
+function renderKeys() {
+  var html = '';
+  KEY_LABELS.forEach(function (p) {
+    var cap = keyCapture === p[0] ? 'press a key…' : (keyBind[p[0]] ? keyName(keyBind[p[0]]) : 'unbound');
+    html += '<div class="keyrow"><span>' + p[1] + '</span>' +
+            '<button class="mini keycap' + (keyCapture === p[0] ? ' armed' : '') +
+            '" data-key="' + p[0] + '">' + cap + '</button></div>';
+  });
+  var list = document.getElementById('keyList');
+  list.innerHTML = html;
+  var btns = list.querySelectorAll('[data-key]');
+  for (var i = 0; i < btns.length; i++) btns[i].onclick = function () {
+    keyCapture = this.dataset.key; renderKeys();
+  };
+}
+
+function renderRates() {
+  var d = DRONES[game.droneIdx];
+  document.getElementById('rateFor').textContent = '· ' + d.name.replace(/"/g, '');
+  [['rRoll', 'vRoll', d.rates.roll, '°/s'], ['rPitch', 'vPitch', d.rates.pitch, '°/s'],
+   ['rYaw', 'vYaw', d.rates.yaw, '°/s'], ['rAngle', 'vAngle', d.angleMax, '°']].forEach(function (p) {
+    document.getElementById(p[0]).value = p[2];
+    document.getElementById(p[1]).textContent = Math.round(p[2]) + p[3];
+  });
+}
+
 function syncChips() {
   var chips = document.querySelectorAll('#modeChips .chip');
   for (var i = 0; i < chips.length; i++)
     chips[i].classList.toggle('on', chips[i].dataset.mode === game.mode);
+}
+
+// Changing airframe can't be resumed into — it's a different aircraft.
+function pickDrone() {
+  if (game.inFlight) { game.inFlight = false; updateCTA(); }
+  renderDroneCard();
 }
 
 function renderDroneCard() {
@@ -1879,14 +2091,15 @@ function renderDroneCard() {
   for (var i = 0; i < DRONES.length; i++) dots += '<span class="' + (i === game.droneIdx ? 'on' : '') + '"></span>';
   document.getElementById('dDots').innerHTML = dots;
   previewDrone(game.droneIdx);
+  renderRates();
 }
 
 function wireMenu() {
   document.getElementById('prevDrone').onclick = function () {
-    game.droneIdx = (game.droneIdx + DRONES.length - 1) % DRONES.length; renderDroneCard();
+    game.droneIdx = (game.droneIdx + DRONES.length - 1) % DRONES.length; pickDrone();
   };
   document.getElementById('nextDrone').onclick = function () {
-    game.droneIdx = (game.droneIdx + 1) % DRONES.length; renderDroneCard();
+    game.droneIdx = (game.droneIdx + 1) % DRONES.length; pickDrone();
   };
   var chips = document.querySelectorAll('#modeChips .chip');
   for (var i = 0; i < chips.length; i++) chips[i].onclick = function () {
@@ -1904,9 +2117,56 @@ function wireMenu() {
   }
   sw('swCourse', 'course');
   sw('swShadow', 'shadows', function () { renderer.shadowMap.enabled = opts.shadows; forceMatUpdate(); });
-  sw('swInv', 'invertThrottle');
   sw('swGlass', 'glass');
-  document.getElementById('fly').onclick = startGame;
+
+  // controller / keyboard tabs
+  var tabs = document.querySelectorAll('#stickTabs .chip');
+  for (var t = 0; t < tabs.length; t++) tabs[t].onclick = function () {
+    for (var j = 0; j < tabs.length; j++) tabs[j].classList.toggle('on', tabs[j] === this);
+    document.getElementById('tabPad').style.display = this.dataset.tab === 'pad' ? 'block' : 'none';
+    document.getElementById('tabKey').style.display = this.dataset.tab === 'key' ? 'block' : 'none';
+  };
+
+  // per-channel detect + invert
+  CHANNELS.forEach(function (ch) {
+    document.querySelector('[data-detect="' + ch + '"]').onclick = function () { startDetect(ch); };
+    document.querySelector('[data-inv="' + ch + '"]').onclick = function () {
+      bind[ch].inv = !bind[ch].inv; renderBinds();
+    };
+  });
+
+  var zs = document.querySelectorAll('#thrZero .chip');
+  for (var z = 0; z < zs.length; z++) zs[z].onclick = function () {
+    tune.throttleZero = this.dataset.z;
+    renderBinds();
+  };
+
+  function slider(id, apply) {
+    var el = document.getElementById(id);
+    el.oninput = function () { apply(+el.value); };
+  }
+  slider('rDead', function (v) { tune.deadzone = v / 100; renderBinds(); });
+  slider('rExpo', function (v) { tune.expo = v / 100; renderBinds(); });
+  slider('rRoll', function (v) { DRONES[game.droneIdx].rates.roll = v; renderRates(); });
+  slider('rPitch', function (v) { DRONES[game.droneIdx].rates.pitch = v; renderRates(); });
+  slider('rYaw', function (v) { DRONES[game.droneIdx].rates.yaw = v; renderRates(); });
+  slider('rAngle', function (v) { DRONES[game.droneIdx].angleMax = v; renderRates(); });
+  document.getElementById('ratesReset').onclick = function () {
+    var d = DRONES[game.droneIdx];
+    d.rates.roll = d.stock.roll; d.rates.pitch = d.stock.pitch; d.rates.yaw = d.stock.yaw;
+    d.angleMax = d.stock.angleMax;
+    renderRates(); toast('Stock rates restored');
+  };
+
+  document.getElementById('fly').onclick = function () {
+    if (game.inFlight) resumeGame(); else startGame();
+  };
+  document.getElementById('newFlight').onclick = startGame;
+}
+
+function updateCTA() {
+  document.getElementById('fly').textContent = game.inFlight ? 'Resume flight' : 'Fly now';
+  document.getElementById('newFlight').style.display = game.inFlight ? 'block' : 'none';
 }
 
 function forceMatUpdate() {
@@ -1920,7 +2180,15 @@ function startGame() {
   document.getElementById('menu').classList.add('hide');
   document.getElementById('hud').classList.add('on');
   document.getElementById('scorebox').classList.remove('show');
-  document.getElementById('keyhelp').style.display = 'block';
+  var kh = document.getElementById('keyhelp');
+  kh.innerHTML =
+    keyName(keyBind.thrUp) + '/' + keyName(keyBind.thrDn) + ' throttle &nbsp;·&nbsp; ' +
+    keyName(keyBind.yawL) + '/' + keyName(keyBind.yawR) + ' yaw &nbsp;·&nbsp; ' +
+    keyName(keyBind.pitchF) + keyName(keyBind.pitchB) + keyName(keyBind.rollL) + keyName(keyBind.rollR) +
+    ' pitch + roll &nbsp;·&nbsp; ' + keyName(keyBind.mode) + ' flight mode<br>' +
+    keyName(keyBind.respawn) + ' respawn &nbsp;·&nbsp; ' + keyName(keyBind.camera) +
+    ' camera &nbsp;·&nbsp; [ ] camera tilt &nbsp;·&nbsp; H hide this &nbsp;·&nbsp; ESC pause';
+  kh.style.display = 'block';
   setTimeout(function () {
     var kh = document.getElementById('keyhelp'); if (kh) kh.style.display = 'none';
   }, 9000);
@@ -1941,15 +2209,36 @@ function startGame() {
   banner('YES', 'good luck out there', 1800);
 }
 
-function toMenu() {
+function pauseGame() {
+  if (!game.running) return;
   game.running = false;
+  game.inFlight = true;
+  showMenu();
+  toast('Paused — tune away');
+}
+
+function resumeGame() {
+  document.getElementById('menu').classList.add('hide');
+  document.getElementById('hud').classList.add('on');
+  game.running = true;
+  last = performance.now(); acc = 0;
+}
+
+function showMenu() {
   document.getElementById('menu').classList.remove('hide');
   document.getElementById('hud').classList.remove('on');
   document.getElementById('fx').style.opacity = 0;
   renderer.domElement.style.transform = '';
   renderer.domElement.style.filter = '';
   banner('', '', 1);
+  updateCTA();
   renderDroneCard();
+}
+
+function toMenu() {
+  game.running = false;
+  game.inFlight = false;
+  showMenu();
 }
 
 /* ------------------------------------------------------------- 12. resize */
@@ -1972,9 +2261,12 @@ function boot() {
   initPreview();
   wireMenu();
   spawnDrone(0);
+  renderBinds();
+  renderKeys();
   renderDroneCard();
   syncChips();
   refreshPadUI();
+  updateCTA();
   // park the camera on a nice establishing shot behind the menu
   camera.position.set(60, 40, 120);
   camera.lookAt(0, 30, 0);
