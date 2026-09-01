@@ -340,6 +340,12 @@
         <div class="row">Gate course timer <div class="sw on" id="swCourse"><i></i></div></div>
         <div class="row">Shadows <div class="sw on" id="swShadow"><i></i></div></div>
         <div class="row">Smash shop windows <div class="sw on" id="swGlass"><i></i></div></div>
+        <div class="row">Battery drain <div class="sw" id="swBatt"><i></i></div></div>
+        <div class="row">Respawn at next gate <div class="sw" id="swGateSpawn"><i></i></div></div>
+        <div class="raterow" style="margin-top:4px"><span>Gravity</span>
+          <input type="range" id="rGrav" min="98" max="260" step="2"><b id="vGrav"></b></div>
+        <div class="hint">Gravity is scaled up from Earth's 9.8 by default — at this size the real
+          figure feels like sinking through water. Hover throttle stays put wherever you set it.</div>
       </div>
 
       <button class="cta" id="fly">Fly now</button>
@@ -404,6 +410,13 @@ var rand = function (a, b) { return a + rng() * (b - a); };
 var randi = function (a, b) { return Math.floor(rand(a, b + 1)); };
 
 var TEAL = 0x00A3A0, TEAL_D = 0x00706E, YELLOW = 0xFFD200, WHITE = 0xF4FBFA, DARK = 0x102524;
+
+/* Gravity. Earth is 9.81, but at this scale that reads as floaty — a 100m
+   building takes an age to fall past. Thrust is computed against this same
+   number (see flightControl), so hover throttle stays at 1/TWR no matter what
+   you set it to: turning gravity up makes the drone fall harder AND climb
+   harder, rather than just making it underpowered. Adjustable in the menu. */
+var G = 15.0;
 
 // Smooth an input toward a target at a fixed rate (used for keyboard sticks).
 function approach(cur, target, rate, dt) {
@@ -692,7 +705,7 @@ var DRONES = [
     build: buildYesQuad, mass: 0.72, twr: 5.0, half: [0.16, 0.055, 0.16],
     rates: { roll: 880, pitch: 840, yaw: 500 }, angleMax: 40, angleRate: 0.5,
     pid: { p: 26, i: 8, d: 0.42 }, tau: 0.030,
-    drag: { x: 0.030, y: 0.040, z: 0.013 }, camTilt: 25,
+    drag: { x: 0.030, y: 0.028, z: 0.013 }, camTilt: 25,
     stats: { Speed: 78, Agility: 94, Payload: 22, Vibe: 88 }
   },
   {
@@ -700,7 +713,7 @@ var DRONES = [
     build: build5GSpeeder, mass: 0.60, twr: 6.2, half: [0.26, 0.045, 0.19],
     rates: { roll: 720, pitch: 560, yaw: 340 }, angleMax: 46, angleRate: 0.55,
     pid: { p: 22, i: 6, d: 0.40 }, tau: 0.040,
-    drag: { x: 0.055, y: 0.062, z: 0.0058 }, camTilt: 18,
+    drag: { x: 0.055, y: 0.042, z: 0.0058 }, camTilt: 18,
     stats: { Speed: 97, Agility: 66, Payload: 14, Vibe: 74 }
   },
   {
@@ -708,7 +721,7 @@ var DRONES = [
     build: buildCEO, mass: 2.45, twr: 2.35, half: [0.26, 0.075, 0.33],
     rates: { roll: 340, pitch: 320, yaw: 210 }, angleMax: 30, angleRate: 0.6,
     pid: { p: 15, i: 5, d: 0.55 }, tau: 0.075,
-    drag: { x: 0.075, y: 0.095, z: 0.052 }, camTilt: 15,
+    drag: { x: 0.075, y: 0.068, z: 0.052 }, camTilt: 15,
     stats: { Speed: 44, Agility: 30, Payload: 99, Vibe: 61 }
   }
 ];
@@ -772,7 +785,7 @@ function initRenderer() {
 
 function initPhysics() {
   world = new CANNON.World();
-  world.gravity.set(0, -9.81, 0);
+  world.gravity.set(0, -G, 0);
   world.broadphase = new CANNON.SAPBroadphase(world);
   world.solver.iterations = 8;
   world.defaultContactMaterial.friction = 0.35;
@@ -1050,11 +1063,17 @@ function buildCity() {
     g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText('H', w / 2, h * .52);
   });
-  var pad = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 0.12, 32),
+  var pad = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, PAD_TOP, 32),
     new THREE.MeshStandardMaterial({ map: padTex, roughness: .8 }));
-  pad.position.set(SPAWN.x, 0.06, SPAWN.z);
+  pad.position.set(SPAWN.x, PAD_TOP / 2, SPAWN.z);
   pad.receiveShadow = true;
   scene.add(pad);
+  // give it a collision surface so the drone rests on the pad rather than in it
+  var padBody = new CANNON.Body({ mass: 0, material: groundMat,
+    shape: new CANNON.Box(new CANNON.Vec3(7, PAD_TOP / 2, 7)) });
+  padBody.position.set(SPAWN.x, PAD_TOP / 2, SPAWN.z);
+  padBody.gameTag = 'ground';
+  world.addBody(padBody);
 
   buildBlimp(280, 150, 120);
   buildBlimp(-320, 190, -220);
@@ -1124,7 +1143,14 @@ function stepParticles(dt) {
 }
 
 /* ------------------------------------------------------------- 5. the drone */
-var SPAWN = new THREE.Vector3(0, 1.2, 40);
+var SPAWN = new THREE.Vector3(0, 0, 40);      // the launch pad
+var PAD_TOP = 0.12;
+
+/* Sitting on the pad, not dropped onto it — the exact height depends on which
+   airframe is loaded, so work it out rather than hard-coding a number. */
+function spawnPoint() {
+  return new THREE.Vector3(SPAWN.x, PAD_TOP + (spec ? spec.half[1] : 0.06) + 0.01, SPAWN.z);
+}
 
 function spawnDrone(index) {
   spec = DRONES[index];
@@ -1145,7 +1171,7 @@ function spawnDrone(index) {
   droneBody.allowSleep = false;
   droneBody.addEventListener('collide', onDroneCollide);
   world.addBody(droneBody);
-  resetDrone(SPAWN);
+  resetDrone(spawnPoint());
   ctl.reset();
   game.camTilt = spec.camTilt;
 }
@@ -1254,9 +1280,9 @@ function flightControl(dt) {
   droneBody.torque.vadd(_v3, droneBody.torque);
 
   // ---- thrust along the drone's own up axis ------------------------------
-  var hover = spec.mass * 9.81;
+  var hover = spec.mass * G;
   var thrust = game.throttle * hover * spec.twr;
-  if (game.battery.v < 13.6) thrust *= clamp((game.battery.v - 12.6) / 1.0, 0.25, 1); // sag
+  if (opts.battery && game.battery.v < 13.6) thrust *= clamp((game.battery.v - 12.6) / 1.0, 0.25, 1);
   _v3.set(0, thrust, 0);
   droneBody.quaternion.vmult(_v3, _v3);
   droneBody.force.vadd(_v3, droneBody.force);
@@ -1292,26 +1318,13 @@ function flightControl(dt) {
     if (p.userData.disc) p.userData.disc.visible = game.throttle > 0.12;
   });
 
-  // ---- thruster trail: teal plumes off each motor -------------------------
-  if (game.throttle > 0.15) {
-    var wp = new THREE.Vector3();
-    droneMesh.userData.props.forEach(function (p) {
-      if (rng() > 0.45) return;
-      p.getWorldPosition(wp);
-      emit(wp.x, wp.y - 0.03, wp.z,
-        droneBody.velocity.x * .25 + rand(-.6, .6),
-        droneBody.velocity.y * .25 - rand(1.2, 3.0),
-        droneBody.velocity.z * .25 + rand(-.6, .6),
-        0.05, 0.85, 0.83, rand(0.35, 0.75), rand(0.10, 0.22) * (1 + game.throttle));
-    });
-  }
 }
 
 /* ------------------------------------------------------- 7. input handling */
 var input = { throttle: 0, yaw: 0, pitch: 0, roll: 0 };
 var keys = Object.create(null);
 var pad = { index: null, id: '', connected: false, ch: { throttle: -1, yaw: 0, pitch: 0, roll: 0 } };
-var opts = { course: true, shadows: true, glass: true };
+var opts = { course: true, shadows: true, glass: true, battery: false, gateRespawn: false };
 
 /* Channel -> gamepad axis. Defaults are mode 2 on a standard pad; every one of
    them is re-bindable because transmitters in USB joystick mode order their
@@ -1558,16 +1571,19 @@ function crash(impact) {
 }
 
 function respawn(manual) {
-  var p = SPAWN.clone();
-  if (opts.course && gates[game.nextGate]) {           // restart at the gate you were chasing
+  var p = spawnPoint();
+  // Optional: pick up where you left off instead, hovering behind the next gate.
+  if (opts.gateRespawn && opts.course && gates[game.nextGate]) {
     var g = gates[game.nextGate];
     p.set(g.pos.x, Math.max(4, g.pos.y), g.pos.z);
     p.addScaledVector(g.normal, -14);
   }
   resetDrone(p);
   game.battery.v = Math.max(14.4, game.battery.v);
+  game.signal = 100;
+  game.interference = 0;
   banner('', '', 1);
-  if (manual) toast('Respawned');
+  toast(opts.gateRespawn && opts.course ? 'Back at gate ' + (game.nextGate + 1) : 'Back on the pad');
 }
 
 /* ---- gates -------------------------------------------------------------- */
@@ -1648,6 +1664,13 @@ function applyGlitch() {
 
 /* ---- battery ------------------------------------------------------------- */
 function updateBattery(dt) {
+  if (!opts.battery) {
+    // Infinite pack: keep the voltage sag under throttle, because a needle that
+    // never moves looks broken, but never actually deplete it.
+    game.battery.used = 0;
+    game.battery.v = 16.8 - game.throttle * 0.9;
+    return;
+  }
   var draw = 4 + Math.pow(game.throttle, 1.6) * 92;      // amps-ish
   game.battery.used += draw * dt / 3.6;                  // mAh
   var pct = clamp(1 - game.battery.used / game.battery.mah, 0, 1);
@@ -1796,7 +1819,7 @@ function drawHUD() {
   document.getElementById('hudTL').innerHTML =
     '<b>' + game.mode + '</b>' + (game.mode === 'ACRO' ? '  (no help)' : '') + '\n' +
     '<span class="' + vCls + '">' + v.toFixed(2) + 'V</span>  ' +
-    Math.round(game.battery.mah - game.battery.used) + 'mAh\n' +
+    (opts.battery ? Math.round(game.battery.mah - game.battery.used) + 'mAh' : '\u221E') + '\n' +
     'ARMED  ' + spec.name.replace(/"/g, '');
 
   var sig = Math.round(game.signal);
@@ -2055,6 +2078,11 @@ function renderKeys() {
   };
 }
 
+function renderPhysics() {
+  document.getElementById('rGrav').value = Math.round(G * 10);
+  document.getElementById('vGrav').textContent = G.toFixed(1) + ' m/s²';
+}
+
 function renderRates() {
   var d = DRONES[game.droneIdx];
   document.getElementById('rateFor').textContent = '· ' + d.name.replace(/"/g, '');
@@ -2118,6 +2146,11 @@ function wireMenu() {
   sw('swCourse', 'course');
   sw('swShadow', 'shadows', function () { renderer.shadowMap.enabled = opts.shadows; forceMatUpdate(); });
   sw('swGlass', 'glass');
+  sw('swGateSpawn', 'gateRespawn');
+  sw('swBatt', 'battery', function () {
+    game.battery.used = 0;
+    toast(opts.battery ? 'Battery drain on — 1300mAh' : 'Battery drain off');
+  });
 
   // controller / keyboard tabs
   var tabs = document.querySelectorAll('#stickTabs .chip');
@@ -2145,6 +2178,7 @@ function wireMenu() {
     var el = document.getElementById(id);
     el.oninput = function () { apply(+el.value); };
   }
+  slider('rGrav', function (v) { G = v / 10; world.gravity.set(0, -G, 0); renderPhysics(); });
   slider('rDead', function (v) { tune.deadzone = v / 100; renderBinds(); });
   slider('rExpo', function (v) { tune.expo = v / 100; renderBinds(); });
   slider('rRoll', function (v) { DRONES[game.droneIdx].rates.roll = v; renderRates(); });
@@ -2263,6 +2297,7 @@ function boot() {
   spawnDrone(0);
   renderBinds();
   renderKeys();
+  renderPhysics();
   renderDroneCard();
   syncChips();
   refreshPadUI();
