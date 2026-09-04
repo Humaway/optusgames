@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optus of Duty</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #333333; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; }
+        
+        /* UI Overlay */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; }
+        
+        /* Crosshair */
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background-color: #00A3A6; border-radius: 50%; transform: translate(-50%, -50%); }
+        
+        /* Health Bar */
+        #health-container { position: absolute; bottom: 30px; left: 30px; width: 300px; height: 25px; background: rgba(51, 51, 51, 0.8); border: 2px solid #FFFFFF; border-radius: 4px; }
+        #health-bar { width: 100%; height: 100%; background-color: #FFD600; transition: width 0.2s ease-out; }
+        
+        /* Weapon Info */
+        #weapon-info { position: absolute; bottom: 30px; right: 30px; text-align: right; color: #FFFFFF; text-shadow: 1px 1px 2px #000; }
+        #weapon-name { font-size: 24px; font-weight: bold; color: #FFD600; }
+        #ammo-count { font-size: 18px; color: #00A3A6; }
+        
+        /* Killfeed */
+        #killfeed { position: absolute; top: 20px; right: 20px; width: 300px; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+        .kill-msg { background: rgba(0, 163, 166, 0.8); color: white; padding: 5px 10px; border-radius: 4px; font-size: 14px; animation: fadeOut 4s forwards; }
+        
+        /* Map Vote / Start Screen */
+        #start-screen { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(51,51,51,0.9); display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: auto; z-index: 10; color: white; }
+        h1 { color: #FFD600; font-size: 48px; margin-bottom: 10px; }
+        p { color: #00A3A6; margin-bottom: 30px; }
+        .btn { background: #00A3A6; color: white; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; margin: 5px; transition: 0.2s; }
+        .btn:hover { background: #FFD600; color: #333; }
+        .map-select { margin-bottom: 20px; display: flex; gap: 15px; }
+        
+        @keyframes fadeOut { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+    </style>
+</head>
+<body>
+
+    <div id="game-container"></div>
+
+    <div id="ui-layer">
+        <div id="crosshair"></div>
+        <div id="health-container"><div id="health-bar"></div></div>
+        <div id="weapon-info">
+            <div id="weapon-name">iPhone (AR)</div>
+            <div id="ammo-count">30 / 30</div>
+        </div>
+        <div id="killfeed"></div>
+    </div>
+
+    <div id="start-screen">
+        <h1>Optus of Duty</h1>
+        <p>Click to deploy. WASD to move. Click to shoot. 1-5 to swap weapons.</p>
+        <div class="map-select">
+            <button class="btn" id="btn-map1">Load "The Flagship"</button>
+            <button class="btn" id="btn-map2">Load "Yes-Town"</button>
+        </div>
+        <div style="font-size: 12px; color: #aaa; margin-top: 20px;">Ensure Firebase config is set in the source code to enable multiplayer.</div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+        import { PointerLockControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/PointerLockControls.js';
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, update, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // ==========================================
+        // 1. FIREBASE CONFIGURATION
+        // ==========================================
+        const firebaseConfig = {
+            // REPLACE WITH YOUR FIREBASE CONFIG
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            databaseURL: "YOUR_DATABASE_URL",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        
+        let db, playerRef;
+        const playerId = "Ollie_" + Math.floor(Math.random() * 1000);
+        let multiplayerEnabled = false;
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getDatabase(app);
+            multiplayerEnabled = true;
+        } catch (e) {
+            console.warn("Firebase not configured. Running offline mode.");
+        }
+
+        // ==========================================
+        // 2. BRAND COLORS & WEAPON DEFS
+        // ==========================================
+        const COLORS = { yellow: 0xFFD600, teal: 0x00A3A6, white: 0xFFFFFF, charcoal: 0x333333, gray: 0x888888 };
+        
+        const WEAPONS = [
+            { id: 1, name: "iPhone (AR)", fireRate: 150, damage: 20, speedMult: 1.0, color: 0xeeeeee, scale: [0.1, 0.2, 0.4], spread: 0.02, bullets: 1 },
+            { id: 2, name: "Samsung Galaxy (SMG)", fireRate: 70, damage: 10, speedMult: 1.1, color: 0x111111, scale: [0.08, 0.15, 0.3], spread: 0.06, bullets: 1 },
+            { id: 3, name: "Google Pixel 9 (Shotgun)", fireRate: 800, damage: 15, speedMult: 0.9, color: 0x7a8b79, scale: [0.12, 0.1, 0.5], spread: 0.15, bullets: 5 },
+            { id: 4, name: "Tablet (LMG)", fireRate: 200, damage: 35, speedMult: 0.6, color: 0x222222, scale: [0.2, 0.3, 0.6], spread: 0.04, bullets: 1 },
+            { id: 5, name: "Smartwatch (Pistol)", fireRate: 350, damage: 25, speedMult: 1.3, color: 0xdddddd, scale: [0.05, 0.05, 0.1], spread: 0.01, bullets: 1 }
+        ];
+
+        // ==========================================
+        // 3. THREE.JS SCENE SETUP
+        // ==========================================
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // Sky blue
+        scene.fog = new THREE.Fog(0x87CEEB, 0, 100);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.getElementById('game-container').appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(50, 100, 50);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // ==========================================
+        // 4. MAP GENERATION
+        // ==========================================
+        let mapObjects = [];
+        const floorMaterial = new THREE.MeshLambertMaterial({ color: COLORS.charcoal });
+
+        function clearMap() {
+            mapObjects.forEach(obj => scene.remove(obj));
+            mapObjects = [];
+            projectiles.forEach(p => scene.remove(p.mesh));
+            projectiles = [];
+        }
+
+        function createBox(w, h, d, color, x, y, z) {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mat = new THREE.MeshLambertMaterial({ color: color });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+            mapObjects.push(mesh);
+            return mesh;
+        }
+
+        function buildMap1() { // The Flagship
+            clearMap();
+            scene.background = new THREE.Color(0x222222);
+            scene.fog = new THREE.Fog(0x222222, 0, 60);
+            
+            // Floor & Walls
+            createBox(100, 1, 100, COLORS.charcoal, 0, -0.5, 0);
+            createBox(100, 10, 1, COLORS.yellow, 0, 5, -50);
+            createBox(100, 10, 1, COLORS.yellow, 0, 5, 50);
+            createBox(1, 10, 100, COLORS.teal, -50, 5, 0);
+            createBox(1, 10, 100, COLORS.teal, 50, 5, 0);
+
+            // Display Tables
+            for(let i=-20; i<=20; i+=20) {
+                for(let j=-20; j<=20; j+=20) {
+                    if(i!==0 || j!==0) createBox(6, 2, 4, COLORS.teal, i, 1, j);
+                }
+            }
+            // Checkout counter
+            createBox(20, 3, 5, COLORS.yellow, 0, 1.5, 0);
+            
+            resetPlayerPosition();
+        }
+
+        function buildMap2() { // Yes-Town
+            clearMap();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.Fog(0x87CEEB, 0, 100);
+
+            // Grass Floor
+            createBox(100, 1, 100, 0x4CAF50, 0, -0.5, 0);
+            // Street
+            createBox(20, 1.1, 100, COLORS.gray, 0, -0.45, 0);
+
+            // Yellow House
+            createBox(20, 15, 20, COLORS.yellow, -35, 7.5, 0);
+            // Teal House
+            createBox(20, 15, 20, COLORS.teal, 35, 7.5, 0);
+
+            // Vans (Cover)
+            createBox(4, 5, 10, COLORS.white, -5, 2.5, 10);
+            createBox(4, 5, 10, COLORS.white, 5, 2.5, -10);
+
+            // 5G Towers
+            const towerGeo = new THREE.CylinderGeometry(1, 2, 30, 8);
+            const towerMat = new THREE.MeshLambertMaterial({color: COLORS.charcoal});
+            const t1 = new THREE.Mesh(towerGeo, towerMat); t1.position.set(-35, 15, -30); scene.add(t1); mapObjects.push(t1);
+            const t2 = new THREE.Mesh(towerGeo, towerMat); t2.position.set(35, 15, 30); scene.add(t2); mapObjects.push(t2);
+
+            resetPlayerPosition();
+        }
+
+        // ==========================================
+        // 5. PLAYER & CONTROLS
+        // ==========================================
+        const controls = new PointerLockControls(camera, document.body);
+        let player = { health: 100, weaponIdx: 0, isShooting: false, velocity: new THREE.Vector3(), direction: new THREE.Vector3() };
+        
+        const moveState = { forward: false, backward: false, left: false, right: false, jump: false };
+        let canJump = false;
+        let lastShootTime = 0;
+
+        document.getElementById('start-screen').addEventListener('click', () => {
+            controls.lock();
+        });
+
+        controls.addEventListener('lock', () => { document.getElementById('start-screen').style.display = 'none'; });
+        controls.addEventListener('unlock', () => { document.getElementById('start-screen').style.display = 'flex'; });
+
+        document.addEventListener('keydown', (e) => {
+            switch(e.code) {
+                case 'KeyW': moveState.forward = true; break;
+                case 'KeyS': moveState.backward = true; break;
+                case 'KeyA': moveState.left = true; break;
+                case 'KeyD': moveState.right = true; break;
+                case 'Space': if(canJump) { player.velocity.y += 10; canJump = false; } break;
+                case 'Digit1': switchWeapon(0); break;
+                case 'Digit2': switchWeapon(1); break;
+                case 'Digit3': switchWeapon(2); break;
+                case 'Digit4': switchWeapon(3); break;
+                case 'Digit5': switchWeapon(4); break;
+            }
+        });
+        document.addEventListener('keyup', (e) => {
+            switch(e.code) {
+                case 'KeyW': moveState.forward = false; break;
+                case 'KeyS': moveState.backward = false; break;
+                case 'KeyA': moveState.left = false; break;
+                case 'KeyD': moveState.right = false; break;
+            }
+        });
+        document.addEventListener('mousedown', (e) => { if(e.button === 0 && controls.isLocked) player.isShooting = true; });
+        document.addEventListener('mouseup', (e) => { if(e.button === 0) player.isShooting = false; });
+
+        document.getElementById('btn-map1').addEventListener('click', (e) => { e.stopPropagation(); buildMap1(); controls.lock(); });
+        document.getElementById('btn-map2').addEventListener('click', (e) => { e.stopPropagation(); buildMap2(); controls.lock(); });
+
+        function resetPlayerPosition() {
+            camera.position.set((Math.random() - 0.5) * 40, 2, (Math.random() - 0.5) * 40);
+            player.health = 100;
+            updateHUD();
+        }
+
+        // Viewmodel (Weapon) Setup
+        const viewWeaponGeo = new THREE.BoxGeometry(1, 1, 1);
+        const viewWeaponMat = new THREE.MeshLambertMaterial({color: WEAPONS[0].color});
+        const viewWeapon = new THREE.Mesh(viewWeaponGeo, viewWeaponMat);
+        viewWeapon.position.set(0.3, -0.3, -0.5); // Bottom right
+        camera.add(viewWeapon);
+        scene.add(camera); // Add camera to scene to render attached objects
+
+        function switchWeapon(idx) {
+            player.weaponIdx = idx;
+            const w = WEAPONS[idx];
+            viewWeapon.scale.set(w.scale[0], w.scale[1], w.scale[2]);
+            viewWeapon.material.color.setHex(w.color);
+            updateHUD();
+        }
+        switchWeapon(0);
+
+        function updateHUD() {
+            document.getElementById('health-bar').style.width = player.health + '%';
+            document.getElementById('weapon-name').innerText = WEAPONS[player.weaponIdx].name;
+            document.getElementById('ammo-count').innerText = "∞"; // Infinite ammo for simplicity
+        }
+
+        function pushKillfeed(msg) {
+            const kf = document.getElementById('killfeed');
+            const el = document.createElement('div');
+            el.className = 'kill-msg';
+            el.innerText = msg;
+            kf.appendChild(el);
+            setTimeout(() => el.remove(), 4000);
+        }
+
+        // ==========================================
+        // 6. COMBAT & PROJECTILES
+        // ==========================================
+        let projectiles = [];
+        const projGeo = new THREE.SphereGeometry(0.1, 8, 8);
+        const projMat = new THREE.MeshBasicMaterial({color: COLORS.yellow});
+
+        function shoot() {
+            const time = Date.now();
+            const w = WEAPONS[player.weaponIdx];
+            if(time - lastShootTime < w.fireRate) return;
+            lastShootTime = time;
+
+            // Weapon Recoil Animation
+            viewWeapon.position.z = -0.4;
+            setTimeout(() => { viewWeapon.position.z = -0.5; }, 50);
+
+            for(let i=0; i<w.bullets; i++) {
+                const p = new THREE.Mesh(projGeo, projMat);
+                p.position.copy(camera.position);
+                
+                const dir = new THREE.Vector3(0, 0, -1);
+                dir.applyQuaternion(camera.quaternion);
+                
+                // Add spread
+                dir.x += (Math.random() - 0.5) * w.spread;
+                dir.y += (Math.random() - 0.5) * w.spread;
+                dir.z += (Math.random() - 0.5) * w.spread;
+                dir.normalize();
+
+                projectiles.push({ mesh: p, dir: dir, life: 100, owner: playerId, dmg: w.damage });
+                scene.add(p);
+            }
+        }
+
+        // ==========================================
+        // 7. MULTIPLAYER (OLLIE) NETWORK LOGIC
+        // ==========================================
+        let enemies = {};
+
+        function createOllieModel() {
+            const group = new THREE.Group();
+            // Body (Teal Cylinder)
+            const bodyGeo = new THREE.CylinderGeometry(0.5, 0.5, 1.4, 16);
+            const bodyMat = new THREE.MeshLambertMaterial({color: COLORS.teal});
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.7;
+            group.add(body);
+            // Head (Yellow Sphere)
+            const headGeo = new THREE.SphereGeometry(0.6, 16, 16);
+            const headMat = new THREE.MeshLambertMaterial({color: COLORS.yellow});
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 1.8;
+            group.add(head);
+            // Eyes
+            const eyeGeo = new THREE.SphereGeometry(0.15, 8, 8);
+            const eyeMat = new THREE.MeshBasicMaterial({color: COLORS.white});
+            const eyeL = new THREE.Mesh(eyeGeo, eyeMat); eyeL.position.set(-0.25, 2.0, -0.5); group.add(eyeL);
+            const eyeR = new THREE.Mesh(eyeGeo, eyeMat); eyeR.position.set(0.25, 2.0, -0.5); group.add(eyeR);
+            return group;
+        }
+
+        if(multiplayerEnabled) {
+            playerRef = ref(db, 'players/' + playerId);
+            onDisconnect(playerRef).remove();
+
+            // Listen for other players
+            onValue(ref(db, 'players'), (snapshot) => {
+                const data = snapshot.val() || {};
+                
+                // Add/Update Enemies
+                for(let id in data) {
+                    if(id === playerId) continue;
+                    
+                    if(!enemies[id]) {
+                        enemies[id] = { 
+                            mesh: createOllieModel(), 
+                            targetPos: new THREE.Vector3(data[id].x, data[id].y, data[id].z),
+                            targetRot: data[id].rY,
+                            health: data[id].health,
+                            bobTime: 0
+                        };
+                        scene.add(enemies[id].mesh);
+                        pushKillfeed(`${id} joined.`);
+                    } else {
+                        enemies[id].targetPos.set(data[id].x, data[id].y, data[id].z);
+                        enemies[id].targetRot = data[id].rY;
+                        
+                        // Handle hit logic synced via DB
+                        if(data[id].health < enemies[id].health) {
+                            // Flashing effect
+                            enemies[id].mesh.children[0].material.color.setHex(COLORS.white);
+                            setTimeout(() => { if(enemies[id]) enemies[id].mesh.children[0].material.color.setHex(COLORS.teal); }, 100);
+                        }
+                        enemies[id].health = data[id].health;
+                    }
+                }
+
+                // Remove disconnected
+                for(let id in enemies) {
+                    if(!data[id]) {
+                        scene.remove(enemies[id].mesh);
+                        delete enemies[id];
+                        pushKillfeed(`${id} disconnected.`);
+                    }
+                }
+            });
+        }
+
+        let networkTick = 0;
+
+        // ==========================================
+        // 8. GAME LOOP
+        // ==========================================
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = Math.min(clock.getDelta(), 0.1);
+
+            // Controls & Physics
+            if (controls.isLocked) {
+                const speed = 40.0 * WEAPONS[player.weaponIdx].speedMult;
+                
+                player.velocity.x -= player.velocity.x * 10.0 * delta;
+                player.velocity.z -= player.velocity.z * 10.0 * delta;
+                player.velocity.y -= 30.0 * delta; // Gravity
+
+                player.direction.z = Number(moveState.forward) - Number(moveState.backward);
+                player.direction.x = Number(moveState.right) - Number(moveState.left);
+                player.direction.normalize();
+
+                if (moveState.forward || moveState.backward) player.velocity.z -= player.direction.z * speed * delta;
+                if (moveState.left || moveState.right) player.velocity.x -= player.direction.x * speed * delta;
+
+                controls.moveRight(-player.velocity.x * delta);
+                controls.moveForward(-player.velocity.z * delta);
+                camera.position.y += player.velocity.y * delta;
+
+                // Basic Floor Collision
+                if (camera.position.y < 2) {
+                    player.velocity.y = 0;
+                    camera.position.y = 2;
+                    canJump = true;
+                }
+
+                // Map bounds restriction (simple)
+                camera.position.x = Math.max(-48, Math.min(48, camera.position.x));
+                camera.position.z = Math.max(-48, Math.min(48, camera.position.z));
+
+                if(player.isShooting) shoot();
+                
+                // Network Sync Throttle (~20 ticks/sec)
+                networkTick += delta;
+                if(multiplayerEnabled && networkTick > 0.05) {
+                    set(playerRef, {
+                        x: camera.position.x, y: camera.position.y - 2, z: camera.position.z, // Send floor pos
+                        rY: camera.rotation.y,
+                        health: player.health
+                    });
+                    networkTick = 0;
+                }
+            }
+
+            // Projectile Logic & Hit Detection
+            for(let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+                p.mesh.position.addScaledVector(p.dir, 50 * delta);
+                p.life--;
+
+                let hit = false;
+                
+                // Check enemies
+                for(let id in enemies) {
+                    const enemy = enemies[id];
+                    // Simple radial hit detection (distance to Ollie center)
+                    const center = enemy.mesh.position.clone().setY(enemy.mesh.position.y + 1);
+                    if(p.mesh.position.distanceTo(center) < 1.0) {
+                        hit = true;
+                        if(multiplayerEnabled && p.owner === playerId) {
+                            const newHealth = Math.max(0, enemy.health - p.dmg);
+                            update(ref(db, 'players/' + id), { health: newHealth });
+                            if(newHealth === 0) pushKillfeed(`You eliminated ${id}`);
+                        }
+                        break;
+                    }
+                }
+
+                if(p.life <= 0 || hit) {
+                    scene.remove(p.mesh);
+                    projectiles.splice(i, 1);
+                }
+            }
+
+            // Interpolate Enemies (Lerp) & Procedural Animation
+            for(let id in enemies) {
+                const e = enemies[id];
+                e.mesh.position.lerp(e.targetPos, 10 * delta);
+                
+                // Smooth rotation Y
+                const q1 = e.mesh.quaternion.clone();
+                const q2 = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, e.targetRot, 0));
+                e.mesh.quaternion.slerpQuaternions(q1, q2, 10 * delta);
+
+                // Procedural Bobbing if moving
+                if(e.mesh.position.distanceTo(e.targetPos) > 0.05) {
+                    e.bobTime += delta * 15;
+                    e.mesh.position.y += Math.sin(e.bobTime) * 0.05;
+                }
+            }
+
+            // Player Death Logic
+            if(player.health <= 0) {
+                pushKillfeed(`You were eliminated!`);
+                resetPlayerPosition();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Initialize First Map & Start Loop
+        buildMap1();
+        animate();
+    </script>
+</body>
+</html>
