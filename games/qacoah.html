@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0B2027">
+<title>Optus QA Coach — Redcliffe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --teal:#00A3AD; --teal-dk:#00767D; --teal-lt:#5BE1EA;
+  --yellow:#F5E700; --gold:#FFC42E;
+  --slate:#0B2027; --slate-2:#12333C; --slate-3:#1C4954;
+  --mint:#2FE3A4; --red:#FF5B6E;
+  --ink:#05161B; --paper:#FFFFFF;
+  --r-lg:22px; --r-md:16px; --r-sm:11px;
+  --pad:clamp(14px,4vw,22px);
+  --ff:"Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:var(--ff); color:#EAF6F8; background:var(--slate);
+  background-image:radial-gradient(1100px 640px at 50% -14%, #1A4A56 0%, #0E2B33 45%, #0B2027 100%);
+  background-attachment:fixed;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  overscroll-behavior:none; touch-action:manipulation;
+}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+:focus-visible{outline:3px solid var(--yellow); outline-offset:3px; border-radius:8px}
+
+/* ---------- shell ---------- */
+#shake{min-height:100dvh}
+.app{
+  width:100%; max-width:600px; margin:0 auto; min-height:100dvh;
+  display:flex; flex-direction:column;
+  padding:calc(env(safe-area-inset-top) + 12px) var(--pad) calc(env(safe-area-inset-bottom) + 16px);
+}
+.screen{display:none; flex:1; flex-direction:column}
+.screen.is-on{display:flex; animation:screenIn .38s cubic-bezier(.2,.9,.25,1) both}
+@keyframes screenIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+
+/* ---------- start ---------- */
+.hero{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:6px; padding:8px 0 18px}
+.brandline{display:flex;align-items:center;gap:9px;font-weight:700;font-size:13px;letter-spacing:.02em;color:#8FC3CB}
+.brandline i{width:7px;height:7px;border-radius:50%;background:var(--yellow);box-shadow:0 0 12px var(--yellow);font-style:normal}
+h1{font-size:clamp(34px,10.5vw,56px); font-weight:900; line-height:.94; letter-spacing:-.035em; margin:10px 0 2px}
+h1 span{display:block; color:var(--yellow)}
+.sub{font-size:clamp(14px,3.7vw,16px); color:#A9CFD6; max-width:34ch; line-height:1.5; margin-top:10px}
+.setup{display:flex;flex-direction:column;gap:10px;margin-top:22px;width:100%}
+.seg{display:flex;gap:6px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.09);padding:5px;border-radius:var(--r-md)}
+.seg button{flex:1;padding:11px 8px;border-radius:11px;font-weight:700;font-size:14px;color:#9FC7CF;transition:.2s}
+.seg button small{display:block;font-weight:600;font-size:11px;opacity:.7;margin-top:1px}
+.seg button[aria-pressed="true"]{background:var(--teal);color:#032227;box-shadow:0 6px 18px -8px var(--teal)}
+.seg button[aria-pressed="true"] small{opacity:.75}
+.toggles{display:flex;gap:10px}
+.toggles .seg{flex:1}
+.cta{
+  margin-top:16px; width:100%; padding:19px; border-radius:var(--r-lg); font-weight:900; font-size:19px; letter-spacing:-.01em;
+  color:#05202a; background:linear-gradient(180deg,var(--yellow),var(--gold));
+  box-shadow:0 14px 32px -14px rgba(245,231,0,.85), inset 0 -3px 0 rgba(0,0,0,.14);
+  transition:transform .14s cubic-bezier(.2,.9,.25,1), box-shadow .2s;
+}
+.cta:active{transform:translateY(3px) scale(.985); box-shadow:0 6px 16px -10px rgba(245,231,0,.8), inset 0 -1px 0 rgba(0,0,0,.14)}
+.foot{margin-top:14px;font-size:11.5px;line-height:1.55;color:#6E9BA4;text-align:center}
+.best{margin-top:14px;font-size:13px;font-weight:700;color:#9FC7CF;min-height:18px}
+.best b{color:var(--yellow)}
+
+/* ---------- ollie ---------- */
+.ollie{width:100%;height:100%;display:block;overflow:visible}
+.ollie-wrap{width:min(46vw,168px);aspect-ratio:.86;position:relative;filter:drop-shadow(0 18px 26px rgba(0,0,0,.42))}
+.ollie-wrap.idle{animation:bob 3.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-9px) rotate(1.5deg)}}
+.ollie-body{animation:squish 3.4s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 92%}
+@keyframes squish{0%,100%{transform:scale(1,1)}50%{transform:scale(.985,1.02)}}
+.ollie-eye{transform-box:fill-box;transform-origin:center;animation:blink 5.2s infinite}
+@keyframes blink{0%,95%,100%{transform:scaleY(1)}97.5%{transform:scaleY(.08)}}
+.ollie-head{transform-box:fill-box;transform-origin:50% 78%}
+.is-sad .ollie-head{animation:headshake 1.9s cubic-bezier(.4,0,.3,1) both}
+.is-sad .ollie-eye{animation:none;transform:scaleY(.34) translateY(3px)}
+.is-sad .ollie-wrap{animation:none}
+@keyframes headshake{
+  0%{transform:rotate(0)}
+  8%{transform:rotate(-13deg)} 22%{transform:rotate(12deg)}
+  36%{transform:rotate(-11deg)} 50%{transform:rotate(10deg)}
+  64%{transform:rotate(-8deg)} 78%{transform:rotate(6deg)}
+  100%{transform:rotate(0)}
+}
+.is-happy .ollie-wrap,.ollie-wrap.is-happy{animation:hop .62s cubic-bezier(.3,1.5,.4,1) 2}
+@keyframes hop{0%,100%{transform:translateY(0) scale(1)}30%{transform:translateY(-24px) scale(1.06,.94)}60%{transform:translateY(0) scale(.94,1.06)}}
+.thumb{
+  position:absolute; right:-14%; bottom:2%;
+  width:clamp(46px,14vw,60px); aspect-ratio:1; border-radius:50%;
+  display:grid; place-items:center; color:var(--red); padding:clamp(11px,3.4vw,15px);
+  background:#12333C; border:2px solid rgba(255,255,255,.16);
+  box-shadow:0 10px 22px rgba(0,0,0,.5);
+  animation:thumbIn .5s .5s cubic-bezier(.2,1.6,.4,1) both;
+}
+@keyframes thumbIn{from{opacity:0;transform:scale(.2) rotate(-45deg)}to{opacity:1;transform:scale(1) rotate(-8deg)}}
+.drop{transform-box:fill-box;opacity:0}
+.is-sad .drop{animation:dropFall 1.4s .6s ease-in both}
+@keyframes dropFall{0%{opacity:0;transform:translateY(-6px) scale(.4)}30%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(26px) scale(.9)}}
+
+/* ---------- game hud ---------- */
+.hud{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.hud .quit{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.07);display:grid;place-items:center;font-size:17px;color:#9FC7CF;flex:none}
+.score{font-weight:900;font-size:23px;letter-spacing:-.02em;line-height:1;font-variant-numeric:tabular-nums}
+.score small{display:block;font-size:10.5px;font-weight:700;color:#7FB0BA;letter-spacing:.06em;margin-top:3px}
+.spacer{flex:1}
+.streak{
+  display:flex;align-items:center;gap:6px;font-weight:800;font-size:14px;padding:8px 12px;border-radius:999px;
+  background:rgba(255,255,255,.07);color:#9FC7CF;transition:.3s
+}
+.streak.hot{background:linear-gradient(135deg,#FF8A00,#FF3D6E);color:#fff;box-shadow:0 0 22px -4px #FF6B3D}
+.streak.blaze{background:linear-gradient(135deg,var(--yellow),#FF7A00);color:#2B1400;box-shadow:0 0 30px -3px var(--gold);animation:pulseHot 1s ease-in-out infinite}
+@keyframes pulseHot{50%{transform:scale(1.06)}}
+.pips{display:flex;gap:4px;margin-bottom:14px}
+.pip{flex:1;height:4px;border-radius:99px;background:rgba(255,255,255,.11);transition:.35s}
+.pip.on{background:var(--teal-lt)}
+.pip.miss{background:var(--red)}
+.pip.now{background:var(--yellow);box-shadow:0 0 10px var(--yellow)}
+.timer{height:5px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden;margin-bottom:16px}
+.timer i{display:block;height:100%;width:100%;border-radius:99px;background:linear-gradient(90deg,var(--teal-lt),var(--yellow));transform-origin:left}
+.timer.warn i{background:linear-gradient(90deg,var(--gold),var(--red))}
+
+/* ---------- question ---------- */
+.qcard{
+  background:linear-gradient(165deg,rgba(255,255,255,.1),rgba(255,255,255,.035));
+  border:1px solid rgba(255,255,255,.11); border-radius:var(--r-lg);
+  padding:clamp(15px,4.4vw,20px); margin-bottom:14px; position:relative; overflow:hidden;
+}
+.qcard::after{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--yellow)}
+.cat{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;color:#03272B;background:var(--teal-lt);padding:4px 10px;border-radius:99px;margin-bottom:11px}
+.q{font-size:clamp(16.5px,4.5vw,19px);font-weight:700;line-height:1.4;letter-spacing:-.012em}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{
+  display:flex;gap:12px;align-items:flex-start;text-align:left;width:100%;
+  padding:13px 14px; border-radius:var(--r-md);
+  background:rgba(255,255,255,.06); border:2px solid rgba(255,255,255,.1);
+  font-size:14px;font-weight:600;line-height:1.4;color:#EAF6F8;
+  transition:transform .16s cubic-bezier(.2,.9,.25,1), background .2s, border-color .2s, opacity .3s;
+}
+.opt:active{transform:scale(.982)}
+@media(hover:hover){.opt:hover{background:rgba(255,255,255,.1);border-color:rgba(91,225,234,.5)}}
+.opt .key{
+  flex:none;width:26px;height:26px;border-radius:9px;display:grid;place-items:center;
+  background:rgba(255,255,255,.12);font-weight:900;font-size:13px;color:#BFE6EB;margin-top:1px;transition:.2s
+}
+.opt.is-right{background:rgba(47,227,164,.17);border-color:var(--mint);animation:rightPop .5s cubic-bezier(.2,1.5,.4,1)}
+.opt.is-right .key{background:var(--mint);color:#03231A}
+@keyframes rightPop{0%{transform:scale(1)}40%{transform:scale(1.035)}100%{transform:scale(1)}}
+.opt.is-wrong{background:rgba(255,91,110,.16);border-color:var(--red);animation:nope .45s}
+.opt.is-wrong .key{background:var(--red);color:#2B0006}
+@keyframes nope{0%,100%{transform:translateX(0)}18%{transform:translateX(-9px)}38%{transform:translateX(8px)}58%{transform:translateX(-5px)}78%{transform:translateX(3px)}}
+.opt.is-dim{opacity:.34}
+.opts.locked .opt{pointer-events:none}
+
+/* ---------- fx ---------- */
+#fx{position:fixed;inset:0;z-index:60;pointer-events:none}
+#flash{position:fixed;inset:0;z-index:55;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 45%, rgba(245,231,0,.55), rgba(0,163,173,.35) 45%, transparent 72%)}
+#flash.go{animation:flashy .62s ease-out}
+@keyframes flashy{0%{opacity:0}12%{opacity:1}100%{opacity:0}}
+#shake.q1{animation:shk .42s cubic-bezier(.3,.1,.3,1)}
+@keyframes shk{0%,100%{transform:translate(0,0) rotate(0)}
+ 15%{transform:translate(-9px,4px) rotate(-.7deg)} 32%{transform:translate(8px,-6px) rotate(.6deg)}
+ 51%{transform:translate(-6px,3px) rotate(-.4deg)} 70%{transform:translate(4px,-2px) rotate(.25deg)} 86%{transform:translate(-2px,1px)}}
+.burst{position:fixed;inset:0;z-index:70;display:grid;place-content:center;place-items:center;pointer-events:none;gap:8px;
+  background:radial-gradient(circle at 50% 50%, rgba(4,20,25,.62) 0%, rgba(4,20,25,.35) 34%, transparent 62%)}
+.burst h2{
+  font-size:clamp(46px,15vw,86px);font-weight:900;letter-spacing:-.045em;line-height:.9;
+  color:var(--yellow); -webkit-text-stroke:2px #06232A; text-shadow:0 10px 34px rgba(245,231,0,.55);
+  animation:burstIn .68s cubic-bezier(.2,1.7,.35,1) both, throb .5s .5s ease-in-out 2;
+}
+@keyframes burstIn{0%{opacity:0;transform:scale(.3) rotate(-9deg)}55%{opacity:1;transform:scale(1.13) rotate(2deg)}100%{transform:scale(1) rotate(-2deg)}}
+@keyframes throb{50%{transform:scale(1.08) rotate(1deg)}}
+.burst .pts{
+  font-weight:900;font-size:clamp(20px,6vw,28px);color:#03272B;background:var(--mint);
+  padding:7px 18px;border-radius:99px;font-variant-numeric:tabular-nums;
+  animation:ptsUp .8s .18s cubic-bezier(.2,1.4,.4,1) both;
+}
+@keyframes ptsUp{from{opacity:0;transform:translateY(28px) scale(.7)}to{opacity:1;transform:none}}
+.burst .bonus{font-size:13px;font-weight:800;color:#CFF6EE;opacity:.9;animation:ptsUp .8s .3s cubic-bezier(.2,1.4,.4,1) both}
+
+/* ---------- overlay ---------- */
+#over{position:fixed;inset:0;z-index:80;display:none;background:rgba(5,20,25,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+#over.on{display:grid;place-items:center;padding:var(--pad);animation:fadeIn .25s both}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.pane{width:100%;max-width:560px;display:none;flex-direction:column;align-items:center}
+.pane.on{display:flex;animation:paneIn .42s cubic-bezier(.2,.9,.25,1) both}
+@keyframes paneIn{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
+.oops{font-size:clamp(26px,8vw,38px);font-weight:900;letter-spacing:-.03em;margin-top:16px;color:#fff}
+.oops-sub{font-size:14.5px;color:#A9CFD6;margin-top:6px;text-align:center;max-width:30ch;line-height:1.45}
+.sheet{
+  width:100%;background:linear-gradient(170deg,#153A44,#102B33);
+  border:1px solid rgba(255,255,255,.12);border-radius:var(--r-lg);padding:clamp(16px,4.6vw,22px);
+  max-height:min(82dvh,760px);overflow-y:auto;-webkit-overflow-scrolling:touch
+}
+.sheet .cat{margin-bottom:9px}
+.sheet .qq{font-size:14px;font-weight:600;color:#A9CFD6;line-height:1.45;margin-bottom:16px}
+.ansbox{background:rgba(47,227,164,.13);border:2px solid var(--mint);border-radius:var(--r-md);padding:14px 15px;margin-bottom:14px}
+.ansbox .lbl{font-size:11.5px;font-weight:800;color:var(--mint);letter-spacing:.04em;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.ansbox p{font-size:15px;font-weight:700;line-height:1.45}
+.youbox{background:rgba(255,91,110,.1);border:1px dashed rgba(255,91,110,.55);border-radius:var(--r-md);padding:12px 14px;margin-bottom:14px}
+.youbox .lbl{font-size:11.5px;font-weight:800;color:var(--red);letter-spacing:.04em;margin-bottom:5px}
+.youbox p{font-size:13.5px;font-weight:600;line-height:1.42;color:#F0C9CE}
+.why{display:flex;gap:11px;align-items:flex-start;font-size:14px;line-height:1.55;color:#CFE9EE;margin-bottom:18px}
+.why .bulb{flex:none;font-size:19px;line-height:1.2}
+.why b{color:#fff}
+.next{
+  width:100%;padding:17px;border-radius:var(--r-lg);font-weight:900;font-size:17px;color:#03272B;
+  background:linear-gradient(180deg,var(--teal-lt),var(--teal));
+  box-shadow:0 12px 26px -14px var(--teal-lt), inset 0 -3px 0 rgba(0,0,0,.16);
+  transition:transform .14s
+}
+.next:active{transform:translateY(3px) scale(.985)}
+
+/* ---------- results ---------- */
+.res{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:4px;padding:10px 0}
+.rank{font-size:clamp(28px,8.5vw,40px);font-weight:900;letter-spacing:-.035em;line-height:1.05;margin-top:14px}
+.rank.gold{color:var(--yellow)}
+.rank.mint{color:var(--mint)}
+.rank.warn{color:var(--gold)}
+.rank.low{color:#FF9AA6}
+.bignum{font-size:clamp(62px,20vw,96px);font-weight:900;letter-spacing:-.05em;line-height:.9;color:#fff;font-variant-numeric:tabular-nums;margin-top:6px}
+.bignum em{font-style:normal;font-size:.42em;color:#8FC3CB;letter-spacing:-.02em}
+.stats{display:flex;gap:8px;width:100%;margin:20px 0 6px}
+.stat{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:var(--r-md);padding:12px 8px}
+.stat b{display:block;font-size:21px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.stat small{font-size:10.5px;font-weight:700;color:#8FC3CB;letter-spacing:.03em}
+.misslist{width:100%;text-align:left;margin-top:16px}
+.misslist h3{font-size:13px;font-weight:800;color:#9FC7CF;margin-bottom:9px}
+.miss{background:rgba(255,91,110,.08);border-left:3px solid var(--red);border-radius:0 11px 11px 0;padding:10px 13px;margin-bottom:7px;font-size:13.5px;line-height:1.42}
+.miss span{display:block;color:#8FC3CB;font-weight:800;font-size:11px;letter-spacing:.02em;margin-bottom:3px}
+.btnrow{display:flex;gap:9px;width:100%;margin-top:20px}
+.ghost{flex:1;padding:16px;border-radius:var(--r-lg);font-weight:800;font-size:15px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.13);color:#DCF1F4;transition:transform .14s}
+.ghost:active{transform:translateY(2px)}
+.cta.half{flex:1.4;margin-top:0;padding:16px;font-size:16px}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+}
+@media (max-height:680px){
+  h1{font-size:clamp(28px,8vw,40px)} .ollie-wrap{width:min(34vw,120px)} .sub{display:none}
+}
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<div id="flash"></div>
+
+<div id="shake">
+<div class="app">
+
+  <!-- ============ START ============ -->
+  <section class="screen is-on" id="s-start">
+    <div class="hero">
+      <div class="ollie-wrap idle" data-ollie></div>
+      <div class="brandline"><i></i> Redcliffe store training</div>
+      <h1>QA Coach<span>Know it cold.</span></h1>
+      <p class="sub">Fifteen real audit scenarios, reworded every round so you learn the process — not the answer sheet.</p>
+
+      <div class="setup">
+        <div class="seg" id="mode-seg" role="group" aria-label="Round length">
+          <button data-mode="7" aria-pressed="true">Quick shift<small>7 questions</small></button>
+          <button data-mode="15" aria-pressed="false">Full audit<small>All 15</small></button>
+        </div>
+        <div class="toggles">
+          <div class="seg"><button id="t-timer" aria-pressed="true">⏱ Timer on</button></div>
+          <div class="seg"><button id="t-sound" aria-pressed="true">🔊 Sound on</button></div>
+        </div>
+      </div>
+
+      <button class="cta" id="go">Start the round</button>
+      <div class="best" id="best"></div>
+      <p class="foot">Unofficial staff study tool built from the Redcliffe QA coaching sheet (2026 ed.). Not an Optus product.</p>
+    </div>
+  </section>
+
+  <!-- ============ GAME ============ -->
+  <section class="screen" id="s-game">
+    <div class="hud">
+      <button class="quit" id="quit" aria-label="End round">✕</button>
+      <div class="score"><span id="score">0</span><small id="qcount">Question 1 of 7</small></div>
+      <div class="spacer"></div>
+      <div class="streak" id="streak">🔥 <span id="streak-n">0</span></div>
+    </div>
+    <div class="pips" id="pips"></div>
+    <div class="timer" id="timer"><i id="timer-bar"></i></div>
+    <div class="qcard">
+      <span class="cat" id="cat">Fraud &amp; ATC</span>
+      <p class="q" id="q"></p>
+    </div>
+    <div class="opts" id="opts" role="group" aria-label="Answer options"></div>
+  </section>
+
+  <!-- ============ RESULTS ============ -->
+  <section class="screen" id="s-res">
+    <div class="res">
+      <div class="ollie-wrap" data-ollie id="res-ollie"></div>
+      <div class="rank" id="rank"></div>
+      <div class="bignum"><span id="res-acc">0</span><em>%</em></div>
+      <div class="stats">
+        <div class="stat"><b id="res-score">0</b><small>Points</small></div>
+        <div class="stat"><b id="res-right">0</b><small>Correct</small></div>
+        <div class="stat"><b id="res-streak">0</b><small>Best streak</small></div>
+      </div>
+      <div class="misslist" id="misslist"></div>
+      <div class="btnrow">
+        <button class="ghost" id="again-miss">Drill my misses</button>
+        <button class="cta half" id="again">Play again</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+</div>
+
+<!-- ============ OVERLAY: OLLIE + CORRECTION ============ -->
+<div id="over" role="dialog" aria-modal="true" aria-live="polite">
+  <div class="pane" id="pane-ollie">
+    <div class="ollie-wrap" data-ollie id="sad-ollie">
+      <div class="thumb"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.6 3.4h-2.1c-.8 0-1.4.6-1.4 1.4v7.3c0 .8.6 1.4 1.4 1.4h2.1c.8 0 1.4-.6 1.4-1.4V4.8c0-.8-.6-1.4-1.4-1.4Z"/><path d="M15.4 3.4H6.2c-1 0-1.8.6-2.1 1.5L2.3 10.8c-.5 1.5.6 3 2.1 3h4.3l-.7 3.1a2 2 0 0 0 3.6 1.6l3.8-5.5V3.4Z"/></svg></div>
+    </div>
+    <div class="oops" id="oops-title">Not quite.</div>
+    <p class="oops-sub" id="oops-sub">Ollie's seen this one go wrong on the floor. Let's fix it.</p>
+  </div>
+  <div class="pane" id="pane-fix">
+    <div class="sheet">
+      <span class="cat" id="fix-cat"></span>
+      <p class="qq" id="fix-q"></p>
+      <div class="ansbox">
+        <div class="lbl">✓ The right call</div>
+        <p id="fix-ans"></p>
+      </div>
+      <div class="youbox" id="fix-youbox">
+        <div class="lbl">You picked</div>
+        <p id="fix-you"></p>
+      </div>
+      <div class="why"><span class="bulb">💡</span><div id="fix-why"></div></div>
+      <button class="next" id="fix-next">Got it — next question</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   OPTUS QA COACH — Redcliffe QA coaching sheet (2026 ed.)
+   Single file. No dependencies. No storage assumptions.
+   ============================================================ */
+
+const OLLIE_SVG = `
+<svg class="ollie" viewBox="0 0 200 250" aria-hidden="true">
+  <defs>
+    <radialGradient id="ob" cx="34%" cy="26%" r="82%">
+      <stop offset="0%" stop-color="#FFF07A"/><stop offset="42%" stop-color="#FFD520"/>
+      <stop offset="82%" stop-color="#F7C000"/><stop offset="100%" stop-color="#E0A400"/>
+    </radialGradient>
+    <linearGradient id="of" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/><stop offset="100%" stop-color="#F1F6F7"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <path d="M86 168 L78 238" stroke="#141414" stroke-width="9" stroke-linecap="round" fill="none"/>
+    <path d="M114 168 L122 238" stroke="#141414" stroke-width="9" stroke-linecap="round" fill="none"/>
+  </g>
+  <g class="ollie-head">
+    <path class="ollie-body" fill="url(#ob)" d="
+      M94 32 C97 20 104 9 121 2 C113 16 111 26 116 35
+      C150 46 174 78 174 114 C174 155 141 188 100 188
+      C59 188 26 155 26 114 C26 76 55 44 94 32 Z"/>
+    <ellipse cx="100" cy="103" rx="52" ry="35" fill="url(#of)"/>
+    <circle class="ollie-eye" cx="80" cy="103" r="7.5" fill="#141414"/>
+    <circle class="ollie-eye" cx="120" cy="103" r="7.5" fill="#141414"/>
+    <path class="drop" d="M150 78 c0 0 -9 11 -9 16 a9 9 0 0 0 18 0 c0 -5 -9 -16 -9 -16 z" fill="#7FD8E8" opacity="0"/>
+  </g>
+</svg>`;
+
+/* ---------- QUESTION BANK ----------
+   Each entry: 3 wording variations, 1 correct answer, 3 plausible traps, and the why. */
+const BANK = [
+{ id:'fake-id', cat:'Fraud & ATC',
+  v:["A customer presents ID that is obviously fraudulent. What do you do?",
+     "You're mid-sale and the licence in front of you is clearly a fake. What's the correct action?",
+     "The ID a customer has handed you is plainly not genuine. How do you handle the interaction?"],
+  a:"Stop the interaction, tell them nothing, document what happened and send everything you have to EFRM to escalate.",
+  w:["Tell the customer the ID has been flagged as fraudulent, refuse the sale and ask them to return with valid ID later.",
+     "Complete the sale to avoid a confrontation, then email your Leader the customer's details straight afterwards.",
+     "Keep hold of the ID, photocopy it for the store file and call the police from the front counter yourself."],
+  why:"Never tip off a bad actor. The moment you tell them what you've spotted, they adapt and try the next store. Stop, say nothing, write it all down and let <b>EFRM (External Fraud Risk Management)</b> escalate it." },
+
+{ id:'fraud-alert', cat:'Fraud & ATC',
+  v:["A customer you suspect is on fraud alert presents in store. What process do you follow?",
+     "You think the person you're serving has been flagged on a fraud alert. What are the steps?",
+     "Someone comes in and you suspect they're currently on a fraud alert. What's the correct process?"],
+  a:"Follow ATC: tell your Leader, email the Credit Team, tick the ATC box at credit check and follow their direction.",
+  w:["Refuse to serve them at the counter and ask the customer to call the fraud line themselves to get the alert cleared.",
+     "Run the credit check as normal and only escalate it to the Credit Team if the check comes back declined.",
+     "Tick the ATC box when you submit the credit check, then carry on with the sale once it returns approved."],
+  why:"Air Time Connect is a two-part move: <b>Leader + Credit Team email first</b>, then the ATC box at credit check. You don't decide the outcome — the Credit Team comes back and tells you how to process forward." },
+
+{ id:'atc-triggers', cat:'Fraud & ATC',
+  v:["What scenarios trigger Air Time Connect, and what do you do once you spot one?",
+     "Name the situations that should trigger ATC and the action you take.",
+     "Which red flags mean you should be running ATC, and what happens next?"],
+  a:"Fake ID, coercion of the account holder, a recent fraud alert, or disinterest in the sale — then Leader, Credit Team, ATC box.",
+  w:["Only when an ID fails DVS verification, since every other scenario is covered by the standard credit check.",
+     "A declined credit check, an interstate address or a customer paying in cash — flag all of these to your Leader at shift end.",
+     "Any customer buying more than one device in a day — tick the ATC box and finish once your Leader approves."],
+  why:"ATC is as much about <b>behaviour as paperwork</b>. Someone being pushed by a third party, or who doesn't care which phone they get, is the classic tell — the ID can be perfect and it's still ATC." },
+
+{ id:'mfa', cat:'MFA & Account Info',
+  v:["When entering an account, what does the customer need to quote or give you?",
+     "What must a customer provide before you can get into their account?",
+     "Walk through what's required from the customer to pass MFA on their account."],
+  a:"Name plus date of birth or postcode for Step 1, then a one-time code by SMS or email for Step 2. No ID needed.",
+  w:["Name, date of birth and a photo ID for Step 1, then a one-time code by SMS or email to complete Step 2 of MFA.",
+     "Name, postcode and the last four digits of the card on file. Step 2 is only needed on post-paid accounts.",
+     "Name and date of birth only — the one-time code is only needed if the customer can't produce any ID."],
+  why:"It's always <b>two steps</b>, and the second one has to land on something the customer controls. ID isn't a shortcut past Step 2 and isn't required at all unless you're using it for MFA." },
+
+{ id:'dvs', cat:'MFA & Account Info',
+  v:["What is the new DVS process, and why is customer consent required?",
+     "Explain the DVS consent step — what has to happen before you verify an ID?",
+     "Before adding an ID to an account under DVS, what's required from the customer and why?"],
+  a:"The customer must read, understand and accept the DVS Consent Request before any government ID is verified.",
+  w:["Consent is only needed the very first time. After that the verified ID sits on the account and can be reused.",
+     "Verbal consent is enough, as long as you note in JARVIS that the customer agreed before you scanned it.",
+     "DVS consent only applies to Passports. Licences and Medicare cards can be verified without any consent."],
+  why:"You're sending a customer's government ID to a <b>third party</b>. That can only happen with permission they've actually read and understood — not assumed, not verbal, and not carried over from last time." },
+
+{ id:'chg-name', cat:'MFA & Account Info',
+  v:["A customer needs the name on their account changed. What's required?",
+     "What do you need before you can change a customer's name on their account?",
+     "Someone's just married and wants their account in their new name. What has to happen?"],
+  a:"ID in both the old and the new name, a completed Change of Name form, and a Leader to complete the change.",
+  w:["One current ID in the new name plus a Change of Name form — any team member can then action it in JARVIS.",
+     "A Change of Name Certificate and a Statutory Declaration, then an INC with CHL to have the name updated.",
+     "ID in both names and a Change of Name form — whoever is serving can action it if a Leader signs the form."],
+  why:"Three things, all of them: <b>evidence linking both names</b>, the form, and a <b>Leader completing the change</b>. A Leader signing off afterwards isn't the same as a Leader doing it." },
+
+{ id:'address', cat:'MFA & Account Info',
+  v:["A customer has just moved and needs their address updated. How do you do it and what's required?",
+     "What's the process for changing the address on a customer's account?",
+     "A customer wants a new address on their account. What do you need from them?"],
+  a:"MFA into the account, ask the customer for the new address and update it in JARVIS. No ID needed beyond MFA.",
+  w:["MFA into the account, sight a licence or utility bill showing the new address, then update it in JARVIS.",
+     "Ask the customer to change it themselves in the My Optus app, since retail can't update address details.",
+     "MFA into the account, update the address in JARVIS, then run a DVS check to confirm the new address is real."],
+  why:"Once MFA is passed, this is a straightforward service task. There's <b>no proof-of-address requirement</b> and no DVS — asking for a utility bill sends the customer away for nothing." },
+
+{ id:'chown', cat:'JARVIS & Account',
+  v:["What is the standard process for a CHOWN?",
+     "Talk me through a change of ownership from start to finish.",
+     "A customer wants to transfer their service to another person. What's the full CHOWN process?"],
+  a:"MFA both accounts, 100 points of ID each, both signatures on the paperwork, DVS both in JARVIS, then archive it.",
+  w:["MFA the receiving account, 100 points of ID for the incoming customer, complete in JARVIS, then archive it.",
+     "MFA both accounts, 100 points of ID from both, complete it in JARVIS, then hand the signed paperwork to the customer.",
+     "MFA both accounts, get both parties to sign the form, then email it to the Credit Team to process the transfer."],
+  why:"Everything is doubled — <b>both accounts, both IDs, both signatures, DVS for both</b>. And the paperwork gets <b>archived</b>, not handed over: it's the store's evidence the transfer was authorised." },
+
+{ id:'esign', cat:'JARVIS & Account',
+  v:["An eSignature fails. What's the process you follow?",
+     "The customer can't get their eSignature to go through. What do you do?",
+     "eSignature won't complete on a contract. What are the correct steps?"],
+  a:"Troubleshoot it. If you can't fix it, raise an INC with CHL and ask the customer to return once it's resolved.",
+  w:["Print the contract, have the customer wet-sign the paper copy, and archive that in store instead.",
+     "Raise an INC with CHL but complete the sale anyway so the customer isn't inconvenienced by a system fault.",
+     "Try another device or the My Optus app; if that fails, raise it with your Leader at the end of the day."],
+  why:"No signature means no agreement — there's no workaround that leaves the customer holding a device on an unsigned contract. Troubleshoot, <b>raise the INC with CHL</b>, and bring them back when it's fixed." },
+
+{ id:'abn', cat:'JARVIS & Account',
+  v:["A customer wants an ABN added to their account. How do you verify it?",
+     "What do you use to confirm a customer actually owns the business behind an ABN?",
+     "Before adding an ABN to an account, how do you verify the business and the person?"],
+  a:"Use ABN Lookup and ASIC to verify that the customer is the owner or director of that business.",
+  w:["Sight the customer's business card and a recent invoice showing the ABN, then add the ABN in JARVIS.",
+     "Email the Credit Team with the ABN and they'll confirm the directorship before it can be added.",
+     "Check the ABN in JARVIS against the customer's ID; if the surname matches, the ABN can be added on."],
+  why:"Two public registers do two jobs: <b>ABN Lookup</b> confirms the business is real and active, <b>ASIC</b> confirms the person in front of you is actually the owner or director." },
+
+{ id:'officer-docs', cat:'Compliance & Vulnerability',
+  v:["An officer comes in requesting customer documentation. What's the correct process?",
+     "Police attend the store and ask for a customer's account documents. What do you do?",
+     "An officer asks you to hand over paperwork relating to a customer. How do you respond?"],
+  a:"Refer the officer to their own internal State Intelligence unit, who will then contact LELU themselves.",
+  w:["Take the officer's badge number and email the documentation through to LELU on the officer's behalf.",
+     "Hand the documentation over if the officer has a warrant with them; otherwise refer them to FRM.",
+     "Refer the officer to your Leader, who can release the documentation once their identity is confirmed."],
+  why:"Retail is never the channel for this — not even with a warrant on the counter. The request has to travel officer → <b>their own State Intelligence unit</b> → <b>LELU (Law Enforcement Liaison Unit)</b>." },
+
+{ id:'officer-cctv', cat:'Compliance & Vulnerability',
+  v:["An officer comes in with a warrant requesting CCTV footage. What's the correct process?",
+     "Police present a warrant for your store's CCTV. What do you do?",
+     "A warrant is served in store for camera footage. What are the steps?"],
+  a:"Email FRM the officer's full name, badge number, contact number and email. FRM replies within 2 business days.",
+  w:["Refer the officer to their own State Intelligence unit, so they can request the footage through LELU.",
+     "Email FRM the officer's details, and let the officer know the footage will be released within 24 hours.",
+     "Provide the footage on the spot if the warrant is valid, and note the badge number in the store diary."],
+  why:"CCTV goes a different way to account documents — straight to <b>FRM</b>, with all <b>four</b> officer details. FRM comes back within <b>2 business days</b>, so never promise a faster turnaround at the counter." },
+
+{ id:'vuln-support', cat:'Compliance & Vulnerability',
+  v:["What support does Optus offer for vulnerable customers?",
+     "Name the supports available to you when serving a vulnerable customer.",
+     "A customer is clearly vulnerable. What support options exist?"],
+  a:"The Vulnerable Customer Matrix, Specialist Care, the Financial Hardship Team and the Payment Assistance Policy.",
+  w:["The Vulnerable Customer Matrix, Specialist Care, the Credit Team and a DCM case raised at the counter.",
+     "Specialist Care, the Financial Hardship Team, the Payment Assistance Policy and a mandatory referral to the TIO.",
+     "The Vulnerable Care Decision tool, Public Trustee support, payment extensions and the Complaints Team."],
+  why:"Four named supports: the <b>Matrix</b> to identify, <b>Specialist Care</b> to hand over to, the <b>Financial Hardship Team</b> and the <b>Payment Assistance Policy</b> for money pressure." },
+
+{ id:'complaint', cat:'Compliance & Vulnerability',
+  v:["A customer comes in complaining about a bill. What's the correct process for handling it?",
+     "How do you handle a billing complaint at the counter?",
+     "A customer is unhappy about a charge on their bill. What are you meant to do?"],
+  a:"Try to resolve it with OA or credits. If you can't, raise a DCM case and give the customer the case ID.",
+  w:["Raise a DCM case first so the complaint is formally recorded, then try to resolve it while it's open.",
+     "Try to resolve it with OA or credits. If you can't, refer the customer straight to the TIO to lodge it.",
+     "Try to resolve it with OA or credits. If you can't, email the Credit Team and ask the customer to call."],
+  why:"Fix it at the counter first — that's what OA and credits are for. <b>DCM is the escalation, not the opening move</b>, and the customer must leave holding the case ID." },
+
+{ id:'trustee', cat:'Compliance & Vulnerability',
+  v:["A customer whose account is handled by the Public Trustee wants to make changes. How do you handle it?",
+     "Public Trustee manages this customer's account and they've asked for changes in store. What can you do?",
+     "How do you work out what you're allowed to action on a Public Trustee account?"],
+  a:"Use the Vulnerable Care Decision tool — no sales or monetary changes by retail, but SIM swaps and bills are fine.",
+  w:["Refuse all changes and refer them to Specialist Care, since only the Hardship Team can touch the account.",
+     "Use the Vulnerable Care Decision tool — retail can action any change if the Public Trustee approves it by phone.",
+     "Complete the change and raise a DCM case so the Public Trustee is notified of the activity afterwards."],
+  why:"The <b>Vulnerable Care Decision tool</b> draws the line for you. Anything that costs money or changes the plan is out; day-to-day service like a <b>SIM swap or printing a bill</b> is fine." }
+];
+
+/* ============================ ENGINE ============================ */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const shuffle=a=>{const b=a.slice();for(let i=b.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[b[i],b[j]]=[b[j],b[i]];}return b;};
+const pick=a=>a[Math.random()*a.length|0];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const LETTERS=['A','B','C','D'];
+const TIME=30000;
+
+const ollieSvg=i=>OLLIE_SVG.replace('id="ob"',`id="ob${i}"`).replace(/url\(#ob\)/g,`url(#ob${i})`)
+                          .replace('id="of"',`id="of${i}"`).replace(/url\(#of\)/g,`url(#of${i})`);
+$$('[data-ollie]').forEach((el,i)=>el.insertAdjacentHTML('afterbegin',ollieSvg(i)));
+
+/* ---------- optional best-score memory (degrades silently) ---------- */
+let BEST={score:0,acc:0};
+(async()=>{ try{ if(window.storage){ const r=await window.storage.get('qacoach:best'); if(r&&r.value) BEST=JSON.parse(r.value); } }catch(e){} paintBest(); })();
+async function saveBest(){ try{ if(window.storage) await window.storage.set('qacoach:best',JSON.stringify(BEST)); }catch(e){} }
+function paintBest(){ $('#best').innerHTML = BEST.score ? `Personal best <b>${BEST.score.toLocaleString()}</b> at ${BEST.acc}% accuracy` : ''; }
+
+/* ---------- sound ---------- */
+let AC=null;
+function tone(f,at,dur,type,vol){
+  const o=AC.createOscillator(), g=AC.createGain();
+  o.type=type; o.frequency.setValueAtTime(f,at);
+  g.gain.setValueAtTime(0,at); g.gain.linearRampToValueAtTime(vol,at+.015);
+  g.gain.exponentialRampToValueAtTime(.0001,at+dur);
+  o.connect(g); g.connect(AC.destination); o.start(at); o.stop(at+dur+.05);
+}
+function sfx(kind){
+  if(!SET.sound) return;
+  try{
+    AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==='suspended') AC.resume();
+    const n=AC.currentTime;
+    if(kind==='right') [523.25,659.25,783.99,1046.50].forEach((f,i)=>tone(f,n+i*.075,.36,'triangle',.15));
+    if(kind==='wrong'){ tone(233,n,.24,'sawtooth',.09); tone(174,n+.17,.34,'sawtooth',.09); tone(131,n+.34,.5,'sawtooth',.08); }
+    if(kind==='end') [523,659,784,1046,1318].forEach((f,i)=>tone(f,n+i*.1,.55,'triangle',.13));
+    if(kind==='tap') tone(660,n,.045,'square',.04);
+  }catch(e){}
+}
+const buzz=p=>{ try{ navigator.vibrate && navigator.vibrate(p); }catch(e){} };
+
+/* ---------- confetti ---------- */
+const cv=$('#fx'), cx=cv.getContext('2d');
+let parts=[], raf=null;
+function fit(){ const d=Math.min(devicePixelRatio||1,2); cv.width=innerWidth*d; cv.height=innerHeight*d; cx.setTransform(d,0,0,d,0,0); }
+fit(); addEventListener('resize',fit);
+const COLS=['#F5E700','#00A3AD','#5BE1EA','#FFFFFF','#FFC42E','#2FE3A4'];
+function confetti(n){
+  if(REDUCED) return;
+  const w=innerWidth,h=innerHeight;
+  for(let i=0;i<n;i++){
+    const blast=i<n*.42, ang=Math.random()*Math.PI*2, spd=3+Math.random()*13;
+    parts.push({
+      x: blast? w/2 : Math.random()*w,
+      y: blast? h*.42 : -20-Math.random()*h*.35,
+      vx: blast? Math.cos(ang)*spd : (Math.random()-.5)*2.4,
+      vy: blast? Math.sin(ang)*spd-2 : 2.5+Math.random()*4,
+      w: 5+Math.random()*7, h: 8+Math.random()*10,
+      rot: Math.random()*6.28, vr:(Math.random()-.5)*.34,
+      c: COLS[Math.random()*COLS.length|0], a:1, sw:Math.random()*6.28
+    });
+  }
+  if(!raf) raf=requestAnimationFrame(tickFx);
+}
+function tickFx(){
+  cx.clearRect(0,0,innerWidth,innerHeight);
+  const h=innerHeight;
+  for(let i=parts.length-1;i>=0;i--){
+    const p=parts[i];
+    p.vy+=.17; p.vx*=.992; p.vy*=.994; p.x+=p.vx; p.y+=p.vy; p.rot+=p.vr; p.sw+=.16;
+    if(p.y>h*.75) p.a-=.02;
+    if(p.y>h+60||p.a<=0){ parts.splice(i,1); continue; }
+    cx.save(); cx.translate(p.x,p.y); cx.rotate(p.rot);
+    cx.globalAlpha=clamp(p.a,0,1); cx.fillStyle=p.c;
+    cx.fillRect(-p.w/2,-p.h/2,p.w,p.h*Math.abs(Math.cos(p.sw)));
+    cx.restore();
+  }
+  if(parts.length) raf=requestAnimationFrame(tickFx);
+  else { raf=null; cx.clearRect(0,0,innerWidth,innerHeight); }
+}
+
+/* ---------- state ---------- */
+const SET={mode:7,timer:true,sound:true};
+let Q=[], idx=0, score=0, shown=0, streak=0, bestStreak=0, right=0, misses=[], locked=false, tStart=0, tRaf=null;
+
+/* ---------- screens ---------- */
+function show(id){ $$('.screen').forEach(s=>s.classList.toggle('is-on',s.id===id)); scrollTo(0,0); }
+
+/* ---------- start screen wiring ---------- */
+$$('#mode-seg button').forEach(b=>b.addEventListener('click',()=>{
+  $$('#mode-seg button').forEach(x=>x.setAttribute('aria-pressed', x===b));
+  SET.mode=+b.dataset.mode; sfx('tap');
+}));
+function toggle(el,key,on,off){
+  el.addEventListener('click',()=>{
+    SET[key]=!SET[key]; el.setAttribute('aria-pressed',SET[key]); el.textContent=SET[key]?on:off;
+    if(key==='sound'&&SET.sound) sfx('tap');
+  });
+}
+toggle($('#t-timer'),'timer','⏱ Timer on','⏱ Timer off');
+toggle($('#t-sound'),'sound','🔊 Sound on','🔇 Sound off');
+
+$('#go').addEventListener('click',()=>startRound());
+$('#again').addEventListener('click',()=>startRound());
+$('#again-miss').addEventListener('click',()=>startRound(misses.map(m=>m.q)));
+$('#quit').addEventListener('click',()=>{ stopTimer(); results(); });
+$('#fix-next').addEventListener('click',()=>{ closeOver(); next(); });
+
+/* ---------- round ---------- */
+function startRound(pool){
+  const src = (pool&&pool.length) ? pool : BANK;
+  const n = (pool&&pool.length) ? pool.length : Math.min(SET.mode,BANK.length);
+  Q = shuffle(src).slice(0,n).map(q=>({
+    src:q, text:pick(q.v),
+    opts: shuffle([{t:q.a,ok:true}, ...q.w.map(t=>({t,ok:false}))])
+  }));
+  idx=0; score=0; shown=0; streak=0; bestStreak=0; right=0; misses=[]; parts=[];
+  $('#score').textContent='0';
+  $('#pips').innerHTML=Q.map(()=>'<i class="pip"></i>').join('');
+  show('s-game'); render();
+}
+
+function render(){
+  const cur=Q[idx];
+  locked=false;
+  $('#cat').textContent=cur.src.cat;
+  $('#q').textContent=cur.text;
+  $('#qcount').textContent=`Question ${idx+1} of ${Q.length}`;
+  $$('#pips .pip').forEach((p,i)=>p.classList.toggle('now',i===idx));
+  const o=$('#opts'); o.className='opts'; o.innerHTML='';
+  cur.opts.forEach((op,i)=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.type='button';
+    b.style.animation=REDUCED?'':`screenIn .34s ${.05+i*.055}s cubic-bezier(.2,.9,.25,1) both`;
+    b.innerHTML=`<span class="key">${LETTERS[i]}</span><span>${op.t}</span>`;
+    b.addEventListener('click',()=>answer(i));
+    o.appendChild(b);
+  });
+  paintStreak(); startTimer();
+}
+
+document.addEventListener('keydown',e=>{
+  if(!$('#s-game').classList.contains('is-on')||locked) return;
+  const k=e.key.toUpperCase(); let i=LETTERS.indexOf(k);
+  if(i<0 && '1234'.includes(k)) i=+k-1;
+  if(i>=0 && i<4) answer(i);
+});
+
+/* ---------- timer ---------- */
+function startTimer(){
+  stopTimer();
+  const bar=$('#timer-bar'), wrap=$('#timer');
+  wrap.style.display=SET.timer?'block':'none';
+  bar.style.transform='scaleX(1)'; wrap.classList.remove('warn');
+  if(!SET.timer) return;
+  tStart=performance.now(); tickTimer();
+}
+function tickTimer(){
+  const left=clamp(1-(performance.now()-tStart)/TIME,0,1);
+  $('#timer-bar').style.transform=`scaleX(${left})`;
+  $('#timer').classList.toggle('warn',left<.32);
+  if(left<=0){ answer(-1); return; }
+  tRaf=requestAnimationFrame(tickTimer);
+}
+function stopTimer(){ if(tRaf) cancelAnimationFrame(tRaf); tRaf=null; }
+function timeLeft(){ return SET.timer? clamp(1-(performance.now()-tStart)/TIME,0,1) : 0; }
+
+/* ---------- answering ---------- */
+function answer(i){
+  if(locked) return;
+  locked=true; const left=timeLeft(); stopTimer();
+  const cur=Q[idx], btns=$$('#opts .opt'), chosen=i>=0?cur.opts[i]:null;
+  $('#opts').classList.add('locked');
+  btns.forEach((b,j)=>{
+    b.style.animation='';
+    if(cur.opts[j].ok) b.classList.add('is-right');
+    else if(j===i) b.classList.add('is-wrong');
+    else b.classList.add('is-dim');
+  });
+  if(chosen&&chosen.ok) win(left); else lose(chosen,i<0);
+}
+
+function win(left){
+  right++; streak++; bestStreak=Math.max(bestStreak,streak);
+  const speed=SET.timer?Math.round(left*100):0;
+  const combo=Math.min(streak-1,6)*25;
+  const pts=100+speed+combo;
+  score+=pts;
+  $$('#pips .pip')[idx].classList.add('on');
+  paintStreak(); countTo(score);
+  sfx('right'); buzz([12,40,18]);
+  $('#flash').classList.remove('go'); void $('#flash').offsetWidth; $('#flash').classList.add('go');
+  if(!REDUCED){ const s=$('#shake'); s.classList.remove('q1'); void s.offsetWidth; s.classList.add('q1'); }
+  confetti(streak>=4?190:130);
+
+  const bits=[];
+  if(speed>0) bits.push(`+${speed} speed`);
+  if(combo>0) bits.push(`+${combo} streak x${streak}`);
+  const el=document.createElement('div');
+  el.className='burst';
+  el.innerHTML=`<h2>CORRECT!</h2><div class="pts">+${pts}</div>${bits.length?`<div class="bonus">${bits.join('   ')}</div>`:''}`;
+  document.body.appendChild(el);
+  setTimeout(()=>{ el.style.transition='opacity .3s'; el.style.opacity='0'; setTimeout(()=>el.remove(),320); },1150);
+  setTimeout(next,1500);
+}
+
+function lose(chosen,timedOut){
+  streak=0; paintStreak();
+  const cur=Q[idx];
+  misses.push({q:cur.src, text:cur.text, you:chosen?chosen.t:null});
+  $$('#pips .pip')[idx].classList.add('miss');
+  sfx('wrong'); buzz([90,60,90]);
+  setTimeout(()=>{
+    $('#oops-title').textContent = timedOut? "Time's up." : "Not quite.";
+    $('#oops-sub').textContent = timedOut
+      ? "On the floor you'd still have to answer. Ollie's showing you the right call."
+      : "Ollie's watched this one go wrong in store. Let's fix it.";
+    openOver();
+  }, 620);
+}
+
+/* ---------- overlay ---------- */
+function openOver(){
+  const cur=Q[idx];
+  $('#fix-cat').textContent=cur.src.cat;
+  $('#fix-q').textContent=cur.text;
+  $('#fix-ans').textContent=cur.src.a;
+  const you=misses[misses.length-1].you;
+  if(you){ $('#fix-youbox').style.display='block'; $('#fix-you').textContent=you; }
+  else $('#fix-youbox').style.display='none';
+  $('#fix-why').innerHTML=cur.src.why;
+  $('#fix-next').textContent = idx>=Q.length-1 ? 'Got it — see my score' : 'Got it — next question';
+
+  $('#over').classList.add('on');
+  $('#pane-fix').classList.remove('on');
+  $('#pane-ollie').classList.add('on');
+  const w=$('#sad-ollie'); w.classList.remove('is-sad'); void w.offsetWidth; w.classList.add('is-sad');
+  $('#pane-ollie').parentNode.classList.add('is-sad');
+  setTimeout(()=>{
+    $('#pane-ollie').classList.remove('on');
+    $('#pane-fix').classList.add('on');
+    $('.sheet').scrollTop=0;
+  }, REDUCED?400:2300);
+}
+function closeOver(){
+  $('#over').classList.remove('on','is-sad');
+  $('#sad-ollie').classList.remove('is-sad');
+  $('#pane-fix').classList.remove('on');
+}
+
+/* ---------- hud ---------- */
+function paintStreak(){
+  const s=$('#streak'); $('#streak-n').textContent=streak;
+  s.classList.toggle('hot',streak>=3&&streak<5);
+  s.classList.toggle('blaze',streak>=5);
+}
+function countTo(target){
+  const el=$('#score'), from=shown, delta=target-from, t0=performance.now();
+  (function step(t){
+    const p=clamp((t-t0)/420,0,1), e=1-Math.pow(1-p,3);
+    shown=Math.round(from+delta*e); el.textContent=shown.toLocaleString();
+    if(p<1) requestAnimationFrame(step);
+  })(t0);
+}
+
+/* ---------- flow ---------- */
+function next(){ idx++; if(idx>=Q.length) results(); else render(); }
+
+function results(){
+  stopTimer();
+  const answered=right+misses.length, total=Math.max(answered,1), acc=answered?Math.round(right/answered*100):0;
+  const tiers=[
+    [100,'Audit proof.','gold'],
+    [80,'Floor ready.','mint'],
+    [60,'Close, but check the sheet.','warn'],
+    [0,'Back to the cheat sheet.','low']
+  ];
+  const t=tiers.find(x=>acc>=x[0]);
+  $('#rank').textContent=t[1]; $('#rank').className='rank '+t[2];
+  $('#res-acc').textContent=acc;
+  $('#res-score').textContent=score.toLocaleString();
+  $('#res-right').textContent=`${right}/${total}`;
+  $('#res-streak').textContent=bestStreak;
+
+  const ml=$('#misslist');
+  if(misses.length){
+    ml.innerHTML='<h3>Worth another look</h3>'+misses.map(m=>
+      `<div class="miss"><span>${m.q.cat}</span> ${m.q.v[0]}</div>`).join('');
+    $('#again-miss').style.display='block';
+    $('#again-miss').textContent = misses.length===1 ? 'Drill that one' : `Drill these ${misses.length}`;
+  } else {
+    ml.innerHTML='<h3>Nothing missed — every scenario handled correctly.</h3>';
+    $('#again-miss').style.display='none';
+  }
+
+  const ro=$('#res-ollie');
+  ro.classList.toggle('is-happy',acc>=80);
+  ro.classList.toggle('idle',acc<80);
+
+  if(score>BEST.score){ BEST={score,acc}; saveBest(); }
+  paintBest();
+  show('s-res');
+  if(acc>=80){ sfx('end'); confetti(acc===100?240:150); buzz([14,50,14,50,20]); }
+}
+</script>
+</body>
+</html>
