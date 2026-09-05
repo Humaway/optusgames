@@ -1,0 +1,2293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0A0C10">
+<meta name="description" content="Optus Exchange — a real-time parody stock market sim.">
+<title>Optus Exchange — Yes Trading Floor</title>
+<style>
+/* ============================================================================
+   OPTUS EXCHANGE — STYLE SHEET
+   Design language: a telco network operations centre pretending to be a
+   trading terminal. Signal bars instead of decorative sparkline chrome,
+   hairline terminal rows instead of SaaS cards, and the Optus retail-sign
+   yellow band as the one loud moment on the page.
+   ========================================================================== */
+
+:root{
+  --bg:#0A0C10;          /* deep switchboard black */
+  --bg-2:#10141B;        /* raised surface */
+  --panel:#151A23;       /* rows, sheets */
+  --line:#232B37;        /* hairlines */
+  --line-soft:#1A212B;
+  --txt:#EAEFF5;
+  --dim:#8794A5;
+  --dimmer:#5C6878;
+
+  --yes:#FFD600;         /* Optus Yes yellow */
+  --yes-ink:#1A1400;
+  --teal:#00A3A6;
+  --teal-lit:#25D7CE;
+
+  --up:#2BD98A;
+  --dn:#FF4D6A;
+  --warn:#FF9F1C;
+
+  --r-s:8px; --r-m:14px; --r-l:22px;
+  --sans:"Helvetica Neue",Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,"Roboto Mono",Menlo,Consolas,monospace;
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-t:env(safe-area-inset-top,0px);
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{
+  background:var(--bg);color:var(--txt);font-family:var(--sans);
+  font-size:15px;line-height:1.45;letter-spacing:-0.01em;
+  overscroll-behavior-y:none;-webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+input,textarea{background:var(--bg-2);border:1px solid var(--line);color:var(--txt);
+  border-radius:var(--r-s);padding:12px 14px;width:100%;outline:none}
+input:focus,textarea:focus,button:focus-visible{outline:2px solid var(--teal-lit);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-0.02em}
+.up{color:var(--up)} .dn{color:var(--dn)} .dim{color:var(--dim)}
+.hide{display:none !important}
+
+/* ---------- app shell ---------------------------------------------------- */
+#app{display:flex;flex-direction:column;height:100dvh;max-width:760px;margin:0 auto;
+  position:relative;background:var(--bg)}
+@media(min-width:761px){#app{border-left:1px solid var(--line);border-right:1px solid var(--line)}}
+
+/* ---------- header ------------------------------------------------------- */
+header{padding:calc(var(--safe-t) + 10px) 14px 0;background:var(--bg);z-index:20}
+.brandrow{display:flex;align-items:center;gap:10px}
+.mark{display:inline-flex;align-items:baseline;gap:6px;background:var(--yes);color:var(--yes-ink);
+  border-radius:6px;padding:3px 8px 4px;font-weight:800;font-size:15px;letter-spacing:-0.04em}
+.mark small{font-weight:700;font-size:10px;opacity:.7;letter-spacing:0}
+.brandrow h1{font-size:15px;font-weight:600;margin:0;letter-spacing:-0.02em}
+.brandrow .clock{margin-left:auto;text-align:right;font-size:11px;color:var(--dim);line-height:1.25}
+.brandrow .clock b{display:block;color:var(--txt);font-size:12px;font-weight:600}
+.iconbtn{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);
+  display:grid;place-items:center;color:var(--dim);font-size:15px}
+.iconbtn:active{background:var(--panel)}
+
+/* wallet strip */
+.wallet{display:flex;gap:0;margin-top:12px;border:1px solid var(--line);border-radius:var(--r-m);
+  overflow:hidden;background:linear-gradient(180deg,var(--bg-2),#0C1016)}
+.wallet div{flex:1;padding:9px 12px;border-right:1px solid var(--line-soft)}
+.wallet div:last-child{border-right:0}
+.wallet span{display:block;font-size:10px;color:var(--dimmer);letter-spacing:.02em}
+.wallet b{font-family:var(--mono);font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.wallet .netw b{color:var(--yes)}
+
+/* ---------- ticker tape (the loud moment) -------------------------------- */
+.tape{margin-top:12px;background:var(--yes);color:var(--yes-ink);overflow:hidden;
+  position:relative;height:30px;display:flex;align-items:center}
+.tape::after{content:"";position:absolute;inset:0;pointer-events:none;
+  box-shadow:inset 0 -1px 0 rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.35)}
+.tape-track{display:flex;gap:26px;white-space:nowrap;will-change:transform;
+  animation:tape 42s linear infinite;padding-left:14px}
+.tape:hover .tape-track{animation-play-state:paused}
+@keyframes tape{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tape b{font-family:var(--mono);font-size:12px;font-weight:700}
+.tape i{font-style:normal;font-family:var(--mono);font-size:12px;opacity:.75}
+.tape .t-dn i{color:#8C0F26;opacity:1}
+.tape .t-up i{color:#0A5C36;opacity:1}
+
+/* network status bar — the market's weather */
+.netstat{display:flex;align-items:center;gap:9px;padding:8px 14px;font-size:12px;
+  border-bottom:1px solid var(--line);background:var(--bg-2)}
+.netstat .bulb{width:8px;height:8px;border-radius:50%;background:var(--up);flex:none;
+  box-shadow:0 0 0 4px rgba(43,217,138,.14)}
+.netstat.deg .bulb{background:var(--warn);box-shadow:0 0 0 4px rgba(255,159,28,.14)}
+.netstat.out .bulb{background:var(--dn);box-shadow:0 0 0 4px rgba(255,77,106,.16);
+  animation:pulse 1.1s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.netstat span{color:var(--dim)} .netstat b{font-weight:600}
+.netstat .who{margin-left:auto;color:var(--dimmer);font-size:11px}
+
+/* ---------- main scroll -------------------------------------------------- */
+main{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:22px}
+.view{display:none;animation:fade .18s ease}
+.view.on{display:block}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms !important;transition-duration:.001ms !important}
+  .tape-track{animation:none}
+}
+
+.secthead{display:flex;align-items:center;gap:10px;padding:16px 14px 8px}
+.secthead h2{margin:0;font-size:13px;font-weight:600;color:var(--dim);letter-spacing:0}
+.secthead .rt{margin-left:auto;font-size:11px;color:var(--dimmer);font-family:var(--mono)}
+
+/* filter chips */
+.chips{display:flex;gap:7px;padding:4px 14px 10px;overflow-x:auto;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);border-radius:100px;padding:6px 13px;
+  font-size:12.5px;color:var(--dim);background:var(--bg-2)}
+.chip[aria-pressed="true"]{background:var(--yes);border-color:var(--yes);color:var(--yes-ink);font-weight:600}
+
+/* ---------- stock rows --------------------------------------------------- */
+.rows{border-top:1px solid var(--line-soft)}
+.row{display:flex;align-items:center;gap:11px;padding:11px 14px;border-bottom:1px solid var(--line-soft);
+  position:relative;width:100%;text-align:left}
+.row:active{background:var(--panel)}
+.row.held::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--yes)}
+.row.flash-up{animation:fu .7s} .row.flash-dn{animation:fd .7s}
+@keyframes fu{0%{background:rgba(43,217,138,.16)}100%{background:transparent}}
+@keyframes fd{0%{background:rgba(255,77,106,.16)}100%{background:transparent}}
+.tag{width:44px;height:38px;flex:none;border-radius:var(--r-s);display:grid;place-items:center;
+  font-family:var(--mono);font-size:11px;font-weight:700;background:var(--panel);
+  border:1px solid var(--line);color:var(--teal-lit)}
+.tag.crypto{color:var(--yes)} .tag.mine{background:var(--yes);color:var(--yes-ink);border-color:var(--yes)}
+.rname{min-width:0;flex:1}
+.rname b{display:block;font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.rname span{display:block;font-size:11.5px;color:var(--dimmer);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.spark{width:52px;height:24px;flex:none;opacity:.85}
+.rprice{text-align:right;flex:none;min-width:84px}
+.rprice b{display:block;font-family:var(--mono);font-size:14.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.rprice span{display:block;font-family:var(--mono);font-size:11.5px;font-variant-numeric:tabular-nums}
+
+/* signal bars — telco vernacular for volatility */
+.bars{display:flex;align-items:flex-end;gap:2px;height:14px;flex:none;width:16px}
+.bars i{width:3px;background:var(--line);border-radius:1px}
+.bars i:nth-child(1){height:35%} .bars i:nth-child(2){height:60%}
+.bars i:nth-child(3){height:82%} .bars i:nth-child(4){height:100%}
+.bars.s1 i:nth-child(-n+1),.bars.s2 i:nth-child(-n+2),
+.bars.s3 i:nth-child(-n+3),.bars.s4 i:nth-child(-n+4){background:var(--teal-lit)}
+.bars.hot i{background:var(--yes) !important}
+
+/* narrow phones: drop the sparkline before the name starts truncating */
+@media(max-width:369px){
+  .spark{display:none}
+  .tag{width:40px}
+  .rprice{min-width:76px}
+  nav button{font-size:10px}
+}
+@media(max-width:340px){ .bars{display:none} }
+
+/* ---------- generic panels ---------------------------------------------- */
+.pad{padding:0 14px}
+.panel{background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r-m);padding:14px;margin-bottom:12px}
+.panel h3{margin:0 0 4px;font-size:14.5px;font-weight:600}
+.panel p{margin:0;font-size:13px;color:var(--dim)}
+.empty{padding:40px 24px;text-align:center;color:var(--dimmer);font-size:13.5px}
+.empty b{display:block;color:var(--dim);font-size:14.5px;font-weight:600;margin-bottom:5px}
+
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 14px 4px}
+.stat{background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r-m);padding:11px 12px}
+.stat span{display:block;font-size:10.5px;color:var(--dimmer)}
+.stat b{font-family:var(--mono);font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+
+/* positions */
+.pos{border-bottom:1px solid var(--line-soft);padding:12px 14px;display:flex;gap:11px;align-items:center;width:100%;text-align:left}
+.side{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;font-family:var(--mono)}
+.side.L{background:rgba(43,217,138,.15);color:var(--up)}
+.side.S{background:rgba(255,77,106,.15);color:var(--dn)}
+
+/* news */
+.news{border-bottom:1px solid var(--line-soft);padding:13px 14px;display:flex;gap:11px}
+.news .rail{width:3px;border-radius:2px;flex:none;background:var(--line)}
+.news.pos-t .rail{background:var(--up)} .news.neg-t .rail{background:var(--dn)}
+.news.big .rail{background:var(--yes);width:4px}
+.news h4{margin:0 0 3px;font-size:14px;font-weight:600;line-height:1.35}
+.news p{margin:0;font-size:12.5px;color:var(--dim);line-height:1.45}
+.news .meta{margin-top:6px;font-size:10.5px;color:var(--dimmer);font-family:var(--mono)}
+.news.ad{background:linear-gradient(90deg,rgba(255,214,0,.07),transparent)}
+.news.ad h4::before{content:"Sponsored ";color:var(--yes);font-weight:700;font-size:10px;
+  letter-spacing:.02em;vertical-align:1px}
+
+/* floor prints sit quieter than stories */
+.news.flow{padding:9px 14px;background:rgba(255,255,255,.012)}
+.news.flow .rail{background:var(--teal)}
+.news.flow h4{font-size:12.5px;font-weight:500;color:var(--dim)}
+.news.flow h4 em{font-style:normal;color:var(--txt);font-weight:600}
+.news.flow p{font-size:11.5px;color:var(--dimmer)}
+.news.flow .meta{display:none}
+
+#pChart{width:100%;height:96px;display:block}
+
+.guide div{border-top:1px solid var(--line-soft);padding:11px 0;font-size:13px;color:var(--dim);line-height:1.5}
+.guide div b{color:var(--txt);font-weight:600}
+
+/* ranks */
+.rank{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line-soft)}
+.rank .n{width:22px;font-family:var(--mono);color:var(--dimmer);font-size:13px}
+.rank.me{background:rgba(255,214,0,.06)} .rank.me .n{color:var(--yes)}
+.rank b{flex:1;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* buttons */
+.btn{display:block;width:100%;padding:14px;border-radius:var(--r-m);font-weight:600;font-size:15px;
+  text-align:center;transition:transform .08s}
+.btn:active{transform:scale(.985)}
+.btn.y{background:var(--yes);color:var(--yes-ink)}
+.btn.t{background:var(--teal);color:#00181A}
+.btn.g{border:1px solid var(--line);color:var(--txt);background:var(--bg-2)}
+.btn.long{background:var(--up);color:#04331F}
+.btn.short{background:var(--dn);color:#3A0512}
+.btn[disabled]{opacity:.4;pointer-events:none}
+.btn.sm{padding:9px 14px;font-size:13px;width:auto;display:inline-block}
+
+/* ---------- bottom nav --------------------------------------------------- */
+nav{display:flex;background:rgba(10,12,16,.92);backdrop-filter:blur(14px);
+  border-top:1px solid var(--line);padding-bottom:var(--safe-b);z-index:30}
+nav button{flex:1;padding:9px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;
+  color:var(--dimmer);font-size:10.5px}
+nav button svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+nav button[aria-current="true"]{color:var(--yes)}
+nav .dot{position:absolute;top:6px;right:calc(50% - 15px);width:6px;height:6px;border-radius:50%;background:var(--dn)}
+nav button{position:relative}
+
+/* ---------- trade sheet -------------------------------------------------- */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:40;opacity:0;pointer-events:none;
+  transition:opacity .2s}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--bg-2);
+  border-top:1px solid var(--line);border-radius:var(--r-l) var(--r-l) 0 0;
+  transform:translateY(101%);transition:transform .26s cubic-bezier(.2,.8,.2,1);
+  max-width:760px;margin:0 auto;max-height:92dvh;overflow-y:auto;
+  padding-bottom:calc(var(--safe-b) + 16px)}
+.sheet.on{transform:translateY(0)}
+.grab{width:36px;height:4px;border-radius:2px;background:var(--line);margin:9px auto 4px}
+.sheet-head{display:flex;align-items:flex-start;gap:12px;padding:8px 16px 12px}
+.sheet-head .rprice b{font-size:22px}
+.sheet-head h3{margin:0;font-size:17px;font-weight:600}
+.sheet-head span{font-size:12px;color:var(--dimmer)}
+#sheetChart{width:100%;height:132px;display:block}
+.qtybar{display:flex;align-items:center;gap:10px;padding:12px 16px 0}
+.qtybar input{text-align:center;font-family:var(--mono);font-size:19px;font-weight:600;padding:11px}
+.step{width:46px;height:46px;flex:none;border:1px solid var(--line);border-radius:var(--r-s);
+  font-size:20px;display:grid;place-items:center;background:var(--panel)}
+.quick{display:flex;gap:7px;padding:10px 16px 0}
+.quick button{flex:1;border:1px solid var(--line);border-radius:var(--r-s);padding:8px 0;font-size:12.5px;
+  color:var(--dim);background:var(--bg)}
+.costline{display:flex;justify-content:space-between;padding:14px 16px 4px;font-size:13px;color:var(--dim)}
+.costline b{font-family:var(--mono);color:var(--txt);font-weight:600}
+.acts{display:flex;gap:10px;padding:12px 16px 0}
+.acts .btn{flex:1}
+.posbox{margin:14px 16px 0;border:1px solid var(--line);border-radius:var(--r-m);padding:12px;background:var(--panel)}
+.posbox .r{display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px}
+.posbox .r b{font-family:var(--mono)}
+
+/* ---------- modals / auth ------------------------------------------------ */
+.modal{position:fixed;inset:0;z-index:60;background:rgba(6,8,11,.86);backdrop-filter:blur(8px);
+  display:none;padding:20px;overflow-y:auto}
+.modal.on{display:flex;align-items:center;justify-content:center}
+.card{width:100%;max-width:400px;background:var(--bg-2);border:1px solid var(--line);
+  border-radius:var(--r-l);padding:22px}
+.card h2{margin:0 0 4px;font-size:20px;font-weight:600;letter-spacing:-0.02em}
+.card > p{margin:0 0 16px;font-size:13px;color:var(--dim)}
+.card label{display:block;font-size:11.5px;color:var(--dimmer);margin:12px 0 5px}
+.tabs{display:flex;gap:6px;margin-bottom:14px;background:var(--bg);border-radius:var(--r-s);padding:4px}
+.tabs button{flex:1;padding:9px;border-radius:6px;font-size:13px;color:var(--dim)}
+.tabs button[aria-pressed="true"]{background:var(--panel);color:var(--txt);font-weight:600}
+.err{color:var(--dn);font-size:12.5px;margin-top:10px;min-height:16px}
+.fineprint{font-size:11px;color:var(--dimmer);line-height:1.5;margin-top:14px}
+.fineprint a{color:var(--dim)}
+
+/* toasts */
+#toasts{position:fixed;left:0;right:0;top:calc(var(--safe-t) + 8px);z-index:70;
+  display:flex;flex-direction:column;align-items:center;gap:7px;pointer-events:none;padding:0 12px}
+.toast{max-width:420px;width:100%;background:var(--panel);border:1px solid var(--line);
+  border-left:3px solid var(--teal);border-radius:var(--r-s);padding:10px 13px;font-size:13px;
+  box-shadow:0 12px 30px rgba(0,0,0,.5);animation:tin .22s}
+.toast.bad{border-left-color:var(--dn)} .toast.good{border-left-color:var(--up)}
+.toast.big{border-left-color:var(--yes)}
+.toast b{display:block;font-size:13.5px;font-weight:600;margin-bottom:1px}
+.toast span{color:var(--dim);font-size:12.5px}
+@keyframes tin{from{opacity:0;transform:translateY(-10px)}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="brandrow">
+      <span class="mark">yes<small>EXCHANGE</small></span>
+      <h1>Trading floor</h1>
+      <div class="clock"><b id="gClock">Day 1 · 09:00</b>Live market</div>
+      <button class="iconbtn" id="btnMenu" aria-label="Settings">&#9881;</button>
+    </div>
+
+    <div class="wallet">
+      <div><span>Credits</span><b class="mono" id="wCash">10,000</b></div>
+      <div class="netw"><span>Net worth</span><b class="mono" id="wNet">10,000</b></div>
+      <div><span>Open P&amp;L</span><b class="mono" id="wPnl">0</b></div>
+    </div>
+
+    <div class="tape" aria-hidden="true"><div class="tape-track" id="tape"></div></div>
+  </header>
+
+  <div class="netstat" id="netstat">
+    <i class="bulb"></i>
+    <span>Network</span><b id="netLabel">Nominal</b>
+    <span class="who" id="whoBadge">connecting…</span>
+  </div>
+
+  <main>
+
+    <!-- ============ MARKET ============ -->
+    <section class="view on" id="view-market">
+      <div class="chips" id="filters">
+        <button class="chip" data-f="all" aria-pressed="true">Everything</button>
+        <button class="chip" data-f="telco" aria-pressed="false">Telco</button>
+        <button class="chip" data-f="media" aria-pressed="false">Media</button>
+        <button class="chip" data-f="tech" aria-pressed="false">Tech</button>
+        <button class="chip" data-f="crypto" aria-pressed="false">Crypto</button>
+        <button class="chip" data-f="held" aria-pressed="false">Holding</button>
+      </div>
+      <div class="rows" id="stockRows"></div>
+      <p class="fineprint pad" style="padding-bottom:20px">
+        Prices move on what every trader online is doing right now. Big orders move them further.
+      </p>
+    </section>
+
+    <!-- ============ PORTFOLIO ============ -->
+    <section class="view" id="view-port">
+      <div class="stats">
+        <div class="stat"><span>Net worth</span><b class="mono" id="pNet">10,000</b></div>
+        <div class="stat"><span>Buying power</span><b class="mono" id="pCash">10,000</b></div>
+        <div class="stat"><span>Exposure</span><b class="mono" id="pExp">0</b></div>
+        <div class="stat"><span>All-time return</span><b class="mono" id="pRet">0.0%</b></div>
+      </div>
+      <div class="pad" style="padding-top:10px">
+        <div class="panel" style="padding:10px 6px 4px">
+          <canvas id="pChart" aria-label="Net worth over time"></canvas>
+          <p class="dim" id="pChartNote" style="font-size:11px;padding:0 8px 4px">Your net worth is
+             sampled every 15 seconds while you are on the floor.</p>
+        </div>
+      </div>
+      <div class="secthead"><h2>Open positions</h2><span class="rt" id="posCount">0</span></div>
+      <div class="rows" id="posRows"></div>
+      <div class="secthead"><h2>Recent fills</h2></div>
+      <div class="rows" id="fillRows"></div>
+    </section>
+
+    <!-- ============ NEWS ============ -->
+    <section class="view" id="view-news">
+      <div class="secthead"><h2>The wire</h2><span class="rt">Not every story says what it means</span></div>
+      <div class="chips" id="newsFilters">
+        <button class="chip" data-nf="all" aria-pressed="true">Everything</button>
+        <button class="chip" data-nf="story" aria-pressed="false">Stories</button>
+        <button class="chip" data-nf="floor" aria-pressed="false">The floor</button>
+      </div>
+      <div class="rows" id="newsRows"></div>
+    </section>
+
+    <!-- ============ MINT ============ -->
+    <section class="view" id="view-mint">
+      <div class="pad" style="padding-top:14px">
+
+        <div class="panel" id="mintLocked">
+          <h3>Issue your own asset</h3>
+          <p>Reach 1,000,000 credits in net worth and you can list a coin or float a company on this
+             exchange. Everyone online will be able to trade it, and you keep 60% of the supply.</p>
+          <div style="margin-top:14px;height:6px;background:var(--bg);border-radius:3px;overflow:hidden">
+            <div id="mintBar" style="height:100%;width:1%;background:var(--yes)"></div>
+          </div>
+          <p class="mono" style="margin-top:7px;font-size:12px" id="mintProg">1,000,000 to go</p>
+        </div>
+
+        <div class="panel hide" id="mintForm">
+          <h3>List a new asset</h3>
+          <p>Costs 250,000 credits. Choose carefully — the ticker is permanent.</p>
+          <label for="mSym">Ticker (3–5 letters)</label>
+          <input id="mSym" maxlength="5" placeholder="OLLIE2" autocapitalize="characters">
+          <label for="mName">Name</label>
+          <input id="mName" maxlength="28" placeholder="Ollie Coin Classic">
+          <label for="mType">Type</label>
+          <select id="mType" style="width:100%;background:var(--bg-2);border:1px solid var(--line);
+            border-radius:8px;padding:12px 14px">
+            <option value="crypto">Cryptocurrency — wild swings, no floor</option>
+            <option value="ipo">Company IPO — steadier, pays attention to the market</option>
+          </select>
+          <label for="mPrice">Opening price</label>
+          <input id="mPrice" type="number" min="0.05" step="0.05" value="5.00" inputmode="decimal">
+          <button class="btn y" id="btnMint" style="margin-top:16px">List it</button>
+          <div class="err" id="mintErr"></div>
+        </div>
+
+        <div class="hide" id="mintOwned">
+          <div class="panel">
+            <h3 id="ownSym">—</h3>
+            <p id="ownStat">—</p>
+          </div>
+          <div class="panel">
+            <h3>Buy attention</h3>
+            <p>Advertising puts your asset on the global wire. Traders and bots who see it start
+               buying, which lifts the price for as long as the campaign runs.</p>
+            <div class="quick" style="padding:12px 0 0">
+              <button data-ad="10000">10k</button>
+              <button data-ad="50000">50k</button>
+              <button data-ad="150000">150k</button>
+              <button data-ad="500000">500k</button>
+            </div>
+            <label for="adCopy">Campaign line</label>
+            <input id="adCopy" maxlength="70" placeholder="The only coin with actual coverage.">
+            <div class="err" id="adErr"></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============ RANKS ============ -->
+    <section class="view" id="view-ranks">
+      <div class="secthead"><h2>Richest on the floor</h2><span class="rt" id="onlineN">—</span></div>
+      <div class="rows" id="rankRows"></div>
+    </section>
+
+  </main>
+
+  <nav id="nav">
+    <button data-view="market" aria-current="true">
+      <svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 5-8 4 5"/><path d="M3 21h18"/></svg>Market</button>
+    <button data-view="port" aria-current="false">
+      <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>Portfolio</button>
+    <button data-view="news" aria-current="false">
+      <svg viewBox="0 0 24 24"><path d="M4 5h13v14H6a2 2 0 01-2-2z"/><path d="M17 9h3v8a2 2 0 01-3 2"/><path d="M7 9h7M7 13h7"/></svg>
+      <i class="dot hide" id="newsDot"></i>News</button>
+    <button data-view="mint" aria-current="false">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 10h5M9.5 14h5"/></svg>Issue</button>
+    <button data-view="ranks" aria-current="false">
+      <svg viewBox="0 0 24 24"><path d="M6 20V10M12 20V4M18 20v-7"/></svg>Ranks</button>
+  </nav>
+</div>
+
+<!-- ============ TRADE SHEET ============ -->
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-label="Trade">
+  <div class="grab"></div>
+  <div class="sheet-head">
+    <div class="rname" style="flex:1">
+      <h3 id="sheetName">—</h3>
+      <span id="sheetSub">—</span>
+    </div>
+    <div class="rprice">
+      <b class="mono" id="sheetPrice">0.00</b>
+      <span class="mono" id="sheetChg">0.00%</span>
+    </div>
+  </div>
+  <canvas id="sheetChart"></canvas>
+  <div class="posbox hide" id="sheetPos"></div>
+  <div class="qtybar">
+    <button class="step" id="qMinus" aria-label="Fewer">&minus;</button>
+    <input id="qty" class="mono" type="number" min="1" step="1" value="10" inputmode="numeric">
+    <button class="step" id="qPlus" aria-label="More">+</button>
+  </div>
+  <div class="quick" id="quickQty">
+    <button data-q="10">10</button><button data-q="50">50</button>
+    <button data-q="250">250</button><button data-q="max">Max</button>
+  </div>
+  <div class="costline"><span id="costLabel">Order value</span><b class="mono" id="costVal">0</b></div>
+  <div class="costline" style="padding-top:0"><span>Fee &amp; spread</span><b class="mono" id="feeVal">0</b></div>
+  <div class="acts">
+    <button class="btn long" id="btnLong">Go long</button>
+    <button class="btn short" id="btnShort">Go short</button>
+  </div>
+  <p class="fineprint" style="padding:0 16px">Shorting holds the full position value as margin. If the
+     price doubles against you the position is closed out automatically.</p>
+</div>
+
+<!-- ============ AUTH ============ -->
+<div class="modal on" id="authModal">
+  <div class="card">
+    <span class="mark" style="font-size:17px">yes<small>EXCHANGE</small></span>
+    <h2 style="margin-top:14px">Open a trading account</h2>
+    <p>10,000 credits to start. The market is live and shared with everyone else online.</p>
+    <div class="tabs" id="authTabs">
+      <button data-m="in" aria-pressed="true">Sign in</button>
+      <button data-m="up" aria-pressed="false">Create account</button>
+    </div>
+    <div id="nameWrap" class="hide">
+      <label for="aName">Trader name</label>
+      <input id="aName" maxlength="18" placeholder="Ollie">
+    </div>
+    <label for="aMail">Email</label>
+    <input id="aMail" type="email" autocomplete="email" placeholder="you@example.com">
+    <label for="aPass">Password</label>
+    <input id="aPass" type="password" autocomplete="current-password" placeholder="At least 6 characters">
+    <button class="btn y" id="btnAuth" style="margin-top:18px">Sign in</button>
+    <button class="btn g" id="btnGuest" style="margin-top:9px">Play as a guest</button>
+    <div class="err" id="authErr"></div>
+    <p class="fineprint" id="modeNote"></p>
+  </div>
+</div>
+
+<!-- ============ SETTINGS ============ -->
+<div class="modal" id="cfgModal">
+  <div class="card">
+    <h2>Settings</h2>
+    <p id="cfgState">—</p>
+    <label for="cfgBox">Firebase config</label>
+    <textarea id="cfgBox" rows="8" class="mono" style="font-size:12px"
+      placeholder='{"apiKey":"…","authDomain":"…","databaseURL":"…","projectId":"…","appId":"…"}'></textarea>
+    <p class="fineprint">Paste the config object from your Firebase console to connect this device to the
+       shared live market. Leave it empty to keep trading against the local simulation.</p>
+    <button class="btn y" id="btnSaveCfg" style="margin-top:14px">Save and reload</button>
+    <button class="btn g" id="btnGuide" style="margin-top:9px">How this works</button>
+    <button class="btn g" id="btnSignOut" style="margin-top:9px">Sign out</button>
+    <button class="btn g" id="btnCloseCfg" style="margin-top:9px">Close</button>
+    <p class="fineprint">Optus Exchange is an unofficial parody built for fun. Not affiliated with
+       Optus, Singtel or anyone else named here. No real money, no real advice.</p>
+  </div>
+</div>
+
+<div class="modal" id="guideModal">
+  <div class="card">
+    <h2>How the floor works</h2>
+    <p>Four things worth knowing before you put money down.</p>
+    <div class="guide">
+      <div><b>Prices move on real orders.</b> Every trade anyone places pushes the price in the
+        direction they bet. Big orders push harder, and thin stocks move furthest.</div>
+      <div><b>You can bet either way.</b> Long profits when a price rises. Short profits when it falls,
+        and holds the position value as margin until you close it.</div>
+      <div><b>The wire is the edge.</b> Some stories say what they mean. Others just tell you something
+        happened and leave the trade to you.</div>
+      <div><b>Nothing moves alone.</b> These companies are tangled together. When one drops, work out
+        who supplies it, who competes with it, and who sells to its customers.</div>
+    </div>
+    <button class="btn y" id="btnGuideGo" style="margin-top:18px">Start trading</button>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script id="game-code">
+/* =============================================================================
+   OPTUS EXCHANGE
+   A perpetual, multiplayer, telco-flavoured stock market.
+
+   Everything lives in this one file. Drop your Firebase config in FIREBASE_CONFIG
+   below (or paste it into Settings inside the game) and every browser that opens
+   the file joins the same live market. With no config it runs a full local
+   simulation so you can play immediately.
+
+   Module map
+     CONFIG / ROSTER ....... tunables, the stock roster, the hidden correlation web
+     NEWS .................. headline pool + the generator that fires them
+     ENGINE ................ the market simulation (runs on one elected host client)
+     NET ................... storage adapters: FireNet (shared) and LocalNet (solo)
+     AUTH .................. Firebase Auth wrapper + guest play
+     PORTFOLIO ............. cash, positions, fills, liquidation, minting
+     UI .................... rendering, the trade sheet, toasts, navigation
+   ========================================================================== */
+(function () {
+'use strict';
+
+/* ---------------------------------------------------------------------------
+   1. CONFIG
+   ------------------------------------------------------------------------ */
+
+// Paste your Firebase project config here, or leave it null and use Settings.
+const FIREBASE_CONFIG = null;
+/*  Example:
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBJoMyi-9kC-zQGleMWr9wlSsNDLZjygNo",
+  authDomain: "optusexchange.firebaseapp.com",
+  databaseURL: "https://optusexchange-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "optusexchange",
+  storageBucket: "optusexchange.firebasestorage.app",
+  messagingSenderId: "864964072437",
+  appId: "1:864964072437:web:4dc7d86a1810e7339d06bc",
+  measurementId: "G-7EY447FSJV"
+};
+*/
+
+const CFG = {
+  TICK_MS:        3000,        // one market tick every 3 real seconds
+  MS_PER_HOUR:    60000,       // 1 real minute = 1 in-game hour
+  EPOCH:          Date.UTC(2026, 8, 1),
+  START_CASH:     10000,
+  MINT_MIN:       1000000,     // net worth needed to unlock issuing an asset
+  MINT_COST:      250000,
+  FEE:            0.0015,      // brokerage taken on every fill
+  SPREAD:         0.0011,      // half-spread paid on entry and exit
+  IMPACT:         0.014,       // max price move per tick from order flow
+  HOST_TTL:       12000,       // a host that stops beating is replaced after this
+  NEWS_CHANCE:    0.16,        // per tick
+  MAX_NEWS:       40,
+  HIST:           140          // price points kept for charts
+};
+
+/* ---------------------------------------------------------------------------
+   2. THE ROSTER
+   liq  = how much order flow it takes to move the price (bigger = heavier stock)
+   vol  = per-tick volatility
+   mr   = pull back toward the anchor price (0 = pure random walk)
+   beta = sensitivity to the whole-market factor
+   ------------------------------------------------------------------------ */
+const ROSTER = [
+  { s:'OPT',  n:'Optus',                    d:'Network titan',            sec:'telco',  p:142.50, vol:.0052, drift:.00004, mr:.010, beta:1.25, liq:260000 },
+  { s:'YES',  n:'Yes! Telecommunications',  d:'Retail holding co.',       sec:'telco',  p:64.20,  vol:.0046, drift:.00006, mr:.014, beta:1.05, liq:120000 },
+  { s:'SNGT', n:'Singtel Overlords',        d:'The parent company',       sec:'telco',  p:214.80, vol:.0021, drift:.00003, mr:.022, beta:0.55, liq:420000 },
+  { s:'BSPT', n:'Blackspot Infrastructure', d:'Towers and trenches',      sec:'telco',  p:22.40,  vol:.0061, drift:-.00002,mr:.012, beta:1.10, liq:70000  },
+  { s:'TELS', n:'Telstar Communications',   d:'The big rival',            sec:'telco',  p:88.60,  vol:.0040, drift:.00003, mr:.013, beta:0.95, liq:200000 },
+  { s:'BODA', n:'Bodafone Mobile',          d:'The scrappy rival',        sec:'telco',  p:31.15,  vol:.0055, drift:.00002, mr:.011, beta:1.00, liq:90000  },
+  { s:'CSAI', n:'Customer Support AI Ltd.', d:'Replaces the call centre', sec:'tech',   p:57.80,  vol:.0072, drift:.00011, mr:.006, beta:1.35, liq:85000  },
+  { s:'GLDY', n:'Gladys Tech Corp',         d:'Ex-executive venture fund',sec:'tech',   p:38.90,  vol:.0068, drift:.00007, mr:.008, beta:1.20, liq:65000  },
+  { s:'PUDD', n:'Pudding Productions',      d:'Studio and content arm',   sec:'media',  p:31.20,  vol:.0064, drift:.00005, mr:.009, beta:1.15, liq:60000  },
+  { s:'MUZZ', n:'Muzz Inc',                 d:'Streaming and bundles',    sec:'media',  p:48.60,  vol:.0060, drift:.00006, mr:.009, beta:1.20, liq:75000  },
+  { s:'S3ND', n:'S3ndy',                    d:'Payments and messaging',   sec:'tech',   p:19.75,  vol:.0090, drift:.00012, mr:.005, beta:1.45, liq:42000  },
+  { s:'OLLIE',n:'Ollie Coin',               d:'The mascot coin',          sec:'crypto', p:3.42,   vol:.0210, drift:.00020, mr:.002, beta:1.70, liq:26000  }
+];
+const BY_SYM = {}; ROSTER.forEach(r => BY_SYM[r.s] = r);
+
+/* The hidden web. Nothing in the UI names these — you learn them by watching.
+   Value = how much of yesterday's move in the key rubs off on the listed stock. */
+const LINKS = {
+  OPT:  [['YES',.75],['SNGT',.50],['BSPT',.46],['MUZZ',.30],['PUDD',.20],['CSAI',.18],['TELS',-.42],['BODA',-.38]],
+  YES:  [['OPT',.55],['BSPT',.30],['TELS',-.25]],
+  SNGT: [['OPT',.28],['YES',.22]],
+  BSPT: [['OPT',.30],['TELS',.22],['BODA',.20],['SNGT',.12]],
+  TELS: [['BODA',.48],['BSPT',.18],['OPT',-.36]],
+  BODA: [['TELS',.44],['OPT',-.30]],
+  CSAI: [['GLDY',.40],['S3ND',.22],['OPT',-.16]],
+  GLDY: [['CSAI',.34],['S3ND',.30],['OLLIE',.14]],
+  PUDD: [['MUZZ',.52],['OPT',.18]],
+  MUZZ: [['PUDD',.46],['OPT',.30],['OLLIE',.12]],
+  S3ND: [['OLLIE',.42],['GLDY',.26],['CSAI',.18]],
+  OLLIE:[['S3ND',.34],['MUZZ',.16],['GLDY',.12]]
+};
+
+/* ---------------------------------------------------------------------------
+   3. NEWS POOL
+   tone: +1 good / -1 bad / 0 ambiguous.  mag: size of the shock.
+   subtle: the headline does not tell you which way it lands.
+   also:  knock-on shocks applied at a fraction of the headline size.
+   ------------------------------------------------------------------------ */
+const NEWS = [
+  // --- Optus: overt -------------------------------------------------------
+  { s:'OPT', tone:-1, mag:.075, big:true, h:'Nationwide outage takes Optus mobile and NBN offline',
+    b:'Eleven million services dropped just after 4am. Triple zero calls are affected. The board has been summoned.',
+    also:[['TELS',.55],['BODA',.50],['BSPT',-.35],['YES',-.60],['CSAI',.30]] },
+  { s:'OPT', tone:1, mag:.055, h:'Optus wins the national 5G spectrum auction',
+    b:'A decade of exclusive mid-band spectrum, paid for with a bond issue nobody has read yet.',
+    also:[['TELS',-.45],['BSPT',.50],['YES',.55]] },
+  { s:'OPT', tone:-1, mag:.048, h:'Regulator opens investigation into Optus billing practices',
+    b:'Customers say the discount expired quietly. The ombudsman received forty thousand complaints in a month.',
+    also:[['YES',-.50],['TELS',.30]] },
+  { s:'OPT', tone:1, mag:.042, h:'Optus posts record quarter on regional subscriber growth',
+    b:'Net adds beat every analyst estimate, driven by towns that finally got coverage.',
+    also:[['BSPT',.45],['SNGT',.40],['YES',.50]] },
+  { s:'OPT', tone:-1, mag:.038, h:'Optus store staff walk out over roster changes',
+    b:'Retail floors are running on skeleton crews across three states.',
+    also:[['CSAI',.60],['YES',-.45]] },
+  { s:'OPT', tone:1, mag:.036, h:'Optus signs stadium naming rights for another decade',
+    b:'Brand people call it a coup. Finance people call it a lot of money.',
+    also:[['PUDD',.35],['MUZZ',.30]] },
+  // --- Optus: subtle ------------------------------------------------------
+  { s:'OPT', tone:-1, mag:.020, subtle:true, h:'Optus schedules unusually large overnight maintenance window',
+    b:'The notice went out at 11pm and covers every core routing site on the east coast.',
+    also:[['BSPT',-.30]] },
+  { s:'OPT', tone:1, mag:.018, subtle:true, h:'Three senior Optus engineers seen touring a decommissioned exchange',
+    b:'Nobody will say why. The site has fibre nobody has lit since 2009.',
+    also:[['BSPT',.40]] },
+  { s:'OPT', tone:-1, mag:.016, subtle:true, h:'Optus quietly removes its uptime dashboard from the public site',
+    b:'A spokesperson describes it as a routine content refresh.' },
+  { s:'OPT', tone:1, mag:.015, subtle:true, h:'Unusual volume of Optus handset stock arriving at port',
+    b:'Freight manifests show three times the normal pallet count for this time of year.',
+    also:[['YES',.40]] },
+
+  // --- rivals -------------------------------------------------------------
+  { s:'TELS', tone:1, mag:.045, h:'Telstar undercuts the market with an unlimited plan',
+    b:'Priced below what the network costs to run, which is either strategy or panic.',
+    also:[['OPT',-.55],['BODA',-.40],['YES',-.45]] },
+  { s:'TELS', tone:-1, mag:.040, h:'Telstar copper network fails another compliance audit',
+    b:'The regulator wants a remediation plan within thirty days.',
+    also:[['OPT',.45],['BSPT',.35]] },
+  { s:'BODA', tone:1, mag:.050, h:'Bodafone lands the entire government mobile fleet',
+    b:'A four-year contract worth more than its last three years of revenue combined.',
+    also:[['OPT',-.40],['TELS',-.35]] },
+  { s:'BODA', tone:-1, mag:.044, h:'Bodafone loses roaming deal, coverage map shrinks overnight',
+    b:'Regional customers wake up to one bar and a strongly worded FAQ.',
+    also:[['OPT',.40],['TELS',.30]] },
+
+  // --- infrastructure -----------------------------------------------------
+  { s:'BSPT', tone:-1, mag:.060, h:'Blackspot tower collapses during install, work halted nationally',
+    b:'No injuries. Every crane on every site is stood down pending review.',
+    also:[['OPT',-.35],['TELS',-.25]] },
+  { s:'BSPT', tone:1, mag:.052, h:'Blackspot awarded the regional coverage rollout',
+    b:'Eight hundred new sites, funded by a program every carrier lobbied for.',
+    also:[['OPT',.35],['TELS',.25],['BODA',.25]] },
+  { s:'BSPT', tone:-1, mag:.019, subtle:true, h:'Council knocks back three Blackspot planning applications',
+    b:'Residents objected to the mast height. Again.' },
+  { s:'BSPT', tone:1, mag:.017, subtle:true, h:'Blackspot hires aggressively for riggers in two states',
+    b:'Two hundred roles posted in a week for work that has not been announced.' },
+
+  // --- parent -------------------------------------------------------------
+  { s:'SNGT', tone:1, mag:.030, h:'Singtel Overlords lift the dividend',
+    b:'Steady as ever. The chairman used the word disciplined nine times.',
+    also:[['OPT',.35],['YES',.25]] },
+  { s:'SNGT', tone:-1, mag:.032, h:'Singtel reviews its Australian holdings',
+    b:'Bankers have been appointed. Everyone insists this is normal housekeeping.',
+    also:[['OPT',-.40],['YES',-.35]] },
+  { s:'SNGT', tone:0, mag:.014, subtle:true, h:'Singtel books an unusually long board session in Sydney',
+    b:'Three days. The agenda is not public.',
+    also:[['OPT',-.30]] },
+
+  // --- tech ---------------------------------------------------------------
+  { s:'CSAI', tone:1, mag:.070, h:'Customer Support AI wins the contract to replace an entire call centre',
+    b:'Twelve hundred human roles go. The demo answered in nine languages and never sighed.',
+    also:[['OPT',.30],['GLDY',.45]] },
+  { s:'CSAI', tone:-1, mag:.062, h:'Support bot tells a customer to have you tried dying for six hours',
+    b:'The transcript is trending. The apology was also written by the bot.',
+    also:[['GLDY',-.40],['OPT',-.20]] },
+  { s:'CSAI', tone:1, mag:.022, subtle:true, h:'Customer Support AI opens a second data centre floor',
+    b:'Filed as a lease amendment. Nobody sent a press release.' },
+  { s:'GLDY', tone:1, mag:.058, h:'Gladys Tech raises a fund larger than its last three combined',
+    b:'The pitch deck was eleven slides and one of them was a photo of a harbour.',
+    also:[['S3ND',.45],['CSAI',.35]] },
+  { s:'GLDY', tone:-1, mag:.050, h:'Gladys Tech portfolio company collapses, writedown expected',
+    b:'The founder has already announced a new venture in the same building.',
+    also:[['S3ND',-.35],['CSAI',-.25]] },
+  { s:'GLDY', tone:0, mag:.020, subtle:true, h:'Gladys Tech registers four shell entities in a week',
+    b:'All named after birds. Nobody has explained the birds.' },
+
+  { s:'S3ND', tone:1, mag:.085, h:'S3ndy passes ten million monthly transfers',
+    b:'Growth is vertical and so is the cost of running it.',
+    also:[['OLLIE',.50],['GLDY',.40]] },
+  { s:'S3ND', tone:-1, mag:.078, h:'S3ndy outage during payday, transfers stuck for nine hours',
+    b:'Rent was late nationwide. The status page said everything was fine.',
+    also:[['OLLIE',-.40],['GLDY',-.30]] },
+  { s:'S3ND', tone:1, mag:.024, subtle:true, h:'S3ndy quietly raises its transfer cap',
+    b:'From two thousand to fifty thousand, with no announcement.' },
+  { s:'S3ND', tone:-1, mag:.022, subtle:true, h:'S3ndy chief risk officer departs after eleven weeks',
+    b:'To spend more time with a family that has not been introduced.' },
+
+  // --- media --------------------------------------------------------------
+  { s:'PUDD', tone:1, mag:.056, h:'Pudding Productions series becomes the most streamed launch of the year',
+    b:'Eleven episodes about a regional post office. Nobody predicted this.',
+    also:[['MUZZ',.55],['OPT',.20]] },
+  { s:'PUDD', tone:-1, mag:.048, h:'Pudding Productions writes off two unreleased films',
+    b:'Both were finished. Both will never be seen.',
+    also:[['MUZZ',-.45]] },
+  { s:'PUDD', tone:0, mag:.021, subtle:true, h:'Rumours circulate about a new chief executive at Pudding Productions',
+    b:'Three names are doing the rounds. Two of them have never run a studio.',
+    also:[['MUZZ',.25]] },
+  { s:'PUDD', tone:1, mag:.018, subtle:true, h:'Pudding books every sound stage in the state for eight months',
+    b:'The booking is under a holding company nobody recognises.' },
+  { s:'MUZZ', tone:1, mag:.054, h:'Muzz Inc bundles into every telco plan in the country',
+    b:'Free for the customer, paid for by the carrier, counted as a subscriber by Muzz.',
+    also:[['OPT',.35],['PUDD',.45]] },
+  { s:'MUZZ', tone:-1, mag:.050, h:'Muzz Inc raises prices, cancellations spike within hours',
+    b:'The retention offer appeared before the increase did.',
+    also:[['PUDD',-.40]] },
+  { s:'MUZZ', tone:0, mag:.019, subtle:true, h:'Muzz Inc removes its subscriber count from the investor deck',
+    b:'Replaced with engaged listening hours, a metric invented last quarter.' },
+
+  // --- crypto -------------------------------------------------------------
+  { s:'OLLIE', tone:1, mag:.150, big:true, h:'Ollie Coin listed on a major exchange',
+    b:'The mascot rang the bell. The bell was also a token.',
+    also:[['S3ND',.45],['GLDY',.25]] },
+  { s:'OLLIE', tone:-1, mag:.140, big:true, h:'Ollie Coin whale wallet moves everything to an exchange',
+    b:'Forty percent of supply, in one transaction, at three in the morning.',
+    also:[['S3ND',-.40]] },
+  { s:'OLLIE', tone:1, mag:.090, h:'Ollie Coin accepted for phone bills in a pilot program',
+    b:'Limited to one store. The queue went around the block anyway.',
+    also:[['OPT',.20],['S3ND',.35]] },
+  { s:'OLLIE', tone:-1, mag:.088, h:'Ollie Coin bridge exploited, funds drained',
+    b:'The team is aware and is monitoring the situation from an undisclosed timezone.',
+    also:[['S3ND',-.35]] },
+  { s:'OLLIE', tone:0, mag:.045, subtle:true, h:'Ollie Coin developer wallet stirs after eight months',
+    b:'One test transaction of a single coin. Then nothing.' },
+
+  // --- market-wide --------------------------------------------------------
+  { s:'*', tone:-1, mag:.030, h:'Rates held higher for longer, risk assets sold off',
+    b:'The statement changed two words and the market lost its composure.' },
+  { s:'*', tone:1, mag:.028, h:'Broad rally as inflation prints cooler than expected',
+    b:'Every desk on the floor has decided this changes everything.' },
+  { s:'*', tone:-1, mag:.035, h:'Undersea cable cut disrupts capacity across the region',
+    b:'Traffic is rerouting. Latency is not what it was this morning.' },
+  { s:'*', tone:0, mag:.014, subtle:true, h:'Volumes thin as the desks empty out for a long weekend',
+    b:'Anything that moves today will move further than it should.' }
+];
+
+/* ---------------------------------------------------------------------------
+   4. UTILITIES
+   ------------------------------------------------------------------------ */
+const $  = id => document.getElementById(id);
+const el = (tag, cls, html) => { const e = document.createElement(tag);
+  if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const now = () => Date.now();
+
+// Box–Muller normal, so price paths look like price paths and not sawtooth.
+function gauss() {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+const pick = a => a[Math.floor(Math.random() * a.length)];
+
+function money(n, dp) {
+  if (n == null || isNaN(n)) return '—';
+  const neg = n < 0; n = Math.abs(n);
+  let s;
+  if (dp != null)        s = n.toFixed(dp);
+  else if (n >= 1e9)     s = (n / 1e9).toFixed(2) + 'b';
+  else if (n >= 1e6)     s = (n / 1e6).toFixed(2) + 'm';
+  else if (n >= 100000)  s = Math.round(n).toLocaleString();
+  else                   s = n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return (neg ? '-' : '') + s;
+}
+const px = p => p >= 100 ? p.toFixed(2) : p >= 1 ? p.toFixed(2) : p.toFixed(4);
+const pct = n => (n >= 0 ? '+' : '') + (n * 100).toFixed(2) + '%';
+
+// 1 real minute = 1 in-game hour, counted from a fixed epoch so every client agrees.
+function gameTime() {
+  const h = Math.floor((now() - CFG.EPOCH) / CFG.MS_PER_HOUR);
+  return { day: Math.floor(h / 24) + 1, hour: ((h % 24) + 24) % 24 };
+}
+
+/* ---------------------------------------------------------------------------
+   5. SHARED CLIENT STATE
+   ------------------------------------------------------------------------ */
+const S = {
+  online:   false,     // true when a Firebase config is present
+  uid:      null,
+  name:     'Trader',
+  isHost:   false,
+  px:       {},        // symbol -> { p, o, hi, lo, prev, mag }
+  meta:     { net: 'ok', tick: 0 },
+  custom:   {},        // player-issued assets, merged into the roster at runtime
+  hist:     {},        // symbol -> recent prices, for charts
+  news:     [],
+  player:   null,      // { name, cash, positions, fills, minted, peak }
+  ranks:    [],
+  onlineN:  0,
+  filter:   'all',
+  view:     'market',
+  sheetSym: null,
+  seenNews: 0
+};
+
+function symbols() { return ROSTER.concat(Object.values(S.custom)); }
+function meta(sym) { return BY_SYM[sym] || S.custom[sym] || { s:sym, n:sym, sec:'crypto', liq:20000, vol:.02, beta:1, mr:0, drift:0 }; }
+function priceOf(sym) { const q = S.px[sym]; return q ? q.p : 0; }
+
+function pushHist(sym, p) {
+  const h = S.hist[sym] || (S.hist[sym] = []);
+  h.push(p);
+  if (h.length > CFG.HIST) h.shift();
+}
+
+/* ---------------------------------------------------------------------------
+   6. MARKET ENGINE
+   Runs on exactly one client at a time — the elected host. Every other client
+   just listens. The host consumes the shared order-flow pressure written by all
+   players, folds in news shocks, correlation spillover, a common market factor
+   and simulated background flow, then publishes the new prices.
+   ------------------------------------------------------------------------ */
+const Engine = {
+  st: null,     // { prices, shocks, ret, factor, seed }
+  timer: null,
+
+  /** Build a fresh market from the roster. */
+  fresh() {
+    const prices = {};
+    ROSTER.forEach(r => { prices[r.s] = { p:r.p, o:r.p, hi:r.p, lo:r.p, prev:r.p, anchor:r.p, base:r.p, vol:0 }; });
+    return { prices, shocks:{}, ret:{}, custom:{}, day:gameTime().day, net:'ok', netUntil:0, tick:0 };
+  },
+
+  /** Make sure late-added custom assets and new roster entries exist. */
+  reconcile(st) {
+    // Realtime Database drops empty objects, so put them back before use.
+    st.prices = st.prices || {}; st.shocks = st.shocks || {};
+    st.ret    = st.ret    || {}; st.custom = st.custom || {};
+    ROSTER.forEach(r => {
+      if (!st.prices[r.s]) st.prices[r.s] = { p:r.p, o:r.p, hi:r.p, lo:r.p, prev:r.p, anchor:r.p, base:r.p, vol:0 };
+      if (!st.prices[r.s].base) st.prices[r.s].base = r.p;
+    });
+    Object.values(st.custom || {}).forEach(c => {
+      if (!st.prices[c.s]) {
+        st.prices[c.s] = { p:c.p, o:c.p, hi:c.p, lo:c.p, prev:c.p, anchor:c.p, base:c.p, vol:0 };
+      }
+    });
+    return st;
+  },
+
+  /** Definition for a symbol, roster or player-issued. */
+  spec(st, sym) {
+    if (BY_SYM[sym]) return BY_SYM[sym];
+    const c = (st.custom || {})[sym];
+    if (c) return {
+      s: c.s, n: c.n, sec: c.type === 'crypto' ? 'crypto' : 'ipo',
+      vol: c.type === 'crypto' ? .026 : .011,
+      drift: -0.00012,                       // issued assets bleed without attention
+      mr: 0, beta: c.type === 'crypto' ? 1.6 : 0.9,
+      liq: Math.max(6000, (c.float || 40000) * 0.15)
+    };
+    return null;
+  },
+
+  /**
+   * One tick. `flow` is the aggregate order pressure since the last tick,
+   * shaped as { SYM: netNotionalCredits }. Returns the events it produced.
+   */
+  step(st, flow) {
+    const events = [];
+    const gt = gameTime();
+    st.tick++;
+
+    // Overnight the floor is thinner: less flow, wilder prints.
+    const night = gt.hour < 6 || gt.hour >= 22;
+    const liqMul = night ? 0.55 : 1;
+    const volMul = night ? 1.25 : 1;
+
+    // New in-game day: roll the open/high/low.
+    if (gt.day !== st.day) {
+      st.day = gt.day;
+      Object.values(st.prices).forEach(q => { q.o = q.p; q.hi = q.p; q.lo = q.p; q.vol = 0; });
+      events.push({ type:'day', day:gt.day });
+    }
+
+    // The common market factor — one number that nudges everything at once.
+    st.factor = (st.factor || 0) * 0.85 + gauss() * 0.0016;
+
+    const prevRet = st.ret || {};
+    const nextRet = {};
+    const syms = Object.keys(st.prices);
+
+    syms.forEach(sym => {
+      const sp = this.spec(st, sym);
+      const q  = st.prices[sym];
+      if (!sp || !q) return;
+
+      let r = 0;
+
+      // (a) drift + noise
+      r += sp.drift + sp.vol * volMul * gauss();
+
+      // (b) whole-market factor
+      r += (sp.beta || 1) * st.factor;
+
+      // (c) mean reversion toward a slowly drifting anchor
+      if (sp.mr) {
+        q.anchor = q.anchor * 0.99976 + q.p * 0.0002 + (q.base || q.p) * 0.00004;
+        r += sp.mr * Math.log(q.anchor / q.p) * 0.06;
+      }
+
+      // (d) the hidden correlation web — last tick's moves bleed into partners
+      const web = LINKS[sym];
+      if (web) for (const [src, coef] of web) {
+        const pr = prevRet[src];
+        if (pr) r += coef * pr * 0.45;
+      }
+
+      // (e) news shocks, released gradually then decayed
+      const sh = st.shocks[sym];
+      if (sh) {
+        r += sh.v * 0.3;
+        sh.v *= 0.68;
+        if (Math.abs(sh.v) < 0.0002) delete st.shocks[sym];
+      }
+
+      // (f) long-run tether. The market never closes, so without this a lucky
+      //     run compounds forever. Negligible near the listing price, brutal at
+      //     the edges, and deliberately wider for crypto.
+      const band = (sp.sec === 'crypto' || !sp.mr) ? 2.4 : 1.0;
+      const dev  = Math.log(q.p / (q.base || q.anchor || q.p)) / band;
+      r -= 0.00042 * Math.sign(dev) * Math.min(9, Math.abs(dev) ** 3);
+
+      // (g) order flow from real players plus simulated background traders
+      const liq = Math.max(4000, (sp.liq || 40000) * liqMul);
+      let net = (flow[sym] || 0);
+      net += this.npcFlow(st, sym, sp, liq);
+      const impact = CFG.IMPACT * Math.tanh(net / liq);
+      r += impact;
+
+      // Publish.
+      q.prev = q.p;
+      const np = Math.max(0.0005, q.p * Math.exp(clamp(r, -0.35, 0.35)));
+      q.p  = np;
+      q.hi = Math.max(q.hi, np);
+      q.lo = Math.min(q.lo, np);
+      q.vol = (q.vol || 0) + Math.abs(net);
+      nextRet[sym] = Math.log(np / q.prev);
+    });
+
+    st.ret = nextRet;
+
+    // Network status is Optus' weather: it follows the shock on OPT.
+    const optShock = st.shocks.OPT ? st.shocks.OPT.v : 0;
+    if (optShock < -0.045)      { st.net = 'out'; st.netUntil = st.tick + 26; }   // ~80 seconds
+    else if (optShock < -0.016) { if (st.net !== 'out') { st.net = 'deg'; st.netUntil = st.tick + 10; } }
+    if (st.net !== 'ok' && st.tick > (st.netUntil || 0) && optShock > -0.010) st.net = 'ok';
+
+    // News.
+    if (Math.random() < CFG.NEWS_CHANCE) {
+      const item = this.makeNews(st);
+      if (item) events.push({ type:'news', item });
+    }
+    return events;
+  },
+
+  /**
+   * Background traders. They chase news, fade extremes, and pile into anything
+   * currently being advertised — so a market with two humans in it still breathes.
+   */
+  npcFlow(st, sym, sp, liq) {
+    let f = gauss() * liq * 0.06;
+
+    // momentum: bots chase the last move
+    const lr = (st.ret || {})[sym] || 0;
+    f += Math.tanh(lr * 40) * liq * 0.075;
+
+    // news chasers
+    const sh = st.shocks[sym];
+    if (sh) f += Math.sign(sh.v) * Math.min(Math.abs(sh.v) * 14, 0.5) * liq;
+
+    // value buyers when something has fallen a long way below its anchor
+    const q = st.prices[sym];
+    if (q && q.anchor) {
+      const gap = Math.log(q.anchor / q.p);
+      if (Math.abs(gap) > 0.25) f += Math.sign(gap) * liq * 0.08;
+    }
+
+    // paid attention: advertising campaigns generate real demand while they run
+    const c = (st.custom || {})[sym];
+    if (c && c.hypeUntil > now()) {
+      const left = (c.hypeUntil - now()) / (c.hypeMs || 1);
+      f += (c.hype || 0) * left * 0.9;
+      f += Math.abs(gauss()) * liq * 0.05;
+    }
+    return f;
+  },
+
+  /** Pick a headline, apply its shock to the target and everything downstream. */
+  makeNews(st) {
+    const pool = NEWS.filter(n => n.s === '*' || st.prices[n.s]);
+    if (!pool.length) return null;
+
+    // Big events are rarer than the pool implies.
+    let n = pick(pool);
+    if (n.big && Math.random() > 0.22) n = pick(pool.filter(x => !x.big)) || n;
+
+    const dir = n.tone === 0 ? (Math.random() < .5 ? 1 : -1) : n.tone;
+    const size = n.mag * (0.7 + Math.random() * 0.7);
+    const add = (sym, v) => {
+      if (!st.prices[sym]) return;
+      const s = st.shocks[sym] || (st.shocks[sym] = { v:0 });
+      s.v += v;
+    };
+
+    if (n.s === '*') {
+      Object.keys(st.prices).forEach(sym => {
+        const sp = this.spec(st, sym);
+        add(sym, dir * size * (sp ? (sp.beta || 1) : 1) * 0.7);
+      });
+    } else {
+      add(n.s, dir * size);
+      (n.also || []).forEach(([sym, mult]) => add(sym, dir * size * mult));
+    }
+
+    return {
+      h: n.h, b: n.b, s: n.s, tone: n.subtle ? 0 : dir,
+      big: !!n.big, mag: size, ts: now(), day: gameTime().day, hour: gameTime().hour
+    };
+  }
+};
+
+/* ---------------------------------------------------------------------------
+   7. STORAGE ADAPTERS
+   Both adapters expose the same interface, so nothing above or below this
+   section knows or cares whether the market is shared or local:
+
+     start(h)              wire up handlers { onState, onNews, onPlayer, onRanks, onOnline }
+     flow(sym, notional)   register order pressure (signed: + buys, - sells)
+     mutatePlayer(fn)      atomic read-modify-write of the player record
+     mint(asset)           list a new player-issued asset
+     advertise(sym, …)     run a campaign
+     refreshRanks()        pull the leaderboard
+   ------------------------------------------------------------------------ */
+
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  del(k)    { try { localStorage.removeItem(k); } catch (e) {} }
+};
+
+/* ---- 7a. LocalNet — single player, everything in this browser ------------ */
+const LocalNet = {
+  h: null, flow_: {}, st: null, saveAt: 0,
+
+  start(h) {
+    this.h = h;
+    this.st = Engine.reconcile(LS.get('oe.market', null) || Engine.fresh());
+    S.isHost = true;
+    // Boot owns S.news; replay the cache through the same handler.
+    const cached = LS.get('oe.news', []);
+    S.news = [];
+    cached.slice().reverse().forEach(n => h.onNews(n, true));
+    h.onState(this.st);
+    h.onOnline(1 + Math.floor(Math.random() * 40));
+    this.tick = setInterval(() => this.loop(), CFG.TICK_MS);
+    this.rankSeed();
+  },
+
+  loop() {
+    this.npcTrade();
+    const flow = this.flow_; this.flow_ = {};
+    const evts = Engine.step(this.st, flow);
+    this.h.onState(this.st);
+    evts.forEach(e => { if (e.type === 'news') this.h.onNews(e.item); });
+    if (now() - this.saveAt > 9000) {
+      this.saveAt = now();
+      LS.set('oe.market', this.st);
+      LS.set('oe.news', S.news.slice(0, CFG.MAX_NEWS));
+    }
+  },
+
+  flow(sym, n) { this.flow_[sym] = (this.flow_[sym] || 0) + n; },
+
+  floorPost(item) { this.h.onNews(item); },
+
+  /** Rival desks. Solo play still needs someone else on the other side. */
+  npcTrade() {
+    if (Math.random() > 0.30) return;
+    const syms = Object.keys(this.st.prices);
+    const sym = syms[Math.floor(Math.random() * syms.length)];
+    const q = this.st.prices[sym]; if (!q) return;
+    const name = this.npcs ? pick(this.npcs).name : 'A trader';
+    const long = Math.random() < (this.st.ret[sym] > 0 ? 0.62 : 0.42);   // bots chase
+    const notional = 20000 + Math.abs(gauss()) * 260000;
+    const qty = Math.max(1, Math.round(notional / q.p));
+    this.flow(sym, long ? notional : -notional);
+    this.h.onNews(Floor.item(name, sym, long ? 'L' : 'S', qty, notional));
+  },
+
+  async mutatePlayer(fn) {
+    const cur = LS.get('oe.player.' + S.uid, null);
+    const next = fn(cur);
+    if (!next) return null;
+    LS.set('oe.player.' + S.uid, next);
+    this.h.onPlayer(next);
+    return next;
+  },
+
+  async mint(a) {
+    this.st.custom[a.s] = a;
+    this.st.prices[a.s] = { p:a.p, o:a.p, hi:a.p, lo:a.p, prev:a.p, anchor:a.p, vol:0 };
+    LS.set('oe.market', this.st);
+    this.h.onState(this.st);
+  },
+
+  async advertise(sym, spend, copy, name) {
+    const c = this.st.custom[sym]; if (!c) return;
+    const ms = clamp(spend / 25, 20000, 600000);
+    c.hype = (c.hype || 0) + spend * 0.55;
+    c.hypeMs = ms; c.hypeUntil = now() + ms;
+    const item = { h:copy || (c.n + ' is going somewhere'), b:'Paid promotion from ' + name + '. ' +
+      money(spend) + ' credits behind ' + c.s + '.', s:sym, tone:1, ad:true, ts:now(),
+      day:gameTime().day, hour:gameTime().hour };
+    this.h.onNews(item);
+  },
+
+  rankSeed() {
+    const names = ['GladysFan01','SignalStrength','ollie_maxi','TowerClimber','Yes Whale','BlackspotBill',
+      'PuddingLongOnly','ShortTheTelco','5G Truther','Roaming Ronnie','MargincallMel','Fibre Fiend'];
+    this.npcs = names.map(n => ({ name:n, netWorth: 8000 + Math.random() * 900000 }));
+    setInterval(() => {
+      this.npcs.forEach(p => p.netWorth = Math.max(500, p.netWorth * (1 + gauss() * 0.02)));
+    }, 5000);
+  },
+
+  async refreshRanks() {
+    const me = S.player ? [{ name:S.player.name, netWorth:Portfolio.netWorth(), uid:S.uid }] : [];
+    return me.concat(this.npcs).sort((a, b) => b.netWorth - a.netWorth).slice(0, 20);
+  },
+
+  signOut() { location.reload(); }
+};
+
+/* ---- 7b. FireNet — the shared, always-on market --------------------------- */
+const FireNet = {
+  h: null, db: null, fs: null, hostBeat: null,
+
+  start(h) {
+    this.h  = h;
+    this.db = firebase.database();
+    this.fs = firebase.firestore();
+
+    const M = this.db.ref('market');
+    this.stateRef = M.child('state');
+    this.flowRef  = M.child('flow');
+    this.newsRef  = M.child('news');
+    this.mintRef  = M.child('mints');
+    this.adRef    = M.child('ads');
+    this.hostRef  = M.child('host');
+
+    // --- the public feed every client reads --------------------------------
+    this.stateRef.on('value', s => { const v = s.val(); if (v) h.onState(v); });
+
+    this.newsRef.limitToLast(CFG.MAX_NEWS).on('child_added', s => {
+      const v = s.val(); if (v) h.onNews(v);
+    });
+
+    // --- presence ----------------------------------------------------------
+    const me = this.db.ref('presence/' + S.uid);
+    me.set({ n:S.name, t:firebase.database.ServerValue.TIMESTAMP });
+    me.onDisconnect().remove();
+    this.db.ref('presence').on('value', s => h.onOnline(s.numChildren() || 1));
+
+    // --- the player's own record ------------------------------------------
+    this.pRef = this.fs.collection('players').doc(S.uid);
+    this.pRef.onSnapshot(d => { if (d.exists) h.onPlayer(d.data()); });
+
+    // --- host election -----------------------------------------------------
+    this.claim();
+    setInterval(() => this.claim(), 5000);
+  },
+
+  /** Try to become the client that runs the simulation. */
+  claim() {
+    const t = now();
+    this.hostRef.transaction(cur => {
+      if (!cur || (t - (cur.ts || 0)) > CFG.HOST_TTL || cur.uid === S.uid) {
+        return { uid: S.uid, ts: t };
+      }
+      return undefined;                       // someone else is alive, stand down
+    }, (err, committed, snap) => {
+      const v = snap && snap.val();
+      const mine = !!(committed && v && v.uid === S.uid);
+      if (mine && !S.isHost) this.becomeHost();
+      if (!mine && S.isHost) this.standDown();
+      S.isHost = mine;
+      UI.hostBadge();
+    });
+  },
+
+  async becomeHost() {
+    const snap = await this.stateRef.once('value');
+    Engine.st = Engine.reconcile(snap.val() || Engine.fresh());
+    if (this.tick) clearInterval(this.tick);
+    this.tick = setInterval(() => this.hostLoop(), CFG.TICK_MS);
+    this.hostBeat = setInterval(() => this.hostRef.set({ uid:S.uid, ts:now() }), 4000);
+  },
+
+  standDown() {
+    clearInterval(this.tick); this.tick = null;
+    clearInterval(this.hostBeat); this.hostBeat = null;
+  },
+
+  async hostLoop() {
+    if (!S.isHost || !Engine.st) return;
+    try {
+      const flow  = await this.consume(this.flowRef);
+      const mints = await this.consume(this.mintRef);
+      const ads   = await this.consume(this.adRef);
+
+      // fold in anything players listed or promoted since the last tick
+      Object.values(mints || {}).forEach(a => {
+        if (Engine.st.custom[a.s]) return;
+        Engine.st.custom[a.s] = a;
+        Engine.st.prices[a.s] = { p:a.p, o:a.p, hi:a.p, lo:a.p, prev:a.p, anchor:a.p, vol:0 };
+        this.newsRef.push({ h:a.n + ' lists on the exchange under ' + a.s,
+          b:'Issued by ' + (a.ownerName || 'a trader') + ' at ' + px(a.p) + ' credits.',
+          s:a.s, tone:1, big:true, ts:now(), day:gameTime().day, hour:gameTime().hour });
+      });
+      Object.values(ads || {}).forEach(ad => {
+        const c = Engine.st.custom[ad.sym]; if (!c) return;
+        const ms = clamp(ad.spend / 25, 20000, 600000);
+        c.hype = (c.hype || 0) + ad.spend * 0.55;
+        c.hypeMs = ms; c.hypeUntil = now() + ms;
+        this.newsRef.push({ h:ad.copy || (c.n + ' is going somewhere'),
+          b:'Paid promotion from ' + (ad.ownerName || 'a trader') + '. ' + money(ad.spend) +
+            ' credits behind ' + c.s + '.',
+          s:ad.sym, tone:1, ad:true, ts:now(), day:gameTime().day, hour:gameTime().hour });
+      });
+
+      const evts = Engine.step(Engine.st, flow || {});
+      await this.stateRef.set(Engine.st);
+      evts.forEach(e => { if (e.type === 'news') this.newsRef.push(e.item); });
+
+      // keep the wire from growing forever
+      if (Engine.st.tick % 40 === 0) {
+        const old = await this.newsRef.orderByChild('ts').limitToFirst(60).once('value');
+        const cut = now() - 1000 * 60 * 45; const up = {};
+        old.forEach(c => { if ((c.val().ts || 0) < cut) up[c.key] = null; });
+        if (Object.keys(up).length) this.newsRef.update(up);
+      }
+    } catch (e) { console.warn('host loop', e); }
+  },
+
+  /** Atomically read a node and clear it, so flow is counted exactly once. */
+  consume(ref) {
+    return new Promise(res => {
+      let got = null;
+      ref.transaction(cur => { if (cur) got = cur; return null; }, () => res(got));
+    });
+  },
+
+  flow(sym, n) {
+    this.flowRef.child(sym).transaction(cur => (cur || 0) + n);
+  },
+
+  async mutatePlayer(fn) {
+    const ref = this.pRef;
+    let out = null;
+    await this.fs.runTransaction(async t => {
+      const d = await t.get(ref);
+      const next = fn(d.exists ? d.data() : null);
+      if (!next) return;
+      out = next;
+      t.set(ref, next);
+    });
+    if (out) this.h.onPlayer(out);
+    return out;
+  },
+
+  floorPost(item) { this.newsRef.push(item); },
+
+  async mint(a)  { await this.mintRef.child(a.s).set(a); },
+  async advertise(sym, spend, copy, name) {
+    await this.adRef.push({ sym, spend, copy, ownerName:name, uid:S.uid, ts:now() });
+  },
+
+  async refreshRanks() {
+    const q = await this.fs.collection('players').orderBy('netWorth', 'desc').limit(20).get();
+    const out = []; q.forEach(d => out.push(Object.assign({ uid:d.id }, d.data())));
+    return out;
+  },
+
+  signOut() { firebase.auth().signOut().then(() => location.reload()); }
+};
+
+let Net = LocalNet;
+
+/* ---------------------------------------------------------------------------
+   8. AUTH
+   ------------------------------------------------------------------------ */
+const Auth = {
+  mode: 'in',
+
+  config() {
+    return FIREBASE_CONFIG || LS.get('oe.fbcfg', null);
+  },
+
+  init() {
+    const cfg = this.config();
+    S.online = !!(cfg && cfg.apiKey && window.firebase);
+    $('modeNote').textContent = S.online
+      ? 'Connected to the shared market. Everyone signed in is trading the same prices.'
+      : 'No Firebase config found, so this device runs its own local market. Add a config in Settings to trade against everyone else.';
+    $('cfgState').textContent = S.online ? 'Connected to the shared market.' : 'Running the local market.';
+
+    if (S.online) {
+      firebase.initializeApp(cfg);
+      Net = FireNet;
+      firebase.auth().onAuthStateChanged(u => {
+        if (u) this.ready(u.uid, u.displayName || (u.isAnonymous ? 'Guest ' + u.uid.slice(0, 4) : (u.email || '').split('@')[0]));
+      });
+      const cached = LS.get('oe.name', null);
+      if (cached) $('aName').value = cached;
+    } else {
+      Net = LocalNet;
+      const saved = LS.get('oe.localuser', null);
+      if (saved) { this.ready(saved.uid, saved.name); return; }
+    }
+  },
+
+  setMode(m) {
+    this.mode = m;
+    $('nameWrap').classList.toggle('hide', m !== 'up');
+    $('btnAuth').textContent = m === 'up' ? 'Create account' : 'Sign in';
+    $('aPass').setAttribute('autocomplete', m === 'up' ? 'new-password' : 'current-password');
+  },
+
+  async submit() {
+    const mail = $('aMail').value.trim(), pass = $('aPass').value;
+    const name = ($('aName').value.trim() || (mail.split('@')[0] || 'Trader')).slice(0, 18);
+    const err = $('authErr'); err.textContent = '';
+
+    if (!S.online) { this.guest(name); return; }
+    if (!mail || pass.length < 6) { err.textContent = 'Enter an email and a password of at least 6 characters.'; return; }
+
+    try {
+      if (this.mode === 'up') {
+        const c = await firebase.auth().createUserWithEmailAndPassword(mail, pass);
+        await c.user.updateProfile({ displayName: name });
+        LS.set('oe.name', name);
+        this.ready(c.user.uid, name);
+      } else {
+        await firebase.auth().signInWithEmailAndPassword(mail, pass);
+      }
+    } catch (e) {
+      err.textContent = this.readable(e);
+    }
+  },
+
+  async guest(nameIn) {
+    const name = (nameIn || $('aName').value.trim() || 'Guest ' + Math.floor(Math.random() * 900 + 100)).slice(0, 18);
+    if (S.online) {
+      try {
+        const c = await firebase.auth().signInAnonymously();
+        await c.user.updateProfile({ displayName: name });
+        LS.set('oe.name', name);
+        this.ready(c.user.uid, name);
+      } catch (e) { $('authErr').textContent = this.readable(e); }
+    } else {
+      const uid = 'local-' + Math.random().toString(36).slice(2, 9);
+      LS.set('oe.localuser', { uid, name });
+      this.ready(uid, name);
+    }
+  },
+
+  readable(e) {
+    const c = (e && e.code) || '';
+    if (c.includes('email-already-in-use')) return 'That email already has an account. Switch to sign in.';
+    if (c.includes('wrong-password') || c.includes('invalid-credential')) return 'That email and password do not match.';
+    if (c.includes('user-not-found')) return 'No account with that email yet. Create one.';
+    if (c.includes('operation-not-allowed')) return 'Turn on this sign-in method in the Firebase console first.';
+    if (c.includes('network')) return 'Cannot reach Firebase. Check the connection and the config.';
+    return (e && e.message) || 'Something went wrong. Try again.';
+  },
+
+  ready(uid, name) {
+    if (S.uid) return;                        // guard against double fire
+    S.uid = uid; S.name = name;
+    $('authModal').classList.remove('on');
+    Boot.run();
+  }
+};
+
+/* ---------------------------------------------------------------------------
+   9. PORTFOLIO
+   Cash, positions, fills, forced closes and asset issuance. Every write goes
+   through Net.mutatePlayer so the shared and local backends behave identically.
+   ------------------------------------------------------------------------ */
+const Portfolio = {
+
+  blank() {
+    return { name:S.name, cash:CFG.START_CASH, positions:{}, fills:[], minted:null,
+             peak:CFG.START_CASH, netWorth:CFG.START_CASH, created:now() };
+  },
+
+  positions() { return Object.entries((S.player && S.player.positions) || {}); },
+
+  /** Mark-to-market value of one position. */
+  value(pos) {
+    const p = priceOf(pos.sym) || pos.entry;
+    return pos.side === 'L' ? pos.qty * p
+                            : Math.max(0, pos.qty * (2 * pos.entry - p));
+  },
+  pnl(pos) {
+    const p = priceOf(pos.sym) || pos.entry;
+    return pos.side === 'L' ? (p - pos.entry) * pos.qty : (pos.entry - p) * pos.qty;
+  },
+  exposure() { let t = 0; this.positions().forEach(([, p]) => t += this.value(p)); return t; },
+  openPnl()  { let t = 0; this.positions().forEach(([, p]) => t += this.pnl(p)); return t; },
+  netWorth() { return ((S.player && S.player.cash) || 0) + this.exposure(); },
+
+  /** Open a long or short. Returns an error string, or null on success. */
+  async open(sym, side, qty) {
+    qty = Math.floor(qty);
+    if (!qty || qty < 1) return 'Enter a quantity of at least 1.';
+    const mkt = priceOf(sym);
+    if (!mkt) return 'No price for that symbol yet.';
+
+    const entry = side === 'L' ? mkt * (1 + CFG.SPREAD) : mkt * (1 - CFG.SPREAD);
+    const notional = qty * entry;
+    const fee = notional * CFG.FEE;
+    const outlay = notional + fee;          // longs pay cost, shorts post equal margin
+
+    let failed = null;
+    await Net.mutatePlayer(p => {
+      p = p || this.blank();
+      if (p.cash < outlay) { failed = 'Not enough credits. You need ' + money(outlay) + '.'; return null; }
+      const id = 'p' + now().toString(36) + Math.random().toString(36).slice(2, 5);
+      p.cash = p.cash - outlay;
+      p.positions = p.positions || {};
+      p.positions[id] = { sym, side, qty, entry, ts:now() };
+      p.fills = [{ sym, side, qty, p:entry, ts:now(), act:'open' }].concat(p.fills || []).slice(0, 30);
+      p.netWorth = p.cash + this.exposure() + notional;
+      return p;
+    });
+    if (failed) return failed;
+
+    // Buying pressure for longs, selling pressure for shorts.
+    Net.flow(sym, side === 'L' ? notional : -notional);
+    Floor.post(sym, side, qty, notional);
+    UI.toast(side === 'L' ? 'good' : 'bad',
+      (side === 'L' ? 'Long ' : 'Short ') + qty + ' ' + sym,
+      'Filled at ' + px(entry) + ' · fee ' + money(fee, 2));
+    return null;
+  },
+
+  /** Close a position at the current price. */
+  async close(id, forced) {
+    const pos = S.player && S.player.positions && S.player.positions[id];
+    if (!pos) return;
+    const mkt = priceOf(pos.sym) || pos.entry;
+    const exit = pos.side === 'L' ? mkt * (1 - CFG.SPREAD) : mkt * (1 + CFG.SPREAD);
+    const gross = pos.side === 'L' ? pos.qty * exit
+                                   : Math.max(0, pos.qty * (2 * pos.entry - exit));
+    const fee = gross * CFG.FEE;
+    const net = Math.max(0, gross - fee);
+    const pl = pos.side === 'L' ? (exit - pos.entry) * pos.qty : (pos.entry - exit) * pos.qty;
+
+    await Net.mutatePlayer(p => {
+      if (!p || !p.positions || !p.positions[id]) return null;
+      p.cash += net;
+      delete p.positions[id];
+      p.fills = [{ sym:pos.sym, side:pos.side, qty:pos.qty, p:exit, ts:now(),
+                   act: forced ? 'liquidated' : 'close', pl }].concat(p.fills || []).slice(0, 30);
+      p.peak = Math.max(p.peak || 0, p.cash);
+      return p;
+    });
+
+    Net.flow(pos.sym, pos.side === 'L' ? -pos.qty * exit : pos.qty * exit);
+    UI.toast(forced ? 'bad' : (pl >= 0 ? 'good' : 'bad'),
+      forced ? 'Closed out of ' + pos.sym : 'Closed ' + pos.qty + ' ' + pos.sym,
+      (pl >= 0 ? 'Profit ' : 'Loss ') + money(Math.abs(pl)) + ' credits');
+  },
+
+  /** A short is closed automatically once the loss eats the margin. */
+  closing: {},
+  checkMargin() {
+    this.positions().forEach(([id, pos]) => {
+      if (pos.side !== 'S' || this.closing[id]) return;
+      const p = priceOf(pos.sym);
+      if (p && p >= pos.entry * 1.98) {
+        this.closing[id] = 1;
+        this.close(id, true).then(() => { delete this.closing[id]; });
+      }
+    });
+  },
+
+  async syncWorth() {
+    if (!S.player) return;
+    const nw = this.netWorth();
+    await Net.mutatePlayer(p => {
+      if (!p) return null;
+      p.netWorth = nw; p.name = S.name;
+      p.peak = Math.max(p.peak || 0, nw);
+      // a sampled equity curve, roughly 20 minutes deep
+      p.worthLog = (p.worthLog || []).concat([Math.round(nw * 100) / 100]).slice(-80);
+      return p;
+    });
+  },
+
+  /* --- issuing ---------------------------------------------------------- */
+  async mint(sym, name, type, price) {
+    sym = sym.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+    if (sym.length < 3) return 'Tickers are 3 to 5 characters.';
+    if (BY_SYM[sym] || S.custom[sym]) return 'That ticker is taken.';
+    if (!name || name.length < 3) return 'Give it a name.';
+    price = Math.max(0.05, Number(price) || 1);
+    if (S.player.minted) return 'You have already issued an asset.';
+    if (this.netWorth() < CFG.MINT_MIN) return 'You need ' + money(CFG.MINT_MIN) + ' credits of net worth.';
+
+    let failed = null;
+    const supply = 400000;                   // total units in existence
+    const mine   = Math.round(supply * 0.6); // the issuer keeps 60%
+    const float  = supply - mine;            // what the market can actually trade
+
+    await Net.mutatePlayer(p => {
+      if (p.cash < CFG.MINT_COST) { failed = 'Listing costs ' + money(CFG.MINT_COST) + ' credits.'; return null; }
+      p.cash -= CFG.MINT_COST;
+      p.minted = sym;
+      const id = 'mint' + now().toString(36);
+      p.positions = p.positions || {};
+      p.positions[id] = { sym, side:'L', qty:mine, entry:price, ts:now() };
+      return p;
+    });
+    if (failed) return failed;
+
+    await Net.mint({ s:sym, n:name.slice(0, 28), type, p:price, owner:S.uid,
+                     ownerName:S.name, float, supply, ts:now(), hype:0 });
+    UI.toast('big', sym + ' is listed', 'You hold ' + money(mine) + ' units. Now go make people care.');
+    return null;
+  },
+
+  async advertise(spend, copy) {
+    const sym = S.player && S.player.minted;
+    if (!sym) return 'You have nothing listed.';
+    if (S.player.cash < spend) return 'Not enough credits for that campaign.';
+    await Net.mutatePlayer(p => { p.cash -= spend; return p; });
+    await Net.advertise(sym, spend, copy, S.name);
+    UI.toast('big', 'Campaign live', money(spend) + ' credits of attention pointed at ' + sym + '.');
+    return null;
+  }
+};
+
+/* Big orders are public. Everyone on the floor sees who moved the price. */
+const Floor = {
+  MIN: 5000,                                   // credits before an order is newsworthy
+  item(name, sym, side, qty, notional) {
+    const t = gameTime();
+    return {
+      h: name + (side === 'L' ? ' went long ' : ' shorted ') + money(qty) + ' ' + sym,
+      b: 'Order value ' + money(notional) + ' credits at ' + px(priceOf(sym) || 0) + '.',
+      s: sym, tone: side === 'L' ? 1 : -1, flow: true,
+      ts: now(), day: t.day, hour: t.hour
+    };
+  },
+  post(sym, side, qty, notional) {
+    if (notional < this.MIN || !Net.floorPost) return;
+    try { Net.floorPost(this.item(S.name, sym, side, qty, notional)); } catch (e) {}
+  }
+};
+
+/* ---------------------------------------------------------------------------
+   10. UI
+   ------------------------------------------------------------------------ */
+const UI = {
+  rows: {}, tape: {}, lastPx: {},
+
+  /* --- navigation ------------------------------------------------------- */
+  go(view) {
+    S.view = view;
+    document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'view-' + view));
+    document.querySelectorAll('nav button').forEach(b =>
+      b.setAttribute('aria-current', String(b.dataset.view === view)));
+    document.querySelector('main').scrollTop = 0;
+    if (view === 'news') { this.renderNews(); S.seenNews = S.news.length; $('newsDot').classList.add('hide'); }
+    if (view === 'ranks') this.loadRanks();
+    if (view === 'port')  this.renderPort();
+    if (view === 'mint')  this.renderMint();
+  },
+
+  toast(kind, title, sub) {
+    const t = el('div', 'toast ' + kind, '<b></b><span></span>');
+    t.querySelector('b').textContent = title;
+    t.querySelector('span').textContent = sub || '';
+    $('toasts').appendChild(t);
+    setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity .3s';
+      setTimeout(() => t.remove(), 320); }, 3400);
+  },
+
+  hostBadge() {
+    $('whoBadge').textContent = S.online
+      ? (S.onlineN + ' online' + (S.isHost ? ' · you run the ticker' : ''))
+      : 'local market';
+  },
+
+  clock() {
+    const t = gameTime();
+    $('gClock').textContent = 'Day ' + t.day + ' · ' + String(t.hour).padStart(2, '0') + ':00';
+  },
+
+  /* --- market list ------------------------------------------------------ */
+  buildRows() {
+    const wrap = $('stockRows'); wrap.innerHTML = ''; this.rows = {};
+    symbols().forEach(m => {
+      const held = this.heldQty(m.s) > 0;
+      const isMine = S.player && S.player.minted === m.s;
+      const r = el('button', 'row' + (held ? ' held' : ''));
+      r.dataset.sym = m.s;
+      r.innerHTML =
+        '<span class="tag' + (m.sec === 'crypto' ? ' crypto' : '') + (isMine ? ' mine' : '') + '">' + m.s + '</span>' +
+        '<span class="rname"><b></b><span></span></span>' +
+        '<svg class="spark" viewBox="0 0 52 24" preserveAspectRatio="none">' +
+          '<polyline fill="none" stroke="currentColor" stroke-width="1.5" points=""></polyline></svg>' +
+        '<span class="bars"><i></i><i></i><i></i><i></i></span>' +
+        '<span class="rprice"><b class="mono"></b><span class="mono"></span></span>';
+      r.querySelector('.rname b').textContent = m.n;
+      r.querySelector('.rname span').textContent = m.d || (m.ownerName ? 'Issued by ' + m.ownerName : 'Player issued');
+      r.addEventListener('click', () => Sheet.open(m.s));
+      wrap.appendChild(r);
+      this.rows[m.s] = {
+        root:r, name:r.querySelector('.rname b'), price:r.querySelector('.rprice b'),
+        chg:r.querySelector('.rprice span'), spark:r.querySelector('polyline'),
+        bars:r.querySelector('.bars')
+      };
+    });
+    this.applyFilter();
+  },
+
+  heldQty(sym) {
+    let q = 0;
+    Portfolio.positions().forEach(([, p]) => { if (p.sym === sym) q += p.qty; });
+    return q;
+  },
+
+  applyFilter() {
+    const f = S.filter;
+    symbols().forEach(m => {
+      const r = this.rows[m.s]; if (!r) return;
+      let show = true;
+      if (f === 'held') show = this.heldQty(m.s) > 0;
+      else if (f === 'crypto') show = m.sec === 'crypto' || m.type === 'crypto';
+      else if (f !== 'all') show = m.sec === f || (f === 'tech' && m.type === 'ipo');
+      r.root.classList.toggle('hide', !show);
+    });
+  },
+
+  updateRows() {
+    symbols().forEach(m => {
+      const r = this.rows[m.s], q = S.px[m.s]; if (!r || !q) return;
+      const chg = (q.p - q.o) / q.o;
+      r.price.textContent = px(q.p);
+      r.chg.textContent = pct(chg);
+      r.chg.className = 'mono ' + (chg >= 0 ? 'up' : 'dn');
+
+      // flash on change
+      const prev = this.lastPx[m.s];
+      if (prev != null && Math.abs(q.p - prev) / prev > 0.0004) {
+        const cls = q.p > prev ? 'flash-up' : 'flash-dn';
+        r.root.classList.remove('flash-up', 'flash-dn');
+        void r.root.offsetWidth;
+        r.root.classList.add(cls);
+      }
+      this.lastPx[m.s] = q.p;
+
+      // sparkline
+      const h = S.hist[m.s] || [];
+      if (h.length > 1) {
+        const lo = Math.min.apply(null, h), hi = Math.max.apply(null, h), span = (hi - lo) || 1;
+        const n = h.length, pts = [];
+        for (let i = 0; i < n; i++) {
+          pts.push((i / (n - 1) * 52).toFixed(1) + ',' + (22 - (h[i] - lo) / span * 20).toFixed(1));
+        }
+        r.spark.setAttribute('points', pts.join(' '));
+        r.spark.parentNode.style.color = chg >= 0 ? 'var(--up)' : 'var(--dn)';
+      }
+
+      // signal bars show how hard it is moving right now
+      const mv = Math.abs(q.p - q.prev) / q.prev;
+      const lvl = mv > 0.012 ? 4 : mv > 0.006 ? 3 : mv > 0.002 ? 2 : 1;
+      r.bars.className = 'bars s' + lvl + (lvl === 4 ? ' hot' : '');
+
+      // tape
+      const t = this.tape[m.s];
+      if (t) t.forEach(node => {
+        node.className = chg >= 0 ? 't-up' : 't-dn';
+        node.querySelector('b').textContent = m.s + ' ' + px(q.p);
+        node.querySelector('i').textContent = pct(chg);
+      });
+    });
+    if (S.sheetSym) Sheet.refresh();
+  },
+
+  buildTape() {
+    const track = $('tape'); track.innerHTML = ''; this.tape = {};
+    const list = symbols();
+    for (let copy = 0; copy < 2; copy++) {
+      list.forEach(m => {
+        const s = el('span', '', '<b></b> <i></i>');
+        track.appendChild(s);
+        (this.tape[m.s] = this.tape[m.s] || []).push(s);
+      });
+    }
+  },
+
+  /* --- wallet + portfolio ---------------------------------------------- */
+  renderWallet() {
+    if (!S.player) return;
+    const nw = Portfolio.netWorth(), pl = Portfolio.openPnl();
+    $('wCash').textContent = money(S.player.cash);
+    $('wNet').textContent  = money(nw);
+    $('wPnl').textContent  = (pl >= 0 ? '+' : '') + money(pl);
+    $('wPnl').className    = 'mono ' + (pl >= 0 ? 'up' : 'dn');
+  },
+
+  renderPort() {
+    if (!S.player) return;
+    const nw = Portfolio.netWorth();
+    $('pNet').textContent = money(nw);
+    $('pCash').textContent = money(S.player.cash);
+    $('pExp').textContent = money(Portfolio.exposure());
+    const ret = (nw - CFG.START_CASH) / CFG.START_CASH;
+    $('pRet').textContent = pct(ret);
+    $('pRet').className = 'mono ' + (ret >= 0 ? 'up' : 'dn');
+
+    this.equityChart();
+
+    const list = Portfolio.positions();
+    $('posCount').textContent = list.length + ' open';
+    const wrap = $('posRows'); wrap.innerHTML = '';
+    if (!list.length) {
+      wrap.appendChild(el('div', 'empty', '<b>Nothing open</b>Tap any stock on the market tab to take a position.'));
+    }
+    list.sort((a, b) => b[1].ts - a[1].ts).forEach(([id, p]) => {
+      const pl = Portfolio.pnl(p), cur = priceOf(p.sym) || p.entry;
+      const row = el('div', 'pos');
+      row.innerHTML =
+        '<span class="tag">' + p.sym + '</span>' +
+        '<span class="rname"><b><span class="side ' + p.side + '">' + (p.side === 'L' ? 'LONG' : 'SHORT') +
+          '</span> ' + money(p.qty) + ' @ ' + px(p.entry) + '</b>' +
+          '<span>Now ' + px(cur) + ' · value ' + money(Portfolio.value(p)) + '</span></span>' +
+        '<span class="rprice"><b class="mono ' + (pl >= 0 ? 'up' : 'dn') + '">' + (pl >= 0 ? '+' : '') + money(pl) + '</b>' +
+          '<span class="mono dim">' + pct(pl / Math.max(1, p.qty * p.entry)) + '</span></span>';
+      const btn = el('button', 'btn sm g', 'Close');
+      btn.style.marginLeft = '4px';
+      btn.addEventListener('click', () => Portfolio.close(id));
+      row.appendChild(btn);
+      wrap.appendChild(row);
+    });
+
+    const fw = $('fillRows'); fw.innerHTML = '';
+    const fills = (S.player.fills || []).slice(0, 12);
+    if (!fills.length) fw.appendChild(el('div', 'empty', 'No trades yet.'));
+    fills.forEach(f => {
+      const r = el('div', 'pos');
+      const verb = f.act === 'open' ? (f.side === 'L' ? 'Bought' : 'Sold short')
+                 : f.act === 'liquidated' ? 'Closed out' : 'Closed';
+      r.innerHTML = '<span class="rname"><b>' + verb + ' ' + money(f.qty) + ' ' + f.sym + '</b>' +
+        '<span>' + px(f.p) + ' credits · ' + new Date(f.ts).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) + '</span></span>' +
+        (f.pl != null ? '<span class="rprice"><b class="mono ' + (f.pl >= 0 ? 'up' : 'dn') + '">' +
+          (f.pl >= 0 ? '+' : '') + money(f.pl) + '</b></span>' : '');
+      fw.appendChild(r);
+    });
+  },
+
+  /* --- news ------------------------------------------------------------- */
+  renderNews() {
+    const wrap = $('newsRows'); wrap.innerHTML = '';
+    const f = S.newsFilter || 'all';
+    const list = S.news.filter(n => f === 'all' ? true : f === 'floor' ? n.flow : !n.flow)
+                       .slice(0, CFG.MAX_NEWS);
+    if (!list.length) {
+      wrap.appendChild(el('div', 'empty', f === 'floor'
+        ? '<b>Nobody has moved size yet</b>Orders over ' + money(Floor.MIN) + ' credits show up here.'
+        : '<b>The wire is quiet</b>Stories break every few minutes. Some of them mean something.'));
+      return;
+    }
+    list.forEach(n => {
+      const cls = 'news ' + (n.ad ? 'ad ' : '') + (n.big ? 'big ' : '') + (n.flow ? 'flow ' : '') +
+        (n.tone > 0 ? 'pos-t' : n.tone < 0 ? 'neg-t' : '');
+      const d = el('div', cls);
+      d.innerHTML = '<span class="rail"></span><div><h4></h4><p></p>' +
+        '<div class="meta">' + (n.s && n.s !== '*' ? n.s + ' · ' : 'Market · ') +
+        'Day ' + (n.day || 1) + ' · ' + String(n.hour || 0).padStart(2, '0') + ':00</div></div>';
+      d.querySelector('h4').textContent = n.h;
+      d.querySelector('p').textContent = n.b;
+      if (n.s && n.s !== '*' && S.px[n.s]) d.addEventListener('click', () => Sheet.open(n.s));
+      wrap.appendChild(d);
+    });
+  },
+
+  /** Net worth over the session, drawn from the sampled log on the player record. */
+  equityChart() {
+    const cv = $('pChart'); if (!cv) return;
+    const log = (S.player && S.player.worthLog) || [];
+    const h = log.concat(S.player ? [Portfolio.netWorth()] : []);
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth || 320, ht = 96;
+    cv.width = w * dpr; cv.height = ht * dpr;
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, w, ht);
+    $('pChartNote').textContent = h.length < 3
+      ? 'Your net worth is sampled every 15 seconds while you are on the floor.'
+      : 'Net worth over this session · ' + money(h[0]) + ' to ' + money(h[h.length - 1]);
+    if (h.length < 3) return;
+
+    const lo = Math.min.apply(null, h), hi = Math.max.apply(null, h), span = (hi - lo) || 1;
+    const x = i => 10 + i / (h.length - 1) * (w - 20);
+    const y = v => 10 + (1 - (v - lo) / span) * (ht - 26);
+    const up = h[h.length - 1] >= h[0];
+    const col = up ? '#2BD98A' : '#FF4D6A';
+
+    // where you started, so the session reads at a glance
+    const b = y(clamp(CFG.START_CASH, lo, hi));
+    c.setLineDash([3, 4]); c.strokeStyle = 'rgba(255,255,255,.18)';
+    c.beginPath(); c.moveTo(10, b); c.lineTo(w - 10, b); c.stroke(); c.setLineDash([]);
+
+    c.beginPath(); c.moveTo(x(0), y(h[0]));
+    h.forEach((v, i) => c.lineTo(x(i), y(v)));
+    c.strokeStyle = col; c.lineWidth = 2; c.lineJoin = 'round'; c.stroke();
+    c.fillStyle = col;
+    c.beginPath(); c.arc(x(h.length - 1), y(h[h.length - 1]), 3, 0, 7); c.fill();
+  },
+
+  /* --- ranks ------------------------------------------------------------ */
+  async loadRanks() {
+    try {
+      const list = await Net.refreshRanks();
+      S.ranks = list || [];
+    } catch (e) { S.ranks = []; }
+    const wrap = $('rankRows'); wrap.innerHTML = '';
+    $('onlineN').textContent = S.onlineN + ' online';
+    if (!S.ranks.length) { wrap.appendChild(el('div', 'empty', 'No traders ranked yet.')); return; }
+    S.ranks.forEach((p, i) => {
+      const me = p.uid === S.uid;
+      const r = el('div', 'rank' + (me ? ' me' : ''));
+      r.innerHTML = '<span class="n">' + (i + 1) + '</span><b></b>' +
+        '<span class="mono">' + money(p.netWorth || 0) + '</span>';
+      r.querySelector('b').textContent = (p.name || 'Trader') + (me ? ' (you)' : '');
+      wrap.appendChild(r);
+    });
+  },
+
+  /* --- issuing ---------------------------------------------------------- */
+  renderMint() {
+    if (!S.player) return;
+    const nw = Portfolio.netWorth();
+    const owned = S.player.minted && S.custom[S.player.minted];
+    $('mintLocked').classList.toggle('hide', nw >= CFG.MINT_MIN || !!S.player.minted);
+    $('mintForm').classList.toggle('hide', nw < CFG.MINT_MIN || !!S.player.minted);
+    $('mintOwned').classList.toggle('hide', !S.player.minted);
+    $('mintBar').style.width = clamp(nw / CFG.MINT_MIN * 100, 1, 100) + '%';
+    $('mintProg').textContent = money(Math.max(0, CFG.MINT_MIN - nw)) + ' credits to go';
+
+    if (S.player.minted) {
+      const sym = S.player.minted, q = S.px[sym], c = S.custom[sym];
+      $('ownSym').textContent = sym + (c ? ' · ' + c.n : ' · listing…');
+      if (q && c) {
+        const chg = (q.p - q.o) / q.o;
+        const live = c.hypeUntil > now();
+        $('ownStat').textContent = px(q.p) + ' credits, ' + pct(chg) + ' today. Market cap ' +
+          money(q.p * (c.supply || c.float || 0)) + '. ' +
+          (live ? 'A campaign is running.' : 'No campaign running.');
+      }
+    }
+  },
+
+  /* --- settings --------------------------------------------------------- */
+  openCfg() {
+    const c = LS.get('oe.fbcfg', null);
+    $('cfgBox').value = c ? JSON.stringify(c, null, 2) : '';
+    $('cfgModal').classList.add('on');
+  }
+};
+
+/* ---------------------------------------------------------------------------
+   11. TRADE SHEET
+   ------------------------------------------------------------------------ */
+const Sheet = {
+  open(sym) {
+    S.sheetSym = sym;
+    const m = meta(sym);
+    $('sheetName').textContent = m.n;
+    $('sheetSub').textContent = sym + ' · ' + (m.d || (m.ownerName ? 'Issued by ' + m.ownerName : 'Player issued'));
+    $('scrim').classList.add('on');
+    $('sheet').classList.add('on');
+    this.refresh();
+  },
+  close() {
+    S.sheetSym = null;
+    $('scrim').classList.remove('on');
+    $('sheet').classList.remove('on');
+  },
+  refresh() {
+    const sym = S.sheetSym; if (!sym) return;
+    const q = S.px[sym]; if (!q) return;
+    const chg = (q.p - q.o) / q.o;
+    $('sheetPrice').textContent = px(q.p);
+    $('sheetChg').textContent = pct(chg) + ' today';
+    $('sheetChg').className = 'mono ' + (chg >= 0 ? 'up' : 'dn');
+    this.chart();
+    this.cost();
+
+    // any position the player already holds in this symbol
+    const mine = Portfolio.positions().filter(([, p]) => p.sym === sym);
+    const box = $('sheetPos');
+    box.classList.toggle('hide', !mine.length);
+    box.innerHTML = '';
+    mine.forEach(([id, p]) => {
+      const pl = Portfolio.pnl(p);
+      const row = el('div', 'r');
+      row.innerHTML = '<span><span class="side ' + p.side + '">' + (p.side === 'L' ? 'LONG' : 'SHORT') +
+        '</span> ' + money(p.qty) + ' @ ' + px(p.entry) + '</span>' +
+        '<b class="' + (pl >= 0 ? 'up' : 'dn') + '">' + (pl >= 0 ? '+' : '') + money(pl) + '</b>';
+      box.appendChild(row);
+      const b = el('button', 'btn sm g', 'Close this position');
+      b.style.width = '100%'; b.style.marginTop = '6px';
+      b.addEventListener('click', () => { Portfolio.close(id); });
+      box.appendChild(b);
+    });
+  },
+  cost() {
+    const sym = S.sheetSym; if (!sym) return;
+    const qty = Math.max(0, Math.floor(Number($('qty').value) || 0));
+    const p = priceOf(sym);
+    const notional = qty * p;
+    $('costVal').textContent = money(notional, 2);
+    $('feeVal').textContent  = money(notional * (CFG.FEE + CFG.SPREAD), 2);
+    const afford = S.player && S.player.cash >= notional * (1 + CFG.FEE + CFG.SPREAD);
+    $('btnLong').disabled = !qty || !afford;
+    $('btnShort').disabled = !qty || !afford;
+  },
+  chart() {
+    const cv = $('sheetChart'), sym = S.sheetSym;
+    const h = (S.hist[sym] || []).slice(-90);
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth || 340, ht = 132;
+    cv.width = w * dpr; cv.height = ht * dpr;
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, w, ht);
+    if (h.length < 2) return;
+
+    const lo = Math.min.apply(null, h), hi = Math.max.apply(null, h), span = (hi - lo) || 1;
+    const x = i => 16 + i / (h.length - 1) * (w - 32);
+    const y = v => 14 + (1 - (v - lo) / span) * (ht - 34);
+    const up = h[h.length - 1] >= h[0];
+    const col = up ? '#2BD98A' : '#FF4D6A';
+
+    // baseline grid
+    c.strokeStyle = 'rgba(255,255,255,.06)'; c.lineWidth = 1;
+    [0, .5, 1].forEach(f => { const yy = 14 + f * (ht - 34);
+      c.beginPath(); c.moveTo(12, yy); c.lineTo(w - 12, yy); c.stroke(); });
+
+    const g = c.createLinearGradient(0, 0, 0, ht);
+    g.addColorStop(0, up ? 'rgba(43,217,138,.28)' : 'rgba(255,77,106,.26)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.beginPath(); c.moveTo(x(0), y(h[0]));
+    h.forEach((v, i) => c.lineTo(x(i), y(v)));
+    c.lineTo(x(h.length - 1), ht); c.lineTo(x(0), ht); c.closePath();
+    c.fillStyle = g; c.fill();
+
+    c.beginPath(); c.moveTo(x(0), y(h[0]));
+    h.forEach((v, i) => c.lineTo(x(i), y(v)));
+    c.strokeStyle = col; c.lineWidth = 2; c.lineJoin = 'round'; c.stroke();
+
+    c.fillStyle = col;
+    c.beginPath(); c.arc(x(h.length - 1), y(h[h.length - 1]), 3.2, 0, 7); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.4)'; c.font = '10px ui-monospace,monospace';
+    c.fillText(px(hi), 14, 11); c.fillText(px(lo), 14, ht - 4);
+  }
+};
+
+/* ---------------------------------------------------------------------------
+   12. NETWORK STATUS + BOOT + EVENT WIRING
+   ------------------------------------------------------------------------ */
+UI.netStatus = function () {
+  const n = S.meta.net || 'ok';
+  const bar = $('netstat');
+  bar.classList.toggle('deg', n === 'deg');
+  bar.classList.toggle('out', n === 'out');
+  $('netLabel').textContent = n === 'out' ? 'Major outage' : n === 'deg' ? 'Degraded' : 'Nominal';
+  if (n !== this._lastNet) {
+    if (n === 'out') this.toast('bad', 'Optus network is down', 'Everything connected to it is about to move.');
+    else if (n === 'ok' && this._lastNet) this.toast('good', 'Network restored', 'Services are back to normal.');
+    this._lastNet = n;
+  }
+};
+
+const Boot = {
+  seen: {},
+
+  run() {
+    S.player = null;
+    Net.start({
+      onState:  st => this.onState(st),
+      onNews:   (n, quiet) => this.onNews(n, quiet),
+      onPlayer: p => this.onPlayer(p),
+      onOnline: n => { S.onlineN = n; UI.hostBadge(); }
+    });
+
+    // create the account record if this is a first visit
+    Net.mutatePlayer(p => {
+      if (p) { if (p.name !== S.name && S.name) p.name = S.name; return p; }
+      const b = Portfolio.blank();
+      UI.toast('big', 'Welcome to the floor', money(CFG.START_CASH) + ' credits are in your account.');
+      if (!LS.get('oe.guided', 0)) setTimeout(() => $('guideModal').classList.add('on'), 500);
+      return b;
+    });
+
+    UI.clock();
+    setInterval(() => UI.clock(), 1000);
+    setInterval(() => Portfolio.syncWorth(), 15000);
+    setInterval(() => { if (S.view === 'ranks') UI.loadRanks(); }, 20000);
+    UI.hostBadge();
+    this.wire();
+  },
+
+  onState(st) {
+    S.px = st.prices || {};
+    S.custom = st.custom || {};
+    S.meta.net = st.net || 'ok';
+
+    Object.keys(S.px).forEach(sym => pushHist(sym, S.px[sym].p));
+
+    // Compare by ticker list, not object identity: the local adapter hands back
+    // the very same object every tick, so a length check would never fire.
+    const sig = Object.keys(S.custom).sort().join(',');
+    if (sig !== this.customSig || !Object.keys(UI.rows).length) {
+      this.customSig = sig;
+      UI.buildRows(); UI.buildTape();
+    }
+
+    UI.updateRows();
+    UI.renderWallet();
+    UI.netStatus();
+    Portfolio.checkMargin();
+    if (S.view === 'port') UI.renderPort();
+    if (S.view === 'mint') UI.renderMint();
+  },
+
+  onNews(n, quiet) {
+    if (!n || !n.h) return;
+    const key = (n.ts || 0) + '|' + n.h;
+    if (this.seen[key]) return;
+    this.seen[key] = 1;
+
+    S.news.unshift(n);
+    S.news.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    if (S.news.length > CFG.MAX_NEWS) S.news.length = CFG.MAX_NEWS;
+
+    if (S.view === 'news') { UI.renderNews(); S.seenNews = S.news.length; }
+    else { $('newsDot').classList.remove('hide'); }
+
+    const fresh = !quiet && (now() - (n.ts || 0)) < 20000;
+    if (fresh && (n.big || n.ad || Math.abs(n.mag || 0) > 0.04)) {
+      UI.toast(n.ad ? 'big' : n.tone > 0 ? 'good' : n.tone < 0 ? 'bad' : '', n.h, n.b);
+    }
+  },
+
+  onPlayer(p) {
+    const first = !S.player;
+    S.player = p;
+    if (p && p.name) S.name = p.name;
+    UI.renderWallet();
+    // keep the yellow "you hold this" edge in sync
+    Object.keys(UI.rows).forEach(sym =>
+      UI.rows[sym].root.classList.toggle('held', UI.heldQty(sym) > 0));
+    if (S.view === 'port') UI.renderPort();
+    if (S.view === 'mint') UI.renderMint();
+    if (S.sheetSym) Sheet.refresh();
+    if (first) UI.applyFilter();
+  },
+
+  /* --- all the DOM listeners in one place ------------------------------- */
+  wire() {
+    if (this.wired) return; this.wired = true;
+
+    document.querySelectorAll('nav button').forEach(b =>
+      b.addEventListener('click', () => UI.go(b.dataset.view)));
+
+    document.querySelectorAll('#filters .chip').forEach(c =>
+      c.addEventListener('click', () => {
+        S.filter = c.dataset.f;
+        document.querySelectorAll('#filters .chip').forEach(x =>
+          x.setAttribute('aria-pressed', String(x === c)));
+        UI.applyFilter();
+      }));
+
+    document.querySelectorAll('#newsFilters .chip').forEach(c =>
+      c.addEventListener('click', () => {
+        S.newsFilter = c.dataset.nf;
+        document.querySelectorAll('#newsFilters .chip').forEach(x =>
+          x.setAttribute('aria-pressed', String(x === c)));
+        UI.renderNews();
+      }));
+
+    const guide = $('guideModal');
+    $('btnGuide').addEventListener('click', () => { $('cfgModal').classList.remove('on'); guide.classList.add('on'); });
+    $('btnGuideGo').addEventListener('click', () => { guide.classList.remove('on'); LS.set('oe.guided', 1); });
+
+    $('scrim').addEventListener('click', () => Sheet.close());
+
+    // the grab handle: tap to close, or drag the sheet down
+    const sh = $('sheet'), grab = sh.querySelector('.grab');
+    grab.addEventListener('click', () => Sheet.close());
+    let y0 = null;
+    sh.addEventListener('touchstart', e => {
+      y0 = sh.scrollTop <= 0 ? e.touches[0].clientY : null;
+    }, { passive: true });
+    sh.addEventListener('touchmove', e => {
+      if (y0 == null) return;
+      const dy = e.touches[0].clientY - y0;
+      if (dy > 0) sh.style.transform = 'translateY(' + dy + 'px)';
+    }, { passive: true });
+    sh.addEventListener('touchend', e => {
+      if (y0 == null) return;
+      const dy = (e.changedTouches[0].clientY - y0);
+      sh.style.transform = '';
+      if (dy > 90) Sheet.close();
+      y0 = null;
+    });
+
+    const qty = $('qty');
+    const bump = d => { qty.value = Math.max(1, (Number(qty.value) || 0) + d); Sheet.cost(); };
+    $('qPlus').addEventListener('click', () => bump(+10));
+    $('qMinus').addEventListener('click', () => bump(-10));
+    qty.addEventListener('input', () => Sheet.cost());
+    document.querySelectorAll('#quickQty button').forEach(b =>
+      b.addEventListener('click', () => {
+        if (b.dataset.q === 'max') {
+          const p = priceOf(S.sheetSym) || 1;
+          qty.value = Math.max(1, Math.floor((S.player.cash * 0.98) / (p * (1 + CFG.FEE + CFG.SPREAD))));
+        } else qty.value = b.dataset.q;
+        Sheet.cost();
+      }));
+
+    const trade = async side => {
+      const err = await Portfolio.open(S.sheetSym, side, Number(qty.value));
+      if (err) UI.toast('bad', 'Order rejected', err);
+      else Sheet.close();
+    };
+    $('btnLong').addEventListener('click', () => trade('L'));
+    $('btnShort').addEventListener('click', () => trade('S'));
+
+    // auth
+    document.querySelectorAll('#authTabs button').forEach(b =>
+      b.addEventListener('click', () => {
+        document.querySelectorAll('#authTabs button').forEach(x =>
+          x.setAttribute('aria-pressed', String(x === b)));
+        Auth.setMode(b.dataset.m);
+      }));
+    $('btnAuth').addEventListener('click', () => Auth.submit());
+    $('btnGuest').addEventListener('click', () => Auth.guest());
+    $('aPass').addEventListener('keydown', e => { if (e.key === 'Enter') Auth.submit(); });
+
+    // settings
+    $('btnMenu').addEventListener('click', () => UI.openCfg());
+    $('btnCloseCfg').addEventListener('click', () => $('cfgModal').classList.remove('on'));
+    $('btnSignOut').addEventListener('click', () => {
+      LS.del('oe.localuser');
+      Net.signOut();
+    });
+    $('btnSaveCfg').addEventListener('click', () => {
+      const raw = $('cfgBox').value.trim();
+      if (!raw) { LS.del('oe.fbcfg'); location.reload(); return; }
+      try {
+        const clean = raw.replace(/^\s*(const|var|let)?\s*\w*\s*=\s*/, '').replace(/;\s*$/, '');
+        const cfg = JSON.parse(clean.replace(/([{,]\s*)([A-Za-z0-9_]+)\s*:/g, '$1"$2":').replace(/'/g, '"'));
+        if (!cfg.apiKey || !cfg.databaseURL) throw new Error('needs apiKey and databaseURL');
+        LS.set('oe.fbcfg', cfg);
+        location.reload();
+      } catch (e) {
+        UI.toast('bad', 'Config not saved', 'That is not a valid Firebase config object.');
+      }
+    });
+
+    // issuing
+    $('btnMint').addEventListener('click', async () => {
+      $('mintErr').textContent = '';
+      const err = await Portfolio.mint($('mSym').value, $('mName').value, $('mType').value, $('mPrice').value);
+      if (err) $('mintErr').textContent = err; else UI.renderMint();
+    });
+    document.querySelectorAll('[data-ad]').forEach(b =>
+      b.addEventListener('click', async () => {
+        $('adErr').textContent = '';
+        const err = await Portfolio.advertise(Number(b.dataset.ad), $('adCopy').value.trim());
+        if (err) $('adErr').textContent = err;
+      }));
+
+    window.addEventListener('resize', () => {
+      if (S.sheetSym) Sheet.chart();
+      if (S.view === 'port') UI.equityChart();
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') Sheet.close(); });
+  }
+};
+
+/* ---------------------------------------------------------------------------
+   13. GO
+   ------------------------------------------------------------------------ */
+Auth.setMode('in');
+Boot.wire();     // listeners first: the sign-in buttons have to work before boot
+Auth.init();
+
+
+})();
+</script>
+</body>
+</html>
