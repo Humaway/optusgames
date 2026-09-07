@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Ollie Man — Swing City</title>
+<style>
+  :root{
+    --yellow:#FFD600;
+    --yellow-hot:#FFE873;
+    --teal:#00A3A6;
+    --teal-bright:#3BE8E0;
+    --navy:#03121B;
+    --navy-2:#07202D;
+    --char:#12181C;
+    --paper:#EAF6F7;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:var(--navy);color:var(--paper);
+    font-family:"Helvetica Neue",Helvetica,Arial,ui-sans-serif,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  canvas{display:block;width:100vw;height:100vh}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:5}
+  .corner{position:absolute;padding:14px 16px}
+  .tl{top:0;left:0}.tr{top:0;right:0;text-align:right}
+  .bl{bottom:0;left:0}.br{bottom:0;right:0;text-align:right}
+
+  .mark{display:flex;align-items:baseline;gap:9px}
+  .mark b{font-size:26px;font-weight:800;letter-spacing:-.045em;color:var(--yellow);line-height:1}
+  .mark span{font-size:13px;font-weight:600;letter-spacing:.02em;color:rgba(234,246,247,.72)}
+
+  .readout{font-variant-numeric:tabular-nums;line-height:1}
+  .big{font-size:64px;font-weight:800;letter-spacing:-.05em;color:var(--paper);
+       text-shadow:0 0 26px rgba(59,232,224,.35)}
+  .big em{font-style:normal;font-size:20px;font-weight:700;color:var(--teal-bright);margin-left:6px;letter-spacing:0}
+  .sub{margin-top:6px;font-size:13px;font-weight:600;color:rgba(234,246,247,.6)}
+
+  .gauge{margin-top:10px;width:230px;height:5px;border-radius:99px;background:rgba(234,246,247,.14);overflow:hidden}
+  .gauge i{display:block;height:100%;width:0%;border-radius:99px;
+    background:linear-gradient(90deg,var(--teal) 0%,var(--teal-bright) 55%,var(--yellow) 100%);
+    box-shadow:0 0 14px rgba(59,232,224,.6);transition:width .06s linear}
+
+  .stat{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+  .stat u{display:block;text-decoration:none;font-size:11px;font-weight:600;
+          color:rgba(234,246,247,.55);margin-bottom:2px}
+  .stat + .stat{margin-top:12px}
+  #combo{color:var(--yellow);opacity:0;transition:opacity .2s}
+  #combo.on{opacity:1}
+
+  .keys{font-size:12px;line-height:1.85;color:rgba(234,246,247,.5);font-weight:600}
+  .keys kbd{display:inline-block;min-width:20px;padding:1px 6px;margin-right:6px;
+    border-radius:5px;border:1px solid rgba(59,232,224,.35);background:rgba(3,18,27,.6);
+    color:var(--teal-bright);font:inherit;font-size:11px;text-align:center}
+
+  /* reticle */
+  #reticle{position:fixed;left:50%;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;z-index:6;
+    pointer-events:none;transition:transform .12s cubic-bezier(.2,1.4,.4,1),opacity .12s}
+  #reticle .ring{position:absolute;inset:11px;border-radius:50%;border:2px solid rgba(234,246,247,.55)}
+  #reticle .tick{position:absolute;left:50%;top:50%;width:2px;height:7px;margin:-16px 0 0 -1px;
+    background:rgba(234,246,247,.5);transform-origin:1px 16px}
+  #reticle.lock{transform:scale(1.35)}
+  #reticle.lock .ring{border-color:var(--yellow);box-shadow:0 0 12px rgba(255,214,0,.8)}
+  #reticle.lock .tick{background:var(--yellow)}
+  #reticle.tower.lock .ring{border-color:var(--teal-bright);box-shadow:0 0 14px rgba(59,232,224,.9)}
+  #reticle.tower.lock .tick{background:var(--teal-bright)}
+
+  /* speed vignette + flash */
+  #vig{position:fixed;inset:0;z-index:4;pointer-events:none;opacity:0;
+    background:radial-gradient(ellipse at center,rgba(0,0,0,0) 42%,rgba(0,20,28,.85) 100%)}
+  #flash{position:fixed;inset:0;z-index:7;pointer-events:none;opacity:0;background:var(--yellow);mix-blend-mode:screen}
+
+  /* toast */
+  #toast{position:fixed;left:50%;top:26%;transform:translateX(-50%);z-index:8;pointer-events:none;
+    font-size:19px;font-weight:800;letter-spacing:-.02em;color:var(--yellow);opacity:0;
+    text-shadow:0 2px 20px rgba(0,0,0,.6)}
+
+  /* ---------- screens ---------- */
+  .screen{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+    background:
+      radial-gradient(1200px 700px at 70% 10%,rgba(0,163,166,.28),transparent 60%),
+      radial-gradient(900px 600px at 15% 90%,rgba(255,214,0,.14),transparent 60%),
+      var(--navy)}
+  .screen.hide{display:none}
+  .card{width:min(880px,92vw)}
+  .dot{width:15px;height:15px;border-radius:50%;background:var(--yellow);display:inline-block;
+    margin-bottom:22px;box-shadow:0 0 0 8px rgba(255,214,0,.12)}
+  h1{font-size:clamp(56px,12vw,132px);font-weight:800;letter-spacing:-.06em;line-height:.86;color:var(--paper)}
+  h1 i{font-style:normal;display:block;color:var(--yellow)}
+  .lede{margin-top:20px;max-width:56ch;font-size:16px;line-height:1.6;color:rgba(234,246,247,.72)}
+  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));gap:18px 34px;margin-top:34px;
+    padding-top:26px;border-top:1px solid rgba(59,232,224,.22)}
+  .cols div{font-size:13px;line-height:1.8;color:rgba(234,246,247,.62);font-weight:600}
+  .cols h3{font-size:12px;font-weight:800;color:var(--teal-bright);margin-bottom:6px;letter-spacing:.01em}
+  .cols kbd{display:inline-block;min-width:22px;padding:1px 7px;margin-right:7px;border-radius:5px;
+    border:1px solid rgba(59,232,224,.35);background:rgba(3,18,27,.5);color:var(--teal-bright);
+    font:inherit;font-size:11px;font-weight:700;text-align:center}
+  button{margin-top:38px;pointer-events:auto;font:inherit;font-size:17px;font-weight:800;letter-spacing:-.01em;
+    color:var(--navy);background:var(--yellow);border:0;border-radius:99px;padding:16px 42px;cursor:pointer;
+    box-shadow:0 10px 40px rgba(255,214,0,.28)}
+  button:hover{background:var(--yellow-hot)}
+  button:focus-visible{outline:3px solid var(--teal-bright);outline-offset:3px}
+  .fine{margin-top:20px;font-size:11.5px;color:rgba(234,246,247,.38);line-height:1.7;max-width:62ch}
+  #loading{position:fixed;left:50%;bottom:8%;transform:translateX(-50%);z-index:21;
+    font-size:13px;font-weight:600;color:rgba(234,246,247,.55)}
+  #err{color:#ff8f7a;font-size:13.5px;line-height:1.6;margin-top:18px;max-width:60ch;display:none}
+  @media (prefers-reduced-motion:reduce){#reticle{transition:none}}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div class="corner tl">
+    <div class="mark"><b>optus</b><span>Ollie Man · Swing City</span></div>
+  </div>
+
+  <div class="corner tr">
+    <div class="stat"><u>Data collected</u><span id="score">0.0 GB</span></div>
+    <div class="stat"><u>Airtime streak</u><span id="combo">×1</span></div>
+    <div class="stat"><u>Altitude</u><span id="alt">0 m</span></div>
+    <div class="stat"><u>Top speed</u><span id="top">0 km/h</span></div>
+  </div>
+
+  <div class="corner bl">
+    <div class="readout big"><span id="kmh">0</span><em>km/h</em></div>
+    <div class="sub" id="state">Standing by</div>
+    <div class="gauge"><i id="gfill"></i></div>
+  </div>
+
+  <div class="corner br">
+    <div class="keys">
+      <div><kbd>LMB</kbd>hold to fire a cable</div>
+      <div><kbd>Space</kbd>release &amp; launch · jump</div>
+      <div><kbd>W</kbd><kbd>S</kbd>reel in / pay out</div>
+      <div><kbd>A</kbd><kbd>D</kbd>steer mid-air</div>
+      <div><kbd>Shift</kbd>dive · <kbd>R</kbd>respawn · <kbd>Esc</kbd>pause</div>
+    </div>
+  </div>
+</div>
+
+<div id="reticle"><div class="ring"></div></div>
+<div id="vig"></div>
+<div id="flash"></div>
+<div id="toast"></div>
+
+<div class="screen" id="start">
+  <div class="card">
+    <span class="dot"></span>
+    <h1>Ollie<i>Man</i></h1>
+    <p class="lede">The network went down across the CBD. Ollie has a shoulder-mounted USB‑C launcher and about four hundred glass towers to swing off. Build speed, keep off the pavement, and light the 5G masts back up.</p>
+    <div class="cols">
+      <div>
+        <h3>Swing</h3>
+        Hold <kbd>LMB</kbd> to fire a cable at whatever you're looking at. It sticks to rooftops, ledges and mast tips. Let go at the bottom of the arc to convert your speed into distance.
+      </div>
+      <div>
+        <h3>Go faster</h3>
+        Hold <kbd>W</kbd> while swinging to reel in — a shorter cable means a tighter, quicker arc. Release with <kbd>Space</kbd> for a bigger launch than letting the button go.
+      </div>
+      <div>
+        <h3>Score</h3>
+        Yellow data nodes float between the buildings. Every second you stay off the ground raises your streak, and the streak multiplies everything you collect.
+      </div>
+    </div>
+    <button id="play">Start swinging</button>
+    <p id="err"></p>
+    <p class="fine">Mouse and keyboard. Click to lock the pointer; press Esc to release it. Unofficial fan parody — not affiliated with or endorsed by Optus. All art is generated procedurally in the browser; no external assets.</p>
+  </div>
+</div>
+
+<div class="screen hide" id="pause">
+  <div class="card">
+    <span class="dot"></span>
+    <h1>Paused</h1>
+    <p class="lede">Your run is still here. Nothing has moved.</p>
+    <button id="resume">Back to the city</button>
+  </div>
+</div>
+
+<div id="loading">Loading Three.js from CDN…</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+/* =====================================================================
+   OLLIE MAN — SWING CITY
+   Single-file Three.js swinging platformer. Everything (geometry,
+   textures, audio) is generated procedurally at runtime.
+
+   Layout of this file:
+     1.  Config + helpers
+     2.  Renderer, scene, sky, environment lighting
+     3.  Procedural textures (windows, road)
+     4.  City: instanced buildings + collision grid
+     5.  5G towers, data nodes
+     6.  Ollie Man character rig
+     7.  Cable, trail, speed lines
+     8.  Input
+     9.  Anchor targeting (auto-aim)
+     10. Physics: swing / freefall / ground
+     11. Camera, HUD, audio
+     12. Main loop
+   ===================================================================== */
+
+/* ---------------------------------------------------------------
+   1. CONFIG + HELPERS
+   Tune the feel here — these are the numbers worth playing with.
+   --------------------------------------------------------------- */
+const CFG = {
+  gravity:        58,     // m/s^2 — deliberately heavier than real gravity
+  maxSpeed:       112,    // hard velocity clamp
+  airAccel:       30,     // WASD influence while airborne
+  groundAccel:    70,
+  swingThrust:    16,     // tangential "pump" along the arc, Insomniac-style cheat
+  swingDamp:      0.06,   // energy lost per second while attached
+  airDrag:        0.012,
+  releaseBoost:   0.34,   // fraction of current speed added along travel dir
+  releaseLift:    0.42,   // fraction of speed converted to upward pop
+  releaseLiftMax: 26,
+  ropeMin:        11,
+  ropeMax:        180,
+  reelSpeed:      30,
+  maxRange:       210,    // how far a cable can reach
+  aimCone:        0.55,   // dot() threshold — generous auto-aim
+  towerBias:      1.15,   // 5G masts win ties against building ledges
+  radius:         1.7,    // player collision sphere
+  jump:           27,
+  fovBase:        70,
+  fovMax:         106
+};
+
+const CELL = 36;            // city block pitch (building + street)
+const GRID = 28;            // blocks per side
+const HALF = GRID * CELL * 0.5;
+
+const COL = {
+  yellow:  0xFFD600,
+  amber:   0xFFA400,
+  teal:    0x00A3A6,
+  tealHot: 0x3BE8E0,
+  navy:    0x03121B,
+  char:    0x12181C,
+  white:   0xEAF6F7
+};
+
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp  = (a, b, t) => a + (b - a) * t;
+// Frame-rate independent smoothing.
+const damp  = (a, b, l, dt) => lerp(a, b, 1 - Math.exp(-l * dt));
+const rand  = (a, b) => a + Math.random() * (b - a);
+const randi = (a, b) => Math.floor(rand(a, b + 1));
+
+// Scratch vectors — allocating inside the loop is how you lose 60fps.
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion();
+const _m1 = new THREE.Matrix4();
+const _obj = new THREE.Object3D();
+const _eul = new THREE.Euler();
+const AXIS_Z = new THREE.Vector3(0, 0, 1);
+const _col = new THREE.Color();
+const UP = new THREE.Vector3(0, 1, 0);
+
+/* ---------------------------------------------------------------
+   2. RENDERER / SCENE / SKY
+   --------------------------------------------------------------- */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x0d4652, 340, 1500);
+
+const camera = new THREE.PerspectiveCamera(CFG.fovBase, window.innerWidth / window.innerHeight, 0.4, 6000);
+camera.position.set(0, 60, 60);
+
+// Sun direction drives both the light and the sky glow.
+const SUN_DIR = new THREE.Vector3(0.42, 0.30, 0.86).normalize();
+
+/**
+ * Gradient sky. `forEnv` strips the tonemap/colorspace chunks so the same
+ * gradient can be baked into a linear PMREM environment map for the glass.
+ */
+function makeSkyMaterial(forEnv) {
+  return new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
+    uniforms: {
+      cTop: { value: new THREE.Color(0x041826) },
+      cMid: { value: new THREE.Color(0x0d6d78) },
+      cBot: { value: new THREE.Color(0xffc24a) },
+      sunDir: { value: SUN_DIR.clone() }
+    },
+    vertexShader: /* glsl */`
+      varying vec3 vDir;
+      void main(){
+        vDir = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: /* glsl */`
+      varying vec3 vDir;
+      uniform vec3 cTop, cMid, cBot, sunDir;
+      void main(){
+        vec3 d = normalize(vDir);
+        float h = clamp(d.y * 0.5 + 0.5, 0.0, 1.0);
+        vec3 col = mix(cBot, cMid, smoothstep(0.44, 0.545, h));
+        col = mix(col, cTop, smoothstep(0.53, 0.92, h));
+        float s = max(dot(d, normalize(sunDir)), 0.0);
+        col += vec3(1.0, 0.88, 0.55) * pow(s, 140.0) * 2.4;   // disc
+        col += vec3(1.0, 0.72, 0.28) * pow(s, 7.0) * 0.30;    // haze
+        gl_FragColor = vec4(col, 1.0);
+        ${forEnv ? '' : '#include <tonemapping_fragment>\n#include <colorspace_fragment>'}
+      }`
+  });
+}
+
+const skyGeo = new THREE.SphereGeometry(3200, 40, 20);
+scene.add(new THREE.Mesh(skyGeo, makeSkyMaterial(false)));
+
+// Bake the sky into an env map so the glass facades actually reflect something.
+{
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  pmrem.compileEquirectangularShader();
+  const envScene = new THREE.Scene();
+  envScene.add(new THREE.Mesh(skyGeo, makeSkyMaterial(true)));
+  scene.environment = pmrem.fromScene(envScene, 0.02, 0.1, 9000).texture;
+  pmrem.dispose();
+}
+
+// --- lights ---
+scene.add(new THREE.HemisphereLight(0x9fe4e8, 0x1a1f22, 0.55));
+scene.add(new THREE.AmbientLight(0xffffff, 0.12));
+
+const sun = new THREE.DirectionalLight(0xfff0cc, 2.5);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 1400;
+sun.shadow.camera.left = -240; sun.shadow.camera.right = 240;
+sun.shadow.camera.top = 240;   sun.shadow.camera.bottom = -240;
+sun.shadow.bias = -0.0006;
+sun.shadow.normalBias = 0.9;
+scene.add(sun, sun.target);
+
+// Four roaming point lights re-parented to whichever masts are nearest —
+// keeps the shader cheap while every tower still appears to glow.
+const roamLights = [];
+for (let i = 0; i < 4; i++) {
+  const l = new THREE.PointLight(COL.tealHot, 0, 300, 1.6);
+  scene.add(l);
+  roamLights.push(l);
+}
+
+/* ---------------------------------------------------------------
+   3. PROCEDURAL TEXTURES
+   --------------------------------------------------------------- */
+
+/** Glass facade: returns { map, emissive } — lit windows in Optus colours. */
+function makeFacadeTextures() {
+  const S = 256, cols = 8, rows = 14;
+  const cd = document.createElement('canvas'); cd.width = cd.height = S;
+  const ce = document.createElement('canvas'); ce.width = ce.height = S;
+  const d = cd.getContext('2d'), e = ce.getContext('2d');
+
+  d.fillStyle = '#0a2029'; d.fillRect(0, 0, S, S);
+  e.fillStyle = '#000000'; e.fillRect(0, 0, S, S);
+
+  const wx = S / cols, wy = S / rows;
+  const lit = ['#FFD600', '#FFE873', '#3BE8E0', '#00A3A6', '#EAF6F7'];
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const px = x * wx + wx * 0.18, py = y * wy + wy * 0.16;
+      const pw = wx * 0.64, ph = wy * 0.60;
+      const on = Math.random() < 0.34;
+      d.fillStyle = on ? lit[randi(0, lit.length - 1)] : (Math.random() < 0.5 ? '#123544' : '#0e2a35');
+      d.fillRect(px, py, pw, ph);
+      if (on) {
+        e.fillStyle = lit[randi(0, lit.length - 1)];
+        e.globalAlpha = rand(0.45, 1);
+        e.fillRect(px, py, pw, ph);
+        e.globalAlpha = 1;
+      }
+    }
+  }
+  // mullion sheen
+  d.strokeStyle = 'rgba(160,220,230,0.10)'; d.lineWidth = 1;
+  for (let x = 0; x <= cols; x++) { d.beginPath(); d.moveTo(x * wx, 0); d.lineTo(x * wx, S); d.stroke(); }
+
+  const map = new THREE.CanvasTexture(cd);
+  const emi = new THREE.CanvasTexture(ce);
+  for (const t of [map, emi]) {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(2, 3);
+    t.anisotropy = 4;
+  }
+  map.colorSpace = THREE.SRGBColorSpace;
+  emi.colorSpace = THREE.SRGBColorSpace;
+  return { map, emi };
+}
+
+/** One city block of ground: asphalt streets around a paved plot. */
+function makeRoadTexture() {
+  const S = 256;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d');
+  g.fillStyle = '#161d21'; g.fillRect(0, 0, S, S);             // road
+  g.fillStyle = '#20282c'; g.fillRect(38, 38, S - 76, S - 76); // footpath
+  g.fillStyle = '#28323a'; g.fillRect(48, 48, S - 96, S - 96); // plot
+
+  // Dashed centre lines sit on the tile edges so neighbours join up.
+  g.strokeStyle = '#FFD600'; g.lineWidth = 3; g.setLineDash([16, 18]); g.globalAlpha = 0.7;
+  g.beginPath(); g.moveTo(0, 1); g.lineTo(S, 1);
+  g.moveTo(1, 0); g.lineTo(1, S); g.stroke();
+  g.globalAlpha = 1; g.setLineDash([]);
+
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(GRID, GRID);
+  t.offset.set(0.5, 0.5);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+// Ground plane
+{
+  const g = new THREE.Mesh(
+    new THREE.PlaneGeometry(GRID * CELL, GRID * CELL),
+    new THREE.MeshStandardMaterial({ map: makeRoadTexture(), roughness: 0.92, metalness: 0.05 })
+  );
+  g.rotation.x = -Math.PI / 2;
+  g.receiveShadow = true;
+  scene.add(g);
+
+  // A dark skirt so the world doesn't end in a hard edge.
+  const skirt = new THREE.Mesh(
+    new THREE.PlaneGeometry(9000, 9000),
+    new THREE.MeshStandardMaterial({ color: 0x08222b, roughness: 1 })
+  );
+  skirt.rotation.x = -Math.PI / 2;
+  skirt.position.y = -0.6;
+  scene.add(skirt);
+}
+
+/* ---------------------------------------------------------------
+   4. CITY — instanced buildings + O(1) collision grid
+   --------------------------------------------------------------- */
+const cellOf = new Int16Array(GRID * GRID).fill(-1);  // cell index -> building index
+const B = { x: [], z: [], w: [], d: [], h: [] };      // building data (parallel arrays)
+const towers = [];                                    // { x, z, h, group, rings[] }
+
+// Reserve a sparse lattice of cells for 5G masts, plus a few plazas.
+const towerCells = new Set();
+for (let i = 3; i < GRID; i += 7) {
+  for (let j = 3; j < GRID; j += 7) {
+    towerCells.add(clamp(i + randi(-1, 1), 0, GRID - 1) * GRID + clamp(j + randi(-1, 1), 0, GRID - 1));
+  }
+}
+
+for (let cz = 0; cz < GRID; cz++) {
+  for (let cx = 0; cx < GRID; cx++) {
+    const key = cx * GRID + cz;
+    const x = -HALF + cx * CELL + CELL / 2;
+    const z = -HALF + cz * CELL + CELL / 2;
+
+    if (towerCells.has(key)) {
+      towers.push({ x, z, h: rand(210, 320) });
+      continue;
+    }
+    if (Math.random() < 0.10) continue; // plaza / park gap
+
+    // Skyline profile: dense and tall downtown, low-rise at the fringes.
+    const t = clamp(Math.hypot(x, z) / HALF, 0, 1);
+    const base = lerp(165, 26, Math.pow(t, 0.85));
+    const h = clamp(base * rand(0.42, 1.25), 16, 230);
+
+    cellOf[key] = B.x.length;
+    B.x.push(x); B.z.push(z);
+    B.w.push(rand(15, 25)); B.d.push(rand(15, 25));
+    B.h.push(h);
+  }
+}
+const BCOUNT = B.x.length;
+
+// --- instanced building mesh ---
+{
+  const { map, emi } = makeFacadeTextures();
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  geo.translate(0, 0.5, 0);                      // pivot at the base
+  const mat = new THREE.MeshStandardMaterial({
+    map, emissiveMap: emi, emissive: 0xffffff, emissiveIntensity: 0.85,
+    roughness: 0.22, metalness: 0.72, envMapIntensity: 1.15
+  });
+  const mesh = new THREE.InstancedMesh(geo, mat, BCOUNT);
+  mesh.castShadow = mesh.receiveShadow = true;
+
+  // Roof caps read as ledges and give the eye something to aim at.
+  const capGeo = new THREE.BoxGeometry(1, 1, 1);
+  capGeo.translate(0, 0.5, 0);
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x0c3742, roughness: 0.55, metalness: 0.5 });
+  const caps = new THREE.InstancedMesh(capGeo, capMat, BCOUNT);
+  caps.castShadow = caps.receiveShadow = true;
+
+  const tints = [0x9fd8e0, 0x7fc6cf, 0xcfe9ec, 0x6fb6c2, 0xd9c98a, 0xa8dfd8];
+  for (let i = 0; i < BCOUNT; i++) {
+    _obj.position.set(B.x[i], 0, B.z[i]);
+    _obj.scale.set(B.w[i], B.h[i], B.d[i]);
+    _obj.rotation.set(0, 0, 0);
+    _obj.updateMatrix();
+    mesh.setMatrixAt(i, _obj.matrix);
+    mesh.setColorAt(i, _col.setHex(tints[i % tints.length]));
+
+    _obj.position.set(B.x[i], B.h[i], B.z[i]);
+    _obj.scale.set(B.w[i] + 1.6, 1.4, B.d[i] + 1.6);
+    _obj.updateMatrix();
+    caps.setMatrixAt(i, _obj.matrix);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  caps.instanceMatrix.needsUpdate = true;
+  scene.add(mesh, caps);
+}
+
+/** Building index occupying a world-space cell, or -1. */
+function buildingAtCell(cx, cz) {
+  if (cx < 0 || cz < 0 || cx >= GRID || cz >= GRID) return -1;
+  return cellOf[cx * GRID + cz];
+}
+const cellX = x => Math.floor((x + HALF) / CELL);
+const cellZ = z => Math.floor((z + HALF) / CELL);
+
+/** True if a world point is inside any building (used for camera pull-in). */
+function pointSolid(x, y, z) {
+  if (y < 0) return true;
+  const i = buildingAtCell(cellX(x), cellZ(z));
+  if (i < 0) return false;
+  return y < B.h[i] &&
+    Math.abs(x - B.x[i]) < B.w[i] * 0.5 &&
+    Math.abs(z - B.z[i]) < B.d[i] * 0.5;
+}
+
+/* ---------------------------------------------------------------
+   5. 5G TOWERS + DATA NODES
+   --------------------------------------------------------------- */
+const mastMat  = new THREE.MeshStandardMaterial({ color: 0x143c46, roughness: 0.4, metalness: 0.85 });
+const ringMat  = new THREE.MeshStandardMaterial({
+  color: COL.tealHot, emissive: COL.tealHot, emissiveIntensity: 2.6,
+  roughness: 0.3, metalness: 0.2, transparent: true, opacity: 0.9
+});
+const coreMat  = new THREE.MeshStandardMaterial({
+  color: COL.yellow, emissive: COL.yellow, emissiveIntensity: 3.2, roughness: 0.35, metalness: 0.1
+});
+const dataMat  = new THREE.MeshBasicMaterial({
+  color: COL.tealHot, transparent: true, opacity: 0.55,
+  blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+});
+
+const mastGeo = new THREE.CylinderGeometry(1.5, 3.4, 1, 10);
+mastGeo.translate(0, 0.5, 0);
+const ringGeo = new THREE.TorusGeometry(6.5, 0.34, 6, 28);
+const dataGeo = new THREE.TorusGeometry(9, 0.5, 4, 28);
+const coreGeo = new THREE.IcosahedronGeometry(4.2, 1);
+
+for (const T of towers) {
+  const g = new THREE.Group();
+  g.position.set(T.x, 0, T.z);
+
+  const mast = new THREE.Mesh(mastGeo, mastMat);
+  mast.scale.set(1, T.h, 1);
+  mast.castShadow = true;
+  g.add(mast);
+
+  // Static structural rings up the mast.
+  for (let i = 0; i < 5; i++) {
+    const r = new THREE.Mesh(ringGeo, ringMat);
+    r.position.y = T.h * (0.28 + i * 0.16);
+    r.rotation.x = Math.PI / 2;
+    r.scale.setScalar(lerp(1.0, 0.45, i / 4));
+    g.add(r);
+  }
+
+  // Emitter core + antenna at the tip — the prime grapple point.
+  const core = new THREE.Mesh(coreGeo, coreMat);
+  core.position.y = T.h + 3;
+  g.add(core);
+
+  const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 20, 6), mastMat);
+  ant.position.y = T.h + 14;
+  g.add(ant);
+
+  // Data rings that climb the mast and fade — animated in the loop.
+  T.rings = [];
+  for (let i = 0; i < 3; i++) {
+    const dr = new THREE.Mesh(dataGeo, dataMat.clone());
+    dr.rotation.x = Math.PI / 2;
+    dr.userData.phase = i / 3;
+    g.add(dr);
+    T.rings.push(dr);
+  }
+  T.core = core;
+  T.group = g;
+  scene.add(g);
+}
+
+// --- data nodes (collectibles) ---
+const NODE_N = 70;
+const nodes = [];
+const nodeMesh = new THREE.InstancedMesh(
+  new THREE.OctahedronGeometry(1.7, 0),
+  new THREE.MeshStandardMaterial({ color: COL.yellow, emissive: COL.yellow, emissiveIntensity: 2.2, roughness: 0.3 }),
+  NODE_N
+);
+nodeMesh.frustumCulled = false;
+scene.add(nodeMesh);
+
+function spawnNode(n) {
+  n.pos.set(rand(-HALF, HALF), rand(38, 190), rand(-HALF, HALF));
+  n.alive = true;
+  n.timer = 0;
+  // Don't spawn one inside a building.
+  if (pointSolid(n.pos.x, n.pos.y, n.pos.z)) n.pos.y = 240 + rand(0, 30);
+}
+for (let i = 0; i < NODE_N; i++) {
+  const n = { pos: new THREE.Vector3(), alive: true, timer: 0, spin: rand(0, 6.28) };
+  spawnNode(n);
+  nodes.push(n);
+}
+
+/* ---------------------------------------------------------------
+   6. OLLIE MAN — procedural rig
+   Yellow teardrop body, white face patch, black stick limbs, teal cape.
+   --------------------------------------------------------------- */
+const skin  = new THREE.MeshStandardMaterial({ color: COL.yellow, roughness: 0.34, metalness: 0.04, emissive: 0x513c00, emissiveIntensity: 0.5 });
+const paint = new THREE.MeshStandardMaterial({ color: COL.white, roughness: 0.42 });
+const ink   = new THREE.MeshStandardMaterial({ color: 0x0A0A0E, roughness: 0.55 });
+const tealM = new THREE.MeshStandardMaterial({ color: COL.teal, roughness: 0.3, metalness: 0.3, emissive: 0x00494b, emissiveIntensity: 0.8, side: THREE.DoubleSide });
+
+/** A limb that hangs from a pivot along -Y, so rotating the pivot aims it. */
+function makeLimb(len, r) {
+  const pivot = new THREE.Group();
+  const geo = new THREE.CapsuleGeometry(r, len, 3, 8);
+  geo.translate(0, -len * 0.5, 0);
+  const m = new THREE.Mesh(geo, ink);
+  m.castShadow = true;
+  pivot.add(m);
+  const tip = new THREE.Group();
+  tip.position.y = -(len * 0.5 + r);
+  pivot.add(tip);
+  return { pivot, tip };
+}
+
+const ollie = new THREE.Group();
+{
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1.55, 26, 20), skin);
+  body.scale.set(1, 1.05, 0.94);
+  body.castShadow = true;
+  ollie.add(body);
+
+  const flick = new THREE.Mesh(new THREE.ConeGeometry(0.62, 1.7, 12), skin);
+  flick.position.set(-0.34, 1.42, 0.05);
+  flick.rotation.z = 0.46;
+  flick.castShadow = true;
+  ollie.add(flick);
+
+  const face = new THREE.Mesh(new THREE.SphereGeometry(1.06, 24, 18), paint);
+  face.scale.set(1.02, 0.94, 0.62);
+  face.position.set(0, 0.26, -1.02);
+  ollie.add(face);
+
+  for (const sx of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.25, 14, 12), ink);
+    eye.scale.set(0.92, 1.18, 0.72);
+    eye.position.set(sx * 0.4, 0.36, -1.48);
+    ollie.add(eye);
+  }
+
+  const cape = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 3.0, 5, 7), tealM);
+  cape.position.set(0, 0.55, 1.05);
+  ollie.add(cape);
+  ollie.userData.cape = cape;
+  ollie.userData.capeBase = cape.geometry.attributes.position.array.slice();
+}
+
+const armL = makeLimb(1.9, 0.16), armR = makeLimb(1.9, 0.16);
+const legL = makeLimb(2.1, 0.17), legR = makeLimb(2.1, 0.17);
+armL.pivot.position.set(-1.28, 0.28, 0.15);
+armR.pivot.position.set( 1.28, 0.28, 0.15);
+legL.pivot.position.set(-0.5, -1.15, 0.05);
+legR.pivot.position.set( 0.5, -1.15, 0.05);
+ollie.add(armL.pivot, armR.pivot, legL.pivot, legR.pivot);
+
+// Wrist launchers.
+for (const a of [armL, armR]) {
+  const cuff = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.09, 6, 12), tealM);
+  cuff.rotation.x = Math.PI / 2;
+  cuff.position.y = 0.12;
+  a.tip.add(cuff);
+}
+scene.add(ollie);
+
+// Glow blob under Ollie so he reads against dark facades.
+const halo = new THREE.PointLight(COL.yellow, 260, 46, 2);
+ollie.add(halo);
+
+/* ---------------------------------------------------------------
+   7. CABLE, TRAIL, SPEED LINES
+   --------------------------------------------------------------- */
+const cableMat = new THREE.MeshBasicMaterial({
+  color: 0x9ffff8, transparent: true, opacity: 0.95,
+  blending: THREE.AdditiveBlending, depthWrite: false
+});
+const cable = new THREE.Mesh(new THREE.BufferGeometry(), cableMat);
+cable.frustumCulled = false;
+cable.visible = false;
+scene.add(cable);
+
+// USB-C plug that snaps onto the anchor point.
+const plug = new THREE.Group();
+{
+  const shell = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.55, 2.4), new THREE.MeshStandardMaterial({ color: 0xdfeff0, roughness: 0.3, metalness: 0.8 }));
+  const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.2, 1.1), new THREE.MeshStandardMaterial({ color: COL.teal, emissive: COL.teal, emissiveIntensity: 1.4 }));
+  tongue.position.z = -1.4;
+  plug.add(shell, tongue);
+}
+plug.visible = false;
+scene.add(plug);
+
+// --- motion trail: additive blobs that fade by darkening ---
+const TRAIL_N = 34;
+const trail = new THREE.InstancedMesh(
+  new THREE.IcosahedronGeometry(0.62, 0),
+  new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }),
+  TRAIL_N
+);
+trail.frustumCulled = false;
+scene.add(trail);
+const trailPts = [];
+for (let i = 0; i < TRAIL_N; i++) trailPts.push(new THREE.Vector3());
+let trailHead = 0;
+
+// --- speed lines: world-space streaks aligned to travel direction ---
+const LINE_N = 240;
+const lineGeo = new THREE.BufferGeometry();
+const linePos = new Float32Array(LINE_N * 6);
+lineGeo.setAttribute('position', new THREE.BufferAttribute(linePos, 3));
+const speedLines = new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({
+  color: 0xd8feff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false
+}));
+speedLines.frustumCulled = false;
+scene.add(speedLines);
+const lineSeeds = [];
+for (let i = 0; i < LINE_N; i++) {
+  lineSeeds.push(new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize().multiplyScalar(rand(6, 34)));
+}
+
+// Aim marker that sits on the current anchor candidate.
+const marker = new THREE.Mesh(
+  new THREE.TorusGeometry(1.5, 0.16, 6, 20),
+  new THREE.MeshBasicMaterial({ color: COL.yellow, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })
+);
+marker.visible = false;
+scene.add(marker);
+
+/* ---------------------------------------------------------------
+   8. INPUT
+   --------------------------------------------------------------- */
+const keys = Object.create(null);
+let mouseDown = false, yaw = 0, pitch = -0.12, running = false;
+
+addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'Space') e.preventDefault();
+  if (e.code === 'KeyR') respawn();
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+
+addEventListener('mousedown', e => { if (running && e.button === 0) mouseDown = true; });
+addEventListener('mouseup', e => {
+  if (e.button === 0) { if (attached) release(1.0); mouseDown = false; }
+});
+addEventListener('contextmenu', e => e.preventDefault());
+
+addEventListener('mousemove', e => {
+  if (document.pointerLockElement !== canvas) return;
+  yaw   -= e.movementX * 0.0023;
+  pitch -= e.movementY * 0.0019;
+  pitch = clamp(pitch, -1.25, 0.95);
+});
+
+document.addEventListener('pointerlockchange', () => {
+  if (document.pointerLockElement !== canvas && running) pauseGame();
+});
+
+/** Camera-space aim direction derived straight from yaw/pitch. */
+function aimDir(out) {
+  const cp = Math.cos(pitch);
+  return out.set(-Math.sin(yaw) * cp, Math.sin(pitch), -Math.cos(yaw) * cp);
+}
+
+/* ---------------------------------------------------------------
+   9. ANCHOR TARGETING
+   Flat array of candidate points: 5 per building (roof centre + corners)
+   plus one per mast tip. Scored by how centred it is in the aim cone.
+   --------------------------------------------------------------- */
+const AN = BCOUNT * 5 + towers.length;
+const anchors = new Float32Array(AN * 3);
+const anchorTower = new Uint8Array(AN);
+{
+  let k = 0;
+  const push = (x, y, z, isTower) => {
+    anchors[k * 3] = x; anchors[k * 3 + 1] = y; anchors[k * 3 + 2] = z;
+    anchorTower[k] = isTower; k++;
+  };
+  for (let i = 0; i < BCOUNT; i++) {
+    const hw = B.w[i] * 0.5 - 1, hd = B.d[i] * 0.5 - 1, y = B.h[i] + 1.4;
+    push(B.x[i], y, B.z[i], 0);
+    push(B.x[i] - hw, y, B.z[i] - hd, 0);
+    push(B.x[i] + hw, y, B.z[i] - hd, 0);
+    push(B.x[i] - hw, y, B.z[i] + hd, 0);
+    push(B.x[i] + hw, y, B.z[i] + hd, 0);
+  }
+  for (const T of towers) push(T.x, T.h + 3, T.z, 1);
+}
+
+let targetIdx = -1;
+const targetPos = new THREE.Vector3();
+
+/** Pick the best anchor in the aim cone. Returns index or -1. */
+function findTarget() {
+  aimDir(_v1);
+  const px = pos.x, py = pos.y, pz = pos.z;
+  const maxR = CFG.maxRange, maxR2 = maxR * maxR;
+  let best = -1, bestScore = -1e9;
+
+  for (let i = 0; i < AN; i++) {
+    const ax = anchors[i * 3], ay = anchors[i * 3 + 1], az = anchors[i * 3 + 2];
+    if (ay < py - 4) continue;                       // anchors must be above you
+    const dx = ax - px, dy = ay - py, dz = az - pz;
+    const d2 = dx * dx + dy * dy + dz * dz;
+    if (d2 > maxR2 || d2 < 90) continue;
+    const inv = 1 / Math.sqrt(d2);
+    const dot = (dx * _v1.x + dy * _v1.y + dz * _v1.z) * inv;
+    if (dot < CFG.aimCone) continue;
+    // Centred beats close; masts get a thumb on the scale.
+    const score = dot * 3 + (1 - Math.sqrt(d2) / maxR) * 0.9 + (anchorTower[i] ? CFG.towerBias : 0);
+    if (score > bestScore) { bestScore = score; best = i; }
+  }
+  return best;
+}
+
+/* ---------------------------------------------------------------
+   10. PHYSICS / STATE
+   --------------------------------------------------------------- */
+const pos = new THREE.Vector3(0, 170, 240);
+const vel = new THREE.Vector3(0, 0, -10);
+let attached = false, grounded = false;
+let ropeLen = 0, anchorIsTower = false;
+const anchor = new THREE.Vector3();
+const handPos = new THREE.Vector3();
+
+let trauma = 0;            // screen shake
+let reattachLock = 0;      // brief no-grapple window after a launch
+let airTime = 0, combo = 1;
+let score = 0, distance = 0, best = 0;
+let flashT = 0, toastT = 0;
+
+function respawn() {
+  pos.set(rand(-120, 120), 262, rand(-120, 120));
+  vel.set(0, 0, -8);
+  attached = false; grounded = false;
+  cable.visible = false; plug.visible = false;
+  combo = 1; airTime = 0;
+}
+
+function attach(idx) {
+  anchor.set(anchors[idx * 3], anchors[idx * 3 + 1], anchors[idx * 3 + 2]);
+  anchorIsTower = !!anchorTower[idx];
+  ropeLen = clamp(pos.distanceTo(anchor) * 0.97, CFG.ropeMin, CFG.ropeMax);
+  attached = true;
+  grounded = false;
+  cable.visible = true; plug.visible = true;
+  Sound.thwip();
+}
+
+/** Detach and convert the arc's momentum into a launch. `power` scales it. */
+function release(power) {
+  if (!attached) return;
+  attached = false;
+  reattachLock = 0.32;
+  cable.visible = false; plug.visible = false;
+
+  const spd = vel.length();
+  if (spd > 1) {
+    _v1.copy(vel).multiplyScalar(1 / spd);
+    vel.addScaledVector(_v1, spd * CFG.releaseBoost * power);
+    // Bigger pop the more of the swing you spent travelling upward.
+    const lift = clamp(spd * CFG.releaseLift * power, 5, CFG.releaseLiftMax);
+    vel.y += lift;
+  }
+  if (vel.length() > CFG.maxSpeed) vel.setLength(CFG.maxSpeed);
+  Sound.whoosh();
+}
+
+/** Sphere-vs-AABB against the 3x3 cells around the player. */
+function collide() {
+  const r = CFG.radius;
+  let hitNormalY = 0, impact = 0;
+
+  for (let pass = 0; pass < 2; pass++) {
+    const cx = cellX(pos.x), cz = cellZ(pos.z);
+    let moved = false;
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const i = buildingAtCell(cx + dx, cz + dz);
+        if (i < 0) continue;
+        const minX = B.x[i] - B.w[i] * 0.5, maxX = B.x[i] + B.w[i] * 0.5;
+        const minZ = B.z[i] - B.d[i] * 0.5, maxZ = B.z[i] + B.d[i] * 0.5;
+        const minY = 0, maxY = B.h[i];
+
+        const qx = clamp(pos.x, minX, maxX);
+        const qy = clamp(pos.y, minY, maxY);
+        const qz = clamp(pos.z, minZ, maxZ);
+        let nx = pos.x - qx, ny = pos.y - qy, nz = pos.z - qz;
+        let d2 = nx * nx + ny * ny + nz * nz;
+
+        if (d2 > r * r) continue;
+
+        if (d2 < 1e-8) {
+          // Centre is inside the box — eject along the shallowest axis.
+          const pxp = maxX - pos.x, pxn = pos.x - minX;
+          const pyp = maxY - pos.y, pyn = pos.y - minY;
+          const pzp = maxZ - pos.z, pzn = pos.z - minZ;
+          const m = Math.min(pxp, pxn, pyp, pyn, pzp, pzn);
+          nx = ny = nz = 0;
+          if (m === pyp) ny = 1; else if (m === pyn) ny = -1;
+          else if (m === pxp) nx = 1; else if (m === pxn) nx = -1;
+          else if (m === pzp) nz = 1; else nz = -1;
+          d2 = 0.0001;
+        }
+        const d = Math.sqrt(d2), inv = 1 / d;
+        nx *= inv; ny *= inv; nz *= inv;
+        const push = r - d;
+        pos.x += nx * push; pos.y += ny * push; pos.z += nz * push;
+
+        const vn = vel.x * nx + vel.y * ny + vel.z * nz;
+        if (vn < 0) {
+          impact = Math.max(impact, -vn);
+          vel.x -= nx * vn; vel.y -= ny * vn; vel.z -= nz * vn;
+          vel.multiplyScalar(0.86);             // scrub speed on contact
+        }
+        hitNormalY = Math.max(hitNormalY, ny);
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+
+  // ground plane
+  if (pos.y < CFG.radius) {
+    impact = Math.max(impact, -vel.y);
+    pos.y = CFG.radius;
+    if (vel.y < 0) vel.y = 0;
+    hitNormalY = 1;
+  }
+
+  const wasGrounded = grounded;
+  grounded = hitNormalY > 0.55;
+
+  if (grounded && !wasGrounded && impact > 18) {
+    trauma = Math.min(1, trauma + impact / 90);
+    Sound.thud(impact);
+    if (attached) { /* keep swinging if the cable is still live */ }
+  }
+  if (grounded && attached && pos.y < 6) release(0.4);
+}
+
+const step = 1 / 120;
+let acc = 0;
+
+function physics(dt) {
+  // --- input axes, camera relative ---
+  aimDir(_v1);
+  _v1.y = 0;
+  if (_v1.lengthSq() < 1e-6) _v1.set(0, 0, -1);
+  _v1.normalize();
+  _v2.copy(_v1).cross(UP).normalize();   // right
+
+  let ix = 0, iz = 0;
+  if (keys.KeyW || keys.ArrowUp) iz += 1;
+  if (keys.KeyS || keys.ArrowDown) iz -= 1;
+  if (keys.KeyD || keys.ArrowRight) ix += 1;
+  if (keys.KeyA || keys.ArrowLeft) ix -= 1;
+
+  _v3.set(0, 0, 0).addScaledVector(_v1, iz).addScaledVector(_v2, ix);
+  if (_v3.lengthSq() > 1) _v3.normalize();
+
+  if (attached) {
+    /* ---- pendulum ---- */
+    vel.y -= CFG.gravity * dt;
+
+    // Steering nudge (A/D only — W/S are reel controls while attached).
+    vel.addScaledVector(_v2, ix * CFG.airAccel * 0.8 * dt);
+
+    // Reel in / pay out. Reeling in tightens the arc and speeds you up.
+    if (keys.KeyW) ropeLen = Math.max(CFG.ropeMin, ropeLen - CFG.reelSpeed * dt);
+    if (keys.KeyS) ropeLen = Math.min(CFG.ropeMax, ropeLen + CFG.reelSpeed * dt);
+
+    // Tangential pump along the direction of travel — the "assist" that
+    // makes this feel like a game rather than a physics demo. Full push on
+    // the downswing, half on the way up, so you can't orbit indefinitely.
+    _v3.copy(pos).sub(anchor);
+    const dist0 = _v3.length() || 1;
+    _v3.multiplyScalar(1 / dist0);                       // radial unit
+    _v1.copy(vel).addScaledVector(_v3, -vel.dot(_v3));   // tangential component
+    const tSpd = _v1.length();
+    if (tSpd > 0.5) {
+      const pump = CFG.swingThrust * (vel.y < 0 ? 1 : 0.42);
+      vel.addScaledVector(_v1.multiplyScalar(1 / tSpd), pump * dt);
+    }
+
+    vel.multiplyScalar(1 - CFG.swingDamp * dt);
+    pos.addScaledVector(vel, dt);
+
+    // Distance constraint — clamp to the sphere and kill outward velocity.
+    _v3.copy(pos).sub(anchor);
+    const dist = _v3.length();
+    if (dist > ropeLen) {
+      _v3.multiplyScalar(1 / dist);
+      pos.copy(anchor).addScaledVector(_v3, ropeLen);
+      const radial = vel.dot(_v3);
+      if (radial > 0) vel.addScaledVector(_v3, -radial);
+    }
+    airTime += dt;
+  } else if (grounded) {
+    /* ---- on the pavement ---- */
+    vel.addScaledVector(_v3, CFG.groundAccel * dt);
+    const f = Math.exp(-7 * dt);
+    vel.x *= f; vel.z *= f;
+    vel.y -= CFG.gravity * dt;
+    if (keys.Space) { vel.y = CFG.jump; grounded = false; Sound.jump(); }
+    pos.addScaledVector(vel, dt);
+    airTime = 0;
+    combo = 1;
+  } else {
+    /* ---- freefall ---- */
+    vel.y -= CFG.gravity * dt;
+    vel.addScaledVector(_v3, CFG.airAccel * dt);
+    if (keys.ShiftLeft || keys.ShiftRight) {           // dive for speed
+      aimDir(_v1);
+      vel.addScaledVector(_v1, 34 * dt);
+    }
+    const drag = 1 - CFG.airDrag * dt * vel.length() * 0.05;
+    vel.multiplyScalar(clamp(drag, 0.9, 1));
+    pos.addScaledVector(vel, dt);
+    airTime += dt;
+  }
+
+  if (vel.length() > CFG.maxSpeed) vel.setLength(CFG.maxSpeed);
+  collide();
+
+  // Keep the player inside the city footprint.
+  const lim = HALF + 60;
+  if (Math.abs(pos.x) > lim) { pos.x = clamp(pos.x, -lim, lim); vel.x *= -0.4; }
+  if (Math.abs(pos.z) > lim) { pos.z = clamp(pos.z, -lim, lim); vel.z *= -0.4; }
+
+  distance += vel.length() * dt;
+  combo = grounded ? 1 : clamp(1 + Math.floor(airTime / 3), 1, 9);
+  best = Math.max(best, vel.length());
+}
+
+/* ---------------------------------------------------------------
+   11. VISUALS: rig posing, cable, camera, HUD, audio
+   --------------------------------------------------------------- */
+const smoothQuat = new THREE.Quaternion();
+let bank = 0, capeT = 0, runT = 0;
+
+function poseOllie(dt) {
+  ollie.position.copy(pos);
+
+  // Face the direction of travel.
+  const spd = vel.length();
+  if (spd > 2) {
+    _v1.copy(pos).addScaledVector(vel, 1 / spd * 10);
+    _obj.position.copy(pos);
+    _obj.up.set(0, 1, 0);
+    _obj.lookAt(_v1);
+    smoothQuat.slerp(_obj.quaternion, 1 - Math.exp(-9 * dt));
+  }
+  // Bank into turns using lateral velocity.
+  const targetBank = clamp(-(vel.x * Math.cos(yaw) - vel.z * Math.sin(yaw)) * 0.006, -0.5, 0.5);
+  bank = damp(bank, attached ? targetBank : targetBank * 0.4, 6, dt);
+  _q1.setFromAxisAngle(AXIS_Z, bank);
+  ollie.quaternion.copy(smoothQuat).multiply(_q1);
+  ollie.updateMatrixWorld(true);   // so worldToLocal below uses this frame's pose
+
+  // Arms: aim at the anchor while attached, otherwise trail behind.
+  if (attached) {
+    _v1.copy(anchor);
+    ollie.worldToLocal(_v1);
+    for (const a of [armL, armR]) {
+      _v2.copy(_v1).sub(a.pivot.position).normalize();
+      _q2.setFromUnitVectors(_v3.set(0, -1, 0), _v2);
+      a.pivot.quaternion.slerp(_q2, 1 - Math.exp(-16 * dt));
+    }
+    legL.pivot.rotation.set(damp(legL.pivot.rotation.x, -0.5, 9, dt), 0, -0.12);
+    legR.pivot.rotation.set(damp(legR.pivot.rotation.x, -0.8, 9, dt), 0, 0.12);
+  } else if (grounded) {
+    runT += dt * clamp(spd, 1.5, 16);
+    const s = Math.sin(runT * 1.7);
+    legL.pivot.rotation.set(s * 0.75, 0, -0.08);
+    legR.pivot.rotation.set(-s * 0.75, 0, 0.08);
+    armL.pivot.rotation.set(-s * 0.55, 0, -0.2);
+    armR.pivot.rotation.set(s * 0.55, 0, 0.2);
+  } else {
+    // Superhero freefall: arms swept back, legs streamlined.
+    _q2.setFromEuler(_eul.set(-2.5, 0, -0.5));
+    armL.pivot.quaternion.slerp(_q2, 1 - Math.exp(-10 * dt));
+    _q2.setFromEuler(_eul.set(-2.5, 0, 0.5));
+    armR.pivot.quaternion.slerp(_q2, 1 - Math.exp(-10 * dt));
+    legL.pivot.rotation.set(damp(legL.pivot.rotation.x, 0.35, 8, dt), 0, -0.14);
+    legR.pivot.rotation.set(damp(legR.pivot.rotation.x, 0.5, 8, dt), 0, 0.14);
+  }
+
+  // Cape ripple.
+  const cape = ollie.userData.cape;
+  const base = ollie.userData.capeBase;
+  const arr = cape.geometry.attributes.position.array;
+  capeT += dt * (2 + spd * 0.06);
+  for (let i = 0; i < arr.length; i += 3) {
+    const yv = base[i + 1];
+    const k = (1 - (yv + 1.5) / 3);
+    arr[i + 2] = base[i + 2] + Math.sin(capeT * 3 + yv * 2.2 + base[i]) * 0.32 * k + k * clamp(spd * 0.02, 0, 1.4);
+  }
+  cape.geometry.attributes.position.needsUpdate = true;
+  ollie.updateMatrixWorld(true);   // limbs moved — refresh so the cable finds the hand
+}
+
+/** Rebuild the cable tube with a bit of slack sag. */
+function updateCable() {
+  if (!attached) return;
+  armR.tip.getWorldPosition(handPos);
+  const straight = handPos.distanceTo(anchor);
+  const slack = clamp(ropeLen - straight, 0, 26);
+
+  const pts = [];
+  for (let i = 0; i <= 8; i++) {
+    const t = i / 8;
+    _v1.lerpVectors(handPos, anchor, t);
+    _v1.y -= Math.sin(t * Math.PI) * slack * 0.5;
+    pts.push(_v1.clone());
+  }
+  const curve = new THREE.CatmullRomCurve3(pts);
+  cable.geometry.dispose();
+  cable.geometry = new THREE.TubeGeometry(curve, 16, 0.13, 6, false);
+
+  plug.position.copy(anchor);
+  plug.lookAt(handPos);
+}
+
+function updateTrail(dt, spd) {
+  trailPts[trailHead].copy(pos);
+  trailHead = (trailHead + 1) % TRAIL_N;
+  const vis = clamp((spd - 12) / 40, 0, 1);
+  for (let i = 0; i < TRAIL_N; i++) {
+    const idx = (trailHead + i) % TRAIL_N;
+    const age = i / TRAIL_N;                    // 0 = oldest
+    const p = trailPts[idx];
+    _obj.position.copy(p);
+    _obj.rotation.set(p.x * 0.3, p.y * 0.3, 0);
+    _obj.scale.setScalar(age * age * 1.25 * vis + 0.001);
+    _obj.updateMatrix();
+    trail.setMatrixAt(i, _obj.matrix);
+    _col.setHex(attached ? 0x3BE8E0 : 0xFFD600).multiplyScalar(age * age * vis);
+    trail.setColorAt(i, _col);
+  }
+  trail.instanceMatrix.needsUpdate = true;
+  if (trail.instanceColor) trail.instanceColor.needsUpdate = true;
+}
+
+function updateSpeedLines(spd) {
+  const a = clamp((spd - 38) / 60, 0, 1);
+  speedLines.material.opacity = a * 0.55;
+  if (a <= 0.001) return;
+  _v1.copy(vel).normalize();
+  const len = 3 + a * 26;
+  for (let i = 0; i < LINE_N; i++) {
+    const s = lineSeeds[i];
+    // Wrap the streak field around the player as he moves.
+    _v2.copy(pos).add(s);
+    _v3.copy(_v2).addScaledVector(_v1, -len);
+    linePos[i * 6 + 0] = _v2.x; linePos[i * 6 + 1] = _v2.y; linePos[i * 6 + 2] = _v2.z;
+    linePos[i * 6 + 3] = _v3.x; linePos[i * 6 + 4] = _v3.y; linePos[i * 6 + 5] = _v3.z;
+    // Drift the seed backwards; recycle when it falls behind.
+    s.addScaledVector(_v1, -spd * 0.016);
+    if (s.lengthSq() > 1400 || s.dot(_v1) < -30) {
+      s.set(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize().multiplyScalar(rand(10, 32)).addScaledVector(_v1, 26);
+    }
+  }
+  lineGeo.attributes.position.needsUpdate = true;
+}
+
+// --- camera ---
+const camPos = new THREE.Vector3(0, 180, 300);
+const camLook = new THREE.Vector3();
+
+function updateCamera(dt, spd) {
+  aimDir(_v1);
+  const dist = clamp(10 + spd * 0.11, 9.5, 19);
+  const lift = 2.6 + clamp(spd * 0.03, 0, 3);
+
+  _v2.copy(pos).addScaledVector(_v1, -dist);
+  _v2.y += lift;
+
+  // Pull in if the ideal position is inside geometry.
+  for (let i = 0; i < 6; i++) {
+    if (!pointSolid(_v2.x, _v2.y, _v2.z)) break;
+    _v2.lerp(pos, 0.22);
+  }
+  if (_v2.y < 2.2) _v2.y = 2.2;
+
+  camPos.lerp(_v2, 1 - Math.exp(-(attached ? 11 : 9) * dt));
+  camera.position.copy(camPos);
+
+  // Look slightly ahead of travel so fast swings read clearly.
+  _v3.copy(pos).addScaledVector(_v1, 14).addScaledVector(vel, 0.06);
+  _v3.y += 1.4;
+  camLook.lerp(_v3, 1 - Math.exp(-14 * dt));
+  camera.lookAt(camLook);
+
+  // FOV scaling with speed.
+  const targetFov = CFG.fovBase + clamp(spd * 0.42, 0, CFG.fovMax - CFG.fovBase);
+  camera.fov = damp(camera.fov, targetFov, 5, dt);
+  camera.updateProjectionMatrix();
+
+  // Screen shake.
+  if (trauma > 0) {
+    const t = trauma * trauma;
+    camera.position.x += rand(-1, 1) * t * 2.4;
+    camera.position.y += rand(-1, 1) * t * 2.4;
+    camera.position.z += rand(-1, 1) * t * 2.4;
+    camera.rotateZ(rand(-1, 1) * t * 0.05);
+    trauma = Math.max(0, trauma - dt * 1.9);
+  }
+
+  // Sun + shadow frustum follow the player.
+  sun.position.copy(pos).addScaledVector(SUN_DIR, 420);
+  sun.target.position.copy(pos);
+  sun.target.updateMatrixWorld();
+}
+
+// --- HUD ---
+const el = {
+  kmh: document.getElementById('kmh'), state: document.getElementById('state'),
+  gfill: document.getElementById('gfill'), score: document.getElementById('score'),
+  combo: document.getElementById('combo'), alt: document.getElementById('alt'),
+  top: document.getElementById('top'),
+  ret: document.getElementById('reticle'), vig: document.getElementById('vig'),
+  flash: document.getElementById('flash'), toast: document.getElementById('toast')
+};
+// Reticle ticks
+for (let i = 0; i < 4; i++) {
+  const t = document.createElement('div');
+  t.className = 'tick';
+  t.style.transform = `rotate(${i * 90}deg)`;
+  el.ret.appendChild(t);
+}
+
+let retClass = null;
+function setReticle(c) {
+  if (c === retClass) return;      // avoid a style recalc every frame
+  retClass = c;
+  el.ret.className = c;
+}
+
+let hudT = 0;
+function updateHUD(dt, spd) {
+  hudT += dt;
+  if (hudT < 0.05) return;
+  hudT = 0;
+  el.kmh.textContent = Math.round(spd * 3.6);
+  el.gfill.style.width = clamp(spd / CFG.maxSpeed * 100, 0, 100) + '%';
+  el.alt.textContent = Math.round(pos.y) + ' m';
+  el.top.textContent = Math.round(best * 3.6) + ' km/h';
+  el.score.textContent = score.toFixed(1) + ' GB';
+  el.combo.textContent = '×' + combo;
+  el.combo.className = combo > 1 ? 'on' : '';
+  el.state.textContent = attached
+    ? (anchorIsTower ? 'Swinging from a mast' : 'Swinging')
+    : grounded ? 'On the ground — you lose your streak down here'
+    : vel.y < -20 ? 'Falling' : 'Airborne';
+  el.vig.style.opacity = clamp((spd - 45) / 70, 0, 0.85);
+}
+
+function toast(msg) {
+  if (!msg) return;
+  el.toast.textContent = msg;
+  toastT = 1.4;
+}
+
+// --- audio (all synthesised, no files) ---
+const Sound = (() => {
+  let ctx, master, windGain, ready = false;
+  function noiseBuffer(seconds) {
+    const b = ctx.createBuffer(1, ctx.sampleRate * seconds, ctx.sampleRate);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return b;
+  }
+  function init() {
+    if (ready) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    ctx = new AC();
+    master = ctx.createGain(); master.gain.value = 0.42; master.connect(ctx.destination);
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer(3); src.loop = true;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 520; f.Q.value = 0.7;
+    windGain = ctx.createGain(); windGain.gain.value = 0;
+    src.connect(f).connect(windGain).connect(master);
+    src.start();
+    ready = true;
+  }
+  function blip(type, f0, f1, dur, gain) {
+    if (!ready) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(); o.type = type;
+    const g = ctx.createGain();
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+    o.connect(g).connect(master);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  return {
+    init,
+    resume() { if (ready && ctx.state === 'suspended') ctx.resume(); },
+    wind(spd) { if (ready) windGain.gain.value = clamp((spd - 20) / 120, 0, 1) * 0.5; },
+    thwip() { blip('sawtooth', 1400, 260, 0.14, 0.22); },
+    whoosh() { blip('triangle', 320, 900, 0.22, 0.16); },
+    thud(i) { blip('sine', 140, 40, 0.28, clamp(i / 120, 0.05, 0.35)); },
+    jump() { blip('square', 300, 620, 0.12, 0.1); },
+    pickup() { blip('square', 880, 1760, 0.1, 0.12); }
+  };
+})();
+
+/* ---------------------------------------------------------------
+   12. MAIN LOOP
+   --------------------------------------------------------------- */
+let last = performance.now();
+let towerT = 0;
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  if (!running) { renderer.render(scene, camera); return; }
+
+  // Fixed-step physics for a stable pendulum.
+  acc += dt;
+  let guard = 0;
+  while (acc >= step && guard++ < 8) { physics(step); acc -= step; }
+
+  const spd = vel.length();
+  if (reattachLock > 0) reattachLock -= dt;
+
+  // Targeting + auto-attach while the button is held.
+  if (!attached) {
+    targetIdx = findTarget();
+    if (targetIdx >= 0) {
+      targetPos.set(anchors[targetIdx * 3], anchors[targetIdx * 3 + 1], anchors[targetIdx * 3 + 2]);
+      marker.visible = true;
+      marker.position.copy(targetPos);
+      marker.lookAt(camera.position);
+      const pulse = 1 + Math.sin(now * 0.006) * 0.14;
+      marker.scale.setScalar(pulse * clamp(pos.distanceTo(targetPos) / 60, 0.6, 3));
+      marker.material.color.setHex(anchorTower[targetIdx] ? COL.tealHot : COL.yellow);
+      setReticle('lock' + (anchorTower[targetIdx] ? ' tower' : ''));
+      if (mouseDown && reattachLock <= 0) attach(targetIdx);
+    } else {
+      marker.visible = false;
+      setReticle('');
+    }
+  } else {
+    marker.visible = false;
+    setReticle('');
+    if (keys.Space) release(1.25);   // Space gives a stronger launch than letting go
+  }
+
+  poseOllie(dt);
+  updateCable();
+  updateTrail(dt, spd);
+  updateSpeedLines(spd);
+  updateCamera(dt, spd);
+
+  // --- towers: climbing data rings + nearest-4 point lights ---
+  towerT += dt;
+  const sorted = towers
+    .map(T => ({ T, d: (T.x - pos.x) ** 2 + (T.z - pos.z) ** 2 }))
+    .sort((a, b) => a.d - b.d);
+  for (let i = 0; i < roamLights.length; i++) {
+    const s = sorted[i];
+    if (!s) { roamLights[i].intensity = 0; continue; }
+    roamLights[i].position.set(s.T.x, s.T.h + 4, s.T.z);
+    roamLights[i].intensity = 900;
+    roamLights[i].distance = 420;
+  }
+  for (const s of sorted.slice(0, 6)) {
+    const T = s.T;
+    T.core.rotation.y += dt * 0.6;
+    T.core.scale.setScalar(1 + Math.sin(towerT * 3) * 0.06);
+    for (const r of T.rings) {
+      const p = (towerT * 0.22 + r.userData.phase) % 1;
+      r.position.y = 20 + p * T.h;
+      r.scale.setScalar(lerp(1.3, 0.35, p));
+      r.material.opacity = Math.sin(p * Math.PI) * 0.6;
+    }
+  }
+
+  // --- data nodes ---
+  for (let i = 0; i < NODE_N; i++) {
+    const n = nodes[i];
+    if (!n.alive) {
+      n.timer += dt;
+      if (n.timer > 12) spawnNode(n);
+      _obj.scale.setScalar(0.0001);
+      _obj.position.copy(n.pos);
+      _obj.rotation.set(0, 0, 0);
+    } else {
+      n.spin += dt * 1.6;
+      _obj.position.copy(n.pos);
+      _obj.position.y += Math.sin(n.spin) * 0.8;
+      _obj.rotation.set(n.spin * 0.5, n.spin, 0);
+      _obj.scale.setScalar(1 + Math.sin(n.spin * 2) * 0.08);
+      if (_obj.position.distanceToSquared(pos) < 26) {
+        n.alive = false; n.timer = 0;
+        score += 0.5 * combo;
+        flashT = 0.16;
+        Sound.pickup();
+        toast('+' + (0.5 * combo).toFixed(1) + ' GB');
+      }
+    }
+    _obj.updateMatrix();
+    nodeMesh.setMatrixAt(i, _obj.matrix);
+  }
+  nodeMesh.instanceMatrix.needsUpdate = true;
+
+  // Distance also pays, scaled by the streak.
+  score += spd * dt * 0.004 * combo;
+
+  // Screen flourishes.
+  if (flashT > 0) { flashT -= dt; el.flash.style.opacity = clamp(flashT * 1.1, 0, 0.22); }
+  else el.flash.style.opacity = 0;
+  if (toastT > 0) {
+    toastT -= dt;
+    el.toast.style.opacity = clamp(toastT, 0, 1);
+    el.toast.style.transform = `translateX(-50%) translateY(${(1.4 - toastT) * -14}px)`;
+  } else el.toast.style.opacity = 0;
+
+  Sound.wind(spd);
+  updateHUD(dt, spd);
+  renderer.render(scene, camera);
+}
+
+/* ---------------------------------------------------------------
+   SCREENS / LIFECYCLE
+   --------------------------------------------------------------- */
+const startScreen = document.getElementById('start');
+const pauseScreen = document.getElementById('pause');
+
+function startGame() {
+  Sound.init(); Sound.resume();
+  startScreen.classList.add('hide');
+  pauseScreen.classList.add('hide');
+  running = true;
+  last = performance.now();
+  const p = canvas.requestPointerLock();
+  if (p && typeof p.catch === 'function') p.catch(() => {});
+}
+function pauseGame() {
+  running = false;
+  mouseDown = false;
+  for (const k in keys) keys[k] = false;   // don't hold inputs through a pause
+  pauseScreen.classList.remove('hide');
+}
+document.getElementById('play').addEventListener('click', () => { respawn(); startGame(); });
+document.getElementById('resume').addEventListener('click', startGame);
+
+addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Boot
+respawn();
+smoothQuat.identity();
+document.getElementById('loading').style.display = 'none';
+requestAnimationFrame(frame);
+</script>
+
+<script>
+// If the module never runs (CDN blocked, old browser), say so plainly.
+setTimeout(() => {
+  const l = document.getElementById('loading');
+  if (l && l.style.display !== 'none') {
+    l.style.display = 'none';
+    const e = document.getElementById('err');
+    e.style.display = 'block';
+    e.textContent = 'Three.js could not load from unpkg.com. Check the connection or allow that domain, then reload.';
+  }
+}, 9000);
+</script>
+</body>
+</html>
