@@ -1,0 +1,2675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>OUTER OPTUS — End of Billing Cycle</title>
+<style>
+/* =====================================================================
+   OUTER OPTUS  —  a satirical Outer Wilds clone with a telco problem
+   Single file. No external assets. Three.js from CDN, everything else
+   generated procedurally at runtime (geometry, textures, audio).
+   ===================================================================== */
+
+:root{
+  --teal:#00847b;
+  --teal-bright:#00b8a9;
+  --yellow:#f2a900;
+  --yellow-hot:#ffd34d;
+  --red:#ff4d4d;
+  --char:#1b1e1f;
+  --char-2:#24292b;
+  --white:#f6f8f8;
+  --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Roboto Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#000;color:var(--white);font-family:var(--sans)}
+canvas{display:block}
+#app{position:fixed;inset:0}
+
+/* ---------------------------------------------------------------- HUD */
+#hud{position:fixed;inset:0;pointer-events:none;z-index:20;font-family:var(--mono);opacity:0;transition:opacity .6s}
+#hud.on{opacity:1}
+
+/* the whole HUD sits inside a "phone screen" — rounded inner bezel,
+   scanline sheen, and a shattered-glass overlay drawn in SVG */
+#phoneframe{position:absolute;inset:0;border:2px solid rgba(255,255,255,.10);border-radius:26px;
+  box-shadow:inset 0 0 120px rgba(0,0,0,.75), inset 0 0 6px rgba(255,255,255,.06);}
+#cracks{position:absolute;inset:0;opacity:.55;mix-blend-mode:screen}
+#scanlines{position:absolute;inset:0;opacity:.18;
+  background:repeating-linear-gradient(to bottom,rgba(255,255,255,.10) 0 1px,transparent 1px 3px)}
+
+/* status bar, top of the "app" */
+#statusbar{position:absolute;top:10px;left:0;right:0;display:flex;justify-content:space-between;
+  align-items:center;padding:0 26px;font-size:12px;letter-spacing:.06em;color:rgba(246,248,248,.85)}
+#carrier{display:flex;align-items:center;gap:8px;font-weight:700}
+#carrier .dot{width:8px;height:8px;border-radius:50%;background:var(--yellow);box-shadow:0 0 10px var(--yellow)}
+#clock{opacity:.7}
+
+/* signal / connection bars = health */
+#barswrap{position:absolute;top:44px;left:26px;display:flex;align-items:flex-end;gap:10px}
+#bars{display:flex;align-items:flex-end;gap:3px;height:26px}
+#bars i{display:block;width:6px;background:var(--teal-bright);border-radius:1px;transition:background .2s,opacity .2s}
+#bars i.off{background:#3a4143;opacity:.5}
+#nettype{font-size:20px;font-weight:800;letter-spacing:.02em;color:var(--teal-bright)}
+#nettype.warn{color:var(--yellow)}
+#nettype.crit{color:var(--red);animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.25}}
+
+/* data allowance = jetpack fuel + oxygen */
+#allowance{position:absolute;top:82px;left:26px;width:230px}
+#allowance .lbl{font-size:10px;letter-spacing:.14em;opacity:.6;margin-bottom:5px}
+#allowbar{height:9px;border-radius:5px;background:rgba(255,255,255,.10);overflow:hidden}
+#allowfill{height:100%;width:100%;background:linear-gradient(90deg,var(--teal),var(--teal-bright));
+  transition:width .12s linear}
+#allowfill.low{background:linear-gradient(90deg,#b23b3b,var(--red))}
+#allowtxt{font-size:11px;margin-top:5px;opacity:.75}
+
+/* the looming countdown */
+#cycle{position:absolute;top:44px;right:26px;text-align:right}
+#cycle .lbl{font-size:10px;letter-spacing:.16em;opacity:.55}
+#cycletime{font-size:44px;font-weight:800;line-height:1;letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;color:var(--white);text-shadow:0 0 24px rgba(0,0,0,.8)}
+#cycletime.warn{color:var(--yellow)}
+#cycletime.crit{color:var(--red);animation:blink .55s steps(2) infinite}
+#cyclesub{font-size:10px;letter-spacing:.1em;opacity:.5;margin-top:2px}
+#loopcount{font-size:10px;letter-spacing:.1em;opacity:.45;margin-top:8px}
+
+/* reticle + context prompt */
+#reticle{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;
+  border:1px solid rgba(246,248,248,.55);border-radius:50%;transition:transform .12s,border-color .12s}
+#reticle.hot{border-color:var(--yellow);transform:scale(1.35);box-shadow:0 0 14px rgba(242,169,0,.5)}
+#reticle:after{content:"";position:absolute;left:50%;top:50%;width:2px;height:2px;margin:-1px;border-radius:50%;
+  background:rgba(246,248,248,.8)}
+#prompt{position:absolute;left:50%;top:calc(50% + 30px);transform:translateX(-50%);font-size:13px;
+  padding:7px 14px;border-radius:8px;background:rgba(27,30,31,.82);border:1px solid rgba(242,169,0,.5);
+  color:var(--white);white-space:nowrap;opacity:0;transition:opacity .12s}
+#prompt.on{opacity:1}
+#prompt b{color:var(--yellow)}
+
+/* velocity / nav readout while flying */
+#nav{position:absolute;left:50%;bottom:96px;transform:translateX(-50%);text-align:center;font-size:12px;
+  letter-spacing:.06em;opacity:0;transition:opacity .25s;color:rgba(246,248,248,.85)}
+#nav.on{opacity:1}
+#nav .big{font-size:26px;font-weight:800;color:var(--yellow);font-variant-numeric:tabular-nums}
+#nav .sub{opacity:.7;margin-top:2px}
+
+/* tool belt */
+#tools{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:10px}
+.tool{padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:rgba(27,30,31,.78);
+  font-size:11px;letter-spacing:.08em;opacity:.55;transition:all .15s}
+.tool b{display:block;font-size:9px;opacity:.6;font-weight:600}
+.tool.sel{opacity:1;border-color:var(--yellow);color:var(--yellow);box-shadow:0 0 18px rgba(242,169,0,.28)}
+
+/* packet tracer photo */
+#photo{position:absolute;right:26px;bottom:24px;width:212px;padding:8px;border-radius:10px;
+  background:rgba(27,30,31,.88);border:1px solid rgba(255,255,255,.14);display:none}
+#photo.on{display:block}
+#photo canvas{width:100%;image-rendering:pixelated;border-radius:4px;display:block;background:#000}
+#photo .meta{font-size:10px;opacity:.65;margin-top:6px;display:flex;justify-content:space-between}
+
+/* signalscope overlay */
+#scope{position:absolute;inset:0;display:none}
+#scope.on{display:block}
+#scopevig{position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,transparent 26%,rgba(0,0,0,.86) 62%)}
+#scopering{position:absolute;left:50%;top:50%;width:44vmin;height:44vmin;margin:-22vmin 0 0 -22vmin;
+  border:1px solid rgba(0,184,169,.5);border-radius:50%}
+#scopering:before,#scopering:after{content:"";position:absolute;background:rgba(0,184,169,.35)}
+#scopering:before{left:50%;top:-14px;bottom:-14px;width:1px}
+#scopering:after{top:50%;left:-14px;right:-14px;height:1px}
+#scopepanel{position:absolute;left:50%;bottom:14%;transform:translateX(-50%);width:min(520px,80vw);
+  background:rgba(27,30,31,.9);border:1px solid rgba(0,184,169,.4);border-radius:12px;padding:14px 18px}
+#scopepanel .band{font-size:11px;letter-spacing:.14em;opacity:.6}
+#scopepanel .name{font-size:17px;font-weight:700;color:var(--teal-bright);margin:4px 0 8px}
+#scopemeter{height:7px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden}
+#scopemeter i{display:block;height:100%;width:0;background:var(--teal-bright);transition:width .1s}
+#scopehint{font-size:10px;opacity:.5;margin-top:8px}
+
+/* subtitles / toast log */
+#toasts{position:absolute;left:50%;bottom:130px;transform:translateX(-50%);display:flex;flex-direction:column;
+  align-items:center;gap:6px;width:min(620px,84vw)}
+.toast{background:rgba(27,30,31,.9);border-left:3px solid var(--yellow);padding:9px 14px;border-radius:6px;
+  font-size:13px;line-height:1.45;animation:tin .3s ease-out;font-family:var(--sans)}
+.toast.teal{border-left-color:var(--teal-bright)}
+.toast.red{border-left-color:var(--red)}
+@keyframes tin{from{opacity:0;transform:translateY(10px)}}
+
+/* ------------------------------------------------------------- MODALS */
+.screen{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;
+  background:rgba(9,11,12,.86);backdrop-filter:blur(3px);padding:24px}
+.screen.on{display:flex}
+.card{width:min(660px,94vw);max-height:86vh;background:var(--char);border:1px solid rgba(255,255,255,.12);
+  border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 30px 90px rgba(0,0,0,.7)}
+.card header{padding:16px 22px;background:linear-gradient(90deg,var(--teal),#006b64);display:flex;
+  align-items:center;justify-content:space-between}
+.card header h2{margin:0;font-size:16px;letter-spacing:.02em}
+.card header span{font-size:11px;font-family:var(--mono);opacity:.8}
+.card .body{padding:20px 22px;overflow-y:auto;font-size:14px;line-height:1.6;color:rgba(246,248,248,.88)}
+.card .foot{padding:14px 22px;border-top:1px solid rgba(255,255,255,.1);display:flex;gap:10px;
+  align-items:center;justify-content:flex-end;background:var(--char-2)}
+.card .foot .note{margin-right:auto;font-size:11px;font-family:var(--mono);opacity:.6}
+button{font-family:var(--sans);font-size:14px;font-weight:600;padding:11px 20px;border-radius:10px;border:0;
+  background:var(--yellow);color:#241a00;cursor:pointer;transition:filter .15s,opacity .15s}
+button:hover{filter:brightness(1.08)}
+button:disabled{opacity:.35;cursor:not-allowed}
+button.ghost{background:transparent;color:rgba(246,248,248,.75);border:1px solid rgba(255,255,255,.18)}
+button:focus-visible{outline:2px solid var(--yellow-hot);outline-offset:2px}
+
+/* T&C scroller */
+#tcbody{height:44vh}
+#tcbody p{margin:0 0 12px}
+#tcprog{font-family:var(--mono);font-size:11px;opacity:.6;margin-right:auto}
+
+/* 2FA */
+#twofa .body{text-align:center}
+#twofa .code{font-family:var(--mono);font-size:42px;letter-spacing:.34em;font-weight:800;color:var(--yellow);
+  margin:14px 0 6px;min-height:52px}
+#twofa .spin{width:34px;height:34px;margin:18px auto 8px;border-radius:50%;border:3px solid rgba(255,255,255,.15);
+  border-top-color:var(--teal-bright);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#twofawait{font-family:var(--mono);font-size:12px;opacity:.65}
+
+/* lore / decoder */
+#lore .card{border-color:rgba(242,169,0,.4)}
+#lore .card header{background:linear-gradient(90deg,#8a6200,#3d2c00)}
+#lorebody .raw{font-family:var(--mono);font-size:12px;color:var(--yellow);opacity:.8;
+  border-left:2px solid rgba(242,169,0,.45);padding-left:12px;margin-bottom:16px;white-space:pre-wrap}
+#lorebody .trans{font-size:15px;line-height:1.65}
+#lorebody .who{font-size:11px;font-family:var(--mono);letter-spacing:.12em;opacity:.55;margin-bottom:10px}
+
+/* ship log */
+#log .card{width:min(760px,94vw)}
+#logbody{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.logentry{border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:12px;background:var(--char-2)}
+.logentry h4{margin:0 0 6px;font-size:13px;color:var(--yellow)}
+.logentry p{margin:0;font-size:12px;line-height:1.5;opacity:.8}
+.logentry.locked{opacity:.35}
+.logentry.locked h4{color:rgba(246,248,248,.6)}
+
+/* ---------------------------------------------------------- FULLSCREEN */
+#whiteout{position:fixed;inset:0;z-index:60;background:#fff;opacity:0;pointer-events:none;transition:opacity .5s}
+#deathcard{position:fixed;inset:0;z-index:61;display:none;flex-direction:column;align-items:center;
+  justify-content:center;background:#fff;color:#111;font-family:var(--sans);text-align:center;padding:30px}
+#deathcard.on{display:flex}
+#deathcard .x{width:86px;height:86px;border-radius:50%;background:var(--red);display:grid;place-items:center;
+  font-size:48px;color:#fff;font-weight:700;margin-bottom:22px}
+#deathcard h1{margin:0;font-size:30px;letter-spacing:-.01em}
+#deathcard p{margin:10px 0 0;font-size:15px;color:#555;max-width:440px;line-height:1.55}
+#deathcard .ref{margin-top:22px;font-family:var(--mono);font-size:11px;color:#999}
+
+#glitch{position:fixed;inset:0;z-index:55;pointer-events:none;opacity:0;transition:opacity .2s;
+  background:repeating-linear-gradient(to bottom,rgba(255,77,77,.16) 0 2px,transparent 2px 6px);mix-blend-mode:screen}
+
+/* ------------------------------------------------------------ TITLE */
+#boot{position:fixed;inset:0;z-index:70;background:radial-gradient(120% 90% at 50% 8%,#0d3b38 0%,#08100f 55%,#000 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center}
+#boot.off{display:none}
+#boot .kicker{font-family:var(--mono);font-size:11px;letter-spacing:.34em;color:var(--yellow);opacity:.9}
+#boot h1{margin:14px 0 0;font-size:clamp(38px,9vw,86px);line-height:.92;font-weight:800;letter-spacing:-.03em}
+#boot h1 span{display:block;color:var(--teal-bright)}
+#boot .tag{margin:18px 0 0;max-width:560px;font-size:15px;line-height:1.6;color:rgba(246,248,248,.72)}
+#boot .keys{margin:26px 0 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px 26px;
+  max-width:660px;font-family:var(--mono);font-size:11.5px;text-align:left;color:rgba(246,248,248,.62)}
+#boot .keys b{color:var(--yellow);font-weight:700}
+#boot button{margin-top:30px;font-size:16px;padding:14px 34px}
+#boot .disc{margin-top:24px;font-size:10.5px;max-width:600px;line-height:1.6;color:rgba(246,248,248,.38);
+  font-family:var(--mono)}
+#loading{margin-top:24px;font-family:var(--mono);font-size:12px;color:var(--teal-bright)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- ============================== HUD ============================== -->
+<div id="hud">
+  <div id="phoneframe"></div>
+  <svg id="cracks" viewBox="0 0 1000 600" preserveAspectRatio="none">
+    <g stroke="rgba(255,255,255,.5)" fill="none" stroke-width="1.1">
+      <path d="M0 84 L150 150 L214 132 L340 210 L318 300 L420 372 L392 470 L520 600"/>
+      <path d="M214 132 L268 40 M214 132 L120 208 M340 210 L470 190 M318 300 L200 340
+               M420 372 L560 330 M392 470 L300 540 M470 190 L556 96"/>
+      <path d="M1000 40 L880 120 L906 210 L820 268 L860 360 L760 420"/>
+      <path d="M880 120 L940 230 M820 268 L930 300 M860 360 L980 430"/>
+    </g>
+    <g stroke="rgba(0,184,169,.35)" fill="none" stroke-width=".6">
+      <path d="M150 150 L60 120 M268 40 L300 0 M560 330 L640 300 M760 420 L700 520"/>
+    </g>
+  </svg>
+  <div id="scanlines"></div>
+
+  <div id="statusbar">
+    <div id="carrier"><span class="dot"></span> OPTUS &nbsp;<span style="opacity:.5;font-weight:400">yes</span></div>
+    <div id="clock">MY OPTUS · v22.0.1</div>
+  </div>
+
+  <div id="barswrap">
+    <div id="bars"><i style="height:8px"></i><i style="height:13px"></i><i style="height:18px"></i><i style="height:22px"></i><i style="height:26px"></i></div>
+    <div id="nettype">5G</div>
+  </div>
+
+  <div id="allowance">
+    <div class="lbl">DATA ALLOWANCE</div>
+    <div id="allowbar"><div id="allowfill"></div></div>
+    <div id="allowtxt">100.0 GB remaining</div>
+  </div>
+
+  <div id="cycle">
+    <div class="lbl">END OF BILLING CYCLE</div>
+    <div id="cycletime">22:00</div>
+    <div id="cyclesub">AUTO-RENEWAL PENDING</div>
+    <div id="loopcount">CYCLE 001</div>
+  </div>
+
+  <div id="reticle"></div>
+  <div id="prompt"></div>
+
+  <div id="nav">
+    <div class="big"><span id="navspeed">0</span> <span style="font-size:13px">m/s</span></div>
+    <div class="sub" id="navtarget">FREE FLIGHT · NO REFERENCE BODY</div>
+  </div>
+
+  <div id="tools">
+    <div class="tool sel" data-tool="0"><b>1</b>NETWORK SCANNER</div>
+    <div class="tool" data-tool="1"><b>2</b>PACKET TRACER</div>
+    <div class="tool" data-tool="2"><b>3</b>T&amp;C DECODER</div>
+  </div>
+
+  <div id="photo">
+    <canvas id="photocanvas" width="160" height="112"></canvas>
+    <div class="meta"><span id="photolat">-- ms</span><span id="photonote">packet_001.jpg</span></div>
+  </div>
+
+  <div id="scope">
+    <div id="scopevig"></div>
+    <div id="scopering"></div>
+    <div id="scopepanel">
+      <div class="band" id="scopeband">BAND 1 · MARKETING BROADCAST · 98.5 FM</div>
+      <div class="name" id="scopename">no signal locked</div>
+      <div id="scopemeter"><i></i></div>
+      <div id="scopehint">MOUSE WHEEL or [ ] to change band · release RIGHT MOUSE to stow</div>
+    </div>
+  </div>
+
+  <div id="toasts"></div>
+</div>
+
+<!-- ============================= MODALS ============================= -->
+<div class="screen" id="tc">
+  <div class="card">
+    <header><h2>Terms &amp; Conditions of Spaceflight</h2><span id="tcver">v22.0.1</span></header>
+    <div class="body" id="tcbody"></div>
+    <div class="foot">
+      <span id="tcprog">scrolled 0%</span>
+      <button class="ghost" id="tcdecline">Decline</button>
+      <button id="tcaccept" disabled>Accept and launch</button>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="twofa">
+  <div class="card">
+    <header><h2>Verify it's you</h2><span>2-STEP LAUNCH AUTHORISATION</span></header>
+    <div class="body">
+      <p>A 6-digit code has been sent to the device registered on this account.</p>
+      <div class="spin" id="twofaspin"></div>
+      <div class="code" id="twofacode"></div>
+      <div id="twofawait">delivery in progress — do not close this window</div>
+    </div>
+    <div class="foot">
+      <span class="note" id="twofanote">SMS gateway congestion: high</span>
+      <button class="ghost" id="twofaclose">Close</button>
+      <button id="twofaok" disabled>Use this code</button>
+    </div>
+  </div>
+</div>
+
+<div class="screen" id="lore">
+  <div class="card">
+    <header><h2 id="loretitle">Founders' Notice</h2><span>T&amp;C DECODER</span></header>
+    <div class="body" id="lorebody"></div>
+    <div class="foot"><span class="note">logged to ship computer</span><button id="loreclose">Close</button></div>
+  </div>
+</div>
+
+<div class="screen" id="log">
+  <div class="card">
+    <header><h2>Ship computer — knowledge base</h2><span id="logcount">0 / 0</span></header>
+    <div class="body"><div id="logbody"></div></div>
+    <div class="foot"><span class="note">survives the billing cycle. you do not.</span><button id="logclose">Close</button></div>
+  </div>
+</div>
+
+<div id="glitch"></div>
+<div id="whiteout"></div>
+<div id="deathcard">
+  <div class="x">!</div>
+  <h1 id="deathtitle">Payment declined</h1>
+  <p id="deathtext">Your session could not be renewed. Reverting to the last known good state.</p>
+  <div class="ref" id="deathref">REF 0x00000</div>
+</div>
+
+<!-- ============================== BOOT ============================== -->
+<div id="boot">
+  <div class="kicker">A CORPORATE TIME LOOP</div>
+  <h1>OUTER OPTUS<span>End of Billing Cycle</span></h1>
+  <p class="tag">You have 22 minutes before the star goes into hyper-inflation and audits the solar system.
+     Get the launch codes, accept the terms, and find out what happened to the network the Founders left behind.</p>
+  <div class="keys">
+    <div><b>WASD</b> move · <b>SPACE</b> jump / jetpack</div>
+    <div><b>MOUSE</b> look · <b>E</b> interact</div>
+    <div><b>1 2 3</b> tools · <b>LMB</b> use tool</div>
+    <div><b>RMB</b> hold: network scanner</div>
+    <div><b>SHIFT</b> boost (in ship)</div>
+    <div><b>Q / R</b> roll · <b>X</b> match velocity</div>
+    <div><b>F</b> leave ship · <b>TAB</b> knowledge base</div>
+    <div><b>T</b> hold: fast-forward time (debug)</div>
+  </div>
+  <button id="startbtn" disabled>Loading the network…</button>
+  <div id="loading">connecting to three.js…</div>
+  <p class="disc">Parody / fair dealing. Not affiliated with, endorsed by, or connected to Singtel Optus Pty Limited or
+     Mobius Digital. All brands, characters and grievances belong to their respective owners. Outer Wilds is a
+     masterpiece and you should buy it.</p>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+/* =====================================================================
+   0. CONFIG
+   ===================================================================== */
+const CFG = {
+  LOOP: 22 * 60,           // seconds in a billing cycle
+  INFLATE_AT: 21 * 60,     // sun begins hyper-inflation
+  SUN_R: 700,
+  STAR_FAR: 90000,
+  WALK: 14, RUN: 22, JUMP: 16,
+  JET: 34,                 // jetpack acceleration
+  JET_COST: 5.2,           // GB per second of jetpack
+  DRIFT_COST: 0.42,        // GB per second while off-planet (oxygen)
+  ALLOWANCE: 100,          // GB
+  SHIP_THRUST: 190,
+  SHIP_BOOST: 3.2,
+  SHIP_MAXRATE: 1.5,
+  PLAYER_H: 1.9,
+  FALL_SAFE: 46,           // impact speed before bars start dropping
+};
+const COL = {
+  teal: 0x00847b, tealBright: 0x00b8a9, yellow: 0xf2a900, yellowHot: 0xffd34d,
+  red: 0xff4d4d, char: 0x1b1e1f, char2: 0x2c3234, white: 0xf6f8f8, sand: 0xe3b552,
+};
+
+/* =====================================================================
+   1b. GAME STATE  (declared early: planet collision functions read it)
+   ===================================================================== */
+const state = {
+  running: false, t: 0, loop: 1, bars: 5, allowance: CFG.ALLOWANCE,
+  mode: 'foot', codesThisLoop: false, trusted: false, tcAccepted: false,
+  vpn: false, inStation: false, coreAccess: 0, tool: 0, scope: false, band: 0,
+  dead: false, resetting: false, timeScale: 1, decoding: 0, twofa: null, glitch: 0,
+  knowledge: new Set(),
+};
+
+/* =====================================================================
+   1. TINY UTILITIES
+   ===================================================================== */
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[(Math.random() * arr.length) | 0];
+
+/** deterministic pseudo-random so every loop rebuilds the same universe */
+function mulberry(seed) {
+  return function () {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/** evenly scattered points on a sphere (fibonacci) */
+function fibSphere(i, n) {
+  const y = 1 - (i / (n - 1)) * 2;
+  const r = Math.sqrt(Math.max(0, 1 - y * y));
+  const th = Math.PI * (3 - Math.sqrt(5)) * i;
+  return new THREE.Vector3(Math.cos(th) * r, y, Math.sin(th) * r);
+}
+
+/** canvas -> THREE texture; every texture in the game is drawn in code */
+function makeTex(w, h, draw, repeat) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat[0], repeat[1]); }
+  t.anisotropy = 4;
+  return t;
+}
+
+/** orient an object so its local +Y points along `up` */
+const _yAxis = new THREE.Vector3(0, 1, 0);
+function alignY(obj, up) { obj.quaternion.setFromUnitVectors(_yAxis, up); }
+
+/* glsl chunks so custom ShaderMaterials play nice with the log depth buffer */
+/* Three resolves #include with /^[ \t]*#include +<...>/gm — the pattern is
+   ANCHORED TO THE START OF A LINE. These chunks get spliced into the middle of
+   shader source (`gl_Position = ...; ${LOG_V} }`), so without the leading and
+   trailing newlines below the directive is left in the GLSL verbatim and every
+   custom shader in the game — star, corona, ocean, black hole — fails to
+   compile and renders as nothing at all.                                     */
+const LOG_V_PARS = '\n#include <common>\n#include <logdepthbuf_pars_vertex>\n';
+const LOG_V = '\n#include <logdepthbuf_vertex>\n';
+const LOG_F_PARS = '\n#include <common>\n#include <logdepthbuf_pars_fragment>\n';
+const LOG_F = '\n#include <logdepthbuf_fragment>\n';
+
+/* compact 3d simplex noise for shaders */
+const GLSL_NOISE = `
+vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}
+vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}
+vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}
+vec4 taylorInvSqrt(vec4 r){return 1.79284291400159-0.85373472095314*r;}
+float snoise(vec3 v){
+  const vec2 C=vec2(1.0/6.0,1.0/3.0); const vec4 D=vec4(0.0,0.5,1.0,2.0);
+  vec3 i=floor(v+dot(v,C.yyy)); vec3 x0=v-i+dot(i,C.xxx);
+  vec3 g=step(x0.yzx,x0.xyz); vec3 l=1.0-g; vec3 i1=min(g.xyz,l.zxy); vec3 i2=max(g.xyz,l.zxy);
+  vec3 x1=x0-i1+C.xxx; vec3 x2=x0-i2+C.yyy; vec3 x3=x0-D.yyy;
+  i=mod289(i);
+  vec4 p=permute(permute(permute(i.z+vec4(0.0,i1.z,i2.z,1.0))+i.y+vec4(0.0,i1.y,i2.y,1.0))+i.x+vec4(0.0,i1.x,i2.x,1.0));
+  float n_=0.142857142857; vec3 ns=n_*D.wyz-D.xzx;
+  vec4 j=p-49.0*floor(p*ns.z*ns.z); vec4 x_=floor(j*ns.z); vec4 y_=floor(j-7.0*x_);
+  vec4 x=x_*ns.x+ns.yyyy; vec4 y=y_*ns.x+ns.yyyy; vec4 h=1.0-abs(x)-abs(y);
+  vec4 b0=vec4(x.xy,y.xy); vec4 b1=vec4(x.zw,y.zw);
+  vec4 s0=floor(b0)*2.0+1.0; vec4 s1=floor(b1)*2.0+1.0; vec4 sh=-step(h,vec4(0.0));
+  vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy; vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+  vec3 p0=vec3(a0.xy,h.x); vec3 p1=vec3(a0.zw,h.y); vec3 p2=vec3(a1.xy,h.z); vec3 p3=vec3(a1.zw,h.w);
+  vec4 norm=taylorInvSqrt(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+  p0*=norm.x;p1*=norm.y;p2*=norm.z;p3*=norm.w;
+  vec4 m=max(0.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.0); m=m*m;
+  return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+}`;
+
+/* =====================================================================
+   2. AUDIO — everything synthesised, no audio files
+   ===================================================================== */
+const AU = {
+  ctx: null, master: null, thrust: null, thrustGain: null, scope: null, scopeGain: null,
+  holdTimer: null, ready: false,
+  init() {
+    if (this.ready) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    this.ctx = new AC();
+    this.master = this.ctx.createGain(); this.master.gain.value = 0.5;
+    this.master.connect(this.ctx.destination);
+    // continuous thruster rumble: filtered noise, gain driven by the throttle
+    const buf = this.ctx.createBuffer(1, this.ctx.sampleRate * 2, this.ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * 0.6;
+    const src = this.ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 320;
+    this.thrustGain = this.ctx.createGain(); this.thrustGain.gain.value = 0;
+    src.connect(lp); lp.connect(this.thrustGain); this.thrustGain.connect(this.master); src.start();
+    // signalscope voice
+    this.scope = this.ctx.createOscillator(); this.scope.type = 'triangle'; this.scope.frequency.value = 220;
+    this.scopeGain = this.ctx.createGain(); this.scopeGain.gain.value = 0;
+    const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 1.6;
+    this.scope.connect(bp); bp.connect(this.scopeGain); this.scopeGain.connect(this.master); this.scope.start();
+    this.ready = true;
+  },
+  resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
+  tone(f, dur = .18, type = 'sine', vol = .18, slideTo = null) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t + dur);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .012);
+    g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur + .05);
+  },
+  noiseBurst(dur = .5, vol = .3, freq = 900) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime, n = this.ctx.createBufferSource();
+    const b = this.ctx.createBuffer(1, this.ctx.sampleRate * dur, this.ctx.sampleRate);
+    const d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    n.buffer = b;
+    const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(freq, t);
+    f.frequency.exponentialRampToValueAtTime(90, t + dur);
+    const g = this.ctx.createGain(); g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    n.connect(f); f.connect(g); g.connect(this.master); n.start();
+  },
+  beep() { this.tone(880, .07, 'square', .1); },
+  ok() { this.tone(660, .09, 'square', .12); setTimeout(() => this.tone(990, .12, 'square', .12), 90); },
+  deny() { this.tone(220, .22, 'sawtooth', .14, 90); },
+  warp() { this.tone(140, .9, 'sine', .2, 1600); this.noiseBurst(.9, .18, 2400); },
+  boom() { this.noiseBurst(3.2, .5, 400); this.tone(60, 3, 'sine', .25, 24); },
+  /* the white hole station hold music: tinny, compressed, endless */
+  startHold() {
+    if (!this.ready || this.holdTimer) return;
+    const mel = [523, 587, 659, 587, 523, 440, 494, 523, 587, 659, 698, 659];
+    let i = 0;
+    const step = () => {
+      const t = this.ctx.currentTime, o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 700;
+      o.type = 'triangle'; o.frequency.value = mel[i % mel.length] * (i % 24 < 12 ? 1 : 1.5);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.09, t + .02);
+      g.gain.exponentialRampToValueAtTime(.0001, t + .38);
+      o.connect(hp); hp.connect(g); g.connect(this.master); o.start(t); o.stop(t + .42);
+      i++;
+    };
+    step(); this.holdTimer = setInterval(step, 420);
+  },
+  stopHold() { if (this.holdTimer) { clearInterval(this.holdTimer); this.holdTimer = null; } },
+};
+
+/* =====================================================================
+   3. RENDERER / SCENE / CAMERA
+   ===================================================================== */
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.1, 200000);
+const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x000206);
+document.getElementById('app').appendChild(renderer.domElement);
+
+/* LIGHTING --------------------------------------------------------------
+   Three r155+ lights are physically based: a PointLight's brightness falls
+   off as 1/distance^decay. Our worlds orbit between 6,000 and 24,500 units
+   out, so ANY decay crushes the star's contribution to roughly zero and
+   leaves the whole system lit by ambient alone — flat, murky, and unreadable.
+   A star is effectively at infinity, so this light runs with decay = 0:
+   constant intensity everywhere, still radiating FROM the star's position,
+   which is what gives every world an honest day side, terminator and night
+   side. Intensity ~PI reads as full daylight on a Lambert surface, because
+   the Lambert BRDF divides by PI.                                          */
+const ambient = new THREE.AmbientLight(0x41606e, 0.95);      // starlight fill — keeps night sides legible
+scene.add(ambient);
+const sunLight = new THREE.PointLight(0xfff4dc, 3.5, 0, 0);  // decay 0 = the star reaches everything
+scene.add(sunLight);
+const rimLight = new THREE.DirectionalLight(0x00b8a9, 0.24); // faint teal bounce from the galaxy
+rimLight.position.set(-1, .4, .6); scene.add(rimLight);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* starfield ------------------------------------------------------------ */
+(function stars() {
+  const n = 4200, pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  const c = new THREE.Color();
+  for (let i = 0; i < n; i++) {
+    const v = fibSphere(i, n).multiplyScalar(CFG.STAR_FAR * rand(.85, 1));
+    pos.set([v.x, v.y, v.z], i * 3);
+    c.setHSL(rand(.45, .62), rand(.1, .5), rand(.6, 1));
+    col.set([c.r, c.g, c.b], i * 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ size: 240, vertexColors: true, sizeAttenuation: true, depthWrite: false })));
+})();
+
+/* =====================================================================
+   4. PHYSICS CORE
+   Everything inside a planet's sphere of influence is simulated in that
+   planet's *local* frame (which translates with the planet but does not
+   rotate). Crossing the SOI boundary converts the velocity by adding or
+   subtracting the planet's own orbital velocity — so matching velocity
+   with a moving world actually matters, like it should.
+   ===================================================================== */
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+const _q1 = new THREE.Quaternion();
+
+const planets = [];
+function definePlanet(def) {
+  const p = Object.assign({
+    radius: 100, g: 20, soi: 500, spin: 0,
+    collide(local) { return this.radius; },
+    update() { },
+  }, def);
+  p.wpos = new THREE.Vector3(); p.wvel = new THREE.Vector3();
+  p.group = new THREE.Group(); scene.add(p.group);
+  planets.push(p);
+  return p;
+}
+
+class Body {
+  constructor(radius) {
+    this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
+    this.frame = null; this.radius = radius; this.grounded = false; this.impact = 0;
+  }
+  world(out = _v1) { out.copy(this.pos); if (this.frame) out.add(this.frame.wpos); return out; }
+  setWorld(wp, frame) {
+    this.frame = frame;
+    this.pos.copy(wp); if (frame) this.pos.sub(frame.wpos);
+  }
+}
+
+/** switch a body between the sun frame and a planet frame */
+function updateFrame(b) {
+  const wp = b.world(_v1);
+  if (b.frame) {
+    if (wp.distanceTo(b.frame.wpos) > b.frame.soi * 1.06) {
+      b.vel.add(b.frame.wvel); b.pos.copy(wp); b.frame = null;
+    }
+  } else {
+    for (const p of planets) {
+      if (wp.distanceTo(p.wpos) < p.soi) {
+        b.pos.copy(wp).sub(p.wpos); b.vel.sub(p.wvel); b.frame = p; break;
+      }
+    }
+  }
+}
+
+/** gravity acceleration for a body, in its current frame's coordinates */
+function gravity(b, out) {
+  if (b.frame) {
+    const d = Math.max(b.pos.length(), .001);
+    const g = b.frame.g * (b.frame.radius * b.frame.radius) / (d * d);
+    return out.copy(b.pos).multiplyScalar(-g / d);
+  }
+  const d = Math.max(b.pos.length(), 1);
+  const g = 9 * (CFG.SUN_R * CFG.SUN_R) / (d * d);   // the star pulls, gently
+  return out.copy(b.pos).multiplyScalar(-g / d);
+}
+
+/* =====================================================================
+   5. THE STAR — "Shareholder Value"
+   ===================================================================== */
+const sunUniforms = {
+  uTime: { value: 0 }, uInflate: { value: 0 },
+};
+const sunMat = new THREE.ShaderMaterial({
+  uniforms: sunUniforms,
+  vertexShader: `${LOG_V_PARS}
+    varying vec3 vP; varying vec3 vW; varying vec3 vNW;
+    void main(){ vP = position;
+      vW = (modelMatrix*vec4(position,1.0)).xyz;
+      vNW = normalize(mat3(modelMatrix)*normalize(position));
+      vec4 mv = modelViewMatrix*vec4(position,1.0);
+      gl_Position = projectionMatrix*mv; ${LOG_V} }`,
+  fragmentShader: `${LOG_F_PARS}
+    ${GLSL_NOISE}
+    uniform float uTime, uInflate; varying vec3 vP; varying vec3 vW; varying vec3 vNW;
+    void main(){
+      vec3 n = normalize(vP);
+      float f = snoise(n*2.6 + vec3(uTime*0.06)) * .5 + snoise(n*7.0 - vec3(uTime*0.11)) * .3
+              + snoise(n*17.0 + vec3(uTime*0.2)) * .2;
+      f = f*.5+.5;
+      // granulation: convective cells running white-hot over a molten base
+      vec3 calm = mix(vec3(1.00,0.68,0.09), vec3(1.00,0.97,0.86), smoothstep(.30,.86,f));
+      vec3 rage = mix(vec3(0.72,0.05,0.03), vec3(1.00,0.42,0.14), smoothstep(.28,.80,f));
+      vec3 c = mix(calm, rage, uInflate);
+      c += pow(f, 5.0) * (1.2 + uInflate);            // flare tops blow out to white
+      // limb darkening — the disc cools toward its edge. Without this a glowing
+      // ball reads as a flat sticker pasted on the starfield.
+      float ndv = clamp(dot(vNW, normalize(cameraPosition - vW)), 0.0, 1.0);
+      c *= mix(0.68, 1.22, pow(ndv, 0.5));
+      gl_FragColor = vec4(c, 1.0); ${LOG_F} }`,
+});
+const sun = new THREE.Mesh(new THREE.IcosahedronGeometry(CFG.SUN_R, 5), sunMat);
+scene.add(sun);
+/* The glow. A star needs light bleeding into the space around it, and with no
+   post-processing stack in a single file there is no bloom pass to do it — so
+   this is one camera-facing quad with a radial falloff, scaled to a few sun
+   diameters. The opaque disc depth-rejects the middle of the quad, so what
+   survives is exactly the halo outside the silhouette: hottest where it meets
+   the limb, and gone well before the quad's own edge — any energy left at that
+   edge shows up as a hard circle cut out of the starfield.                   */
+const SUN_GLOW_SPAN = 6.0;          // quad width, in sun diameters
+const sunGlow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
+  uniforms: sunUniforms, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  vertexShader: `${LOG_V_PARS}
+    varying vec2 vUv;
+    void main(){ vUv = uv; vec4 mv = modelViewMatrix*vec4(position,1.0);
+      gl_Position = projectionMatrix*mv; ${LOG_V} }`,
+  fragmentShader: `${LOG_F_PARS}
+    uniform float uTime, uInflate; varying vec2 vUv;
+    void main(){
+      float d = length(vUv - 0.5) * 2.0;
+      if (d >= 1.0) discard;
+      // remap so the falloff runs from the limb outward and truly reaches zero
+      // at the quad edge, rather than washing the whole sky in a flat haze
+      float t = clamp((1.0 - d) / (1.0 - 2.0/${SUN_GLOW_SPAN.toFixed(1)}), 0.0, 1.0);
+      float a = (pow(t, 3.0) * 0.80 + pow(t, 8.0) * 0.55) * (0.94 + 0.06*sin(uTime*2.3));
+      vec3 c = mix(vec3(1.0,0.82,0.34), vec3(1.0,0.33,0.13), uInflate);
+      gl_FragColor = vec4(c*a, a); ${LOG_F} }`,
+}));
+scene.add(sunGlow);
+let sunRadius = CFG.SUN_R;
+
+/* =====================================================================
+   6. SURFACE PLACEMENT HELPERS
+   ===================================================================== */
+/** put an object on a planet's surface, standing up, facing `yaw` around the normal */
+function placeOn(planet, obj, dir, height = 0, yaw = 0) {
+  const n = dir.clone().normalize();
+  obj.position.copy(n).multiplyScalar(planet.collide(n.clone().multiplyScalar(planet.radius)) + height);
+  alignY(obj, n);
+  obj.rotateY(yaw);
+  planet.group.add(obj);
+  obj.userData.up = n;
+  return obj;
+}
+/** direction on a sphere from lat/lon in degrees */
+function latlon(lat, lon) {
+  const a = THREE.MathUtils.degToRad(lat), b = THREE.MathUtils.degToRad(lon);
+  return new THREE.Vector3(Math.cos(a) * Math.cos(b), Math.sin(a), Math.cos(a) * Math.sin(b));
+}
+const flat = (color, opts = {}) => new THREE.MeshLambertMaterial(Object.assign({ color, flatShading: true }, opts));
+const glow = (color, opacity = 1) => new THREE.MeshBasicMaterial({ color, transparent: opacity < 1, opacity });
+
+/* interaction registry -------------------------------------------------- */
+const interactables = [];
+function interactive(obj, label, onUse, range = 7, cond = () => true) {
+  interactables.push({ obj, label, onUse, range, cond });
+  return obj;
+}
+/* signal sources for the Network Scanner --------------------------------- */
+const signals = [];
+function signal(obj, band, name, motif) { signals.push({ obj, band, name, motif }); }
+const BANDS = [
+  { id: 0, label: 'BAND 1 · MARKETING BROADCAST · 98.5 FM', wave: 'square' },
+  { id: 1, label: 'BAND 2 · ENCRYPTED EXEC COMMS · SCRAMBLED', wave: 'sawtooth' },
+  { id: 2, label: 'BAND 3 · CUSTOMER SUPPORT · DISTRESS', wave: 'sine' },
+];
+/* lore nodes for the T&C Decoder ---------------------------------------- */
+const loreNodes = [];
+function spiralText(planet, dir, height, entry, scale = 1) {
+  // a glowing yellow spiral of Founders' script, drawn as a tube
+  const pts = [];
+  for (let i = 0; i <= 90; i++) {
+    const t = i / 90, a = t * Math.PI * 5.2, r = (0.35 + t * 1.5) * scale;
+    pts.push(new THREE.Vector3(Math.cos(a) * r, t * 2.4 * scale, Math.sin(a) * r));
+  }
+  const tube = new THREE.Mesh(
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 120, .055 * scale, 5, false),
+    new THREE.MeshBasicMaterial({ color: COL.yellowHot })
+  );
+  const g = new THREE.Group(); g.add(tube);
+  const halo = new THREE.Mesh(new THREE.SphereGeometry(1.9 * scale, 10, 8), glow(COL.yellow, .07));
+  halo.position.y = 1.2 * scale; g.add(halo);
+  placeOn(planet, g, dir, height);
+  g.userData.entry = entry;
+  loreNodes.push(g);
+  return g;
+}
+
+/* =====================================================================
+   7. THE SOLAR SYSTEM — orbits
+   ===================================================================== */
+const ORB = {
+  timber: 6000, brittle: 11000, giant: 17000, twins: 24500,
+};
+const circular = (r, speed, tilt = 0, phase = 0) => (t, out) => {
+  const a = phase + t * speed;
+  out.set(Math.cos(a) * r, Math.sin(a) * r * tilt, Math.sin(a) * r);
+  return out;
+};
+
+/* =====================================================================
+   8. PLANET 1 — TIMBER "YES" HUB   (the flagship retail world)
+   ===================================================================== */
+const timber = definePlanet({
+  name: 'Timber "Yes" Hub', short: 'TIMBER YES HUB',
+  radius: 260, g: 21, soi: 1350,
+  orbit: circular(ORB.timber, 0.0019, .06),
+});
+
+/* ---- ground ---------------------------------------------------------- */
+{
+  const geo = new THREE.IcosahedronGeometry(timber.radius, 5);
+  const pos = geo.attributes.position, colors = [];
+  const c1 = new THREE.Color(0x00655e), c2 = new THREE.Color(0x00847b), c3 = new THREE.Color(0x0a9c8f);
+  for (let i = 0; i < pos.count; i++) {
+    const h = (Math.sin(pos.getX(i) * .07) + Math.cos(pos.getZ(i) * .06) + Math.sin(pos.getY(i) * .05)) / 3;
+    const c = h > .25 ? c3 : h < -.2 ? c1 : c2;
+    colors.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  timber.group.add(new THREE.Mesh(geo, flat(0xffffff, { vertexColors: true })));
+}
+
+/* ---- forest of 5G towers (instanced) --------------------------------- */
+{
+  const N = 150, dummy = new THREE.Object3D();
+  const mast = new THREE.InstancedMesh(new THREE.CylinderGeometry(.5, 1.4, 26, 5), flat(0xb9c2c4), N);
+  const head = new THREE.InstancedMesh(new THREE.BoxGeometry(4.4, 2.4, 4.4), flat(COL.char2), N);
+  const lamp = new THREE.InstancedMesh(new THREE.SphereGeometry(.85, 7, 6), glow(COL.red), N);
+  const arms = new THREE.InstancedMesh(new THREE.BoxGeometry(9, .5, .9), flat(0x8e9799), N);
+  const rnd = mulberry(7);
+  for (let i = 0; i < N; i++) {
+    const dir = fibSphere(i, N).applyAxisAngle(new THREE.Vector3(0, 1, 0), rnd() * 6.28);
+    const s = .7 + rnd() * .9;
+    const base = dir.clone().multiplyScalar(timber.radius - 2);
+    dummy.position.copy(base).addScaledVector(dir, 13 * s); alignY(dummy, dir);
+    dummy.rotateY(rnd() * 6.28); dummy.scale.setScalar(s); dummy.updateMatrix();
+    mast.setMatrixAt(i, dummy.matrix);
+    dummy.position.copy(base).addScaledVector(dir, 27 * s); dummy.updateMatrix();
+    head.setMatrixAt(i, dummy.matrix);
+    dummy.position.copy(base).addScaledVector(dir, 24 * s); dummy.updateMatrix();
+    arms.setMatrixAt(i, dummy.matrix);
+    dummy.position.copy(base).addScaledVector(dir, 29.6 * s); dummy.scale.setScalar(s * .9); dummy.updateMatrix();
+    lamp.setMatrixAt(i, dummy.matrix);
+  }
+  [mast, head, lamp, arms].forEach(m => { m.instanceMatrix.needsUpdate = true; timber.group.add(m); });
+  timber.lamps = lamp;
+}
+
+/* ---- the village ----------------------------------------------------- */
+const VILLAGE_DIR = latlon(16, 38);
+timber.spawnDir = VILLAGE_DIR;
+
+/* campfire — where every cycle begins */
+{
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.6, .45, 6, 14), flat(0x6b7274));
+  ring.rotation.x = Math.PI / 2; ring.position.y = .3; g.add(ring);
+  for (let i = 0; i < 5; i++) {
+    const log = new THREE.Mesh(new THREE.CylinderGeometry(.28, .34, 3.4, 5), flat(0x5a3b1e));
+    log.position.set(Math.cos(i * 1.26) * .7, .9, Math.sin(i * 1.26) * .7);
+    log.rotation.set(rand(-.6, .6), i, rand(.6, 1.1)); g.add(log);
+  }
+  const fire = new THREE.Mesh(new THREE.ConeGeometry(1.5, 3.4, 6), glow(COL.yellow, .85));
+  fire.position.y = 2.1; g.add(fire);
+  const lit = new THREE.PointLight(COL.yellow, 180, 80, 2); lit.position.y = 3; g.add(lit);
+  placeOn(timber, g, VILLAGE_DIR, 0);
+  timber.fire = fire;
+  interactive(g, 'Sit by the fire  ·  <b>E</b>', () => {
+    toast('You poke the fire with a promotional lanyard. It burns green. Nobody comments on this.', 'teal');
+  }, 8);
+}
+
+/* the flagship store */
+{
+  const g = new THREE.Group();
+  const shell = new THREE.Mesh(new THREE.BoxGeometry(22, 11, 16), flat(COL.white));
+  shell.position.y = 5.5; g.add(shell);
+  const glassMat = new THREE.MeshLambertMaterial({ color: 0x9fdedb, transparent: true, opacity: .35, flatShading: true });
+  const glassFront = new THREE.Mesh(new THREE.BoxGeometry(21, 8.4, .4), glassMat);
+  glassFront.position.set(0, 5, 8.1); g.add(glassFront);
+  const band = new THREE.Mesh(new THREE.BoxGeometry(22.6, 2.6, 16.6), flat(COL.teal));
+  band.position.y = 12; g.add(band);
+  const signTex = makeTex(512, 128, (x, w, h) => {
+    x.fillStyle = '#00847b'; x.fillRect(0, 0, w, h);
+    x.fillStyle = '#f2a900'; x.beginPath(); x.arc(84, h / 2, 34, 0, 7); x.fill();
+    x.fillStyle = '#fff'; x.font = 'bold 62px sans-serif'; x.fillText('OPTUS', 134, h / 2 + 22);
+    x.font = '30px sans-serif'; x.fillStyle = '#ffd34d'; x.fillText('yes', 400, h / 2 + 22);
+  });
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(20, 5), new THREE.MeshBasicMaterial({ map: signTex }));
+  sign.position.set(0, 12, 8.4); g.add(sign);
+  for (let i = 0; i < 3; i++) {  // display plinths
+    const p = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3, 2.4), flat(COL.char2));
+    p.position.set(-6 + i * 6, 1.5, 3); g.add(p);
+    const phone = new THREE.Mesh(new THREE.BoxGeometry(1, 1.9, .12), glow(COL.tealBright, .9));
+    phone.position.set(-6 + i * 6, 3.9, 3); phone.rotation.x = -.3; g.add(phone);
+  }
+  placeOn(timber, g, latlon(19.6, 39.4), 0, .4);
+  interactive(g, 'Read the window decal  ·  <b>E</b>', () => {
+    toast(pick([
+      'DECAL: "Unlimited* data." The asterisk is 40cm tall and leads to a footnote carved into the mantle.',
+      'DECAL: "Now with more coverage than ever before." Someone has scratched out "ever" and written "briefly".',
+      'DECAL: "Switch and stay connected." Below it, in permanent marker: "we tried".',
+    ]), 'teal');
+  }, 14);
+  signal(g, 0, 'FLAGSHIP STORE — in-store playlist', [523, 659, 784, 659]);
+}
+
+/* recharge kiosks (the "trees") ---------------------------------------- */
+const kiosks = [];
+[[13.4, 34.6], [20.6, 43.2], [11.2, 43.8], [22.4, 33.4]].forEach(([la, lo]) => {
+  const g = new THREE.Group();
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(.5, .7, 7, 6), flat(0x9aa3a5));
+  post.position.y = 3.5; g.add(post);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(3.2, 4, 1.6), flat(COL.teal));
+  box.position.y = 8; g.add(box);
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 3.2), glow(COL.yellowHot, .95));
+  face.position.set(0, 8, .85); g.add(face);
+  const halo = new THREE.PointLight(COL.yellow, 240, 70, 2); halo.position.y = 8; g.add(halo);
+  placeOn(timber, g, latlon(la, lo), 0, rand(0, 6.28));
+  kiosks.push(g);
+});
+
+/* dead-eyed retail staff ------------------------------------------------ */
+const npcs = [];
+const NPC_LINES = [
+  ['Hi! Yes! Welcome!', 'Have you considered adding a second line to your account?', 'I have been at this counter for four cycles. Or one. Time is a bundle.'],
+  ['Yes!', 'Our coverage is the best it has ever been, per our internal definition of "best".', 'When the sun eats us I get a KPI for retention. Isn\'t that funny? Isn\'t it?'],
+  ['Yes! Hi!', 'The Founders promised total coverage. The Founders are not currently reachable.', 'Do you want a case for that? Everyone wants a case for that.'],
+  ['Welcome to Timber!', 'You\'re the one flying today? Brave. Do read the terms.', 'Someone left a spiral of legal text behind the store. Nobody\'s allowed to read it.'],
+];
+[[14.8, 36.2], [18.2, 36.8], [13.6, 41.2], [21, 40.4]].forEach(([la, lo], i) => {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(.75, 1.8, 4, 8), flat([0x00847b, 0x0f6f68, 0x00847b, 0x14837c][i]));
+  body.position.y = 1.9; g.add(body);
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(.72, 1), flat(0xe8c9a6));
+  head.position.y = 3.5; g.add(head);
+  for (const s of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(.16, 6, 5), glow(0xffffff));
+    eye.position.set(s * .26, 3.62, .62); g.add(eye);
+  }
+  const lany = new THREE.Mesh(new THREE.TorusGeometry(.62, .1, 5, 12), glow(COL.yellow));
+  lany.position.y = 2.8; lany.rotation.x = 1.35; g.add(lany);
+  const badge = new THREE.Mesh(new THREE.BoxGeometry(.5, .7, .08), glow(COL.white));
+  badge.position.set(0, 2.1, .6); g.add(badge);
+  placeOn(timber, g, latlon(la, lo), 0, rand(0, 6.28));
+  g.userData.line = 0; g.userData.phase = rand(0, 6.28); g.userData.baseY = g.position.length();
+  npcs.push(g);
+  interactive(g, 'Talk  ·  <b>E</b>', () => {
+    const lines = NPC_LINES[i];
+    toast(lines[g.userData.line % lines.length], 'teal');
+    g.userData.line++; AU.beep();
+  }, 7);
+  signal(g, 2, ['STAFF MEMBER — humming', 'STAFF MEMBER — sighing', 'STAFF MEMBER — hold music leaking', 'STAFF MEMBER — whispering'][i], [330, 349, 294, 262]);
+});
+
+/* promotional geysers --------------------------------------------------- */
+const PROMOS = ['$0 UPFRONT*', '50GB BONUS', 'UNLIMITED*', 'SWITCH & SAVE', '12 MTH PLAN', 'YES SALE', 'ROAMING BUNDLE', '*T&C APPLY'];
+const promoTex = PROMOS.map(txt => makeTex(256, 128, (x, w, h) => {
+  x.fillStyle = 'rgba(0,132,123,.85)'; x.fillRect(0, 0, w, h);
+  x.strokeStyle = '#ffd34d'; x.lineWidth = 6; x.strokeRect(6, 6, w - 12, h - 12);
+  x.fillStyle = '#ffd34d'; x.font = 'bold 34px sans-serif'; x.textAlign = 'center';
+  x.fillText(txt, w / 2, h / 2 + 12);
+}));
+const geysers = [];
+[[-6, 70], [40, 10], [-32, 130]].forEach(([la, lo]) => {
+  const dir = latlon(la, lo);
+  const g = new THREE.Group();
+  const vent = new THREE.Mesh(new THREE.CylinderGeometry(5, 8, 4, 8), flat(0x0d5f59));
+  vent.position.y = 1; g.add(vent);
+  const holo = [];
+  for (let i = 0; i < 12; i++) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: pick(promoTex), transparent: true, opacity: .9, depthWrite: false }));
+    s.scale.set(9, 4.5, 1); s.position.set(rand(-4, 4), rand(0, 140), rand(-4, 4));
+    s.userData.v = rand(28, 46); g.add(s); holo.push(s);
+  }
+  placeOn(timber, g, dir, 0);
+  g.userData = { dir, holo };
+  geysers.push(g);
+  signal(g, 0, 'PROMOTIONAL GEYSER — 14s unskippable', [880, 988, 880, 784]);
+});
+
+/* the 2FA terminal ------------------------------------------------------ */
+{
+  const g = new THREE.Group();
+  const post = new THREE.Mesh(new THREE.BoxGeometry(1.2, 5, 1.2), flat(0x8e9799)); post.position.y = 2.5; g.add(post);
+  const screen = new THREE.Mesh(new THREE.BoxGeometry(5, 3.6, .7), flat(COL.char));
+  screen.position.y = 6; screen.rotation.x = -.28; g.add(screen);
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 3), glow(COL.tealBright, .9));
+  face.position.set(0, 6.06, .42); face.rotation.x = -.28; g.add(face);
+  placeOn(timber, g, latlon(17.4, 41.6), 0, 2.2);
+  interactive(g, 'Request launch authorisation  ·  <b>E</b>', () => open2FA(), 8);
+  signal(g, 1, 'LAUNCH TERMINAL — automated dispatch', [196, 220, 196, 165]);
+}
+
+/* the launch pad -------------------------------------------------------- */
+{
+  const g = new THREE.Group();
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(11, 12, 1.4, 16), flat(COL.char2));
+  pad.position.y = .7; g.add(pad);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(9.4, .5, 6, 24), glow(COL.yellow));
+  ring.rotation.x = Math.PI / 2; ring.position.y = 1.5; g.add(ring);
+  placeOn(timber, g, latlon(12.2, 39), 0);
+  timber.padDir = latlon(12.2, 39);
+}
+
+/* founders' script on Timber ------------------------------------------- */
+spiralText(timber, latlon(21.4, 36.2), 0, 'founders_intro', 1.3);
+spiralText(timber, latlon(-14, 96), 0, 'founders_towers', 1.1);
+
+/* per-frame life -------------------------------------------------------- */
+timber.update = function (dt, t) {
+  // flickering fire
+  if (this.fire) this.fire.scale.setScalar(1 + Math.sin(t * 9) * .08 + Math.sin(t * 21) * .05);
+  // idle NPC bob
+  for (const n of npcs) {
+    n.children[1].position.y = 3.5 + Math.sin(t * 2 + n.userData.phase) * .07;
+    n.children[2].scale.y = n.children[3].scale.y = (Math.sin(t * 1.7 + n.userData.phase) > .96) ? .1 : 1;
+  }
+  // geyser holograms climb and recycle
+  for (const gy of geysers) {
+    for (const s of gy.userData.holo) {
+      s.position.y += s.userData.v * dt;
+      s.material.opacity = clamp(1 - s.position.y / 150, 0, .92);
+      if (s.position.y > 150) { s.position.y = 0; s.position.x = rand(-4, 4); s.position.z = rand(-4, 4); }
+    }
+  }
+};
+
+/* =====================================================================
+   9. PLANET 2 — BRITTLE INFRASTRUCTURE (legacy copper, falling apart)
+   ===================================================================== */
+const brittle = definePlanet({
+  name: 'Brittle Infrastructure', short: 'BRITTLE INFRASTRUCTURE',
+  radius: 300, g: 23, soi: 1500,
+  orbit: circular(ORB.brittle, -0.0012, -.05, 2.1),
+});
+
+const rackTex = makeTex(128, 128, (x, w, h) => {
+  x.fillStyle = '#2b3234'; x.fillRect(0, 0, w, h);
+  for (let r = 0; r < 8; r++) {
+    x.fillStyle = '#1b1e1f'; x.fillRect(6, 6 + r * 15, w - 12, 11);
+    for (let i = 0; i < 7; i++) {
+      x.fillStyle = Math.random() < .25 ? '#ff4d4d' : Math.random() < .5 ? '#00b8a9' : '#3c4446';
+      x.fillRect(12 + i * 15, 9 + r * 15, 5, 5);
+    }
+  }
+  x.strokeStyle = '#0d0f10'; x.lineWidth = 3; x.strokeRect(0, 0, w, h);
+}, [1, 1]);
+
+/* mantle beneath the crust */
+brittle.group.add(new THREE.Mesh(
+  new THREE.IcosahedronGeometry(brittle.radius - 12, 3),
+  flat(0x3a2f2a)
+));
+
+/* the crust: hexagonal fragments that detach when hit ------------------- */
+const plates = [];
+{
+  const N = 260, geo = new THREE.CylinderGeometry(12.5, 11, 5, 6);
+  const mat = new THREE.MeshLambertMaterial({ map: rackTex, flatShading: true });
+  for (let i = 0; i < N; i++) {
+    const dir = fibSphere(i, N);
+    const m = new THREE.Mesh(geo, mat);
+    m.position.copy(dir).multiplyScalar(brittle.radius - 2.5);
+    alignY(m, dir); m.rotateY(rand(0, 6.28));
+    brittle.group.add(m);
+    plates.push({ mesh: m, dir, attached: true, vel: 0, spin: new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-1, 1)) });
+  }
+}
+/** nearest crust fragment to a direction */
+brittle.plateAt = function (local) {
+  const d = _v3.copy(local).normalize();
+  let best = null, bd = -1;
+  for (const p of plates) { const dot = p.dir.dot(d); if (dot > bd) { bd = dot; best = p; } }
+  return best;
+};
+/** the crust only holds you up where a plate still exists — everywhere else
+    is an open hole straight down to the outage void */
+brittle.collide = function (local) {
+  const p = this.plateAt(local);
+  return (p && p.attached) ? this.radius : 0;
+};
+
+/* Hollow's Lantern — the moon that keeps firing traffic at the crust ---- */
+const lantern = new THREE.Group();
+{
+  const m = new THREE.Mesh(new THREE.IcosahedronGeometry(52, 2), flat(0x5a3436));
+  lantern.add(m);
+  for (let i = 0; i < 9; i++) {
+    const v = new THREE.Mesh(new THREE.SphereGeometry(rand(6, 12), 7, 6), glow(COL.red, .9));
+    v.position.copy(fibSphere(i, 9).multiplyScalar(50)); lantern.add(v);
+  }
+  lantern.add(new THREE.PointLight(COL.red, 90000, 2200, 2));   // a burning moon, seen from the crust
+  brittle.group.add(lantern);
+}
+const meteors = [];
+function fireMeteor() {
+  const target = pick(plates.filter(p => p.attached));
+  if (!target) return;
+  const m = new THREE.Mesh(new THREE.IcosahedronGeometry(rand(3.5, 6.5), 1), glow(COL.red));
+  const start = lantern.position.clone().add(new THREE.Vector3(rand(-40, 40), rand(-40, 40), rand(-40, 40)));
+  m.position.copy(start);
+  const vel = target.mesh.position.clone().sub(start).normalize().multiplyScalar(rand(90, 140));
+  brittle.group.add(m);
+  meteors.push({ mesh: m, vel, life: 24 });
+  const l = new THREE.PointLight(COL.red, 1200, 220, 2); m.add(l);
+}
+
+/* the National Outage Void ---------------------------------------------- */
+const voidUniforms = { uTime: { value: 0 } };
+const voidMesh = new THREE.Mesh(new THREE.SphereGeometry(46, 40, 30), new THREE.ShaderMaterial({
+  uniforms: voidUniforms,
+  vertexShader: `${LOG_V_PARS} varying vec3 vN; varying vec3 vP;
+    void main(){ vN=normalize(normalMatrix*normal); vP=position;
+      vec4 mv=modelViewMatrix*vec4(position,1.0); gl_Position=projectionMatrix*mv; ${LOG_V} }`,
+  fragmentShader: `${LOG_F_PARS} ${GLSL_NOISE}
+    uniform float uTime; varying vec3 vN; varying vec3 vP;
+    void main(){
+      float rim = 1.0 - abs(dot(normalize(vN), vec3(0.0,0.0,1.0)));
+      float sw = snoise(normalize(vP)*4.0 + vec3(0.0,uTime*0.8,0.0));
+      vec3 c = mix(vec3(0.0), vec3(0.75,0.06,0.12), pow(rim,3.0)) + vec3(0.35,0.0,0.25)*pow(rim,9.0)*(0.5+sw);
+      gl_FragColor = vec4(c,1.0); ${LOG_F} }`,
+}));
+brittle.group.add(voidMesh);
+{
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(78, 9, 8, 48), glow(0x6b0f2a, .55));
+  ring.rotation.x = 1.2; brittle.group.add(ring); brittle.voidRing = ring;
+}
+spiralText(brittle, latlon(42, 12), 6, 'founders_void', 1.4);
+signal(voidMesh, 1, 'NATIONAL OUTAGE VOID — carrier tone', [110, 98, 87, 73]);
+
+brittle.update = function (dt, t) {
+  // moon orbit
+  const a = t * .22;
+  lantern.position.set(Math.cos(a) * 620, Math.sin(a * .7) * 90, Math.sin(a) * 620);
+  // meteors
+  for (let i = meteors.length - 1; i >= 0; i--) {
+    const m = meteors[i];
+    m.mesh.position.addScaledVector(m.vel, dt);
+    m.life -= dt;
+    const d = m.mesh.position.length();
+    if (d < this.radius + 4) {
+      // impact: knock loose every plate nearby
+      const dir = m.mesh.position.clone().normalize();
+      let hits = 0;
+      for (const p of plates) if (p.attached && p.dir.dot(dir) > .988) { p.attached = false; p.vel = -4; hits++; }
+      flashAt(this, m.mesh.position, COL.red, 22);
+      AU.noiseBurst(.7, .18, 700);
+      m.mesh.parent.remove(m.mesh); meteors.splice(i, 1);
+    } else if (m.life < 0 || d < 60) { m.mesh.parent.remove(m.mesh); meteors.splice(i, 1); }
+  }
+  if (Math.random() < dt * 1.35) fireMeteor();
+  // detached plates fall into the void
+  for (const p of plates) {
+    if (p.attached) continue;
+    p.vel -= 24 * dt;
+    p.mesh.position.addScaledVector(p.dir, p.vel * dt);
+    p.mesh.rotateOnAxis(p.spin, dt * 1.4);
+    if (p.mesh.position.length() < 50) { p.mesh.visible = false; }
+  }
+  voidUniforms.uTime.value = t;
+  if (this.voidRing) this.voidRing.rotation.z += dt * .5;
+};
+brittle.reset = function () {
+  for (const p of plates) {
+    p.attached = true; p.vel = 0; p.mesh.visible = true;
+    p.mesh.position.copy(p.dir).multiplyScalar(this.radius - 2.5);
+    alignY(p.mesh, p.dir);
+  }
+  for (const m of meteors) m.mesh.parent && m.mesh.parent.remove(m.mesh);
+  meteors.length = 0;
+};
+
+/* =====================================================================
+   10. WHITE HOLE STATION — the inescapable waiting room
+   ===================================================================== */
+const station = {
+  pos: new THREE.Vector3(-9000, 12000, 6000),
+  half: new THREE.Vector3(15, 9, 15),
+  group: new THREE.Group(),
+};
+scene.add(station.group);
+station.group.position.copy(station.pos);
+{
+  const g = station.group;
+  const inner = new THREE.Mesh(new THREE.BoxGeometry(30, 18, 30),
+    new THREE.MeshLambertMaterial({ color: 0xf1f2f2, side: THREE.BackSide, flatShading: true }));
+  inner.position.y = 9; g.add(inner);
+  g.add(new THREE.PointLight(0xffffff, 850, 120, 2).translateY(14));
+  const carpet = new THREE.Mesh(new THREE.BoxGeometry(29, .3, 29), flat(0x0f5f59));
+  carpet.position.y = .15; g.add(carpet);
+  // waiting chairs nobody has ever sat in
+  for (let i = 0; i < 6; i++) {
+    const c = new THREE.Group();
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(2.4, .4, 2.2), flat(COL.teal)); seat.position.y = 1.4; c.add(seat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.2, .35), flat(COL.teal)); back.position.set(0, 2.5, -1); c.add(back);
+    c.position.set(-9 + (i % 3) * 3, 0, i < 3 ? -10 : 11); if (i >= 3) c.rotation.y = Math.PI; g.add(c);
+  }
+  const plant = new THREE.Mesh(new THREE.ConeGeometry(1.6, 4.4, 6), flat(0x2f7a3a));
+  plant.position.set(12, 2.6, -12); g.add(plant);
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(1.1, .8, 1.6, 8), flat(0x8a5a3a));
+  pot.position.set(12, .8, -12); g.add(pot);
+  // poster
+  const posterTex = makeTex(512, 320, (x, w, h) => {
+    x.fillStyle = '#00847b'; x.fillRect(0, 0, w, h);
+    x.fillStyle = '#ffd34d'; x.font = 'bold 44px sans-serif'; x.textAlign = 'center';
+    x.fillText('YOU ARE IMPORTANT', w / 2, 110);
+    x.font = '26px sans-serif'; x.fillStyle = '#fff';
+    x.fillText('to us. Your position in the queue', w / 2, 170);
+    x.fillText('is: unchanged.', w / 2, 210);
+    x.font = '18px monospace'; x.fillStyle = 'rgba(255,255,255,.6)';
+    x.fillText('WHITE HOLE STATION · EST. BEFORE YOU', w / 2, 280);
+  });
+  const poster = new THREE.Mesh(new THREE.PlaneGeometry(9, 5.6), new THREE.MeshBasicMaterial({ map: posterTex }));
+  poster.position.set(0, 8, -14.6); g.add(poster);
+  // the router
+  const router = new THREE.Group();
+  const rbody = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1, 2.4), flat(COL.white)); rbody.position.y = 3.2; router.add(rbody);
+  for (let i = 0; i < 3; i++) {
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, 2.4, 5), flat(COL.char2));
+    ant.position.set(-1 + i, 4.6, -.9); ant.rotation.z = (i - 1) * .3; router.add(ant);
+  }
+  const led = new THREE.Mesh(new THREE.SphereGeometry(.22, 7, 6), glow(COL.red)); led.position.set(1.4, 3.4, 1.2); router.add(led);
+  const table = new THREE.Mesh(new THREE.BoxGeometry(4.6, 2.6, 3), flat(0x6b7274)); table.position.y = 1.3; router.add(table);
+  router.position.set(-11, 0, 12); g.add(router);
+  station.led = led;
+  interactive(router, 'Reboot the router  ·  <b>E</b>', () => leaveStation(), 7);
+  signal(router, 2, 'HOLD MUSIC — looping, forever', [523, 587, 659, 587]);
+}
+
+/* =====================================================================
+   11. PLANET 3 — GIANT'S BANDWIDTH (an ocean of raw gigabytes)
+   ===================================================================== */
+const giant = definePlanet({
+  name: "Giant's Bandwidth", short: "GIANT'S BANDWIDTH",
+  radius: 520, g: 27, soi: 2500,
+  orbit: circular(ORB.giant, 0.00082, .04, 4.4),
+});
+const oceanU = { uTime: { value: 0 }, uSunDir: { value: new THREE.Vector3(0, 1, 0) } };
+{
+  const oceanMat = new THREE.ShaderMaterial({
+    uniforms: oceanU,
+    vertexShader: `${LOG_V_PARS} ${GLSL_NOISE}
+      uniform float uTime; varying vec3 vN; varying float vH;
+      void main(){
+        vec3 n = normalize(position);
+        float h = snoise(n*3.0 + vec3(0.0,uTime*0.10,0.0))*9.0
+                + snoise(n*8.0 - vec3(uTime*0.16))*4.0
+                + snoise(n*19.0 + vec3(uTime*0.3))*1.6;
+        vH = h;
+        vec3 p = position + n*h;
+        vN = normalize(normalMatrix*n);
+        vec4 mv = modelViewMatrix*vec4(p,1.0);
+        gl_Position = projectionMatrix*mv; ${LOG_V} }`,
+    fragmentShader: `${LOG_F_PARS}
+      uniform vec3 uSunDir; varying vec3 vN; varying float vH;
+      void main(){
+        float f = clamp(vH*0.07+0.5,0.0,1.0);
+        vec3 deep = vec3(0.0,0.30,0.28);
+        vec3 mid  = vec3(0.0,0.66,0.57);
+        vec3 crest= vec3(1.00,0.76,0.14);
+        vec3 c = mix(deep, mid, smoothstep(0.25,0.6,f));
+        c = mix(c, crest, smoothstep(0.72,0.98,f));
+        // lit by the actual star, not a baked-in direction, so the ocean has a
+        // day side that agrees with everything else in the system
+        vec3 L = normalize((viewMatrix*vec4(uSunDir,0.0)).xyz);
+        vec3 N = normalize(vN);
+        float lambert = clamp(dot(N, L),0.0,1.0);
+        float spec = pow(clamp(dot(reflect(-L, N), vec3(0.0,0.0,1.0)),0.0,1.0), 22.0);
+        gl_FragColor = vec4(c*(0.32+1.05*lambert) + vec3(1.0,0.95,0.8)*spec*0.35,1.0); ${LOG_F} }`,
+  });
+  giant.group.add(new THREE.Mesh(new THREE.IcosahedronGeometry(giant.radius, 6), oceanMat));
+  // the Fair Use Policy barrier — an electric shell around the core
+  const barrier = new THREE.Mesh(new THREE.IcosahedronGeometry(giant.radius * .42, 3),
+    new THREE.MeshBasicMaterial({ color: 0x66ffe6, wireframe: true, transparent: true, opacity: .5 }));
+  giant.group.add(barrier); giant.barrier = barrier;
+  giant.barrierR = giant.radius * .42;
+  // the ocean is not solid: you sink through it and land on the Fair Use barrier,
+  // unless the inverted cyclone has granted you core access
+  giant.collide = function () { return state.coreAccess > 0 ? 96 : this.barrierR; };
+  // the core: uncompressed archives nobody ever streamed
+  const core = new THREE.Group();
+  core.add(new THREE.Mesh(new THREE.IcosahedronGeometry(90, 2), flat(0x05201f)));
+  for (let i = 0; i < 14; i++) {
+    const mono = new THREE.Mesh(new THREE.BoxGeometry(6, 22, 2), glow(i % 3 ? COL.tealBright : COL.yellow, .85));
+    mono.position.copy(fibSphere(i, 14).multiplyScalar(105));
+    alignY(mono, mono.position.clone().normalize()); core.add(mono);
+  }
+  giant.group.add(core); giant.core = core;
+  spiralText(giant, latlon(0, 0), -giant.radius + 118, 'founders_bandwidth', 2.2);
+}
+/* cyclones ------------------------------------------------------------- */
+const cyclones = [];
+for (let i = 0; i < 5; i++) {
+  const reverse = (i === 2);
+  const g = new THREE.Group();
+  for (let k = 0; k < 16; k++) {
+    const r = 26 + k * 4.4 + Math.sin(k) * 4;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 2.6, 5, 18),
+      glow(reverse ? COL.yellow : 0x33d6c2, .5));
+    ring.rotation.x = Math.PI / 2; ring.position.y = k * 13; g.add(ring);
+  }
+  giant.group.add(g);
+  cyclones.push({ group: g, reverse, lat: rand(-60, 60), lon: rand(0, 360), dlat: rand(-2.6, 2.6), dlon: rand(-3.4, 3.4) });
+  signal(g, reverse ? 1 : 0, reverse ? 'ANOMALOUS CYCLONE — inverted spin' : 'CYCLONE — match commentary feed',
+    reverse ? [147, 165, 131, 110] : [440, 494, 523, 587]);
+}
+/* floating server islands ---------------------------------------------- */
+giant.extra = [];
+for (let i = 0; i < 4; i++) {
+  const g = new THREE.Group();
+  const deck = new THREE.Mesh(new THREE.CylinderGeometry(26, 22, 6, 10), flat(0x39424a));
+  g.add(deck);
+  for (let k = 0; k < 5; k++) {
+    const rack = new THREE.Mesh(new THREE.BoxGeometry(5, 9, 5), new THREE.MeshLambertMaterial({ map: rackTex, flatShading: true }));
+    rack.position.set(rand(-14, 14), 7.5, rand(-14, 14)); g.add(rack);
+  }
+  const dir = latlon(rand(-50, 50), rand(0, 360));
+  g.position.copy(dir).multiplyScalar(giant.radius + 6); alignY(g, dir);
+  giant.group.add(g);
+  giant.extra.push({ obj: g, radius: 24, local: g.position, vel: new THREE.Vector3(), dir });
+}
+giant.update = function (dt, t) {
+  oceanU.uTime.value = t;
+  oceanU.uSunDir.value.copy(giant.wpos).negate().normalize();
+  if (this.barrier) this.barrier.rotation.y += dt * .08;
+  if (this.core) this.core.rotation.y -= dt * .05;
+  for (const c of cyclones) {
+    c.lat = clamp(c.lat + c.dlat * dt, -72, 72);
+    c.lon += c.dlon * dt;
+    if (Math.abs(c.lat) > 70) c.dlat *= -1;
+    const dir = latlon(c.lat, c.lon);
+    c.dir = dir;
+    c.group.position.copy(dir).multiplyScalar(this.radius - 8);
+    alignY(c.group, dir);
+    c.group.rotateY((c.reverse ? -1 : 1) * t * 1.6);
+  }
+  // cyclones fling the islands
+  for (const isl of this.extra) {
+    const up = isl.local.clone().normalize();
+    let force = -9;                                  // buoyancy settles them back down
+    for (const c of cyclones) {
+      if (!c.dir) continue;
+      const d = c.dir.clone().multiplyScalar(this.radius).distanceTo(up.clone().multiplyScalar(this.radius));
+      if (d < 90) force += c.reverse ? -30 : 120;
+    }
+    isl.vel.addScaledVector(up, force * dt);
+    isl.local.addScaledVector(isl.vel, dt);
+    const alt = isl.local.length();
+    if (alt < this.radius + 6) { isl.local.setLength(this.radius + 6); isl.vel.setLength(0); }
+    isl.obj.position.copy(isl.local);
+    alignY(isl.obj, up);
+  }
+};
+
+/* =====================================================================
+   12. PLANETS 4 — THE ROLLOVER TWINS (Ember Prepaid / Ash Postpaid)
+   ===================================================================== */
+const twinBary = circular(ORB.twins, 0.00052, .03, 1.2);
+const TWIN_SEP = 470, TWIN_SPD = 0.022;
+const ember = definePlanet({
+  name: 'Ember Prepaid', short: 'EMBER PREPAID', radius: 150, g: 17, soi: 415,
+  orbit: (t, out) => { twinBary(t, out); const a = t * TWIN_SPD; out.x += Math.cos(a) * TWIN_SEP; out.z += Math.sin(a) * TWIN_SEP; return out; },
+});
+const ash = definePlanet({
+  name: 'Ash Postpaid', short: 'ASH POSTPAID', radius: 150, g: 17, soi: 415,
+  orbit: (t, out) => { twinBary(t, out); const a = t * TWIN_SPD; out.x -= Math.cos(a) * TWIN_SEP; out.z -= Math.sin(a) * TWIN_SEP; return out; },
+});
+
+const CAVE_AXIS = latlon(28, 205);
+ember.caveAxis = CAVE_AXIS;
+ember.sandR = 196; ember.caveSand = 60;
+/* ember: bare rock + a draining shell of GB sand */
+{
+  ember.group.add(new THREE.Mesh(new THREE.IcosahedronGeometry(ember.radius, 4), flat(0x7a3b2a)));
+  const sand = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 4), flat(COL.sand));
+  ember.group.add(sand); ember.sandMesh = sand;
+  // cave mouth + shaft
+  const mouth = new THREE.Mesh(new THREE.TorusGeometry(17, 4, 6, 16), flat(0x4a2318));
+  placeOn(ember, mouth, CAVE_AXIS, 0); mouth.rotateX(Math.PI / 2);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(16, 20, 62, 12, 1, true),
+    new THREE.MeshLambertMaterial({ color: 0x33170f, side: THREE.BackSide, flatShading: true }));
+  placeOn(ember, shaft, CAVE_AXIS, -34);
+  // the Hidden Fees chamber: invoices nobody agreed to
+  const cham = new THREE.Group();
+  cham.add(new THREE.Mesh(new THREE.SphereGeometry(46, 14, 12),
+    new THREE.MeshLambertMaterial({ color: 0x2a140d, side: THREE.BackSide, flatShading: true })));
+  for (let i = 0; i < 9; i++) {
+    const fee = new THREE.Mesh(new THREE.BoxGeometry(3, 8, .4), glow(COL.yellow, .8));
+    fee.position.set(rand(-24, 24), rand(-16, 6), rand(-24, 24)); fee.rotation.set(rand(0, 3), rand(0, 3), rand(0, 3));
+    cham.add(fee);
+  }
+  cham.add(new THREE.PointLight(COL.yellow, 1600, 220, 2));
+  cham.position.copy(CAVE_AXIS).multiplyScalar(96);
+  ember.group.add(cham);
+  spiralText(ember, CAVE_AXIS.clone().add(new THREE.Vector3(.16, -.1, .12)).normalize(), -62, 'founders_fees', 1.1);
+  signal(cham, 1, 'HIDDEN FEES CHAMBER — itemised', [131, 147, 110, 98]);
+}
+ember.collide = function (local) {
+  const ang = Math.acos(clamp(_v3.copy(local).normalize().dot(CAVE_AXIS), -1, 1));
+  const alt = local.length();
+  if (ang < 0.13) return Math.max(this.caveSand, 40);                       // open shaft
+  if (ang < 0.42 && alt < 128) return Math.max(this.caveSand, 40);          // side chamber
+  return Math.max(this.radius, this.sandR);
+};
+ember.update = function (dt, t) {
+  const k = clamp(t / CFG.LOOP, 0, 1);
+  this.sandR = lerp(196, 148, Math.min(1, k * 2.1));      // outer sand drains away early
+  this.caveSand = lerp(58, 132, k);                        // and rises inside the caves
+  this.sandMesh.scale.setScalar(this.sandR);
+};
+
+/* ash: rising sand slowly burying the Founders' extenders --------------- */
+ash.sandR = 150; ash.pads = [];
+{
+  ash.group.add(new THREE.Mesh(new THREE.IcosahedronGeometry(ash.radius, 4), flat(0x4c4f56)));
+  const sand = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 4), flat(0xd6a94b));
+  ash.group.add(sand); ash.sandMesh = sand;
+  [[22, 20], [-10, 140], [48, 260]].forEach(([la, lo], i) => {
+    const g = new THREE.Group();
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 3, 46, 6), flat(0xb9c2c4)); mast.position.y = 23; g.add(mast);
+    for (let k = 0; k < 3; k++) {
+      const dish = new THREE.Mesh(new THREE.SphereGeometry(5, 10, 6, 0, 6.28, 0, 1.2), flat(COL.white));
+      dish.position.set(0, 30 + k * 6, 0); dish.rotation.x = 1.1 + k * .5; dish.rotation.y = k * 2.1; g.add(dish);
+    }
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 1, 12), glow(COL.tealBright, .8));
+    pad.position.y = .5; g.add(pad);
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(7, .8, 6, 20), glow(COL.yellow, .9));
+    arch.position.y = 4; arch.rotation.x = Math.PI / 2; g.add(arch);
+    placeOn(ash, g, latlon(la, lo), 0);
+    const rec = { obj: g, pad, dir: latlon(la, lo), target: [timber, brittle, giant][i], aligned: false };
+    ash.pads.push(rec);
+    interactive(g, 'Step onto the extender pad  ·  <b>E</b>', () => usePad(rec), 9);
+    signal(g, 1, 'WI-FI EXTENDER — alignment beacon', [262, 330, 392, 330]);
+  });
+  spiralText(ash, latlon(5, 60), 0, 'founders_rollover', 1.2);
+}
+ash.collide = function () { return Math.max(this.radius, this.sandR); };
+ash.update = function (dt, t) {
+  const k = clamp(t / CFG.LOOP, 0, 1);
+  this.sandR = lerp(150, 196, k);
+  this.sandMesh.scale.setScalar(this.sandR);
+  for (const p of this.pads) {
+    // a pad only warps while it points at its partner world
+    const from = _v1.copy(p.dir).applyQuaternion(_q1.identity());
+    const toT = _v2.copy(p.target.wpos).sub(this.wpos).normalize();
+    p.aligned = from.dot(toT) > 0.975 && this.sandR < 168;
+    p.pad.material.color.setHex(p.aligned ? COL.yellowHot : COL.tealBright);
+    p.obj.visible = this.sandR < 176;
+  }
+};
+
+/* the sand stream between the twins ------------------------------------ */
+const sandStream = (() => {
+  const n = 900, pos = new Float32Array(n * 3);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ color: COL.sand, size: 7, sizeAttenuation: true, depthWrite: false }));
+  scene.add(pts);
+  return { pts, pos, n, phase: new Float32Array(n).map(() => Math.random()) };
+})();
+
+/* =====================================================================
+   13. PLANET 5 — THE INTERLOPER (a comet full of everyone's data)
+   ===================================================================== */
+const INTER_A = 15500, INTER_E = 0.71, INTER_B = INTER_A * Math.sqrt(1 - INTER_E * INTER_E);
+const interloper = definePlanet({
+  name: 'The Interloper', short: 'THE INTERLOPER', radius: 92, g: 12, soi: 420,
+  orbit: (t, out) => {
+    const E = -1.9 + (t / CFG.LOOP) * Math.PI * 2;
+    out.set(INTER_A * (Math.cos(E) - INTER_E), Math.sin(E) * 900, INTER_B * Math.sin(E));
+    return out;
+  },
+});
+interloper.ice = 1; interloper.leaks = [];
+{
+  const iceMat = new THREE.MeshPhongMaterial({ color: 0xcfe9ef, shininess: 120, specular: 0xffffff, flatShading: true });
+  const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(interloper.radius, 3), iceMat);
+  interloper.group.add(shell); interloper.shell = shell;
+  interloper.group.add(new THREE.Mesh(new THREE.IcosahedronGeometry(interloper.radius - 16, 2), flat(0x6d8e97)));
+  // ghost data core
+  const core = new THREE.Mesh(new THREE.IcosahedronGeometry(30, 2), glow(0xff2a3a, .85));
+  interloper.group.add(core); interloper.coreMesh = core;
+  const cage = new THREE.Mesh(new THREE.IcosahedronGeometry(38, 1),
+    new THREE.MeshBasicMaterial({ color: COL.red, wireframe: true, transparent: true, opacity: .55 }));
+  interloper.group.add(cage); interloper.cage = cage;
+  // leak vents
+  for (let i = 0; i < 7; i++) {
+    const dir = fibSphere(i, 7);
+    const vent = new THREE.Group();
+    const crack = new THREE.Mesh(new THREE.TorusGeometry(6, 1.2, 5, 12), glow(COL.red, .9));
+    crack.rotation.x = Math.PI / 2; vent.add(crack);
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 6, 26, 7, 1, true), glow(0xff3355, .35));
+    beam.position.y = 13; vent.add(beam);
+    placeOn(interloper, vent, dir, -2);
+    vent.visible = false;
+    interloper.leaks.push({ obj: vent, dir, active: false });
+  }
+  // the VPN projection stone
+  const stone = new THREE.Group();
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(3.4, 5, .5), flat(0x2f4f57));
+  slab.position.y = 2.6; stone.add(slab);
+  const lens = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 3.6), glow(COL.tealBright, .8));
+  lens.position.set(0, 2.6, .3); stone.add(lens);
+  placeOn(interloper, stone, latlon(-30, 44), 0);
+  interactive(stone, 'Take the VPN projection stone  ·  <b>E</b>', () => {
+    if (!state.vpn) { state.vpn = true; stone.visible = false; toast('VPN projection stone equipped. Hold it toward a leak to block the packets.', 'teal'); unlock('vpn'); AU.ok(); }
+  }, 7);
+  // the fissure: a split in the ice with the payload glowing at the bottom
+  const fis = new THREE.Mesh(new THREE.TorusGeometry(13, 3, 6, 14), flat(0x9fc4cc));
+  placeOn(interloper, fis, latlon(-12, 248), -2); fis.rotateX(Math.PI / 2);
+  const throat = new THREE.Mesh(new THREE.CylinderGeometry(12, 16, 60, 12, 1, true),
+    new THREE.MeshLambertMaterial({ color: 0x4a1a22, side: THREE.BackSide, flatShading: true }));
+  placeOn(interloper, throat, latlon(-12, 248), -34);
+  spiralText(interloper, latlon(20, 150), 0, 'founders_breach', 1);
+  signal(core, 2, 'GHOST DATA — 40 million records, screaming', [98, 87, 78, 65]);
+}
+interloper.fissure = latlon(-12, 248);
+interloper.collide = function (local) {
+  const ang = Math.acos(clamp(_v3.copy(local).normalize().dot(this.fissure), -1, 1));
+  if (ang < 0.24) return 30;                     // the crack down to the payload
+  return this.radius * this.ice;
+};
+interloper.update = function (dt, t) {
+  const d = this.wpos.length();
+  // the closer to the star, the more of the ice boils off
+  this.ice = clamp(0.82 + (d - 4600) / 26000 * 0.18, 0.8, 1);
+  this.shell.scale.setScalar(this.ice);
+  const leaking = this.ice < 0.93;
+  this.leaks.forEach((l, i) => {
+    l.active = leaking && (i % 2 === 0 || this.ice < 0.87);
+    l.obj.visible = l.active;
+    l.obj.position.copy(l.dir).multiplyScalar(this.radius * this.ice - 2);
+  });
+  this.coreMesh.material.opacity = .6 + Math.sin(t * 8) * .25;
+  this.cage.rotation.y += dt * .4; this.cage.rotation.x += dt * .21;
+};
+
+/* =====================================================================
+   14. LORE — what the Founders left behind
+   ===================================================================== */
+const LORE = {
+  founders_intro: {
+    title: 'Founders\' Notice — Site Induction',
+    who: 'ENGRAVED AT THE ORIGINAL HUB',
+    raw: '§1.1  The Party of the First Part ("we", "us", "the Network")\n§1.2  hereby warrants coverage in perpetuity, subject to\n§1.3  Schedule G, which has been misplaced.',
+    text: 'We built the towers before we built the billing. That was the mistake, and it was ours.\n\nWhen the star was young we asked it to underwrite the network. It agreed, on the condition that the arrangement be reviewed at the end of every cycle. We did not read the review clause. Nobody reads the review clause.\n\nIf you are standing here, the review is still happening. It has been happening for a very long time.',
+  },
+  founders_towers: {
+    title: 'Founders\' Notice — Coverage Map',
+    who: 'BENEATH THE TOWER FOREST',
+    raw: '§4.7  "Coverage" means the theoretical possibility of coverage.\n§4.8  Theoretical possibility is not a guarantee of possibility.',
+    text: 'Every tower on this world points at the same place: the core of Giant\'s Bandwidth, where we stored the thing the star wanted as collateral.\n\nWe promised total coverage. We delivered total coverage of the legal surface area instead. It was cheaper, and the star could not tell the difference until the audit.',
+  },
+  founders_void: {
+    title: 'Founders\' Notice — Outage Advisory',
+    who: 'ABOVE THE NATIONAL OUTAGE VOID',
+    raw: '§9.2  In the event of a National Outage, service will be restored\n§9.3  by a process we are not at liberty to describe as "hoping".',
+    text: 'The void at the heart of this world is not damage. It is the escalation path.\n\nAnything that falls in is transported to the station where escalations wait. We built the station to be inescapable so that complaints could not return. We did not consider that we might one day need to return.\n\nThe router in that room still works. It has always worked. That is the joke.',
+  },
+  founders_bandwidth: {
+    title: 'Founders\' Notice — Fair Use',
+    who: 'INSIDE THE CORE OF GIANT\'S BANDWIDTH',
+    raw: '§12.0 Unlimited data is subject to a Fair Use Policy.\n§12.1 The Fair Use Policy is the electric shell you just passed through.\n§12.2 You should not have passed through it.',
+    text: 'This is the collateral. Uncompressed, unwatched, unstreamable: every second of footage the network ever promised to deliver in perfect quality, kept here because delivering it was never actually possible.\n\nOne cyclone spins backwards. We built it as a service door and then classified it as a fault, so that no engineer would ever be dispatched to fix it. Congratulations. You used the fault.',
+  },
+  founders_fees: {
+    title: 'Founders\' Notice — Itemisation',
+    who: 'HIDDEN FEES CHAMBER, EMBER PREPAID',
+    raw: '§6.3  Charges may appear which were not disclosed at sign-up.\n§6.4  These are not undisclosed. They are pre-disclosed, elsewhere.',
+    text: 'The twins are a ledger. What drains from one accrues to the other, and neither world is ever allowed to reach zero, because a balance of zero would end the arrangement with the star.\n\nDo not linger down here late in the cycle. The sand is not sand. It is everything you were quietly charged for, and it is looking for somewhere to settle.',
+  },
+  founders_rollover: {
+    title: 'Founders\' Notice — Rollover',
+    who: 'ASH POSTPAID, BENEATH THE EXTENDERS',
+    raw: '§7.1  Unused allowance rolls over.\n§7.2  Rollover is not transferable, refundable, or, strictly speaking, real.',
+    text: 'The extenders were built to move engineers between worlds instantly, but the alignment windows are brief and the sand buries the doors before most cycles are half done.\n\nUse them early. The network was designed by people who assumed you would already know that.',
+  },
+  founders_breach: {
+    title: 'Founders\' Notice — Incident Report',
+    who: 'ON THE INTERLOPER',
+    raw: '§0.0  A third party has accessed records including but not limited to\n§0.1  names, addresses, licence numbers, and the shape of your voice.\n§0.2  We take your privacy extremely seriously.',
+    text: 'This comet is our incident report. We could not delete the leaked records, so we froze them and put them on the longest orbit we could calculate, hoping the problem would become somebody else\'s in about nine thousand years.\n\nEvery time it nears the star the ice thins and the records leak out again. The projection stone blocks them. We made exactly one stone. We felt that was proportionate.',
+  },
+  vpn: { title: 'VPN Projection Stone', who: 'PICKED UP ON THE INTERLOPER', raw: '§0.3  Protection is provided on a best-efforts basis.', text: 'Hold it toward a leak and the packets stop. Look away and they do not.' },
+  codes: { title: 'Launch authorisation', who: 'TIMBER YES HUB', raw: '§2.2  Authorisation may take up to 45 seconds. Or a cycle.', text: 'The terminal now recognises this device as trusted. Codes are issued immediately from here on — the only thing the network has ever remembered about you.' },
+  station: { title: 'White Hole Station', who: 'DEEP SPACE', raw: '§9.4  Your call is important to us.', text: 'Falling into the outage void does not kill you. It puts you on hold, several thousand kilometres from anywhere, with a working router and a poster about how important you are.' },
+  cyclone: { title: 'The inverted cyclone', who: "GIANT'S BANDWIDTH", raw: '§12.1 see: Fair Use Policy', text: 'Four cyclones throw everything upward. One pulls down. Fly the wrong one on purpose.' },
+  audit: { title: 'End of Financial Year Audit', who: 'OBSERVED DIRECTLY', raw: '§22.0 The arrangement is reviewed at the end of every cycle.', text: 'At twenty-two minutes the star calls in the debt and the system is consumed. Then it starts again, and only you remember the last one. That is not a bug in the network. That is the product.' },
+};
+const ORDERED_LORE = Object.keys(LORE);
+
+/* =====================================================================
+   15. (game state now lives near the top — it is needed during world build)
+   ===================================================================== */
+
+/* =====================================================================
+   16. PLAYER
+   ===================================================================== */
+const player = new Body(0);
+player.fwd = new THREE.Vector3(0, 0, -1);
+player.up = new THREE.Vector3(0, 1, 0);
+let pitch = 0;
+const EYE = 1.62;
+
+/* =====================================================================
+   17. THE SHIP
+   ===================================================================== */
+const ship = new Body(9);
+ship.quat = new THREE.Quaternion();
+ship.mesh = (() => {
+  const g = new THREE.Group();
+  const hull = new THREE.Mesh(new THREE.CapsuleGeometry(3.6, 5.6, 5, 10), flat(COL.yellow));
+  hull.rotation.x = Math.PI / 2; g.add(hull);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(3.6, 5.4, 10), flat(COL.yellowHot));
+  nose.rotation.x = -Math.PI / 2; nose.position.z = -7.2; g.add(nose);
+  const cockpit = new THREE.Mesh(new THREE.SphereGeometry(2.9, 14, 10),
+    new THREE.MeshLambertMaterial({ color: 0x8fdcd6, transparent: true, opacity: .45, flatShading: true }));
+  cockpit.position.set(0, 1.9, -3.2); g.add(cockpit);
+  const band = new THREE.Mesh(new THREE.TorusGeometry(3.7, .55, 6, 14), flat(COL.teal));
+  band.rotation.y = Math.PI / 2; band.rotation.z = Math.PI / 2; band.position.z = 1; g.add(band);
+  for (let i = 0; i < 3; i++) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(.35, .5, 6, 5), flat(COL.char2));
+    const a = i * 2.09 + .5;
+    leg.position.set(Math.cos(a) * 3, -4, Math.sin(a) * 3 + 1); leg.rotation.set(Math.sin(a) * .4, 0, -Math.cos(a) * .4);
+    g.add(leg);
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, .5, 8), flat(COL.char));
+    foot.position.set(Math.cos(a) * 4.2, -6.9, Math.sin(a) * 4.2 + 1); g.add(foot);
+  }
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(2.2, 7, 8), glow(COL.tealBright, .85));
+  flame.rotation.x = Math.PI / 2; flame.position.z = 8.4; flame.visible = false; g.add(flame);
+  g.userData.flame = flame;
+  const tag = makeTex(256, 64, (x, w, h) => {
+    x.fillStyle = 'rgba(0,0,0,0)'; x.clearRect(0, 0, w, h);
+    x.fillStyle = '#1b1e1f'; x.font = 'bold 40px sans-serif'; x.textAlign = 'center';
+    x.fillText('yes', w / 2, 46);
+  });
+  const decal = new THREE.Mesh(new THREE.PlaneGeometry(5, 1.25), new THREE.MeshBasicMaterial({ map: tag, transparent: true }));
+  decal.position.set(3.55, .4, 1); decal.rotation.y = Math.PI / 2; g.add(decal);
+  scene.add(g);
+  return g;
+})();
+interactive(ship.mesh, 'Board the ship  ·  <b>E</b>', () => boardShip(), 13);
+signal(ship.mesh, 1, 'YOUR SHIP — telemetry uplink', [392, 440, 523, 440]);
+
+/* =====================================================================
+   18. INPUT
+   ===================================================================== */
+const keys = {};
+addEventListener('keydown', e => {
+  if (e.code === 'Tab') e.preventDefault();
+  if (!keys[e.code]) onKeyPress(e.code);
+  keys[e.code] = true;
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+function onKeyPress(code) {
+  if (!state.running) return;
+  if (code === 'Digit1') selectTool(0);
+  if (code === 'Digit2') selectTool(1);
+  if (code === 'Digit3') selectTool(2);
+  if (code === 'Tab') toggleLog();
+  if (code === 'KeyE' && state.mode === 'foot') tryInteract();
+  if (code === 'KeyF' && state.mode === 'ship') exitShip();
+  if (code === 'KeyC' && state.tool === 1) recallProbe();
+  if (code === 'BracketLeft') state.band = (state.band + 2) % 3;
+  if (code === 'BracketRight') state.band = (state.band + 1) % 3;
+  if (code === 'Escape') { closeAll(); }
+}
+
+let mouseDown = false, mouse2 = false;
+const canvas = renderer.domElement;
+canvas.addEventListener('mousedown', e => {
+  if (!state.running || !locked()) return;
+  if (e.button === 0) { mouseDown = true; onFire(); }
+  if (e.button === 2) { mouse2 = true; setScope(true); }
+});
+addEventListener('mouseup', e => {
+  if (e.button === 0) { mouseDown = false; state.decoding = 0; }
+  if (e.button === 2) { mouse2 = false; setScope(false); }
+});
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('wheel', e => { if (state.scope) state.band = (state.band + (e.deltaY > 0 ? 1 : 2)) % 3; }, { passive: true });
+
+const locked = () => document.pointerLockElement === canvas;
+function tryLock() {
+  if (!state.running || anyModal()) return;
+  try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => { }); } catch (e) { }
+}
+canvas.addEventListener('click', tryLock);
+addEventListener('mousemove', e => {
+  if (!locked() || !state.running) return;
+  const sx = 0.0022, sy = 0.0022;
+  if (state.mode === 'foot') {
+    player.fwd.applyAxisAngle(player.up, -e.movementX * sx);
+    pitch = clamp(pitch - e.movementY * sy, -1.5, 1.5);
+  } else {
+    shipInput.yaw = clamp(shipInput.yaw - e.movementX * 0.0016, -1, 1);
+    shipInput.pitch = clamp(shipInput.pitch - e.movementY * 0.0016, -1, 1);
+  }
+});
+const shipInput = { yaw: 0, pitch: 0, roll: 0 };
+
+/* =====================================================================
+   19. HUD PLUMBING
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const elPrompt = $('prompt'), elRet = $('reticle');
+function toast(msg, kind = '') {
+  const d = document.createElement('div');
+  d.className = 'toast ' + kind; d.innerHTML = msg;
+  $('toasts').appendChild(d);
+  setTimeout(() => { d.style.transition = 'opacity .4s'; d.style.opacity = '0'; setTimeout(() => d.remove(), 420); }, 5200);
+  while ($('toasts').children.length > 4) $('toasts').firstChild.remove();
+}
+function unlock(id) {
+  if (state.knowledge.has(id)) return;
+  state.knowledge.add(id);
+  const e = LORE[id];
+  if (e) toast('<b>Logged:</b> ' + e.title, 'teal');
+  $('logcount').textContent = state.knowledge.size + ' / ' + ORDERED_LORE.length;
+}
+function selectTool(i) {
+  state.tool = i;
+  document.querySelectorAll('.tool').forEach((t, k) => t.classList.toggle('sel', k === i));
+  $('photo').classList.toggle('on', i === 1 && !!probe.body);
+  AU.beep();
+}
+function anyModal() { return !!document.querySelector('.screen.on'); }
+function closeAll() {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  if (state.running && !state.dead) tryLock();
+}
+
+/* =====================================================================
+   20. INTERACTION
+   ===================================================================== */
+let focused = null;
+function scanInteractables() {
+  if (state.mode !== 'foot') { focused = null; return; }
+  const wp = player.world(_v1).clone(); wp.addScaledVector(player.up, EYE);
+  const dir = _v2.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  let best = null, bestScore = -1;
+  for (const it of interactables) {
+    if (!it.obj.visible || !it.cond()) continue;
+    const p = it.obj.getWorldPosition(_v3);
+    const d = p.distanceTo(wp);
+    if (d > it.range) continue;
+    const to = p.clone().sub(wp).normalize();
+    const dot = to.dot(dir);
+    if (dot < 0.25) continue;
+    const score = dot - d / (it.range * 4);
+    if (score > bestScore) { bestScore = score; best = it; }
+  }
+  focused = best;
+  elPrompt.classList.toggle('on', !!best);
+  elRet.classList.toggle('hot', !!best);
+  if (best) elPrompt.innerHTML = best.label;
+}
+function tryInteract() { if (focused) { focused.onUse(); } }
+
+/* =====================================================================
+   21. TOOLS
+   ===================================================================== */
+/* --- 21a. Network Scanner (signalscope) -------------------------------- */
+let scopeStep = 0, scopeAcc = 0, lockedSignal = null;
+function setScope(on) {
+  state.scope = on && state.running && !anyModal();
+  $('scope').classList.toggle('on', state.scope);
+  camera.fov = state.scope ? 28 : 72; camera.updateProjectionMatrix();
+  if (!state.scope && AU.ready) AU.scopeGain.gain.value = 0;
+}
+function updateScope(dt) {
+  $('scopeband').textContent = BANDS[state.band].label;
+  if (!state.scope) return;
+  const wp = player.world(_v1).clone();
+  const dir = _v2.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  let best = null, bestS = 0;
+  for (const s of signals) {
+    if (s.band !== state.band) continue;
+    if (!s.obj.visible || !s.obj.parent) continue;
+    const p = s.obj.getWorldPosition(_v3);
+    const to = p.clone().sub(wp); const d = to.length(); to.normalize();
+    const align = Math.pow(clamp(to.dot(dir), 0, 1), 26);
+    const falloff = clamp(1 - d / 42000, 0, 1);
+    const strength = align * (0.25 + 0.75 * falloff);
+    if (strength > bestS) { bestS = strength; best = s; }
+  }
+  lockedSignal = best;
+  $('scopename').textContent = best && bestS > 0.05 ? best.name : 'no signal locked';
+  $('scopemeter').firstElementChild.style.width = (bestS * 100).toFixed(0) + '%';
+  if (AU.ready) {
+    AU.scopeGain.gain.value = bestS * 0.22;
+    scopeAcc += dt;
+    if (best && scopeAcc > 0.24) {
+      scopeAcc = 0; scopeStep++;
+      AU.scope.type = BANDS[state.band].wave;
+      AU.scope.frequency.setTargetAtTime(best.motif[scopeStep % best.motif.length], AU.ctx.currentTime, .02);
+    }
+  }
+}
+
+/* --- 21b. Packet Tracer (the scout) ------------------------------------ */
+const probe = { body: null, mesh: null, stuck: false, latency: 0 };
+{
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(.85, 1), glow(COL.tealBright)));
+  g.add(new THREE.Mesh(new THREE.IcosahedronGeometry(1.5, 1), glow(COL.tealBright, .18)));
+  const l = new THREE.PointLight(COL.tealBright, 300, 120, 2); g.add(l);
+  g.visible = false; scene.add(g); probe.mesh = g;
+}
+const photoRT = new THREE.WebGLRenderTarget(160, 112);
+const photoCam = new THREE.PerspectiveCamera(78, 160 / 112, 0.2, 200000);
+const photoPixels = new Uint8Array(160 * 112 * 4);
+function launchProbe() {
+  const b = new Body(1);
+  b.frame = player.frame;
+  b.pos.copy(player.pos).addScaledVector(player.up, EYE);
+  const dir = _v2.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  b.vel.copy(player.vel).addScaledVector(dir, 190);
+  probe.body = b; probe.stuck = false; probe.mesh.visible = true;
+  AU.tone(1200, .14, 'square', .12, 600);
+  toast('Packet away. <b>LMB</b> to capture, <b>C</b> to recall.', 'teal');
+  $('photo').classList.add('on');
+}
+function recallProbe() {
+  probe.body = null; probe.mesh.visible = false; $('photo').classList.remove('on');
+  AU.tone(600, .12, 'square', .1, 1200);
+}
+function takePhoto() {
+  if (!probe.body) return;
+  const wp = probe.body.world(_v1).clone();
+  photoCam.position.copy(wp);
+  photoCam.lookAt(player.world(_v2).clone().addScaledVector(player.up, EYE));
+  probe.mesh.visible = false;
+  const stoneWas = heldStone.visible; heldStone.visible = false;
+  renderer.setRenderTarget(photoRT);
+  renderer.render(scene, photoCam);
+  renderer.readRenderTargetPixels(photoRT, 0, 0, 160, 112, photoPixels);
+  renderer.setRenderTarget(null);
+  probe.mesh.visible = true; heldStone.visible = stoneWas;
+  const cv = $('photocanvas'), cx = cv.getContext('2d');
+  const img = cx.createImageData(160, 112);
+  for (let y = 0; y < 112; y++) {
+    for (let x = 0; x < 160; x++) {
+      const s = ((111 - y) * 160 + x) * 4, d = (y * 160 + x) * 4;
+      // crunch it like a badly compressed jpeg
+      img.data[d] = (photoPixels[s] >> 4) << 4;
+      img.data[d + 1] = (photoPixels[s + 1] >> 4) << 4;
+      img.data[d + 2] = (photoPixels[s + 2] >> 4) << 4;
+      img.data[d + 3] = 255;
+    }
+  }
+  cx.putImageData(img, 0, 0);
+  // latency = structural integrity of whatever it is sitting on
+  let lat = Math.round(20 + wp.distanceTo(player.world(_v2)) / 12);
+  if (probe.body.frame === brittle) {
+    const pl = brittle.plateAt(probe.body.pos);
+    lat = pl && pl.attached ? 180 + Math.round(Math.random() * 400) : 9999;
+  }
+  probe.latency = lat;
+  $('photolat').textContent = lat >= 9999 ? 'TIMEOUT' : lat + ' ms';
+  $('photonote').textContent = 'packet_' + String(Math.floor(Math.random() * 900) + 100) + '.jpg';
+  AU.tone(1500, .06, 'square', .1);
+}
+
+/* --- 21c. T&C Decoder --------------------------------------------------- */
+function decodeTarget() {
+  const wp = player.world(_v1).clone().addScaledVector(player.up, EYE);
+  const dir = _v2.set(0, 0, -1).applyQuaternion(camera.quaternion);
+  for (const n of loreNodes) {
+    const p = n.getWorldPosition(_v3);
+    const to = p.clone().sub(wp); const d = to.length();
+    if (d > 46) continue;
+    if (to.normalize().dot(dir) > 0.94) return n;
+  }
+  return null;
+}
+function onFire() {
+  if (state.mode === 'ship' || anyModal()) return;
+  if (state.tool === 1) { probe.body ? takePhoto() : launchProbe(); }
+}
+
+/* =====================================================================
+   22. MODALS — 2FA, terms, lore, log
+   ===================================================================== */
+const TC_PARAS = [
+  'By boarding this vessel you ("the Customer", "the Pilot", "the Deceased") agree to the following terms, which supersede all previous terms, including the ones you agreed to during the previous billing cycle, which you also do not remember agreeing to.',
+  '1. SERVICE. Optus Interstellar ("we") provides propulsion on a best-efforts basis. "Best efforts" means the efforts we consider best at the time, evaluated retrospectively by us, in private.',
+  '2. COVERAGE. Coverage is provided across the solar system except where it is not. A list of locations where coverage is not provided is available on request, provided the request is made from a location with coverage.',
+  '3. THE STAR. You acknowledge that the star underwriting this network is subject to an end-of-cycle review and that the outcome of that review is not within our control, our interest, or our documentation.',
+  '4. DATA ALLOWANCE. Your allowance is consumed by breathing, by using the jetpack, and by thinking about the jetpack. Unused allowance rolls over to a world you cannot currently reach.',
+  '5. LIABILITY. We are not liable for: loss of signal, loss of ship, loss of limb, loss of world, heat death, cold death, sand-related death, or being placed on hold in deep space.',
+  '6. FAIR USE. Unlimited means unlimited up to a limit. The limit is not published. Requests for the limit will be answered with this paragraph.',
+  '7. THE VOID. Falling into a National Outage is not a fault. It is a redirection to our escalations facility. Redirection is one-way by design and by architecture and by a decision made in a meeting in the year 400.',
+  '8. SUPPORT. Support is available 24 hours a day within a 22-minute cycle, which our records show is the same thing.',
+  '9. PRIVACY. We take your privacy extremely seriously. Records that have already left our custody are, by definition, no longer our custody, and therefore no longer our concern.',
+  '10. ROAMING. Roaming charges apply outside the network. The network is defined as the area in which roaming charges do not apply. This definition has survived four legal challenges and one supernova.',
+  '11. HARDWARE. Your ship is provided as-is. The landing gear is provided as-was. The thrusters are provided as-if.',
+  '12. TERMINATION. We may terminate service at any time. Service may also terminate you. Both outcomes are covered by clause 5.',
+  '13. VARIATION. We may vary these terms without notice. You will be notified of the lack of notice at the start of the next cycle.',
+  '14. DISPUTES. Disputes will be resolved by an independent adjudicator selected by us, employed by us, and located inside us.',
+  '15. FORCE MAJEURE. Neither party shall be liable for failure to perform due to flood, fire, war, industrial action, hyper-inflation of the underwriting star, or a scheduled outage described as unscheduled for reporting purposes.',
+  '16. INTELLECTUAL PROPERTY. Any lore you decode remains the property of the Founders, who are gone, which we interpret as an assignment to us.',
+  '17. ACCEPTANCE. Scrolling constitutes reading. Reading constitutes understanding. Understanding constitutes consent. Consent constitutes acceptance. Acceptance constitutes a further opportunity to sell you a tablet.',
+  '18. FINAL CLAUSE. Thank you for choosing us. There was no other option, which we consider a form of choosing.',
+];
+function openTC() {
+  const b = $('tcbody');
+  b.innerHTML = TC_PARAS.map(p => '<p>' + p + '</p>').join('') +
+    '<p style="color:var(--yellow)">You have reached the end of the terms. Nobody has ever done this. There is nothing here. There was never going to be anything here.</p>';
+  $('tcver').textContent = 'v22.0.' + state.loop;
+  $('tcaccept').disabled = true;
+  $('tcprog').textContent = 'scrolled 0%';
+  $('tc').classList.add('on');
+  document.exitPointerLock();
+  b.scrollTop = 0;
+  b.onscroll = () => {
+    const p = b.scrollTop / Math.max(1, b.scrollHeight - b.clientHeight);
+    $('tcprog').textContent = 'scrolled ' + Math.round(p * 100) + '%';
+    if (p > 0.985) { $('tcaccept').disabled = false; $('tcprog').textContent = 'you actually read it'; }
+  };
+}
+$('tcaccept').onclick = () => {
+  state.tcAccepted = true; $('tc').classList.remove('on'); AU.ok();
+  toast('Terms accepted. Thrusters online.', 'teal'); closeAll();
+};
+$('tcdecline').onclick = () => {
+  $('tc').classList.remove('on'); AU.deny();
+  toast('Terms declined. Thrusters remain locked. You may sit in the ship and think about it.', 'red');
+  closeAll();
+};
+$('loreclose').onclick = () => { $('lore').classList.remove('on'); closeAll(); };
+$('logclose').onclick = () => { $('log').classList.remove('on'); closeAll(); };
+$('twofaclose').onclick = () => { $('twofa').classList.remove('on'); closeAll(); };
+$('twofaok').onclick = () => {
+  if (state.twofa && state.twofa.code) {
+    state.codesThisLoop = true; state.trusted = true; unlock('codes');
+    toast('Launch authorisation granted. The ship is unlocked.', 'teal'); AU.ok();
+  }
+  $('twofa').classList.remove('on'); closeAll();
+};
+
+function open2FA() {
+  $('twofa').classList.add('on'); document.exitPointerLock();
+  if (state.codesThisLoop) {
+    $('twofaspin').style.display = 'none';
+    $('twofacode').textContent = state.twofa ? state.twofa.code : '——————';
+    $('twofawait').textContent = 'already authorised for this cycle.';
+    $('twofaok').disabled = false; return;
+  }
+  if (!state.twofa) {
+    const instant = state.trusted;
+    state.twofa = { left: instant ? 0.8 : 45, code: null };
+    if (instant) toast('Trusted device recognised. Code incoming.', 'teal');
+  }
+  $('twofaok').disabled = !state.twofa.code;
+  $('twofaspin').style.display = state.twofa.code ? 'none' : 'block';
+}
+function update2FA(dt) {
+  const f = state.twofa;
+  if (!f || f.code) return;
+  f.left -= dt;
+  const open = $('twofa').classList.contains('on');
+  if (f.left <= 0) {
+    f.code = String(Math.floor(100000 + Math.random() * 899999)).split('').join(' ');
+    if (open) {
+      $('twofaspin').style.display = 'none';
+      $('twofacode').textContent = f.code;
+      $('twofawait').textContent = 'code delivered. it expires with the universe.';
+      $('twofaok').disabled = false;
+    } else {
+      toast('<b>SMS:</b> your Optus launch code is ' + f.code + '. Never share this code, especially with the star.', 'teal');
+      state.codesThisLoop = true; state.trusted = true; unlock('codes');
+    }
+    AU.ok();
+  } else if (open) {
+    $('twofawait').textContent = 'delivery in progress — ' + f.left.toFixed(0) + 's remaining';
+    $('twofanote').textContent = f.left > 30 ? 'SMS gateway congestion: high'
+      : f.left > 15 ? 'SMS gateway congestion: still high'
+        : 'SMS gateway congestion: it is fine, it is coming, relax';
+  }
+}
+function openLore(id) {
+  const e = LORE[id]; if (!e) return;
+  $('loretitle').textContent = e.title;
+  $('lorebody').innerHTML = '<div class="who">' + e.who + '</div><div class="raw">' + e.raw + '</div><div class="trans">' +
+    e.text.split('\n\n').map(p => '<p>' + p + '</p>').join('') + '</div>';
+  $('lore').classList.add('on'); document.exitPointerLock();
+  unlock(id);
+}
+function toggleLog() {
+  const on = $('log').classList.contains('on');
+  if (on) { $('log').classList.remove('on'); closeAll(); return; }
+  const html = ORDERED_LORE.map(id => {
+    const e = LORE[id], has = state.knowledge.has(id);
+    return '<div class="logentry' + (has ? '' : ' locked') + '"><h4>' + (has ? e.title : 'UNKNOWN RECORD') + '</h4><p>' +
+      (has ? e.who : 'not yet decoded') + '</p></div>';
+  }).join('');
+  $('logbody').innerHTML = html;
+  $('logcount').textContent = state.knowledge.size + ' / ' + ORDERED_LORE.length;
+  $('log').classList.add('on'); document.exitPointerLock();
+}
+
+/* =====================================================================
+   23. SHIP BOARDING / WARPS / STATION
+   ===================================================================== */
+function boardShip() {
+  if (!state.codesThisLoop) {
+    toast('The ship is locked. Launch authorisation is required — try the terminal by the pad.', 'red'); AU.deny(); return;
+  }
+  state.mode = 'ship';
+  shipInput.yaw = shipInput.pitch = shipInput.roll = 0;
+  toast('Boarded. <b>F</b> to disembark.', 'teal');
+  if (!state.tcAccepted) openTC();
+}
+function exitShip() {
+  state.mode = 'foot';
+  const q = ship.quat;
+  player.frame = ship.frame;
+  player.pos.copy(ship.pos).add(_v1.set(0, 0, 12).applyQuaternion(q));
+  player.vel.copy(ship.vel);
+  player.up.copy(player.frame ? player.pos.clone().normalize() : _v2.set(0, 1, 0).applyQuaternion(q));
+  player.fwd.set(0, 0, -1).applyQuaternion(q);
+  toast('Disembarked.', 'teal');
+}
+function usePad(rec) {
+  if (!rec.aligned) {
+    toast('Extender not aligned. It only points at ' + rec.target.short + ' as the twins swing past.', 'red'); AU.deny(); return;
+  }
+  const dir = fibSphere((Math.random() * 40) | 0, 40);
+  player.frame = rec.target;
+  player.pos.copy(dir).multiplyScalar(rec.target.radius + 6);
+  player.vel.set(0, 0, 0);
+  player.up.copy(dir); player.fwd.set(dir.z, dir.x, dir.y).normalize();
+  AU.warp(); flashScreen();
+  toast('Extender aligned — warped to ' + rec.target.short + '.', 'teal');
+  unlock('founders_rollover');
+}
+function enterStation() {
+  state.inStation = true; state.mode = 'foot';
+  player.frame = null;
+  player.pos.copy(station.pos).add(new THREE.Vector3(6, 2, 6));
+  player.vel.set(0, 0, 0); player.up.set(0, 1, 0); player.fwd.set(-1, 0, -1).normalize();
+  AU.warp(); AU.startHold(); flashScreen();
+  unlock('station');
+  toast('Your call has been escalated. Please hold.', 'red');
+}
+function leaveStation() {
+  state.inStation = false;
+  AU.stopHold(); AU.warp(); flashScreen();
+  const dir = fibSphere(3, 12);
+  player.frame = brittle;
+  player.pos.copy(dir).multiplyScalar(brittle.radius + 60);
+  player.vel.set(0, 0, 0); player.up.copy(dir);
+  player.fwd.set(dir.y, dir.z, dir.x).normalize();
+  toast('Router rebooted. Returned to Brittle Infrastructure.', 'teal');
+}
+
+/* =====================================================================
+   24. EFFECTS / DAMAGE / DEATH
+   ===================================================================== */
+const fx = [];
+function flashAt(planet, local, color, size) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(size, 10, 8), glow(color, .8));
+  m.position.copy(local); planet.group.add(m);
+  fx.push({ mesh: m, life: .5, max: .5, grow: size * 5 });
+}
+function flashScreen() {
+  const w = $('whiteout'); w.style.transition = 'opacity .12s'; w.style.opacity = '.9';
+  setTimeout(() => { w.style.transition = 'opacity .5s'; w.style.opacity = '0'; }, 120);
+}
+function damage(n, why) {
+  if (state.dead || state.resetting) return;
+  state.bars -= n;
+  AU.noiseBurst(.35, .2, 500);
+  state.glitch = Math.max(state.glitch, .6);
+  if (state.bars <= 0) { state.bars = 0; die('Service disconnected', why || 'Your connection dropped below the minimum required to remain alive.'); }
+}
+function die(title, text) {
+  if (state.dead || state.resetting) return;
+  state.dead = true;
+  document.exitPointerLock();
+  $('deathtitle').textContent = title;
+  $('deathtext').textContent = text;
+  $('deathref').textContent = 'REF 0x' + Math.floor(Math.random() * 1048575).toString(16).toUpperCase().padStart(5, '0') + ' · CYCLE ' + String(state.loop).padStart(3, '0');
+  $('deathcard').classList.add('on');
+  AU.stopHold(); AU.deny();
+  setTimeout(() => { $('deathcard').classList.remove('on'); resetLoop(); }, 3400);
+}
+
+/* =====================================================================
+   25. THE BILLING CYCLE
+   ===================================================================== */
+function resetLoop() {
+  state.resetting = true;
+  state.t = 0; state.loop++;
+  state.bars = 5; state.allowance = CFG.ALLOWANCE;
+  state.dead = false; state.mode = 'foot'; state.inStation = false;
+  state.codesThisLoop = false; state.tcAccepted = false; state.vpn = false;
+  state.twofa = null; state.coreAccess = 0; state.glitch = 0;
+  recallProbe();
+  brittle.reset();
+  interloper.leaks.forEach(l => l.obj.visible = false);
+  // the projection stone is back where it was, because everything is
+  interactables.forEach(it => { if (it.label.includes('projection stone')) it.obj.visible = true; });
+  updateOrbits(0, 0);
+  // wake up by the fire
+  const d = timber.spawnDir.clone();
+  player.frame = timber;
+  player.pos.copy(d).multiplyScalar(timber.radius + 2);
+  player.vel.set(0, 0, 0);
+  player.up.copy(d);
+  player.fwd.copy(new THREE.Vector3(0, 1, 0).cross(d)).normalize();
+  pitch = 0;
+  // ship back on the pad
+  const pd = timber.padDir.clone();
+  ship.frame = timber; ship.pos.copy(pd).multiplyScalar(timber.radius + 8); ship.vel.set(0, 0, 0);
+  ship.quat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), pd);
+  sunRadius = CFG.SUN_R; sunUniforms.uInflate.value = 0;
+  $('whiteout').style.opacity = '0';
+  setTimeout(() => { state.resetting = false; tryLock(); }, 300);
+  if (state.loop > 1) toast('<b>Cycle ' + state.loop + '.</b> You wake by the fire. The terminal has forgotten nothing, which is new.', 'teal');
+}
+function updateSun(dt) {
+  const t = state.t;
+  if (t > CFG.INFLATE_AT) {
+    const k = clamp((t - CFG.INFLATE_AT) / (CFG.LOOP - CFG.INFLATE_AT), 0, 1);
+    sunUniforms.uInflate.value = Math.min(1, k * 2);
+    sunRadius = CFG.SUN_R * (1 + Math.pow(k, 2.6) * 42);
+    if (k > 0.02 && !state.auditWarned) {
+      state.auditWarned = true; unlock('audit');
+      toast('<b>END OF FINANCIAL YEAR AUDIT.</b> The star is calling in the debt.', 'red');
+      AU.boom();
+    }
+  } else { state.auditWarned = false; sunUniforms.uInflate.value = 0; sunRadius = CFG.SUN_R; }
+  const s = sunRadius / CFG.SUN_R;
+  sun.scale.setScalar(s);
+  // the halo is a billboard: face the camera and grow with the disc, but stay
+  // inside the far plane or the quad's corners get clipped during inflation
+  const inf = sunUniforms.uInflate.value;
+  sunGlow.quaternion.copy(camera.quaternion);
+  sunGlow.scale.setScalar(sunRadius * SUN_GLOW_SPAN * (1.0 - 0.6 * inf));
+  sunUniforms.uTime.value = t;
+  // The star's light answers to its mood: warm daylight normally, a hard red
+  // glare once the audit starts, and a touch hotter the closer in you orbit.
+  // Intensity/PI is what a white surface facing the star renders at, so this
+  // sits at ~1.0 on the inner worlds and ~0.84 out at the Twins — bright
+  // enough to read, short of clipping the flat-shaded facets to a white blob.
+  const near = clamp(1 - (camera.position.length() - sunRadius) / 26000, 0, 1);
+  sunLight.intensity = (2.6 + 0.7 * near) * (1 + inf * 1.4);
+  sunLight.color.setRGB(1, 0.957 - 0.42 * inf, 0.863 - 0.72 * inf);
+  ambient.intensity = 1.05 + inf * 0.5;
+  ambient.color.setRGB(0.255 + 0.5 * inf, 0.376 - 0.2 * inf, 0.431 - 0.28 * inf);
+  if (t >= CFG.LOOP && !state.resetting) {
+    $('whiteout').style.transition = 'opacity .35s';
+    $('whiteout').style.opacity = '1';
+    AU.boom();
+    setTimeout(() => die('Payment declined', 'The billing cycle ended before the balance was settled. Reverting the solar system to its last known good state.'), 380);
+  }
+}
+
+/* =====================================================================
+   26. SIMULATION STEPS
+   ===================================================================== */
+function updateOrbits(t, dt) {
+  for (const p of planets) {
+    _v1.copy(p.wpos);
+    p.orbit(t, p.wpos);
+    if (dt > 0) p.wvel.copy(p.wpos).sub(_v1).divideScalar(dt); else p.wvel.set(0, 0, 0);
+    p.group.position.copy(p.wpos);
+    p.update(dt, t);
+  }
+  sunLight.position.set(0, 0, 0);
+  // GB sand pouring from the world that has it to the world that wants it
+  const { pos, n, phase, pts } = sandStream;
+  for (let i = 0; i < n; i++) {
+    phase[i] = (phase[i] + dt * 0.09) % 1;
+    const k = phase[i];
+    const x = lerp(ember.wpos.x, ash.wpos.x, k), y = lerp(ember.wpos.y, ash.wpos.y, k), z = lerp(ember.wpos.z, ash.wpos.z, k);
+    const wob = Math.sin(k * 9 + i) * 26 * Math.sin(k * Math.PI);
+    pos[i * 3] = x + wob; pos[i * 3 + 1] = y + Math.cos(k * 7 + i) * 26 * Math.sin(k * Math.PI); pos[i * 3 + 2] = z + wob * .5;
+  }
+  pts.geometry.attributes.position.needsUpdate = true;
+}
+
+const _up = new THREE.Vector3(), _right = new THREE.Vector3(), _back = new THREE.Vector3(), _wish = new THREE.Vector3();
+const _mat = new THREE.Matrix4();
+
+function stepPlayer(dt) {
+  if (state.mode === 'ship') {           // riding: the player is wherever the ship is
+    player.frame = ship.frame; player.pos.copy(ship.pos); player.vel.copy(ship.vel);
+    return;
+  }
+  const inStation = state.inStation;
+  if (!inStation) updateFrame(player);
+
+  // local up
+  if (inStation) _up.set(0, 1, 0);
+  else if (player.frame) _up.copy(player.pos).normalize();
+  else _up.copy(player.up);
+  player.up.copy(_up);
+
+  // keep the look direction on the tangent plane
+  player.fwd.addScaledVector(_up, -player.fwd.dot(_up));
+  if (player.fwd.lengthSq() < 1e-6) player.fwd.set(_up.y, _up.z, _up.x).cross(_up);
+  player.fwd.normalize();
+  _right.crossVectors(player.fwd, _up).normalize();
+
+  // desired movement
+  _wish.set(0, 0, 0);
+  if (keys.KeyW) _wish.add(player.fwd);
+  if (keys.KeyS) _wish.sub(player.fwd);
+  if (keys.KeyD) _wish.add(_right);
+  if (keys.KeyA) _wish.sub(_right);
+  const moving = _wish.lengthSq() > 0;
+  if (moving) _wish.normalize();
+  const speed = (keys.ShiftLeft || keys.ShiftRight) ? CFG.RUN : CFG.WALK;
+  _wish.multiplyScalar(speed);
+
+  const vr = player.vel.dot(_up);
+  const tang = _v1.copy(player.vel).addScaledVector(_up, -vr);
+  const icy = player.frame === interloper;
+  const rate = player.grounded ? (icy ? 0.55 : 13) : 2.4;
+  tang.lerp(_wish, 1 - Math.exp(-rate * dt));
+  let newVr = vr;
+
+  // jump / jetpack
+  if (keys.Space) {
+    if (player.grounded) { newVr = CFG.JUMP; player.grounded = false; AU.tone(300, .1, 'square', .07, 500); }
+    else if (state.allowance > 0) {
+      newVr += CFG.JET * dt;
+      state.allowance = Math.max(0, state.allowance - CFG.JET_COST * dt);
+      if (AU.ready) AU.thrustGain.gain.value = 0.16;
+    }
+  }
+  player.vel.copy(tang).addScaledVector(_up, newVr);
+
+  // gravity
+  if (inStation) player.vel.y -= 15 * dt;
+  else {
+    gravity(player, _v2);
+    if (player.frame === giant && player.pos.length() < giant.radius) {   // wading through raw gigabytes
+      _v2.multiplyScalar(0.35);
+      player.vel.multiplyScalar(Math.exp(-1.4 * dt));
+    }
+    player.vel.addScaledVector(_v2, dt);
+  }
+  player.pos.addScaledVector(player.vel, dt);
+
+  // collision
+  player.grounded = false;
+  if (inStation) {
+    const l = _v1.copy(player.pos).sub(station.pos);
+    if (l.y < 0) {
+      if (l.y < -0.2) player.vel.y = Math.max(0, player.vel.y);
+      l.y = 0; player.grounded = true; player.vel.y = Math.max(player.vel.y, 0);
+    }
+    l.x = clamp(l.x, -station.half.x + 1, station.half.x - 1);
+    l.z = clamp(l.z, -station.half.z + 1, station.half.z - 1);
+    l.y = Math.min(l.y, station.half.y * 1.6);
+    player.pos.copy(station.pos).add(l);
+  } else if (player.frame) {
+    const surf = player.frame.collide(player.pos);
+    const alt = player.pos.length();
+    if (alt < surf) {
+      const n = _v1.copy(player.pos).normalize();
+      const impact = -player.vel.dot(n);
+      player.pos.copy(n).multiplyScalar(surf);
+      if (impact > 0) {
+        player.vel.addScaledVector(n, impact);
+        if (impact > CFG.FALL_SAFE) {
+          const bars = Math.min(4, Math.ceil((impact - CFG.FALL_SAFE) / 28));
+          damage(bars, 'You landed at ' + impact.toFixed(0) + ' m/s. The bars did not survive the impact.');
+          AU.noiseBurst(.5, .3, 300);
+        }
+      }
+      player.grounded = true;
+    } else if (alt < surf + 0.4) player.grounded = true;
+
+    // landable objects (the floating server islands)
+    if (player.frame.extra) {
+      for (const e of player.frame.extra) {
+        const c = _v2.copy(e.local).setLength(Math.max(1, e.local.length() - 20));
+        const d = player.pos.distanceTo(c);
+        if (d < 26) {
+          const n = _v3.copy(player.pos).sub(c).normalize();
+          player.pos.copy(c).addScaledVector(n, 26);
+          const into = player.vel.dot(n);
+          if (into < 0) player.vel.addScaledVector(n, -into);
+          player.grounded = true;
+        }
+      }
+    }
+  }
+}
+
+function stepShip(dt) {
+  if (state.mode !== 'ship') { /* the ship still falls, orbits and burns without you */ }
+  updateFrame(ship);
+  const piloting = state.mode === 'ship' && state.tcAccepted && !anyModal();
+  // attitude
+  if (state.mode === 'ship' && !anyModal()) {
+    shipInput.roll = (keys.KeyQ ? 1 : 0) - (keys.KeyR ? 1 : 0);
+  } else { shipInput.yaw = shipInput.pitch = shipInput.roll = 0; }
+  if (piloting) {
+    const rot = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+      shipInput.pitch * CFG.SHIP_MAXRATE * dt,
+      shipInput.yaw * CFG.SHIP_MAXRATE * dt,
+      shipInput.roll * 1.9 * dt, 'XYZ'));
+    ship.quat.multiply(rot);
+    shipInput.yaw *= Math.exp(-6 * dt); shipInput.pitch *= Math.exp(-6 * dt);
+  }
+  // thrust
+  const thrustDir = _v1.set(0, 0, 0);
+  let throttle = 0;
+  if (piloting) {
+    if (keys.KeyW) { thrustDir.z -= 1; }
+    if (keys.KeyS) { thrustDir.z += 1; }
+    if (keys.KeyA) { thrustDir.x -= 1; }
+    if (keys.KeyD) { thrustDir.x += 1; }
+    if (keys.Space) { thrustDir.y += 1; }
+    if (keys.ControlLeft || keys.KeyZ) { thrustDir.y -= 1; }
+    if (thrustDir.lengthSq() > 0) {
+      throttle = (keys.ShiftLeft || keys.ShiftRight) ? CFG.SHIP_BOOST : 1;
+      thrustDir.normalize().applyQuaternion(ship.quat);
+      ship.vel.addScaledVector(thrustDir, CFG.SHIP_THRUST * throttle * dt);
+    }
+    if (keys.KeyX) ship.vel.multiplyScalar(Math.exp(-2.2 * dt));   // match velocity
+  }
+  ship.mesh.userData.flame.visible = throttle > 0 && keys.KeyW;
+  if (AU.ready) {
+    const target = state.mode === 'ship' ? (throttle > 0 ? .10 * throttle : .012) : 0;
+    AU.thrustGain.gain.value += (target - AU.thrustGain.gain.value) * Math.min(1, dt * 6);
+  }
+  // gravity + ocean drag
+  gravity(ship, _v2);
+  if (ship.frame === giant && ship.pos.length() < giant.radius) {
+    _v2.multiplyScalar(.3); ship.vel.multiplyScalar(Math.exp(-.9 * dt));
+  }
+  ship.vel.addScaledVector(_v2, dt);
+  ship.pos.addScaledVector(ship.vel, dt);
+  // landing
+  if (ship.frame) {
+    const surf = ship.frame.collide(ship.pos) + 7;
+    const alt = ship.pos.length();
+    if (alt < surf) {
+      const n = _v1.copy(ship.pos).normalize();
+      const impact = -ship.vel.dot(n);
+      ship.pos.copy(n).multiplyScalar(surf);
+      if (impact > 0) {
+        ship.vel.addScaledVector(n, impact * 1.15);
+        ship.vel.multiplyScalar(0.72);
+        if (impact > 55 && state.mode === 'ship') damage(2, 'You put the ship into the ground at ' + impact.toFixed(0) + ' m/s.');
+        else if (impact > 8) AU.noiseBurst(.25, .12, 260);
+      }
+      // settle upright on the surface
+      const q = _q1.setFromUnitVectors(_v2.set(0, 1, 0).applyQuaternion(ship.quat), n);
+      ship.quat.premultiply(q);
+    }
+  }
+  ship.mesh.position.copy(ship.world(_v1));
+  ship.mesh.quaternion.copy(ship.quat);
+}
+
+function stepProbe(dt) {
+  if (!probe.body) return;
+  const b = probe.body;
+  updateFrame(b);
+  gravity(b, _v2);
+  b.vel.addScaledVector(_v2, dt);
+  b.pos.addScaledVector(b.vel, dt);
+  if (b.frame) {
+    const surf = b.frame.collide(b.pos) + 1;
+    if (b.pos.length() < surf) { b.pos.setLength(surf); b.vel.set(0, 0, 0); probe.stuck = true; }
+  }
+  probe.mesh.position.copy(b.world(_v1));
+}
+
+/* =====================================================================
+   27. HAZARDS
+   ===================================================================== */
+let leakTimer = 0, crushWarn = 0;
+function hazards(dt) {
+  if (state.dead || state.resetting) return;
+  const wp = player.world(_v1).clone();
+
+  // the star
+  if (wp.length() < sunRadius + 6) {
+    die('End of Financial Year Audit', 'You were inside the star when it called in the debt. The audit found nothing of value.');
+    return;
+  }
+  // oxygen / data allowance
+  const nearKiosk = player.frame === timber && kiosks.some(k => k.getWorldPosition(_v2).distanceTo(wp) < 11);
+  const nearFire = player.frame === timber && timber.fire && timber.fire.getWorldPosition(_v2).distanceTo(wp) < 14;
+  if (state.mode === 'ship' || nearKiosk || nearFire) {
+    if (state.allowance < CFG.ALLOWANCE) {
+      const before = state.allowance;
+      state.allowance = Math.min(CFG.ALLOWANCE, state.allowance + 34 * dt);
+      if (before < 40 && state.allowance >= 40) AU.tone(880, .1, 'square', .08);
+    }
+  } else {
+    state.allowance = Math.max(0, state.allowance - CFG.DRIFT_COST * dt);
+    if (state.allowance <= 0) {
+      state.suffocate = (state.suffocate || 0) + dt;
+      if (state.suffocate > 3) { state.suffocate = 0; damage(1, 'You ran out of allowance. There is no more allowance.'); }
+    } else state.suffocate = 0;
+  }
+  // black hole
+  if (player.frame === brittle && player.pos.length() < 66 && !state.inStation) enterStation();
+  if (ship.frame === brittle && ship.pos.length() < 66) {
+    const aboard = state.mode === 'ship';
+    ship.frame = timber; ship.pos.copy(timber.padDir).multiplyScalar(timber.radius + 8); ship.vel.set(0, 0, 0);
+    ship.quat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), timber.padDir);
+    if (aboard) { enterStation(); toast('Ship and pilot escalated separately. The ship is back on the pad.', 'red'); }
+    else toast('Your ship fell into the outage. It has been returned to the pad, along with a survey.', 'red');
+  }
+  state.glitch = Math.max(0, state.glitch - dt * 1.4);
+  if (player.frame === brittle) {
+    const d = player.pos.length();
+    if (d < 240) state.glitch = Math.max(state.glitch, clamp((240 - d) / 180, 0, .9));
+  }
+  // cyclones on Giant's Bandwidth
+  for (const body of [player, ship]) {
+    if (body.frame !== giant) continue;
+    const alt = body.pos.length();
+    if (alt > giant.radius + 320) continue;
+    const up = _v2.copy(body.pos).normalize();
+    for (const c of cyclones) {
+      if (!c.dir) continue;
+      const d = _v3.copy(c.dir).multiplyScalar(giant.radius).distanceTo(up.clone().multiplyScalar(giant.radius));
+      if (d > 78) continue;
+      if (c.reverse) {
+        body.vel.addScaledVector(up, -170 * dt);
+        if (body === player || state.mode === 'ship') {
+          state.coreAccess = 9; unlock('cyclone');
+        }
+      } else {
+        body.vel.addScaledVector(up, 210 * dt);
+      }
+    }
+  }
+  if (state.coreAccess > 0) state.coreAccess -= dt;
+  // Ember: the sand catches up with you
+  if (player.frame === ember) {
+    const ang = Math.acos(clamp(_v2.copy(player.pos).normalize().dot(ember.caveAxis), -1, 1));
+    const inCave = ang < 0.42 && player.pos.length() < 140;
+    if (inCave) {
+      crushWarn -= dt;
+      if (ember.caveSand > 108) {
+        die('Crushed by rollover data', 'The GB sand filled the Hidden Fees chamber with you still itemised inside it.');
+        return;
+      }
+      if (ember.caveSand > 92 && crushWarn <= 0) { crushWarn = 6; toast('The sand is nearly at the ceiling. Leave.', 'red'); AU.tone(160, .4, 'sawtooth', .16); }
+    }
+  }
+  // Interloper: leaked records looking for a reader
+  if (player.frame === interloper) {
+    if (player.pos.length() < 36) { die('Ghost data exposure', 'You entered the payload. Forty million records entered you.'); return; }
+    const camDir = _v3.set(0, 0, -1).applyQuaternion(camera.quaternion);
+    let exposed = false;
+    for (const l of interloper.leaks) {
+      if (!l.active) continue;
+      const lp = l.obj.getWorldPosition(_v2);
+      const d = lp.distanceTo(wp);
+      if (d > 105) continue;
+      const to = lp.clone().sub(wp).normalize();
+      const shielded = state.vpn && to.dot(camDir) > 0.55;      // hold the stone toward the leak
+      if (!shielded) exposed = true;
+    }
+    if (exposed) {
+      leakTimer += dt;
+      state.glitch = Math.max(state.glitch, .7);
+      if (leakTimer > 1.6) { leakTimer = 0; damage(1, 'Leaked records passed straight through you. Repeatedly.'); }
+    } else leakTimer = Math.max(0, leakTimer - dt);
+  }
+  // promo geysers give you a lift whether you want one or not
+  if (player.frame === timber) {
+    for (const gy of geysers) {
+      const dir = gy.userData.dir;
+      const up = _v2.copy(player.pos).normalize();
+      if (dir.dot(up) > 0.995 && player.pos.length() < timber.radius + 160) {
+        player.vel.addScaledVector(up, 120 * dt);
+        state.promoT = (state.promoT || 0) + dt;
+        if (state.promoT > 2.4) { state.promoT = 0; toast(pick(['<b>OFFER:</b> 50GB bonus data on a 12 month plan. You cannot skip this. You are inside it.', '<b>OFFER:</b> $0 upfront on selected handsets. The geyser is very sure about this.', '<b>OFFER:</b> Unlimited* roaming. The asterisk is load-bearing.'])); }
+      }
+    }
+  }
+  // decoding lore
+  if (state.tool === 2 && mouseDown && state.mode === 'foot' && !anyModal()) {
+    const n = decodeTarget();
+    if (n) {
+      state.decoding += dt;
+      if (state.decoding > 1.1) { state.decoding = 0; openLore(n.userData.entry); AU.ok(); }
+    } else state.decoding = 0;
+  }
+}
+
+/* =====================================================================
+   28. CAMERA / HUD / EFFECTS
+   ===================================================================== */
+scene.add(camera);
+const heldStone = (() => {
+  const g = new THREE.Group();
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(.5, .72, .07), flat(0x2f4f57));
+  g.add(slab);
+  const lens = new THREE.Mesh(new THREE.PlaneGeometry(.34, .52), glow(COL.tealBright, .8));
+  lens.position.z = .05; g.add(lens);
+  g.position.set(.42, -.3, -1.05); g.rotation.set(.1, -.25, .06);
+  g.visible = false; camera.add(g);
+  return g;
+})();
+const submerged = document.createElement('div');
+submerged.style.cssText = 'position:fixed;inset:0;z-index:15;pointer-events:none;opacity:0;transition:opacity .3s;' +
+  'background:radial-gradient(circle at 50% 50%,rgba(0,132,123,.35),rgba(0,60,58,.85))';
+document.body.appendChild(submerged);
+
+const resumeHint = document.createElement('div');
+resumeHint.textContent = 'click to resume';
+resumeHint.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:25;' +
+  'font-family:var(--mono);font-size:13px;letter-spacing:.14em;padding:12px 22px;border-radius:10px;' +
+  'background:rgba(27,30,31,.86);border:1px solid rgba(242,169,0,.5);color:#f2a900;display:none;pointer-events:none';
+document.body.appendChild(resumeHint);
+
+function updateCamera() {
+  if (state.mode === 'ship') {
+    camera.position.copy(ship.world(_v1)).add(_v2.set(0, 2.3, -4.6).applyQuaternion(ship.quat));
+    camera.quaternion.copy(ship.quat);
+  } else {
+    camera.position.copy(player.world(_v1)).addScaledVector(player.up, EYE);
+    _back.copy(player.fwd).negate();
+    _right.crossVectors(player.fwd, player.up).normalize();
+    _mat.makeBasis(_right, player.up, _back);
+    camera.quaternion.setFromRotationMatrix(_mat);
+    camera.quaternion.multiply(_q1.setFromAxisAngle(new THREE.Vector3(1, 0, 0), pitch));
+  }
+  heldStone.visible = state.vpn && state.mode === 'foot' && !state.scope;
+}
+
+function updateFx(dt) {
+  for (let i = fx.length - 1; i >= 0; i--) {
+    const f = fx[i]; f.life -= dt;
+    const k = 1 - f.life / f.max;
+    f.mesh.scale.setScalar(1 + k * 3);
+    f.mesh.material.opacity = .8 * (1 - k);
+    if (f.life <= 0) { f.mesh.parent.remove(f.mesh); fx.splice(i, 1); }
+  }
+  if (station.led) station.led.material.color.setHex(Math.sin(performance.now() / 400) > 0 ? 0xff4d4d : 0x551111);
+  $('glitch').style.opacity = state.glitch.toFixed(2);
+  resumeHint.style.display = (state.running && !locked() && !anyModal() && !state.dead) ? 'block' : 'none';
+  const inOcean = (state.mode === 'ship' ? ship : player).frame === giant &&
+    (state.mode === 'ship' ? ship : player).pos.length() < giant.radius;
+  submerged.style.opacity = inOcean ? '1' : '0';
+}
+
+const barEls = [...document.querySelectorAll('#bars i')];
+function updateHUD() {
+  // connection bars
+  barEls.forEach((b, i) => b.classList.toggle('off', i >= state.bars));
+  const nt = $('nettype');
+  const label = state.bars >= 4 ? '5G' : state.bars === 3 ? '4G' : state.bars === 2 ? '3G' : 'SOS';
+  nt.textContent = label;
+  nt.className = state.bars >= 4 ? '' : state.bars >= 2 ? 'warn' : 'crit';
+  // allowance
+  const pct = state.allowance / CFG.ALLOWANCE;
+  $('allowfill').style.width = (pct * 100).toFixed(1) + '%';
+  $('allowfill').classList.toggle('low', pct < .25);
+  $('allowtxt').textContent = state.allowance.toFixed(1) + ' GB remaining' + (pct < .12 ? ' — critical' : '');
+  // the cycle
+  const left = Math.max(0, CFG.LOOP - state.t);
+  const m = Math.floor(left / 60), s = Math.floor(left % 60);
+  const el = $('cycletime');
+  el.textContent = m + ':' + String(s).padStart(2, '0');
+  el.className = left < 60 ? 'crit' : left < 180 ? 'warn' : '';
+  $('cyclesub').textContent = left < 60 ? 'HYPER-INFLATION IN PROGRESS' : left < 180 ? 'AUTO-RENEWAL IMMINENT' : 'AUTO-RENEWAL PENDING';
+  $('loopcount').textContent = 'CYCLE ' + String(state.loop).padStart(3, '0') + ' · ' + state.knowledge.size + '/' + ORDERED_LORE.length + ' DECODED';
+  // nav readout
+  const flying = state.mode === 'ship';
+  $('nav').classList.toggle('on', flying);
+  if (flying) {
+    $('navspeed').textContent = ship.vel.length().toFixed(0);
+    $('navtarget').textContent = ship.frame
+      ? 'REFERENCE: ' + ship.frame.short + ' · ALT ' + Math.max(0, ship.pos.length() - ship.frame.radius).toFixed(0)
+      : 'FREE FLIGHT · NO REFERENCE BODY';
+    if (!state.tcAccepted) {
+      elPrompt.classList.add('on');
+      elPrompt.innerHTML = 'Thrusters locked — terms not accepted. <b>E</b> to review';
+    }
+  }
+  // decoder progress
+  if (state.decoding > 0) {
+    elPrompt.classList.add('on');
+    elPrompt.innerHTML = 'decoding legalese… ' + Math.round(state.decoding / 1.1 * 100) + '%';
+  } else if (state.tool === 2 && state.mode === 'foot' && decodeTarget()) {
+    elPrompt.classList.add('on');
+    elPrompt.innerHTML = 'Founders\' script in range — hold <b>LMB</b> to decode';
+  }
+}
+/* boarding a locked-out ship still lets you re-open the terms */
+addEventListener('keydown', e => {
+  if (e.code === 'KeyE' && state.mode === 'ship' && !state.tcAccepted && !anyModal()) openTC();
+});
+
+/* =====================================================================
+   29. MAIN LOOP
+   ===================================================================== */
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - last) / 1000, .05); last = now;
+  if (state.running && !state.dead && !state.resetting) {
+    const sdt = dt * (keys.KeyT ? 8 : 1);
+    state.t += sdt;
+    updateOrbits(state.t, sdt);
+    update2FA(sdt);
+    const h = sdt / 2;
+    for (let i = 0; i < 2; i++) { stepPlayer(h); stepShip(h); stepProbe(h); }
+    hazards(sdt);
+    updateSun(sdt);
+    updateScope(dt);
+    scanInteractables();
+    updateHUD();
+  }
+  updateFx(dt);
+  if (state.running) updateCamera();
+  renderer.render(scene, camera);
+}
+
+/* =====================================================================
+   30. START
+   ===================================================================== */
+function startGame() {
+  AU.init(); AU.resume();
+  $('boot').classList.add('off');
+  $('hud').classList.add('on');
+  state.running = true;
+  state.loop = 0;
+  state.knowledge.clear();
+  resetLoop();
+  selectTool(0);
+  setTimeout(tryLock, 60);
+  toast('You wake by the fire on Timber "Yes" Hub. The terminal by the launch pad issues launch authorisation.', 'teal');
+  toast('<b>22:00</b> until the end of the billing cycle.', 'red');
+}
+$('startbtn').onclick = startGame;
+$('startbtn').disabled = false;
+$('startbtn').textContent = 'Wake up';
+$('loading').textContent = 'network built · ' + planets.length + ' worlds · 1 star · 0 support tickets resolved';
+
+/* put everything in its place for the title-screen render */
+state.loop = 0; resetLoop(); state.loop = 1; state.running = false;
+$('hud').classList.remove('on');
+camera.position.set(ORB.timber + 700, 320, 700);
+camera.lookAt(0, 0, 0);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
