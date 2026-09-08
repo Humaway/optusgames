@@ -1,0 +1,3830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="description" content="Ollie Hawk: Signal Skater">
+<title>Ollie Hawk: Signal Skater</title>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     1. STYLES  —  Optus palette: charcoal glass, teal chrome, yellow accents.
+     ══════════════════════════════════════════════════════════════════════════ -->
+<style>
+:root{
+  --yellow:#FFD600; --teal:#00A3A6; --dteal:#00686B;
+  --char:#1C1F22;   --off:#F4F6F7;  --mag:#FF3D71;
+  --panel:rgba(28,31,34,.86); --line:rgba(0,163,166,.45);
+  --sans:"Segoe UI Variable Display","Segoe UI",Inter,Roboto,-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:#0b0d0e;color:var(--off);font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;touch-action:none;overscroll-behavior:none}
+canvas#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+button,input,select{font-family:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+.hide{display:none !important}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important}}
+
+/* ── Boot ───────────────────────────────────────────────────────────────── */
+#boot{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;background:#0b0d0e;z-index:60}
+#boot h2{font-size:13px;letter-spacing:.22em;font-weight:600;color:var(--teal)}
+#bootbar{width:min(360px,60vw);height:6px;background:#20252a;border-radius:99px;overflow:hidden}
+#bootfill{height:100%;width:0%;background:var(--yellow);transition:width .18s ease-out}
+#bootmsg{font-size:12px;color:#7d8a92;letter-spacing:.04em}
+
+/* ── Menu ───────────────────────────────────────────────────────────────── */
+#menu{position:fixed;inset:0;z-index:40;display:flex;pointer-events:none}
+#menu .sheet{pointer-events:auto;width:min(560px,94vw);height:100%;background:var(--panel);
+  backdrop-filter:blur(14px);border-right:1px solid var(--line);display:flex;flex-direction:column;
+  padding:26px 30px 18px;gap:16px;overflow:auto}
+#menu h1{font-size:clamp(30px,4.4vw,48px);line-height:.94;font-weight:800;letter-spacing:-.02em}
+#menu h1 b{color:var(--yellow)}
+#menu h1 span{display:block;font-size:13px;letter-spacing:.42em;font-weight:600;color:var(--teal);margin-top:8px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line)}
+.tabs button{padding:10px 14px;font-size:13px;font-weight:600;color:#8e9aa2;border-bottom:2px solid transparent}
+.tabs button.on{color:var(--off);border-bottom-color:var(--yellow)}
+.tabpane{display:none;flex-direction:column;gap:14px;flex:1}
+.tabpane.on{display:flex}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.row>label{min-width:96px;font-size:12px;color:#9aa7ae;letter-spacing:.03em}
+.sw{display:flex;gap:6px;flex-wrap:wrap}
+.sw button{width:26px;height:26px;border-radius:6px;border:2px solid transparent;box-shadow:inset 0 0 0 1px rgba(0,0,0,.4)}
+.sw button.on{border-color:var(--off)}
+.opts{display:flex;gap:6px;flex-wrap:wrap}
+.opts button{padding:6px 11px;font-size:12px;border-radius:7px;background:#252a2f;color:#c3ced4;border:1px solid #333a40}
+.opts button.on{background:var(--teal);color:#04211f;border-color:var(--teal);font-weight:700}
+input[type=text]{background:#1a1e21;border:1px solid #333a40;border-radius:8px;padding:9px 11px;font-size:14px;width:220px}
+input[type=text]:focus{border-color:var(--teal);outline:none}
+input[type=range]{accent-color:var(--yellow);width:170px}
+.play{margin-top:auto;background:var(--yellow);color:#241f00;font-weight:800;font-size:19px;letter-spacing:.05em;
+  padding:15px;border-radius:11px;box-shadow:0 8px 24px rgba(255,214,0,.18)}
+.play:hover{filter:brightness(1.07)}
+.disclaimer{font-size:10.5px;line-height:1.5;color:#6d7981}
+.hintline{font-size:12px;color:#8e9aa2;line-height:1.6}
+.keytbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.keytbl td{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.06)}
+.keytbl td:first-child{color:var(--yellow);font-weight:700;white-space:nowrap;width:132px}
+kbd{background:#2a3035;border:1px solid #3c444a;border-bottom-width:2px;border-radius:5px;padding:1px 5px;font:600 11px var(--sans)}
+
+/* ── HUD ────────────────────────────────────────────────────────────────── */
+#hud{position:fixed;inset:0;z-index:20;pointer-events:none;font-variant-numeric:tabular-nums}
+.hpanel{background:rgba(28,31,34,.62);border:1px solid var(--line);border-radius:10px;backdrop-filter:blur(7px)}
+#speed{position:absolute;left:18px;bottom:18px;padding:9px 13px;display:flex;align-items:baseline;gap:7px}
+#speed b{font-size:26px;font-weight:800;color:var(--yellow)}
+#speed i{font-style:normal;font-size:11px;color:#8e9aa2;letter-spacing:.12em}
+#pushdot{width:8px;height:8px;border-radius:50%;background:#3a4247;margin-left:6px;align-self:center}
+#pushdot.on{background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
+#score{position:absolute;left:18px;top:16px;padding:9px 13px;min-width:168px}
+#score .big{font-size:24px;font-weight:800;color:var(--off);line-height:1}
+#score .sub{font-size:11px;color:#8e9aa2;margin-top:4px}
+#combo{position:absolute;left:50%;top:14px;transform:translateX(-50%);text-align:center;max-width:min(720px,86vw);
+  opacity:0;transition:opacity .18s}
+#combo.on{opacity:1}
+#comboStr{font-size:16px;font-weight:700;color:var(--off);text-shadow:0 2px 8px #000;line-height:1.35}
+#comboStr em{font-style:normal;color:var(--teal)}
+#comboMul{font-size:34px;font-weight:900;color:var(--yellow);text-shadow:0 3px 10px rgba(0,0,0,.7);line-height:1}
+#comboMul.pulse{animation:pop .28s ease-out}
+@keyframes pop{0%{transform:scale(1.32)}100%{transform:scale(1)}}
+#players{position:absolute;right:18px;top:16px;padding:8px 12px;font-size:12px;min-width:150px;max-height:60vh;overflow:hidden}
+#players .ph{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#9aa7ae;
+  border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:5px;margin-bottom:5px}
+#players .pr{display:flex;justify-content:space-between;gap:14px;padding:2px 0}
+#players .pr.me{color:var(--yellow);font-weight:700}
+#dot{width:8px;height:8px;border-radius:50%;background:#f5a623}
+#dot.ok{background:#3ddc84}#dot.off{background:var(--mag)}
+#reticle{position:absolute;left:50%;bottom:86px;transform:translateX(-50%);width:76px;height:76px;opacity:.9}
+#balance{position:absolute;right:18px;bottom:18px;width:206px;padding:8px 10px;opacity:0;transition:opacity .15s}
+#balance.on{opacity:1}
+#balance .lbl{font-size:10px;letter-spacing:.16em;color:#8e9aa2;margin-bottom:6px}
+#balbar{position:relative;height:9px;background:#22282c;border-radius:99px;overflow:hidden}
+#balbar i{position:absolute;top:0;bottom:0;left:50%;width:4px;margin-left:-2px;background:var(--yellow);border-radius:2px}
+#balbar u{position:absolute;top:0;bottom:0;left:50%;width:1px;background:rgba(255,255,255,.18)}
+#toasts{position:absolute;left:50%;top:31%;transform:translateX(-50%);display:flex;flex-direction:column;
+  align-items:center;gap:8px;width:max-content;max-width:80vw}
+.toast{padding:9px 18px;border-radius:9px;background:rgba(28,31,34,.86);border:1px solid var(--line);
+  font-size:15px;font-weight:700;animation:tin .3s ease-out}
+.toast.gap{border-color:var(--yellow);color:var(--yellow)}
+.toast.slam{border-color:var(--mag);color:var(--mag)}
+@keyframes tin{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+#chatlog{position:absolute;left:18px;bottom:74px;width:min(360px,44vw);display:flex;flex-direction:column;gap:3px;font-size:12.5px}
+#chatlog div{background:rgba(28,31,34,.55);padding:3px 8px;border-radius:6px;width:fit-content;max-width:100%}
+#chatlog b{color:var(--yellow)}
+#chatin{position:absolute;left:18px;bottom:46px;width:min(360px,44vw);pointer-events:auto}
+#chatin input{width:100%}
+#hint{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);font-size:12px;color:#c3ced4;
+  background:rgba(28,31,34,.7);padding:7px 14px;border-radius:8px;border:1px solid var(--line);text-align:center;line-height:1.7}
+#netbadge{position:absolute;right:18px;bottom:78px;font-size:11px;padding:5px 10px;border-radius:7px;
+  background:rgba(255,61,113,.14);border:1px solid var(--mag);color:var(--mag)}
+#dbg{position:absolute;left:18px;top:96px;font:11.5px/1.55 ui-monospace,Menlo,Consolas,monospace;
+  background:rgba(0,0,0,.62);padding:8px 11px;border-radius:8px;color:#9fe8c9;white-space:pre}
+#flash{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;z-index:30;transition:opacity .25s}
+
+/* ── Overlays (pause / trick book) ──────────────────────────────────────── */
+.modal{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+  background:rgba(6,8,9,.66);backdrop-filter:blur(4px)}
+.modal .box{width:min(620px,92vw);max-height:86vh;overflow:auto;background:var(--panel);
+  border:1px solid var(--line);border-radius:14px;padding:22px 24px;display:flex;flex-direction:column;gap:14px}
+.modal h3{font-size:20px;font-weight:800}
+.modal h4{font-size:12px;letter-spacing:.14em;color:var(--teal);margin-top:4px}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+.btnrow button{padding:9px 14px;border-radius:9px;background:#252a2f;border:1px solid #343b41;font-size:13px}
+.btnrow button:hover{background:#2e353b}
+.btnrow button.pri{background:var(--yellow);color:#241f00;font-weight:700;border-color:var(--yellow)}
+#tbSearch{width:100%}
+.tricktbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tricktbl th{text-align:left;color:var(--teal);font-size:11px;letter-spacing:.1em;padding:4px 6px}
+.tricktbl td{padding:4px 6px;border-top:1px solid rgba(255,255,255,.06)}
+.tricktbl td:nth-child(3){color:var(--yellow);text-align:right}
+
+/* ── Touch controls ─────────────────────────────────────────────────────── */
+#touch{position:fixed;inset:0;z-index:25;pointer-events:none}
+#touch .zone{position:absolute;bottom:0;height:52%;width:44%;pointer-events:auto}
+#stickL{left:0}#padR{right:0}
+#stickBase{position:absolute;left:0;top:0;width:112px;height:112px;border-radius:50%;
+  border:2px solid var(--line);background:rgba(28,31,34,.4);display:none}
+#stickKnob{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:var(--yellow);opacity:.8}
+#tbtns{position:absolute;right:14px;bottom:14px;display:grid;grid-template-columns:repeat(2,64px);gap:8px;pointer-events:auto}
+#tbtns button{height:52px;border-radius:12px;background:rgba(28,31,34,.72);border:1px solid var(--line);
+  font-size:12px;font-weight:700;color:var(--off)}
+#tbtns button:active{background:var(--teal);color:#04211f}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     2. MARKUP  —  canvas, boot, menu, HUD, overlays, touch controls.
+     ══════════════════════════════════════════════════════════════════════════ -->
+<canvas id="gl"></canvas>
+
+<div id="boot">
+  <h2>OLLIE HAWK</h2>
+  <div id="bootbar"><div id="bootfill"></div></div>
+  <div id="bootmsg">Connecting to the network…</div>
+</div>
+
+<div id="menu" class="hide">
+  <div class="sheet">
+    <h1>OLLIE <b>HAWK</b><span>SIGNAL SKATER</span></h1>
+
+    <nav class="tabs">
+      <button data-tab="skater" class="on">Skater</button>
+      <button data-tab="board">Board</button>
+      <button data-tab="session">Session</button>
+      <button data-tab="controls">Controls</button>
+    </nav>
+
+    <div class="tabpane on" id="pane-skater">
+      <div class="row"><label for="uname">Name</label><input id="uname" type="text" maxlength="16" placeholder="Ollie_92"></div>
+      <div class="row"><label>Body</label><div class="sw" data-slot="sk"></div></div>
+      <div class="row"><label>Shirt</label><div class="sw" data-slot="sh"></div></div>
+      <div class="row"><label>Pants</label><div class="sw" data-slot="pt"></div></div>
+      <div class="row"><label>Shoes</label><div class="sw" data-slot="sc"></div></div>
+      <div class="row"><label>Headwear</label><div class="opts" data-slot="hat"></div></div>
+      <div class="row"><label>Accessory</label><div class="opts" data-slot="acc"></div></div>
+    </div>
+
+    <div class="tabpane" id="pane-board">
+      <div class="row"><label>Deck shape</label><div class="opts" data-slot="deck"></div></div>
+      <div class="row"><label>Graphic</label><div class="opts" data-slot="gfx"></div></div>
+      <div class="row"><label>Deck colour</label><div class="sw" data-slot="dcol"></div></div>
+      <div class="row"><label>Grip</label><div class="sw" data-slot="grip"></div></div>
+      <div class="row"><label>Trucks</label><div class="sw" data-slot="trk"></div></div>
+      <div class="row"><label>Wheels</label><div class="sw" data-slot="whl"></div></div>
+      <div class="row"><label>Wheel size</label><div class="opts" data-slot="wsz"></div></div>
+      <div class="row"><label>Trail</label><div class="sw" data-slot="trail"></div></div>
+    </div>
+
+    <div class="tabpane" id="pane-session">
+      <div class="row"><label for="room">Room</label><input id="room" type="text" maxlength="18" value="campus-1"></div>
+      <div class="row"><label>In this room</label><span class="hintline" id="roomCount">—</span></div>
+      <div class="row"><label>Contact</label><div class="opts" data-slot="contact"></div></div>
+      <div class="row"><label>Music</label><div class="opts" data-slot="music"></div></div>
+      <div class="row"><label for="volm">Master</label><input id="volm" type="range" min="0" max="100" value="80"></div>
+      <div class="row"><label for="vols">Effects</label><input id="vols" type="range" min="0" max="100" value="90"></div>
+      <p class="hintline">Full Contact lets other skaters body-check you into the pavement. Ghost turns collisions off both ways.</p>
+    </div>
+
+    <div class="tabpane" id="pane-controls">
+      <table class="keytbl"><tbody>
+        <tr><td>W / S</td><td>Push · brake</td></tr>
+        <tr><td>A / D</td><td>Carve, air spin, balance corrections</td></tr>
+        <tr><td>Hold left mouse</td><td>Crouch and load the pop</td></tr>
+        <tr><td>Flick + release</td><td>Flick-It: the gesture picks the trick</td></tr>
+        <tr><td>Hold right mouse</td><td>Grab (direction picks which)</td></tr>
+        <tr><td>Ctrl / Shift</td><td>Manual · nose manual</td></tr>
+        <tr><td>Q / E</td><td>Revert on landing</td></tr>
+        <tr><td>B / middle mouse</td><td>Bail on purpose</td></tr>
+        <tr><td>F / G</td><td>Hop off or pick up board · throw board</td></tr>
+        <tr><td>T / R</td><td>Set spawn here · respawn there</td></tr>
+        <tr><td>C / V / P</td><td>Look behind · first person · photo cam</td></tr>
+        <tr><td>Tab · H · Enter</td><td>Scores · trick book · chat</td></tr>
+        <tr><td>1 – 6</td><td>Preset tricks (keyboard-only fallback)</td></tr>
+        <tr><td>F3 / F4 / F8</td><td>Debug · fly · collision wireframes</td></tr>
+      </tbody></table>
+      <p class="hintline">Gamepad: right stick is Flick-It, left stick steers, RT pushes, LT brakes, LB/RB spin, A hops off, X grabs, B bails.</p>
+    </div>
+
+    <button class="play" id="playBtn">Drop in</button>
+    <p class="disclaimer">Unofficial fan-made parody. Not affiliated with, endorsed by, or connected to Optus, EA, or the Skate franchise. All trademarks belong to their owners.</p>
+  </div>
+</div>
+
+<div id="hud" class="hide">
+  <div id="score" class="hpanel"><div class="big" id="sScore">0</div><div class="sub" id="sBest">Best combo 0 · Slams 0</div></div>
+  <div id="combo"><div id="comboStr"></div><div id="comboMul"></div></div>
+  <div id="players" class="hpanel"><div class="ph"><span id="roomName">campus-1</span><span id="dot"></span></div><div id="plist"></div></div>
+  <div id="speed" class="hpanel"><b id="sKmh">0</b><i>KM/H</i><span id="pushdot"></span></div>
+  <svg id="reticle" viewBox="0 0 76 76">
+    <circle cx="38" cy="38" r="27" fill="none" stroke="rgba(244,246,247,.22)" stroke-width="3"/>
+    <circle id="ringFill" cx="38" cy="38" r="27" fill="none" stroke="#FFD600" stroke-width="4"
+            stroke-dasharray="169.6" stroke-dashoffset="169.6" transform="rotate(-90 38 38)" stroke-linecap="round"/>
+    <line id="flickLine" x1="38" y1="38" x2="38" y2="38" stroke="#00A3A6" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="38" cy="38" r="3" fill="rgba(244,246,247,.75)"/>
+  </svg>
+  <div id="balance" class="hpanel"><div class="lbl" id="balLbl">BALANCE</div><div id="balbar"><u></u><i></i></div></div>
+  <div id="toasts"></div>
+  <div id="chatlog"></div>
+  <div id="chatin" class="hide"><input id="chatbox" type="text" maxlength="120" placeholder="Say something…"></div>
+  <div id="hint"></div>
+  <div id="netbadge" class="hide">Offline — multiplayer unavailable</div>
+  <div id="dbg" class="hide"></div>
+</div>
+
+<div id="touch" class="hide">
+  <div class="zone" id="stickL"><div id="stickBase"><div id="stickKnob"></div></div></div>
+  <div class="zone" id="padR"></div>
+  <div id="tbtns">
+    <button data-t="push">PUSH</button><button data-t="brake">BRAKE</button>
+    <button data-t="grab">GRAB</button><button data-t="foot">FOOT</button>
+  </div>
+</div>
+
+<div id="pause" class="modal hide">
+  <div class="box">
+    <h3>Paused</h3>
+    <div class="btnrow">
+      <button class="pri" data-p="resume">Resume</button>
+      <button data-p="custom">Change your look</button>
+      <button data-p="respawn">Respawn</button>
+      <button data-p="setspawn">Set spawn here</button>
+      <button data-p="quit">Quit to menu</button>
+    </div>
+    <h4>SPAWN AT A SPOT</h4>
+    <div class="btnrow" id="zoneBtns"></div>
+    <h4>SETTINGS</h4>
+    <div class="row"><label for="pvolm">Master</label><input id="pvolm" type="range" min="0" max="100" value="80"></div>
+    <div class="row"><label for="pvols">Effects</label><input id="pvols" type="range" min="0" max="100" value="90"></div>
+    <div class="row"><label>Public beacon</label><div class="opts" data-slot="beacon"></div></div>
+    <div class="row"><label>Contact</label><div class="opts" data-slot="contact2"></div></div>
+    <div class="row"><label>Shadows</label><div class="opts" data-slot="shadow"></div></div>
+    <h4>BEST COMBOS</h4>
+    <div class="hintline" id="lbList">—</div>
+  </div>
+</div>
+
+<div id="trickbook" class="modal hide">
+  <div class="box">
+    <h3>Trick book</h3>
+    <input id="tbSearch" type="text" placeholder="Search tricks…">
+    <table class="tricktbl"><thead><tr><th>Trick</th><th>Flick</th><th>Base</th></tr></thead><tbody id="tbBody"></tbody></table>
+    <p class="hintline">Stance is tracked, so the same flick reads as switch, fakie or nollie depending on how you roll into it. Spins multiply: 180 ×1.4, 360 ×2, 540 ×3, 720 ×4.5, 900 ×7.</p>
+    <div class="btnrow"><button class="pri" data-p="closebook">Close</button></div>
+  </div>
+</div>
+
+<div id="flash"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js",
+    "firebase/database": "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer }   from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass }       from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass }  from 'three/addons/postprocessing/UnrealBloomPass.js';
+import * as BGU             from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* ══════════════════════════════════════════════════════════════════════════
+   3. CONFIG
+   ══════════════════════════════════════════════════════════════════════════ */
+
+// ─── FIREBASE ─────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyDI16PL6tBnKdx-_TYxlX0ZFipZhbGwzfo",
+  authDomain: "optusskate.firebaseapp.com",
+  databaseURL: "https://optusskate-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "optusskate",
+  storageBucket: "optusskate.firebasestorage.app",
+  messagingSenderId: "803931910472",
+  appId: "1:803931910472:web:4e86a3426f4676a776437d",
+  measurementId: "G-Y4DMRKGLQL"
+};
+// ──────────────────────────────────────────────────────────
+
+const COLORS = {
+  yellow:0xFFD600, teal:0x00A3A6, dteal:0x00686B,
+  char:0x1C1F22,  off:0xF4F6F7,  mag:0xFF3D71
+};
+
+/** Every number that changes how the game *feels* lives here. */
+const TUNING = {
+  fixed: 1/120,               // physics step (s)
+  gravity: -22,               // m/s^2
+  airDrag: 0.02,
+  push: { impulse: 3.4, cd: 0.45, max: 14 },
+  maxSpeed: 32,
+  brake: -9,
+  turn: { lo: 85, hi: 28 },   // deg/s at 0 m/s and at maxSpeed
+  grip: { slipDeg: 26, slide: 0.35 },
+  pop:  { base: 4.0, charge: 3.5, chargeTime: 0.6, lipBoost: 1.25 },
+  pump: 0.15,                 // +15% exit speed on a well-timed pump
+  air:  { yaw: 210, pitch: 90 },
+  land: { yawTol: 42, rollTol: 40, flipTol: 55, vImpact: 26, sketchy: 0.12 },
+  fric: { concrete:0.12, grass:1.4, asphalt:0.16, road:0.16, wood:0.10, metal:0.06, pavers:0.13, marble:0.09 },
+  grind:{ snap: 0.45, alignDeg: 40, drift: { rail: 1.0, ledge: 0.55 }, pts: 26 },
+  manual:{ drift: 0.9 },
+  walk: { speed: 3.2, sprint: 6.4, jump: 4.2, step: 0.42 },
+  cam:  { stiff: 10, maxLag: 1.15, turn: 5, off: new THREE.Vector3(0, 1.5, -3.4), fovLo: 64, fovHi: 84 },
+  rag:  { iters: 8, damp: 0.992, fric: 0.28, rest: 0.12, minTime: 1.1, blend: 0.4 },
+  net:  { hz: 15, ragHz: 20, interp: 0.12, extrap: 0.25, cap: 20, stale: 20000 },
+  hitSpeed: 6,                // relative speed needed to body-check
+  wallBail: 9                 // closing speed into a wall that ends your run
+};
+
+const ZONES = [
+  { id:'quad',    name:'The Quad',        p:[0, 0.2, 18],     yaw: Math.PI },
+  { id:'park',    name:'SubHub Skatepark',p:[116, 0.3, -94],  yaw: Math.PI },
+  { id:'twelve',  name:'The 12',          p:[-118, 6.5, -16], yaw: 0 },
+  { id:'tower',   name:'Signal Tower',    p:[0, 0.2, -132],   yaw: 0 },
+  { id:'carpark', name:'Car Park Spiral', p:[150, 0.2, 30],   yaw: -Math.PI/2 },
+  { id:'dish',    name:'The Dish',        p:[-128, 0.2, -110],yaw: 0 },
+  { id:'tunnel',  name:'Fibre Tunnel',    p:[0, -5.9, 96],    yaw: Math.PI },
+  { id:'roofs',   name:'Dorm Rooftops',   p:[118, 12.7, 118], yaw: Math.PI },
+  { id:'oval',    name:'The Oval',        p:[-58, 0.4, 190],  yaw: Math.PI },
+  { id:'store',   name:'Optus Retail',    p:[-140, 0.2, 136], yaw: Math.PI },
+  { id:'loop',    name:'Loop Road',       p:[0, 0.2, -186],   yaw: Math.PI/2 }
+];
+
+/* ══════════════════════════════════════════════════════════════════════════
+   4. UTIL  —  maths, easing, spatial hash, pooling, RNG
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const TAU = Math.PI * 2, DEG = Math.PI / 180;
+const clamp = (v,a,b) => v < a ? a : v > b ? b : v;
+const lerp  = (a,b,t) => a + (b - a) * t;
+const easeOut = t => 1 - Math.pow(1-t, 3);
+/** Frame-rate independent exponential approach. */
+const damp  = (a,b,l,dt) => lerp(a, b, 1 - Math.exp(-l*dt));
+/** Shortest signed difference between two angles (radians). */
+function angDiff(a,b){ let d = (b-a) % TAU; if (d >  Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; }
+
+/** Deterministic RNG so the world is identical for every player. */
+function mulberry(seed){ return function(){ seed|=0; seed=seed+0x6D2B79F5|0;
+  let t = Math.imul(seed ^ seed>>>15, 1|seed); t = t + Math.imul(t ^ t>>>7, 61|t) ^ t;
+  return ((t ^ t>>>14) >>> 0) / 4294967296; }; }
+const rng = mulberry(20260908);
+const rr = (a,b) => a + rng()*(b-a);
+
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+const _q1 = new THREE.Quaternion(), _m1 = new THREE.Matrix4();
+
+/**
+ * Uniform spatial hash over the XZ plane. Static colliders are inserted once at
+ * build time; queries walk only the cells an object actually overlaps, which is
+ * what keeps 20 skaters + 220 ragdoll points off the raycaster entirely.
+ */
+class SpatialHash {
+  constructor(cell = 8){ this.cell = cell; this.map = new Map(); }
+  _key(cx, cz){ return cx * 73856093 ^ cz * 19349663; }
+  insert(minx, minz, maxx, maxz, idx){
+    const c = this.cell;
+    for (let cx = Math.floor(minx/c); cx <= Math.floor(maxx/c); cx++)
+      for (let cz = Math.floor(minz/c); cz <= Math.floor(maxz/c); cz++){
+        const k = this._key(cx,cz); let a = this.map.get(k);
+        if (!a){ a = []; this.map.set(k, a); }
+        a.push(idx);
+      }
+  }
+  /** Collects unique indices near (x,z) into `out`; `pad` widens the search. */
+  query(x, z, out, pad = 0){
+    out.length = 0; const c = this.cell;
+    const x0 = Math.floor((x-pad)/c), x1 = Math.floor((x+pad)/c);
+    const z0 = Math.floor((z-pad)/c), z1 = Math.floor((z+pad)/c);
+    for (let cx = x0; cx <= x1; cx++) for (let cz = z0; cz <= z1; cz++){
+      const a = this.map.get(this._key(cx,cz)); if (!a) continue;
+      for (let i = 0; i < a.length; i++) if (out.indexOf(a[i]) === -1) out.push(a[i]);
+    }
+    return out;
+  }
+}
+
+const sanitize = s => (s||'').replace(/[<>&"'`\\]/g,'').replace(/\s+/g,' ').trim().slice(0,16);
+const fmt = n => Math.round(n).toLocaleString('en-AU');
+
+/* ══════════════════════════════════════════════════════════════════════════
+   5. AUDIO  —  everything is synthesised; no sample files exist anywhere.
+   ══════════════════════════════════════════════════════════════════════════ */
+const Audio5G = {
+  ctx:null, master:null, sfxBus:null, musicBus:null, listener:null,
+  vol:{ master:0.8, sfx:0.9 }, musicOn:false, ready:false,
+  noiseBuf:null, roll:null, grind:null, wind:null, music:null,
+
+  init(){
+    if (this.ready) return;
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    const ctx = this.ctx = new AC();
+    this.master = ctx.createGain();  this.master.gain.value = this.vol.master;
+    this.sfxBus = ctx.createGain();  this.sfxBus.gain.value = this.vol.sfx;
+    this.musicBus = ctx.createGain();this.musicBus.gain.value = 0;
+    this.sfxBus.connect(this.master); this.musicBus.connect(this.master);
+    this.master.connect(ctx.destination);
+
+    // Brown noise: the base ingredient for rolling, grinding, wind and slams.
+    const len = ctx.sampleRate * 2, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++){ const w = Math.random()*2-1; last = (last + 0.02*w)/1.02; d[i] = last*3.2; }
+    this.noiseBuf = buf;
+
+    this.roll  = this._loop(140, 'lowpass', 0);
+    this.grind = this._loop(900, 'bandpass', 0, 4);
+    this.wind  = this._loop(300, 'lowpass', 0.05);
+    this.ready = true;
+  },
+  _loop(freq, type, gain, Q = 1){
+    const c = this.ctx, src = c.createBufferSource(); src.buffer = this.noiseBuf; src.loop = true;
+    const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = Q;
+    const g = c.createGain(); g.gain.value = gain;
+    src.connect(f); f.connect(g); g.connect(this.sfxBus); src.start();
+    return { src, f, g };
+  },
+  resume(){ if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
+  setVol(m, s){ if (m != null) this.vol.master = m; if (s != null) this.vol.sfx = s;
+    if (this.master) this.master.gain.value = this.vol.master;
+    if (this.sfxBus) this.sfxBus.gain.value = this.vol.sfx; },
+
+  /** Shared voice builder: an oscillator or noise burst through a filter env. */
+  _blip(o){
+    if (!this.ready) return;
+    const c = this.ctx, t = c.currentTime, out = o.pan ? this._panner(o.pan) : this.sfxBus;
+    const g = c.createGain(); g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(o.vol ?? 0.3, t + (o.atk ?? 0.005));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (o.dur ?? 0.2));
+    const f = c.createBiquadFilter(); f.type = o.filter || 'lowpass';
+    f.frequency.setValueAtTime(o.f0 ?? 1200, t);
+    f.frequency.exponentialRampToValueAtTime(Math.max(60, o.f1 ?? 300), t + (o.dur ?? 0.2));
+    f.Q.value = o.Q ?? 1;
+    let src;
+    if (o.noise){ src = c.createBufferSource(); src.buffer = this.noiseBuf; src.loop = true;
+                  src.playbackRate.value = o.rate ?? 1; }
+    else { src = c.createOscillator(); src.type = o.type || 'sine';
+           src.frequency.setValueAtTime(o.p0 ?? 220, t);
+           src.frequency.exponentialRampToValueAtTime(Math.max(20, o.p1 ?? 90), t + (o.dur ?? 0.2)); }
+    src.connect(f); f.connect(g); g.connect(out);
+    src.start(t); src.stop(t + (o.dur ?? 0.2) + 0.05);
+  },
+  _panner(p){
+    const c = this.ctx, n = c.createPanner();
+    n.panningModel = 'equalpower'; n.distanceModel = 'inverse';
+    n.refDistance = 8; n.maxDistance = 120; n.rolloffFactor = 1.1;
+    n.positionX && n.positionX.setValueAtTime(p.x, c.currentTime);
+    if (!n.positionX) n.setPosition(p.x, p.y, p.z);
+    else { n.positionY.setValueAtTime(p.y, c.currentTime); n.positionZ.setValueAtTime(p.z, c.currentTime); }
+    n.connect(this.sfxBus); return n;
+  },
+  /** Move the WebAudio listener with the camera so remote players sound placed. */
+  listen(cam){
+    if (!this.ready) return; const L = this.ctx.listener, p = cam.position;
+    if (L.positionX){ const t = this.ctx.currentTime;
+      L.positionX.setTargetAtTime(p.x,t,.02); L.positionY.setTargetAtTime(p.y,t,.02); L.positionZ.setTargetAtTime(p.z,t,.02);
+      const f = _v1.set(0,0,-1).applyQuaternion(cam.quaternion);
+      L.forwardX.setTargetAtTime(f.x,t,.02); L.forwardY.setTargetAtTime(f.y,t,.02); L.forwardZ.setTargetAtTime(f.z,t,.02);
+      L.upX.setTargetAtTime(0,t,.02); L.upY.setTargetAtTime(1,t,.02); L.upZ.setTargetAtTime(0,t,.02);
+    } else { L.setPosition(p.x,p.y,p.z); }
+  },
+
+  pop(){ this._blip({ noise:true, dur:.09, vol:.35, f0:2600, f1:400, filter:'bandpass', Q:1.2 });
+         this._blip({ type:'triangle', p0:180, p1:70, dur:.12, vol:.22 }); },
+  land(imp, pan){ const v = clamp(imp/18, .12, .8);
+         this._blip({ noise:true, dur:.16, vol:v, f0:900, f1:120, pan });
+         this._blip({ type:'sine', p0:110, p1:45, dur:.2, vol:v*.7, pan }); },
+  bail(pan){ this._blip({ noise:true, dur:.42, vol:.5, f0:3800, f1:90, filter:'lowpass', pan });
+         this._blip({ type:'sawtooth', p0:260, p1:80, dur:.35, vol:.16, filter:'bandpass', Q:6, pan }); },
+  ui(up = true){ this._blip({ type:'square', p0: up?520:340, p1: up?860:220, dur:.06, vol:.10, f0:3000, f1:2000 }); },
+  score(){ this._blip({ type:'triangle', p0:660, p1:1320, dur:.14, vol:.13, f0:4000, f1:3000 }); },
+  remotePop(pos){ this._blip({ type:'triangle', p0:620, p1:1180, dur:.13, vol:.09, f0:4000, f1:3000, pan:pos }); },
+  gap(){ this._blip({ type:'square', p0:440, p1:1760, dur:.3, vol:.13, f0:5000, f1:3000 }); },
+  spark(){ this._blip({ noise:true, dur:.05, vol:.06, f0:6000, f1:2500, filter:'highpass' }); },
+  step(){ this._blip({ noise:true, dur:.07, vol:.07, f0:700, f1:200 }); },
+  hit(pan){ this._blip({ noise:true, dur:.2, vol:.45, f0:1400, f1:80, pan });
+            this._blip({ type:'sawtooth', p0:150, p1:50, dur:.25, vol:.2, pan }); },
+
+  /** Rolling noise: cutoff and gain track speed, timbre tracks the surface. */
+  setRoll(speed, mat, grounded){
+    if (!this.ready) return;
+    const tone = { concrete:2400, pavers:2000, asphalt:1500, road:1500, wood:1100, metal:3400, marble:2600, grass:420 }[mat] || 1800;
+    const s = clamp(speed/18, 0, 1);
+    this.roll.f.frequency.value = 140 + tone*s;
+    this.roll.g.gain.value = damp(this.roll.g.gain.value, grounded ? 0.03 + 0.16*s : 0, 8, 0.033);
+    this.wind.g.gain.value = damp(this.wind.g.gain.value, 0.012 + 0.05*s, 3, 0.033);
+    this.wind.f.frequency.value = 260 + 900*s;
+  },
+  setGrind(on, speed, mat){
+    if (!this.ready) return;
+    const t = mat === 'metal' ? 1500 : 800;
+    this.grind.f.frequency.value = t + clamp(speed,0,20) * 90;
+    this.grind.g.gain.value = damp(this.grind.g.gain.value, on ? 0.14 : 0, 12, 0.033);
+  },
+  /** Optional generative chiptune: two square voices over a pentatonic scale. */
+  toggleMusic(on){
+    this.musicOn = on;
+    if (!this.ready) return;
+    this.musicBus.gain.setTargetAtTime(on ? 0.11 : 0, this.ctx.currentTime, .3);
+    if (on && !this.music) this._startMusic();
+  },
+  _startMusic(){
+    const c = this.ctx, scale = [0,3,5,7,10,12,15], root = 110;
+    const lead = c.createOscillator(), bass = c.createOscillator();
+    const lg = c.createGain(), bg = c.createGain(), fl = c.createBiquadFilter();
+    lead.type = 'square'; bass.type = 'triangle'; fl.type = 'lowpass'; fl.frequency.value = 1800;
+    lg.gain.value = .07; bg.gain.value = .12;
+    lead.connect(lg); lg.connect(fl); fl.connect(this.musicBus); bass.connect(bg); bg.connect(this.musicBus);
+    lead.start(); bass.start();
+    let step = 0;
+    this.music = setInterval(() => {
+      const t = c.currentTime, n = scale[(step*3 + (step>>2)) % scale.length];
+      lead.frequency.setValueAtTime(root * 2 * Math.pow(2, n/12), t);
+      bass.frequency.setValueAtTime(root * Math.pow(2, scale[(step>>2) % scale.length]/12) / 2, t);
+      step++;
+    }, 260);
+  }
+};
+
+/* ══════════════════════════════════════════════════════════════════════════
+   6. ASSETS  —  procedural textures + geometry factories
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function canvasTex(w, h, draw, rep){
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  if (rep){ t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep[0], rep[1]); }
+  return t;
+}
+const hex = n => '#' + n.toString(16).padStart(6,'0');
+
+/* ── Ground / surface textures ───────────────────────────────────────────── */
+const TEX = {};
+TEX.pavers = canvasTex(256,256,(g,w,h)=>{
+  g.fillStyle='#d9dee0'; g.fillRect(0,0,w,h);
+  for (let y=0;y<8;y++) for (let x=0;x<8;x++){
+    const v = 214 + Math.floor(rng()*22); g.fillStyle=`rgb(${v},${v+3},${v+4})`;
+    g.fillRect(x*32+1,y*32+1,30,30);
+  }
+},[26,26]);
+TEX.asphalt = canvasTex(256,256,(g,w,h)=>{
+  g.fillStyle='#26292c'; g.fillRect(0,0,w,h);
+  for (let i=0;i<2600;i++){ const v=30+Math.floor(rng()*26); g.fillStyle=`rgba(${v},${v+2},${v+3},.7)`;
+    g.fillRect(rng()*w, rng()*h, 2, 2); }
+},[40,40]);
+TEX.road = canvasTex(128,256,(g,w,h)=>{
+  g.fillStyle='#26292c'; g.fillRect(0,0,w,h);
+  for (let i=0;i<900;i++){ const v=30+Math.floor(rng()*22); g.fillStyle=`rgb(${v},${v},${v+2})`; g.fillRect(rng()*w,rng()*h,2,2); }
+  g.fillStyle='#F4F6F7'; g.fillRect(w/2-3, 20, 6, 90); g.fillRect(w/2-3, 150, 6, 90);
+},[1,30]);
+TEX.grass = canvasTex(256,256,(g,w,h)=>{
+  g.fillStyle='#3f7a53'; g.fillRect(0,0,w,h);
+  for (let i=0;i<3400;i++){ const v=Math.floor(rng()*40);
+    g.fillStyle=`rgba(${50+v},${110+v},${70+v},.55)`; g.fillRect(rng()*w,rng()*h,3,3); }
+},[36,36]);
+TEX.concrete = canvasTex(256,256,(g,w,h)=>{
+  g.fillStyle='#c9d0d2'; g.fillRect(0,0,w,h);
+  for (let i=0;i<1400;i++){ const v=192+Math.floor(rng()*30); g.fillStyle=`rgba(${v},${v+4},${v+5},.6)`;
+    g.fillRect(rng()*w,rng()*h,3,3); }
+  g.strokeStyle='rgba(150,158,160,.6)'; g.lineWidth=2;
+  g.beginPath(); g.moveTo(0,128); g.lineTo(w,128); g.moveTo(128,0); g.lineTo(128,h); g.stroke();
+},[10,10]);
+TEX.glass = canvasTex(128,128,(g,w,h)=>{
+  g.fillStyle='#0d3f42'; g.fillRect(0,0,w,h);
+  for (let y=0;y<8;y++) for (let x=0;x<4;x++){
+    g.fillStyle = rng()<.22 ? 'rgba(255,214,0,.30)' : 'rgba(0,163,166,.55)';
+    g.fillRect(x*32+2, y*16+2, 28, 12);
+  }
+},[6,6]);
+TEX.sign = canvasTex(512,128,(g,w,h)=>{
+  g.fillStyle='#00A3A6'; g.fillRect(0,0,w,h);
+  g.fillStyle='#FFD600'; g.font='bold 78px "Segoe UI",Arial'; g.textBaseline='middle';
+  g.fillText('YES U', 26, h/2);
+  g.font='bold 28px "Segoe UI",Arial'; g.fillStyle='#F4F6F7';
+  g.fillText('MACQUARIE PARK CAMPUS', 250, h/2 + 4);
+});
+TEX.billboard = canvasTex(512,256,(g,w,h)=>{
+  g.fillStyle='#1C1F22'; g.fillRect(0,0,w,h);
+  g.fillStyle='#FFD600'; g.font='bold 92px "Segoe UI",Arial'; g.textBaseline='top';
+  g.fillText('5G', 30, 26); g.fillStyle='#F4F6F7'; g.font='bold 54px "Segoe UI",Arial';
+  g.fillText('EVERYWHERE', 30, 128);
+  g.fillStyle='#00A3A6'; for (let i=0;i<5;i++) g.fillRect(330+i*32, 150-i*26, 22, 26+i*26);
+});
+TEX.grip = canvasTex(128,256,(g,w,h)=>{
+  g.fillStyle='#151719'; g.fillRect(0,0,w,h);
+  for (let i=0;i<5200;i++){ const v=Math.floor(rng()*44);
+    g.fillStyle=`rgba(${v+16},${v+16},${v+18},.85)`; g.fillRect(rng()*w,rng()*h,2,2); }
+});
+
+/* ── Deck graphics: six, all drawn in code ───────────────────────────────── */
+const DECK_GFX = {
+  yes: (g,w,h,c)=>{ g.fillStyle=c; g.fillRect(0,0,w,h);
+    g.fillStyle='#FFD600'; g.font='bold 96px "Segoe UI",Arial'; g.textAlign='center';
+    g.save(); g.translate(w/2,h/2); g.rotate(-Math.PI/2); g.fillText('yes', 0, 34); g.restore();
+    g.fillStyle='#00A3A6'; g.fillRect(0,h*.06,w,10); g.fillRect(0,h*.92,w,10); },
+  bars:(g,w,h,c)=>{ g.fillStyle=c; g.fillRect(0,0,w,h);
+    for (let i=0;i<5;i++){ g.fillStyle = i<3 ? '#FFD600' : '#00A3A6';
+      const bh = 26 + i*30; g.fillRect(18 + i*20, h/2 - bh/2, 14, bh); }
+    for (let i=0;i<5;i++){ g.fillStyle = i<3 ? '#FFD600' : '#00A3A6';
+      const bh = 26 + i*30; g.fillRect(18 + i*20, h*.82 - bh/2, 14, bh); } },
+  fibre:(g,w,h,c)=>{ g.fillStyle=c; g.fillRect(0,0,w,h);
+    g.lineWidth=7; for (let i=0;i<7;i++){ g.strokeStyle = i%2 ? '#00A3A6' : '#FFD600';
+      g.beginPath(); for (let y=0;y<=h;y+=8) g.lineTo(w/2 + Math.sin(y*.03 + i)* (16+i*5), y); g.stroke(); } },
+  face:(g,w,h,c)=>{ g.fillStyle=c; g.fillRect(0,0,w,h);
+    g.fillStyle='#FFD600'; g.beginPath(); g.ellipse(w/2,h/2,46,64,0,0,TAU); g.fill();
+    g.fillStyle='#F4F6F7'; g.beginPath(); g.ellipse(w/2,h/2-8,32,26,0,0,TAU); g.fill();
+    g.fillStyle='#101214'; g.beginPath(); g.arc(w/2-12,h/2-10,7,0,TAU); g.arc(w/2+12,h/2-10,7,0,TAU); g.fill(); },
+  check:(g,w,h,c)=>{ g.fillStyle=c; g.fillRect(0,0,w,h);
+    for (let y=0;y<16;y++) for (let x=0;x<8;x++) if ((x+y)%2===0){ g.fillStyle='#1C1F22'; g.fillRect(x*16,y*32,16,32); } },
+  blank:(g,w,h,c)=>{ g.fillStyle=c; g.fillRect(0,0,w,h); }
+};
+const GFX_KEYS = Object.keys(DECK_GFX);
+const GFX_NAMES = { yes:'Yes Logo', bars:'Signal Bars', fibre:'Fibre Waves', face:'Ollie Face', check:'Checkerboard', blank:'Blank' };
+const deckTexCache = new Map();
+function deckTexture(gfx, colHex){
+  const k = gfx + colHex; let t = deckTexCache.get(k);
+  if (!t){ t = canvasTex(128, 256, (g,w,h)=> DECK_GFX[gfx](g,w,h,colHex)); deckTexCache.set(k, t); }
+  return t;
+}
+
+/* ── Shared materials ────────────────────────────────────────────────────── */
+function lam(o){ return new THREE.MeshLambertMaterial(o); }
+const MAT = {
+  concrete: lam({ map:TEX.concrete }),
+  pavers:   lam({ map:TEX.pavers }),
+  asphalt:  lam({ map:TEX.asphalt }),
+  road:     lam({ map:TEX.road }),
+  grass:    lam({ map:TEX.grass }),
+  wood:     lam({ color:0xB07B4A }),
+  metal:    new THREE.MeshStandardMaterial({ color:0xB8C0C4, roughness:.34, metalness:.75 }),
+  marble:   lam({ color:0xE6E9EA }),
+  glass:    lam({ map:TEX.glass, transparent:true, opacity:.88 }),
+  teal:     lam({ color:COLORS.teal }),
+  dteal:    lam({ color:COLORS.dteal }),
+  yellow:   lam({ color:COLORS.yellow }),
+  dark:     lam({ color:COLORS.char }),
+  off:      lam({ color:COLORS.off }),
+  mag:      lam({ color:COLORS.mag }),
+  neon:     new THREE.MeshBasicMaterial({ color:COLORS.teal }),
+  neonY:    new THREE.MeshBasicMaterial({ color:COLORS.yellow }),
+  concreteDS: lam({ map:TEX.concrete, side:THREE.DoubleSide }),
+  metalDS:  new THREE.MeshStandardMaterial({ color:0xB8C0C4, roughness:.34, metalness:.75, side:THREE.DoubleSide }),
+  sign:     lam({ map:TEX.sign }),
+  bill:     lam({ map:TEX.billboard })
+};
+/** Surface name → visual material. Friction comes from TUNING.fric. */
+const SURF = { concrete:MAT.concrete, pavers:MAT.pavers, asphalt:MAT.asphalt, road:MAT.road, wood:MAT.wood,
+               metal:MAT.metal, grass:MAT.grass, marble:MAT.marble };
+
+/* ── Palettes offered in the customiser ──────────────────────────────────── */
+const PAL = {
+  skin:  [0xFFD600,0xFFC400,0xFFE66B,0xF4F6F7,0x00A3A6,0xFF3D71,0xB8C0C4,0x9BE15D],
+  cloth: [0x1C1F22,0xF4F6F7,0x00A3A6,0xFFD600,0xFF3D71,0x00686B,0x3A6EA5,0x8A4FBF],
+  shoe:  [0xF4F6F7,0x1C1F22,0xFF3D71,0xFFD600,0x00A3A6,0xB07B4A],
+  deck:  [0x1C1F22,0xF4F6F7,0x00A3A6,0xFFD600,0xFF3D71,0x00686B,0xB07B4A,0x8A4FBF],
+  grip:  [0x151719,0x00686B,0x6b1030,0xF4F6F7],
+  truck: [0xB8C0C4,0xFFD600,0x1C1F22,0x00A3A6,0xFF3D71],
+  wheel: [0xF4F6F7,0xFFD600,0x00A3A6,0xFF3D71,0x1C1F22],
+  trail: [0xFFD600,0x00A3A6,0xFF3D71,0xF4F6F7,0x9BE15D]
+};
+const HATS = ['none','cap','beanie','helmet','bucket'];
+const ACCS = ['none','backpack','lanyard','headphones','sunnies'];
+const DECKS = ['popsicle','cruiser','fish'];
+const WSIZES = [52,56,60];
+
+const DEFAULT_PROFILE = {
+  n:'', sk:0, sh:2, pt:0, sc:0, hat:1, acc:0,
+  deck:0, gfx:0, dcol:0, grip:0, trk:0, whl:0, wsz:1, trail:0,
+  room:'campus-1', contact:1, music:0, volm:80, vols:90, beacon:0, shadow:1
+};
+
+/* ── Ollie: ~14 primitives on a hand-rolled bone hierarchy ───────────────── */
+function capsule(r, len, mat){ return new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 4, 10), mat); }
+
+function makeOllie(profile){
+  const M = {
+    skin:  lam({ color: PAL.skin[profile.sk] }),
+    shirt: lam({ color: PAL.cloth[profile.sh] }),
+    pants: lam({ color: PAL.cloth[profile.pt] }),
+    shoe:  lam({ color: PAL.shoe[profile.sc] }),
+    limb:  lam({ color: 0x101214 }),
+    white: lam({ color: 0xFFFFFF }),
+    eye:   lam({ color: 0x0A0B0C })
+  };
+  const root = new THREE.Group();
+  const pelvis = new THREE.Group(); pelvis.position.y = 0.78; root.add(pelvis);
+  const chest  = new THREE.Group(); chest.position.y = 0.40;  pelvis.add(chest);
+  const head   = new THREE.Group(); head.position.y = 0.30;   chest.add(head);
+
+  // Mascot body: a big rounded teardrop blob with a quiff and one huge eye patch.
+  const blob = new THREE.Mesh(new THREE.SphereGeometry(0.45, 18, 14), M.skin);
+  blob.scale.set(1, 1.06, 0.94); chest.add(blob);
+  const quiff = new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.42, 10), M.skin);
+  quiff.position.set(-0.14, 0.36, -0.02); quiff.rotation.z = 0.72; quiff.rotation.x = -0.18; chest.add(quiff);
+  const patch = new THREE.Mesh(new THREE.SphereGeometry(0.30, 16, 12), M.white);
+  patch.scale.set(1.02, 0.76, 0.42); patch.position.set(0.02, 0.05, 0.30); chest.add(patch);
+  for (const s of [-1, 1]){
+    const e = new THREE.Mesh(new THREE.SphereGeometry(0.052, 10, 8), M.eye);
+    e.position.set(s * 0.11, 0.07, 0.42); chest.add(e);
+  }
+  // Tee band + shorts read as clothing on a body with no shoulders.
+  const tee = new THREE.Mesh(new THREE.CylinderGeometry(0.455, 0.40, 0.26, 16, 1, true), M.shirt);
+  tee.position.y = -0.20; chest.add(tee);
+  const shorts = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.21, 0.18, 12), M.pants);
+  shorts.position.y = 0.03; pelvis.add(shorts);
+
+  const bones = { root, pelvis, chest, head };
+  const limbs = [];
+  for (const side of [-1, 1]){
+    const s = side < 0 ? 'L' : 'R';
+    const up = new THREE.Group(); up.position.set(side*0.36, 0.02, 0); chest.add(up);
+    const upM = capsule(0.045, 0.26, M.limb); upM.position.y = -0.15; up.add(upM);
+    const fore = new THREE.Group(); fore.position.y = -0.30; up.add(fore);
+    const foreM = capsule(0.042, 0.22, M.limb); foreM.position.y = -0.13; fore.add(foreM);
+    const hand = new THREE.Group(); hand.position.y = -0.26; fore.add(hand);
+    hand.add(new THREE.Mesh(new THREE.SphereGeometry(0.062, 8, 6), M.limb));
+
+    const thigh = new THREE.Group(); thigh.position.set(side*0.13, 0, 0); pelvis.add(thigh);
+    const thM = capsule(0.05, 0.30, M.limb); thM.position.y = -0.17; thigh.add(thM);
+    const shin = new THREE.Group(); shin.position.y = -0.36; thigh.add(shin);
+    const shM = capsule(0.045, 0.26, M.limb); shM.position.y = -0.15; shin.add(shM);
+    const foot = new THREE.Group(); foot.position.y = -0.30; shin.add(foot);
+    const ft = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.07, 0.24), M.shoe);
+    ft.position.set(0, -0.02, 0.045); foot.add(ft);
+
+    bones['up'+s] = up; bones['fore'+s] = fore; bones['hand'+s] = hand;
+    bones['thigh'+s] = thigh; bones['shin'+s] = shin; bones['foot'+s] = foot;
+    limbs.push({ a:up, b:fore, mesh:upM, len:0.30 }, { a:fore, b:hand, mesh:foreM, len:0.26 },
+               { a:thigh, b:shin, mesh:thM, len:0.36 }, { a:shin, b:foot, mesh:shM, len:0.30 });
+  }
+
+  // Headwear + accessories are geometry swaps parented to head / chest.
+  const hatGrp = new THREE.Group(); hatGrp.position.y = -0.02; head.add(hatGrp);
+  const accGrp = new THREE.Group(); chest.add(accGrp);
+  const rig = { root, bones, mats:M, hatGrp, accGrp, limbs, profile:{...profile} };
+  applyHat(rig, profile.hat); applyAcc(rig, profile.acc);
+  root.traverse(o => { if (o.isMesh){ o.castShadow = true; o.receiveShadow = false; } });
+  return rig;
+}
+
+function clearGroup(g){ while (g.children.length){ const c = g.children.pop(); c.geometry && c.geometry.dispose(); } }
+function applyHat(rig, i){
+  clearGroup(rig.hatGrp); const M = rig.mats, k = HATS[i] || 'none';
+  const add = (geo, mat, x, y, z, rx) => { const m = new THREE.Mesh(geo, mat);
+    m.position.set(x,y,z); if (rx) m.rotation.x = rx; m.castShadow = true; rig.hatGrp.add(m); return m; };
+  if (k === 'cap'){ add(new THREE.SphereGeometry(0.30,14,8,0,TAU,0,Math.PI/2), M.shirt, 0, 0.05, 0);
+                    add(new THREE.BoxGeometry(0.34,0.03,0.24), M.shirt, 0, 0.05, 0.24, -0.12); }
+  if (k === 'beanie'){ add(new THREE.SphereGeometry(0.31,14,9,0,TAU,0,Math.PI/1.7), M.pants, 0, 0.02, 0);
+                       add(new THREE.CylinderGeometry(0.315,0.315,0.09,14), M.shirt, 0, 0.03, 0); }
+  if (k === 'helmet'){ add(new THREE.SphereGeometry(0.33,14,9,0,TAU,0,Math.PI/1.9), M.white, 0, 0.02, 0);
+                       add(new THREE.TorusGeometry(0.30,0.02,6,16), M.pants, 0, 0.0, 0, Math.PI/2); }
+  if (k === 'bucket'){ add(new THREE.CylinderGeometry(0.27,0.30,0.20,14), M.shirt, 0, 0.10, 0);
+                       add(new THREE.CylinderGeometry(0.42,0.42,0.02,16), M.shirt, 0, 0.01, 0); }
+}
+function applyAcc(rig, i){
+  clearGroup(rig.accGrp); const M = rig.mats, k = ACCS[i] || 'none';
+  const add = (geo, mat, x, y, z, rx) => { const m = new THREE.Mesh(geo, mat);
+    m.position.set(x,y,z); if (rx) m.rotation.x = rx; m.castShadow = true; rig.accGrp.add(m); return m; };
+  if (k === 'backpack'){ add(new THREE.BoxGeometry(0.34,0.36,0.16), M.pants, 0, -0.05, -0.40);
+                         add(new THREE.BoxGeometry(0.26,0.10,0.02), M.shirt, 0, -0.14, -0.49); }
+  if (k === 'lanyard'){ const t = add(new THREE.TorusGeometry(0.30,0.014,6,20), M.shirt, 0, 0.04, 0.02, Math.PI/2.2);
+                        t.material = M.shirt; add(new THREE.BoxGeometry(0.09,0.13,0.01), M.white, 0, -0.24, 0.40); }
+  if (k === 'headphones'){ add(new THREE.TorusGeometry(0.33,0.024,6,18,Math.PI), M.pants, 0, 0.22, 0);
+                           for (const s of [-1,1]) add(new THREE.CylinderGeometry(0.09,0.09,0.05,10), M.pants, s*0.33, 0.20, 0)
+                             .rotation.z = Math.PI/2; }
+  if (k === 'sunnies'){ add(new THREE.BoxGeometry(0.40,0.09,0.03), M.pants, 0, 0.09, 0.43);
+                        add(new THREE.BoxGeometry(0.42,0.02,0.03), M.shirt, 0, 0.13, 0.43); }
+}
+function recolour(rig, p){
+  rig.mats.skin.color.setHex(PAL.skin[p.sk]);   rig.mats.shirt.color.setHex(PAL.cloth[p.sh]);
+  rig.mats.pants.color.setHex(PAL.cloth[p.pt]); rig.mats.shoe.color.setHex(PAL.shoe[p.sc]);
+  if (rig.profile.hat !== p.hat){ applyHat(rig, p.hat); rig.profile.hat = p.hat; }
+  if (rig.profile.acc !== p.acc){ applyAcc(rig, p.acc); rig.profile.acc = p.acc; }
+}
+
+/* ── Board ───────────────────────────────────────────────────────────────── */
+const DECK_PROFILE = {                       // half-width at nose / middle / tail
+  popsicle: [0.085, 0.118, 0.085],
+  cruiser:  [0.070, 0.128, 0.105],
+  fish:     [0.105, 0.120, 0.135]
+};
+function deckGeometry(shape){
+  const g = new THREE.BoxGeometry(0.24, 0.022, 0.82, 4, 1, 26);
+  const pos = g.attributes.position, prof = DECK_PROFILE[shape] || DECK_PROFILE.popsicle;
+  for (let i = 0; i < pos.count; i++){
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const t = clamp(Math.abs(z)/0.41, 0, 1);
+    // Taper the outline, then kick the nose and tail up with a quadratic bend.
+    const hw = z > 0 ? lerp(prof[1], prof[0], t) : lerp(prof[1], prof[2], t);
+    const kick = t > 0.62 ? Math.pow((t-0.62)/0.38, 2) * 0.085 : 0;
+    pos.setX(i, x / 0.12 * hw);
+    pos.setY(i, y + kick);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+function makeBoard(p){
+  const grp = new THREE.Group();
+  const gripMat  = lam({ map:TEX.grip, color:PAL.grip[p.grip] });
+  const gfxMat   = lam({ map: deckTexture(GFX_KEYS[p.gfx], hex(PAL.deck[p.dcol])) });
+  const sideMat  = lam({ color: PAL.deck[p.dcol] });
+  const truckMat = new THREE.MeshStandardMaterial({ color:PAL.truck[p.trk], roughness:.35, metalness:.7 });
+  const wheelMat = lam({ color: PAL.wheel[p.whl] });
+  // BoxGeometry keeps its six material groups after the bend: 2 = top, 3 = bottom.
+  const deck = new THREE.Mesh(deckGeometry(DECKS[p.deck]),
+                              [sideMat, sideMat, gripMat, gfxMat, sideMat, sideMat]);
+  deck.position.y = 0.075; deck.castShadow = true; grp.add(deck);
+
+  const wr = WSIZES[p.wsz] / 2000;             // mm diameter → metres radius
+  const wheels = [];
+  for (const sz of [1,-1]){
+    const t = new THREE.Mesh(new THREE.BoxGeometry(0.10,0.045,0.09), truckMat);
+    t.position.set(0, 0.045, sz*0.24); t.castShadow = true; grp.add(t);
+    const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,0.20,8), truckMat);
+    axle.rotation.z = Math.PI/2; axle.position.set(0, wr, sz*0.24); grp.add(axle);
+    for (const sx of [1,-1]){
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(wr, wr, 0.028, 12), wheelMat);
+      w.rotation.z = Math.PI/2; w.position.set(sx*0.098, wr, sz*0.24); w.castShadow = true;
+      grp.add(w); wheels.push(w);
+    }
+  }
+  return { group: grp, wheels, wr, mats:{ gripMat, gfxMat, sideMat, truckMat, wheelMat } };
+}
+
+/* ── Prop geometry (merged, drawn with InstancedMesh) ────────────────────── */
+function mergeAll(list){
+  const geos = list.map(([g, m]) => { g.applyMatrix4(m); return g.index ? g.toNonIndexed() : g; });
+  return BGU.mergeGeometries(geos, false);
+}
+const M4 = (x,y,z,rx,ry,rz) => new THREE.Matrix4().compose(
+  new THREE.Vector3(x,y,z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx||0,ry||0,rz||0)), new THREE.Vector3(1,1,1));
+
+const PROPS = {
+  bench: () => mergeAll([[new THREE.BoxGeometry(1.8,0.09,0.5), M4(0,0.46,0)],
+                         [new THREE.BoxGeometry(0.09,0.46,0.44), M4(-0.75,0.23,0)],
+                         [new THREE.BoxGeometry(0.09,0.46,0.44), M4(0.75,0.23,0)]]),
+  bin:   () => mergeAll([[new THREE.CylinderGeometry(0.26,0.22,0.8,10), M4(0,0.4,0)],
+                         [new THREE.CylinderGeometry(0.29,0.29,0.06,10), M4(0,0.83,0)]]),
+  lamp:  () => mergeAll([[new THREE.CylinderGeometry(0.07,0.09,5.2,8), M4(0,2.6,0)],
+                         [new THREE.BoxGeometry(0.5,0.14,0.28), M4(0.3,5.2,0)]]),
+  cone:  () => mergeAll([[new THREE.ConeGeometry(0.19,0.6,8), M4(0,0.3,0)],
+                         [new THREE.BoxGeometry(0.44,0.04,0.44), M4(0,0.02,0)]]),
+  bollard:() => mergeAll([[new THREE.CylinderGeometry(0.09,0.09,1.0,8), M4(0,0.5,0)],
+                          [new THREE.SphereGeometry(0.1,8,6), M4(0,1.0,0)]]),
+  tree:  () => mergeAll([[new THREE.CylinderGeometry(0.16,0.22,2.2,7), M4(0,1.1,0)],
+                         [new THREE.IcosahedronGeometry(1.25,0), M4(0,3.0,0)],
+                         [new THREE.IcosahedronGeometry(0.95,0), M4(0.5,3.9,0.3)]]),
+  car:   () => mergeAll([[new THREE.BoxGeometry(1.9,0.72,4.3), M4(0,0.62,0)],
+                         [new THREE.BoxGeometry(1.65,0.62,2.0), M4(0,1.26,-0.25)],
+                         [new THREE.CylinderGeometry(0.32,0.32,0.22,10), M4(0.9,0.34,1.4,0,0,Math.PI/2)],
+                         [new THREE.CylinderGeometry(0.32,0.32,0.22,10), M4(-0.9,0.34,1.4,0,0,Math.PI/2)],
+                         [new THREE.CylinderGeometry(0.32,0.32,0.22,10), M4(0.9,0.34,-1.4,0,0,Math.PI/2)],
+                         [new THREE.CylinderGeometry(0.32,0.32,0.22,10), M4(-0.9,0.34,-1.4,0,0,Math.PI/2)]]),
+  rack:  () => mergeAll([[new THREE.TorusGeometry(0.35,0.035,6,12,Math.PI), M4(0,0.02,0)],
+                         [new THREE.TorusGeometry(0.35,0.035,6,12,Math.PI), M4(0.7,0.02,0)],
+                         [new THREE.TorusGeometry(0.35,0.035,6,12,Math.PI), M4(1.4,0.02,0)]]),
+  ac:    () => mergeAll([[new THREE.BoxGeometry(1.3,0.8,1.1), M4(0,0.4,0)],
+                         [new THREE.CylinderGeometry(0.35,0.35,0.1,10), M4(0,0.82,0)]])
+};
+const PROP_MAT = { bench:MAT.wood, bin:MAT.dteal, lamp:MAT.metal, cone:MAT.mag, bollard:MAT.yellow,
+                   tree:MAT.grass, car:MAT.off, rack:MAT.metal, ac:MAT.metal };
+
+/* ══════════════════════════════════════════════════════════════════════════
+   7. WORLD  —  data array, builder, and collision proxy generation
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Every entry: { type, pos:[x,y,z], size:[w,h,d], rot:[rx,ry,rz], mat, tag }
+   types: flat box ledge rail kicker quarter bank spine bowl pipe stairs funbox prop gapVolume */
+const WORLD = [];
+const w = (type, o) => { o.type = type; WORLD.push(o); return o; };
+
+/* ── Collision proxies ──────────────────────────────────────────────────── */
+const COL = [];                       // obb | arc | bowl
+const RAILS = [];                     // grind polylines
+const GAPS = [];                      // named gap trigger pairs
+const hashCol = new SpatialHash(8);
+const hashRail = new SpatialHash(8);
+
+function addOBB(px,py,pz, sx,sy,sz, rx,ry,rz, mat){
+  const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx||0, ry||0, rz||0));
+  const c = { kind:'obb', p:new THREE.Vector3(px,py,pz), h:new THREE.Vector3(sx/2,sy/2,sz/2), q,
+              inv:new THREE.Matrix4().compose(new THREE.Vector3(px,py,pz), q, new THREE.Vector3(1,1,1)).invert(),
+              mat: mat||'concrete' };
+  const rad = c.h.length();
+  c.aabb = [px-rad, pz-rad, px+rad, pz+rad];
+  COL.push(c); hashCol.insert(c.aabb[0], c.aabb[1], c.aabb[2], c.aabb[3], COL.length-1);
+  return c;
+}
+/** Cylindrical transition. pu = (cos yaw,0,sin yaw) is the "up the wall" axis. */
+function addArc(cx, cyCentre, cz, r, len, yaw, u0, u1, mat){
+  const c = { kind:'arc', cx, cy:cyCentre, cz, r, len, yaw, u0, u1, mat: mat||'concrete',
+              cos:Math.cos(yaw), sin:Math.sin(yaw) };
+  const rad = r + len/2;
+  c.aabb = [cx-rad, cz-rad, cx+rad, cz+rad];
+  COL.push(c); hashCol.insert(c.aabb[0], c.aabb[1], c.aabb[2], c.aabb[3], COL.length-1);
+  return c;
+}
+/** Radial bowl: flat floor of radius rin, then a quarter-circle wall of radius r. */
+function addBowl(cx, cy, cz, rin, r, mat){
+  const c = { kind:'bowl', cx, cy, cz, rin, r, mat: mat||'concrete' };
+  const rad = rin + r;
+  c.aabb = [cx-rad, cz-rad, cx+rad, cz+rad];
+  COL.push(c); hashCol.insert(c.aabb[0], c.aabb[1], c.aabb[2], c.aabb[3], COL.length-1);
+  return c;
+}
+function addRail(pts, mat, kind){
+  const P = pts.map(p => new THREE.Vector3(p[0], p[1], p[2]));
+  const r = { pts:P, mat: mat||'metal', kind: kind||'rail', segs:[] };
+  let minx=1e9,minz=1e9,maxx=-1e9,maxz=-1e9;
+  for (let i = 0; i < P.length-1; i++){
+    const a = P[i], b = P[i+1], d = b.clone().sub(a), L = d.length();
+    r.segs.push({ a, b, d, L, dir:d.clone().normalize() });
+    minx=Math.min(minx,a.x,b.x); maxx=Math.max(maxx,a.x,b.x);
+    minz=Math.min(minz,a.z,b.z); maxz=Math.max(maxz,a.z,b.z);
+  }
+  RAILS.push(r); hashRail.insert(minx-1, minz-1, maxx+1, maxz+1, RAILS.length-1);
+  return r;
+}
+const addGap = (name, pts, a, b) => GAPS.push({ name, pts, a:new THREE.Vector3(a[0],a[1],a[2]), ar:a[3],
+                                                b:new THREE.Vector3(b[0],b[1],b[2]), br:b[3] });
+
+/* ── Geometry buckets: merged per material to keep draw calls low ───────── */
+const buckets = new Map();
+function addGeo(geo, mat, mtx){
+  if (mtx) geo.applyMatrix4(mtx);
+  if (geo.index) geo = geo.toNonIndexed();
+  let b = buckets.get(mat.uuid);
+  if (!b){ b = { mat, geos: [] }; buckets.set(mat.uuid, b); }
+  b.geos.push(geo);
+}
+const propQueue = [];
+const addProp = (kind, x, y, z, ry, s) => propQueue.push({ kind, x, y, z, ry: ry||0, s: s||1 });
+
+/* ══ Zone layouts ══════════════════════════════════════════════════════════
+   Each function only appends descriptors — adding a new spot anywhere in the
+   campus is one more object in one of these lists.                          */
+
+function zoneGround(){
+  // The base ground is four slabs so the Fibre Tunnel corridor stays a real hole.
+  const g = [[-210,-210,-6,210],[6,-210,210,210],[-6,-210,6,18],[-6,120,6,210]];
+  for (const [x0,z0,x1,z1] of g)
+    w('flat', { pos:[(x0+x1)/2, -0.25, (z0+z1)/2], size:[x1-x0, 0.5, z1-z0], mat:'asphalt' });
+}
+
+function zoneQuad(){
+  // Pavers laid in three slabs so the Fibre Tunnel mouth stays open at z > 24.
+  w('flat', { pos:[-27.5, 0.06, 10], size:[41, 0.14, 92], mat:'pavers', tag:'quad' });
+  w('flat', { pos:[27.5, 0.06, 10], size:[41, 0.14, 92], mat:'pavers' });
+  w('flat', { pos:[0, 0.06, -6], size:[14, 0.14, 60], mat:'pavers' });
+  // "yes" inlaid in yellow: a stylised mark rather than literal type on the ground.
+  w('flat', { pos:[-18, 0.14, 10], size:[16, 0.05, 3], mat:'paint' });
+  w('flat', { pos:[-26, 0.14, 4],  size:[3, 0.05, 15], mat:'paint' });
+  w('flat', { pos:[-10, 0.14, 16], size:[3, 0.05, 15], mat:'paint' });
+  // Fountain — round wall, prime gap material.
+  w('box', { pos:[0, 0.45, -4], size:[7, 0.9, 7], mat:'marble', tag:'fountain', round:true });
+  w('box', { pos:[0, 1.4, -4], size:[1.2, 2.2, 1.2], mat:'marble', round:true });
+  // Manual pads + low ledges
+  w('ledge', { pos:[-20, 0.16, 2], size:[10, 0.32, 3], mat:'concrete' });
+  w('ledge', { pos:[20, 0.16, 20], size:[10, 0.32, 3], mat:'concrete' });
+  w('ledge', { pos:[-26, 0.3, 26], size:[12, 0.6, 1.4], mat:'marble' });
+  w('ledge', { pos:[26, 0.3, -6], size:[12, 0.6, 1.4], mat:'marble' });
+  // 3-stair up to a raised deck, with a flat rail beside it
+  w('stairs', { pos:[20, 0, 34], size:[9, 0.9, 2.4], steps:3, mat:'concrete', rail:true });
+  w('flat', { pos:[20, 0.75, 40], size:[26, 0.3, 10], mat:'concrete' });
+  // Planters, benches, bins
+  for (let i = 0; i < 4; i++){
+    w('ledge', { pos:[-34 + i*23, 0.35, -18], size:[5, 0.7, 2.2], mat:'concrete' });
+    addProp('tree', -34 + i*23, 0.7, -18, rng()*TAU);
+  }
+  for (let i = 0; i < 6; i++) addProp('bench', -40 + i*16, 0, 32, 0);
+  for (let i = 0; i < 5; i++) addProp('bin', -42 + i*21, 0, -30, rng()*TAU);
+  for (let i = 0; i < 8; i++) addProp('lamp', -44 + i*12.5, 0, 44, 0);
+  addProp('rack', -30, 0, 40, 0);
+  addGap('Fountain Fly', 900, [0, 1.5, -11, 6], [0, 1.5, 3, 7]);
+}
+function zoneSkatepark(){
+  const X = 112, Z = -96;
+  w('flat', { pos:[X+4, 0.08, Z+2], size:[62, 0.16, 62], mat:'concrete', tag:'park' });
+  // 4m halfpipe: two facing quarters with 13m of flat between them.
+  w('quarter', { pos:[X-6.5, 0, Z-14], r:4, len:22, yaw:Math.PI, coping:true, mat:'concrete' });
+  w('quarter', { pos:[X+6.5, 0, Z-14], r:4, len:22, yaw:0, coping:true, mat:'concrete' });
+  // Spine: two quarters back-to-back on a shared deck.
+  w('quarter', { pos:[X-8, 0, Z+16], r:2.6, len:14, yaw:0, mat:'concrete' });
+  w('quarter', { pos:[X-2.8, 0, Z+16], r:2.6, len:14, yaw:Math.PI, mat:'concrete' });
+  // Hips and stand-alone quarters
+  w('quarter', { pos:[X+22, 0, Z+6], r:3.2, len:12, yaw:Math.PI/2, coping:true, mat:'concrete' });
+  w('quarter', { pos:[X+18, 0, Z-24], r:2.2, len:10, yaw:Math.PI, coping:true, mat:'concrete' });
+  // Kidney bowl: two overlapping bowls west of the pad, with a bank up to the rim.
+  w('bowl', { pos:[78, 0.05, -134], rin:3.4, r:2.5, coping:true, mat:'concrete' });
+  w('bowl', { pos:[71, 0.05, -140], rin:4.0, r:3.5, coping:true, mat:'concrete' });
+  w('bank', { pos:[89, 0, -134], size:[8, 2.5, 10], yaw:Math.PI/2, mat:'concrete' });
+  // Euro gap and a funbox
+  w('box', { pos:[X+6, 0.75, Z+30], size:[9, 1.5, 4], mat:'concrete', grind:true });
+  w('kicker', { pos:[X+6, 0, Z+24], size:[6, 1.5, 5], yaw:Math.PI, mat:'wood' });
+  w('funbox', { pos:[X-20, 0, Z+4], size:[7, 1.1, 5], mat:'wood' });
+  addGap('Euro Gap', 700, [X+6, 1.6, Z+26, 5], [X+6, 1.6, Z+36, 6]);
+}
+function zoneTwelve(){
+  const X = -118, Z = -8;
+  // Raised lecture-hall deck to the north, stairs dropping away to the south.
+  w('flat', { pos:[X, 3.1, Z-21], size:[34, 6.2, 30], mat:'concrete', tag:'hall' });
+  w('flat', { pos:[X, 6.4, Z-5], size:[12, 0.4, 4], mat:'concrete' });
+  w('flat', { pos:[X, 9.0, Z-21], size:[36, 0.5, 32], mat:'concrete' });   // covered walkway roof
+  for (const sx of [-1,1]) for (const sz of [-1,1])
+    w('box', { pos:[X + sx*16, 4.5, Z - 21 + sz*15], size:[1.2, 9, 1.2], mat:'concrete' });
+  w('stairs', { pos:[X, 0, Z], size:[12, 6.2, 8.4], steps:12, mat:'concrete' });
+  // Twin hubbas either side of the stairs
+  for (const sx of [-1,1])
+    w('ledge', { pos:[X + sx*7.4, 0, Z], size:[1.4, 0.7, 8.6], slope:[6.2, 8.4], mat:'marble' });
+  // Kinked handrail down the middle
+  w('rail', { pts:[[X, 6.6, Z-4.4],[X, 5.4, Z-2.6],[X, 1.0, Z+3.4],[X, 0.7, Z+6.0]], mat:'metal' });
+  addGap('Lecture Hall 12', 1400, [X, 7, Z-3, 5], [X, 1.5, Z+9, 7]);
+  for (let i = 0; i < 4; i++) addProp('bollard', X-8+i*5, 0, Z+11, 0);
+  addProp('lamp', X+14, 0, Z+8, 0);
+}
+function zoneTower(){
+  const Z = -164;
+  // 22m 5G tower with a service platform and ladder.
+  w('box', { pos:[0, 11, Z], size:[3.2, 22, 3.2], mat:'metal', tag:'tower' });
+  w('flat', { pos:[0, 18, Z+3], size:[9, 0.5, 9], mat:'metal', tag:'platform' });
+  w('box', { pos:[4.4, 18.6, Z+3], size:[0.3, 1.2, 9], mat:'metal' });
+  w('box', { pos:[-4.4, 18.6, Z+3], size:[0.3, 1.2, 9], mat:'metal' });
+  w('prop', { kind:'ladder', pos:[0, 0, Z+7.6], h:18.2 });
+  // Mega ramp: steep roll-in, launch, 18m gap over the car park, big landing.
+  w('bank', { pos:[0, 0, Z+16], size:[10, 18, 24], yaw:0, mat:'wood', tag:'rollin' });
+  w('kicker', { pos:[0, 0, Z+31], size:[10, 2.6, 7], yaw:Math.PI, mat:'wood' });
+  w('quarter', { pos:[0, 0, Z+56], r:8, len:22, yaw:-Math.PI/2, mat:'wood', tag:'landing' });
+  w('flat', { pos:[0, 0.08, Z+74], size:[30, 0.16, 26], mat:'concrete' });
+  for (let i = 0; i < 6; i++) addProp('car', -8 + (i%3)*8, 0, Z+38 + Math.floor(i/3)*6, 0);
+  addGap('The Yes Gap', 5000, [0, 3, Z+33, 8], [0, 6, Z+50, 12]);
+  addRail([[-4.2, 18.4, Z-1.2],[-4.2, 18.4, Z+7.2]], 'metal');
+}
+function zoneCarPark(){
+  const X = 150, Z = 24, lv = 3.5;
+  for (let l = 0; l < 4; l++){
+    const y = l * lv;
+    w('flat', { pos:[X, y, Z], size:[38, 0.5, 38], mat:'concrete', tag:'cp'+l });
+    // Perimeter ledges double as grind lines on every level.
+    w('ledge', { pos:[X, y+0.25, Z-19], size:[38, 0.9, 1.0], mat:'concrete' });
+    w('ledge', { pos:[X, y+0.25, Z+19], size:[38, 0.9, 1.0], mat:'concrete' });
+    w('ledge', { pos:[X+19, y+0.25, Z], size:[1.0, 0.9, 38], mat:'concrete' });
+    if (l < 3) w('bank', { pos:[X - 24, y, Z + (l%2 ? 12 : -12)], size:[12, lv, 16], yaw: l%2 ? Math.PI : 0, mat:'concrete' });
+    if (l > 0) for (let i = 0; i < 4; i++) addProp('car', X-14+i*9, y+0.25, Z-8, 0);
+    if (l > 0) w('box', { pos:[X, y+1.6, Z], size:[3, 3.2, 3], mat:'concrete' });
+  }
+  // Rooftop launch onto the library awning.
+  w('kicker', { pos:[X-14, 10.5, Z-14], size:[7, 1.8, 6], yaw:Math.PI, mat:'wood' });
+  w('flat', { pos:[X-46, 8.4, Z-16], size:[22, 0.6, 18], mat:'concrete', tag:'awning' });
+  w('quarter', { pos:[X-46, 8.7, Z-6], r:3, len:20, yaw:Math.PI/2, mat:'concrete' });
+  addGap('Car Park Chasm', 2400, [X-18, 12, Z-16, 8], [X-40, 9.5, Z-16, 10]);
+}
+function zoneDish(){
+  const X = -128, Z = -110;
+  // Decommissioned dish used as a full-pipe cradle, with a bank up to the rim.
+  w('bowl', { pos:[X, 0.2, Z], rin:3, r:8.4, coping:true, mat:'metal', tag:'dish' });
+  w('bank', { pos:[X, 0, Z+23], size:[12, 8.6, 22], yaw:0, mat:'concrete' });
+  w('box', { pos:[X, 1.2, Z-16], size:[6, 2.4, 4], mat:'concrete' });
+  addGap('Dish Escape', 1800, [X, 7, Z-6, 7], [X, 2, Z-20, 9]);
+  for (let i = 0; i < 5; i++) addProp('cone', X-10+i*5, 0, Z+36, 0);
+}
+function zoneTunnel(){
+  // Trench running from the Oval end (south) up to the Quad, roofed in the middle.
+  w('bank', { pos:[0, -6, 114], size:[11, 6.2, 14], yaw:Math.PI, mat:'concrete', tag:'tunnelIn' });
+  w('flat', { pos:[0, -6.2, 66], size:[11, 0.5, 82], mat:'concrete', tag:'tunnel' });
+  w('box', { pos:[-6.2, -3, 66], size:[1.4, 6.4, 82], mat:'concrete' });
+  w('box', { pos:[6.2, -3, 66], size:[1.4, 6.4, 82], mat:'concrete' });
+  w('flat', { pos:[0, 0.2, 66], size:[13.5, 0.5, 70], mat:'concrete', tag:'tunnelRoof' });
+  w('rail', { pts:[[0, -5.3, 100],[0, -5.3, 62]], mat:'metal' });
+  w('rail', { pts:[[-3.4, -5.3, 58],[-3.4, -5.3, 36]], mat:'metal' });
+  w('rail', { pts:[[3.4, -5.3, 58],[3.4, -5.3, 36]], mat:'metal' });
+  // Bank up to the Quad at the north end — hit the side wall for a wallride.
+  w('bank', { pos:[0, -6, 30], size:[11, 6.2, 12], yaw:0, mat:'concrete' });
+  w('prop', { kind:'fibre', pos:[0, -3.4, 66], len:76 });
+  addGap('Fibre Gap', 1100, [0, -4, 78, 8], [0, -4, 58, 9]);
+}
+function zoneRoofs(){
+  const X = 118, Z = 118, H = 12;
+  for (let i = 0; i < 4; i++){
+    const bx = X + (i%2) * 26, bz = Z + Math.floor(i/2) * 24, h = H + (i===2 ? 3 : 0);
+    w('box', { pos:[bx, h/2, bz], size:[18, h, 16], mat:'glass', tag:'dorm'+i });
+    w('flat', { pos:[bx, h + 0.3, bz], size:[18.4, 0.6, 16.4], mat:'concrete' });
+    w('ledge', { pos:[bx, h + 0.9, bz - 8], size:[18.4, 0.8, 0.8], mat:'concrete' });
+    addProp('ac', bx + 4, h + 0.6, bz + 4, rng()*TAU);
+  }
+  // Delivery truck + kicker gets you onto the first roof.
+  w('box', { pos:[X-16, 1.6, Z-14], size:[3, 3.2, 8], mat:'metal' });
+  w('bank', { pos:[X-16, 3.2, Z-6], size:[4.5, 9.2, 12], yaw:Math.PI, mat:'wood' });
+  // Fire-escape rail kinks down the side of the last dorm.
+  w('rail', { pts:[[X+26.5, 12.6, Z+32],[X+30, 9, Z+34],[X+30, 4.4, Z+38],[X+30, 0.6, Z+41]], mat:'metal' });
+  addGap('Rooftop Roamer', 2000, [X, 13, Z+8, 8], [X, 13, Z+18, 9]);
+}
+
+function zoneOval(){
+  const X = -58, Z = 160;
+  w('flat', { pos:[X, 0.1, Z], size:[74, 0.2, 54], mat:'grass', tag:'oval' });
+  // Running track: asphalt straights around the grass, banked at the ends.
+  w('flat', { pos:[X, 0.12, Z-30], size:[80, 0.2, 7], mat:'road' });
+  w('flat', { pos:[X, 0.12, Z+30], size:[80, 0.2, 7], mat:'road' });
+  w('flat', { pos:[X-40, 0.12, Z], size:[7, 0.2, 60], mat:'road' });
+  w('flat', { pos:[X+40, 0.12, Z], size:[7, 0.2, 60], mat:'road' });
+  w('quarter', { pos:[X-44, 0, Z], r:2.4, len:58, yaw:Math.PI, mat:'asphalt' });
+  w('quarter', { pos:[X+44, 0, Z], r:2.4, len:58, yaw:0, mat:'asphalt' });
+  // Battle-of-the-bands stage: vert wall behind it, spine ramp in front.
+  w('flat', { pos:[X, 1.2, Z-12], size:[24, 2.4, 12], mat:'wood', tag:'stage' });
+  w('quarter', { pos:[X, 2.4, Z-18.5], r:4, len:24, yaw:-Math.PI/2, coping:true, mat:'wood', ext:2.2 });
+  w('quarter', { pos:[X-3, 0, Z+12], r:3, len:16, yaw:0, mat:'wood' });
+  w('quarter', { pos:[X+3, 0, Z+12], r:3, len:16, yaw:Math.PI, mat:'wood' });
+  for (let i = 0; i < 6; i++) addProp('cone', X-20+i*8, 0.12, Z+30, 0);
+}
+function zoneStore(){
+  const X = -140, Z = 116;
+  w('box', { pos:[X, 4, Z], size:[26, 8, 18], mat:'glass', tag:'store' });
+  w('flat', { pos:[X, 8.3, Z], size:[26.4, 0.6, 18.4], mat:'concrete' });
+  w('ledge', { pos:[X, 3.4, Z+9.8], size:[26, 0.5, 1.8], mat:'metal', tag:'awning' });   // grindable awning
+  w('ledge', { pos:[X, 0.3, Z+15], size:[16, 0.6, 1.6], mat:'marble' });
+  w('flat', { pos:[X+20, 1.3, Z+6], size:[14, 2.6, 12], mat:'concrete', tag:'dock' });   // loading dock drop
+  w('kicker', { pos:[X+20, 2.6, Z-2], size:[6, 1.4, 5], yaw:0, mat:'wood' });
+  w('prop', { kind:'billboard', pos:[X-2, 11, Z-11] });
+  addGap('Loading Dock Drop', 1200, [X+20, 3.4, Z, 7], [X+20, 1, Z-12, 9]);
+  for (let i = 0; i < 3; i++) addProp('bollard', X-9+i*9, 0, Z+18, 0);
+}
+
+function zoneLoop(){
+  const R = 182;
+  w('flat', { pos:[0, 0.1, -R], size:[2*R+16, 0.2, 14], mat:'road', tag:'loopN' });
+  w('flat', { pos:[0, 0.1, R], size:[2*R+16, 0.2, 14], mat:'road', tag:'loopS' });
+  w('flat', { pos:[-R, 0.1, 0], size:[14, 0.2, 2*R], mat:'road', tag:'loopW' });
+  w('flat', { pos:[R, 0.1, 0], size:[14, 0.2, 2*R], mat:'road', tag:'loopE' });
+  // Mild hills and roadworks ramps tie the zones together.
+  for (let i = 0; i < 6; i++){
+    w('kicker', { pos:[-140 + i*56, 0.1, -R], size:[6, 1.1, 5], yaw:0, mat:'wood' });
+    w('kicker', { pos:[-140 + i*56, 0.1, R], size:[6, 1.1, 5], yaw:Math.PI, mat:'wood' });
+    addProp('cone', -140 + i*56 + 4, 0.1, -R + 5, 0);
+  }
+  for (let i = 0; i < 5; i++){
+    w('bank', { pos:[-R, 0.1, -120 + i*60], size:[9, 1.6, 8], yaw:Math.PI/2, mat:'concrete' });
+    w('bank', { pos:[R, 0.1, -120 + i*60], size:[9, 1.6, 8], yaw:-Math.PI/2, mat:'concrete' });
+  }
+  for (let i = 0; i < 22; i++){
+    const a = i/22 * TAU, x = Math.cos(a)*R*1.06, z = Math.sin(a)*R*1.06;
+    addProp('tree', x, 0, z, rng()*TAU); addProp('lamp', x*0.94, 0, z*0.94, 0);
+  }
+  // Campus buildings filling the gaps between zones.
+  const blds = [[-70,0,-60,20,26,20],[62,0,-40,22,30,22],[-60,0,60,24,22,26],[60,0,72,20,26,20],
+                [-160,0,-40,18,24,18],[160,0,-120,20,28,20],[-40,0,-150,22,20,22],[40,0,160,20,24,20]];
+  for (const [x,,z,sx,sy,sz] of blds){
+    w('box', { pos:[x, sy/2, z], size:[sx, sy, sz], mat:'glass' });
+    w('flat', { pos:[x, sy + 0.3, z], size:[sx+0.6, 0.6, sz+0.6], mat:'concrete' });
+    w('ledge', { pos:[x, sy + 0.9, z - sz/2], size:[sx+0.6, 0.8, 0.8], mat:'concrete' });
+  }
+  w('prop', { kind:'sign', pos:[0, 4, 52] });
+}
+
+/* ── buildWorld: descriptors → meshes + collision proxies ────────────────── */
+function buildWorld(scene){
+  zoneGround(); zoneQuad(); zoneSkatepark(); zoneTwelve(); zoneTower(); zoneCarPark();
+  zoneDish(); zoneTunnel(); zoneRoofs(); zoneOval(); zoneStore(); zoneLoop();
+
+  const paint = MAT.yellow;
+  for (const d of WORLD){
+    const [x, y, z] = d.pos || [0, 0, 0], mat = d.mat || 'concrete';
+    const vis = mat === 'paint' ? paint : mat === 'glass' ? MAT.glass : (SURF[mat] || MAT.concrete);
+    const surf = mat === 'paint' ? 'pavers' : mat === 'glass' ? 'concrete' : mat;
+
+    switch (d.type){
+      case 'flat': case 'box': {
+        const [sx, sy, sz] = d.size;
+        if (d.round){
+          addGeo(new THREE.CylinderGeometry(sx/2, sx/2, sy, 20), vis, M4(x, y, z));
+          addOBB(x, y, z, sx*0.82, sy, sz*0.82, 0,0,0, surf);
+        } else {
+          addGeo(new THREE.BoxGeometry(sx, sy, sz), vis, M4(x, y, z));
+          addOBB(x, y, z, sx, sy, sz, 0,0,0, surf);
+        }
+        if (d.grind && !d.round){
+          addRail([[x-sx/2, y+sy/2, z-sz/2],[x+sx/2, y+sy/2, z-sz/2]], surf, 'ledge');
+          addRail([[x-sx/2, y+sy/2, z+sz/2],[x+sx/2, y+sy/2, z+sz/2]], surf, 'ledge');
+        }
+        break;
+      }
+      case 'ledge': {
+        const [sx, sy, sz] = d.size;
+        if (d.slope){                       // hubba: a ledge that follows a stair slope
+          const [drop, run] = d.slope, ang = Math.atan2(drop, run), L = Math.hypot(drop, run);
+          const cy = y + drop/2 + sy/2;
+          addGeo(new THREE.BoxGeometry(sx, sy, L), vis,
+                 new THREE.Matrix4().compose(new THREE.Vector3(x, cy, z),
+                   new THREE.Quaternion().setFromEuler(new THREE.Euler(ang, 0, 0, 'YXZ')),
+                   new THREE.Vector3(1,1,1)));
+          const c = addOBB(x, cy, z, sx, sy, L, 0, 0, 0, surf);
+          c.q.setFromEuler(new THREE.Euler(ang, 0, 0, 'YXZ'));
+          c.inv.compose(c.p, c.q, new THREE.Vector3(1,1,1)).invert();
+          addRail([[x, y + drop + sy/2, z - run/2],[x, y + sy/2, z + run/2]], surf, 'ledge');
+        } else {
+          addGeo(new THREE.BoxGeometry(sx, sy, sz), vis, M4(x, y, z));
+          addOBB(x, y, z, sx, sy, sz, 0,0,0, surf);
+          // Yellow coping strip + a grind line along each long top edge.
+          const long = sx >= sz;
+          const cw = long ? sx : 0.12, cd = long ? 0.12 : sz;
+          for (const s of [-1, 1]){
+            const ox = long ? 0 : s*sz*0, oz = long ? s*sz/2 : 0, ax = long ? 0 : s*sx/2;
+            addGeo(new THREE.BoxGeometry(cw, 0.06, cd), MAT.yellow, M4(x + ax + ox, y + sy/2 + 0.03, z + oz));
+            if (long) addRail([[x-sx/2, y+sy/2, z+s*sz/2],[x+sx/2, y+sy/2, z+s*sz/2]], surf, 'ledge');
+            else      addRail([[x+s*sx/2, y+sy/2, z-sz/2],[x+s*sx/2, y+sy/2, z+sz/2]], surf, 'ledge');
+          }
+        }
+        break;
+      }
+      case 'rail': {
+        addRail(d.pts, d.mat || 'metal', 'rail');
+        for (let i = 0; i < d.pts.length - 1; i++){
+          const a = new THREE.Vector3(...d.pts[i]), b = new THREE.Vector3(...d.pts[i+1]);
+          const len = a.distanceTo(b), mid = a.clone().lerp(b, .5);
+          const g = new THREE.CylinderGeometry(0.05, 0.05, len, 8);
+          const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), b.clone().sub(a).normalize());
+          addGeo(g, MAT.metal, new THREE.Matrix4().compose(mid, q, new THREE.Vector3(1,1,1)));
+          const posts = Math.max(2, Math.round(len/2.6));
+          for (let k = 0; k <= posts; k++){
+            const p = a.clone().lerp(b, k/posts), h = Math.max(0.2, p.y - Math.max(0, p.y - 1.1));
+            addGeo(new THREE.CylinderGeometry(0.04, 0.04, h, 6), MAT.metal, M4(p.x, p.y - h/2, p.z));
+          }
+        }
+        break;
+      }
+      case 'kicker': case 'bank': {
+        const [sw, sh, sd] = d.size, yaw = d.yaw || 0;
+        // Wedge visual: a triangular prism. Collider: a thin slab lying on the slope.
+        const sh2 = new THREE.Shape();
+        sh2.moveTo(-sd/2, 0); sh2.lineTo(sd/2, 0); sh2.lineTo(sd/2, sh); sh2.closePath();
+        const geo = new THREE.ExtrudeGeometry(sh2, { depth: sw, bevelEnabled:false });
+        geo.translate(0, 0, -sw/2); geo.rotateY(Math.PI/2);
+        addGeo(geo, vis, M4(x, y, z, 0, yaw, 0));
+        const ang = Math.atan2(sh, sd), L = Math.hypot(sh, sd);
+        // One thin slab rotated onto the slope, then sunk by half its thickness
+        // so its top face *is* the surface the wheels ride.
+        const c = addOBB(x, y + sh/2, z, sw, 0.4, L, 0, yaw, 0, surf);
+        c.q.setFromEuler(new THREE.Euler(ang, yaw, 0, 'YXZ'));
+        _v1.set(0,1,0).applyQuaternion(c.q); c.p.addScaledVector(_v1, -0.2);
+        c.inv.compose(c.p, c.q, new THREE.Vector3(1,1,1)).invert();
+        break;
+      }
+      case 'quarter': {
+        const r = d.r, len = d.len, yaw = d.yaw || 0, u1 = r * 0.995, ext = d.ext || 0;
+        addArc(x, y + r, z, r, len, yaw, 0, u1, surf);
+        // Extruded profile: the mass under the transition curve.
+        const s = new THREE.Shape(); s.moveTo(0, y); s.lineTo(u1, y);
+        for (let i = 20; i >= 0; i--){ const u = u1 * i/20; s.lineTo(u, y + r - Math.sqrt(Math.max(0, r*r - u*u))); }
+        s.closePath();
+        const geo = new THREE.ExtrudeGeometry(s, { depth: len, bevelEnabled:false });
+        geo.translate(0, 0, -len/2);
+        addGeo(geo, vis, M4(x, 0, z, 0, -yaw, 0));
+        const pu = new THREE.Vector3(Math.cos(yaw), 0, Math.sin(yaw));
+        if (ext){    // vert extension above the lip
+          addGeo(new THREE.BoxGeometry(0.4, ext, len), vis, M4(x + pu.x*(r+0.2), y + r + ext/2, z + pu.z*(r+0.2), 0, -yaw, 0));
+        }
+        if (d.coping){
+          const ax = new THREE.Vector3(-Math.sin(yaw), 0, Math.cos(yaw));
+          const cx = x + pu.x*r, cz = z + pu.z*r, cy = y + r + ext;
+          addGeo(new THREE.CylinderGeometry(0.06, 0.06, len, 8), MAT.yellow,
+                 new THREE.Matrix4().compose(new THREE.Vector3(cx, cy, cz),
+                   new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI/2, -yaw, 0, 'YXZ')),
+                   new THREE.Vector3(1,1,1)));
+          addRail([[cx - ax.x*len/2, cy, cz - ax.z*len/2],[cx + ax.x*len/2, cy, cz + ax.z*len/2]], 'metal', 'rail');
+          // Deck behind the lip so you can stand up top.
+          addGeo(new THREE.BoxGeometry(2.4, 0.4, len), vis, M4(x + pu.x*(r+1.2), cy - 0.2, z + pu.z*(r+1.2), 0, -yaw, 0));
+          addOBB(x + pu.x*(r+1.2), cy - 0.2, z + pu.z*(r+1.2), 2.4, 0.4, len, 0, -yaw, 0, surf);
+        }
+        break;
+      }
+      case 'bowl': {
+        const rin = d.rin, r = d.r;
+        addBowl(x, y, z, rin, r, surf);
+        const pts = [new THREE.Vector2(0.01, y), new THREE.Vector2(rin, y)];
+        for (let i = 1; i <= 12; i++){ const t = r * i/12;
+          pts.push(new THREE.Vector2(rin + t, y + r - Math.sqrt(Math.max(0, r*r - t*t)))); }
+        const geo = new THREE.LatheGeometry(pts, 28);
+        addGeo(geo, mat === 'metal' ? MAT.metalDS : MAT.concreteDS, M4(x, 0, z));
+        // Outer shell so the bowl reads as a solid object from outside.
+        addGeo(new THREE.CylinderGeometry(rin + r + 0.4, rin + r*0.7, y + r, 28, 1, true), vis, M4(x, (y + r)/2, z));
+        if (d.coping){
+          const ring = []; const R = rin + r;
+          for (let i = 0; i <= 28; i++){ const a = i/28*TAU; ring.push([x + Math.cos(a)*R, y + r, z + Math.sin(a)*R]); }
+          addRail(ring, 'metal', 'rail');
+          addGeo(new THREE.TorusGeometry(R, 0.06, 6, 34), MAT.yellow,
+                 M4(x, y + r, z).multiply(new THREE.Matrix4().makeRotationX(Math.PI/2)));
+        }
+        break;
+      }
+      case 'stairs': {
+        const [sw, sh, sd] = d.size, n = d.steps, stepH = sh/n, stepD = sd/n;
+        for (let i = 0; i < n; i++)
+          addGeo(new THREE.BoxGeometry(sw, stepH, stepD), vis,
+                 M4(x, y + sh - stepH*(i + 0.5), z - sd/2 + stepD*(i + 0.5)));
+        // One sloped collider through the step noses: wheels roll, they don't stutter.
+        const ang = Math.atan2(sh, sd), L = Math.hypot(sh, sd);
+        const c = addOBB(x, y + sh/2, z, sw, 0.4, L, 0, 0, 0, surf);
+        c.q.setFromEuler(new THREE.Euler(ang, 0, 0, 'YXZ'));
+        _v1.set(0,1,0).applyQuaternion(c.q); c.p.addScaledVector(_v1, -0.2);
+        c.inv.compose(c.p, c.q, new THREE.Vector3(1,1,1)).invert();
+        if (d.rail) addRail([[x - sw/2 - 0.9, y + sh + 0.6, z - sd/2],[x - sw/2 - 0.9, y + 0.6, z + sd/2]], 'metal', 'rail');
+        break;
+      }
+      case 'funbox': {
+        const [sw, sh, sd] = d.size;
+        addGeo(new THREE.BoxGeometry(sw, sh, sd), vis, M4(x, sh/2, z));
+        addOBB(x, sh/2, z, sw, sh, sd, 0,0,0, surf);
+        addRail([[x-sw/2, sh, z-sd/2],[x+sw/2, sh, z-sd/2]], surf, 'ledge');
+        addRail([[x-sw/2, sh, z+sd/2],[x+sw/2, sh, z+sd/2]], surf, 'ledge');
+        for (const s of [-1, 1]){
+          const sh2 = new THREE.Shape();
+          sh2.moveTo(-2, 0); sh2.lineTo(2, 0); sh2.lineTo(2, sh); sh2.closePath();
+          const g2 = new THREE.ExtrudeGeometry(sh2, { depth: sw, bevelEnabled:false });
+          g2.translate(0, 0, -sw/2); g2.rotateY(Math.PI/2);
+          const ry = s > 0 ? 0 : Math.PI;
+          addGeo(g2, vis, M4(x, 0, z + s*(sd/2 + 2), 0, ry, 0));
+          const L = Math.hypot(sh, 4);
+          const cc = addOBB(x, sh/2, z + s*(sd/2 + 2), sw, 0.4, L, 0, ry, 0, surf);
+          cc.q.setFromEuler(new THREE.Euler(Math.atan2(sh, 4), ry, 0, 'YXZ'));
+          _v1.set(0,1,0).applyQuaternion(cc.q); cc.p.addScaledVector(_v1, -0.2);
+          cc.inv.compose(cc.p, cc.q, new THREE.Vector3(1,1,1)).invert();
+        }
+        break;
+      }
+      case 'prop': buildSpecialProp(d); break;
+    }
+  }
+
+  // ── Merge every bucket into one mesh per material ──────────────────────
+  for (const b of buckets.values()){
+    if (!b.geos.length) continue;
+    const merged = BGU.mergeGeometries(b.geos, false);
+    if (!merged) continue;
+    const m = new THREE.Mesh(merged, b.mat);
+    m.castShadow = true; m.receiveShadow = true; m.matrixAutoUpdate = false;
+    scene.add(m);
+    b.geos.forEach(g => g.dispose());
+  }
+  // ── Instanced props ────────────────────────────────────────────────────
+  const byKind = {};
+  for (const p of propQueue) (byKind[p.kind] = byKind[p.kind] || []).push(p);
+  for (const kind in byKind){
+    const list = byKind[kind], geo = PROPS[kind]();
+    const im = new THREE.InstancedMesh(geo, PROP_MAT[kind], list.length);
+    im.castShadow = true; im.receiveShadow = true;
+    list.forEach((p, i) => {
+      im.setMatrixAt(i, new THREE.Matrix4().compose(
+        new THREE.Vector3(p.x, p.y, p.z),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0, p.ry, 0)),
+        new THREE.Vector3(p.s, p.s, p.s)));
+      // Cars, benches and planters are solid; the rest are decoration you skate past.
+      if (kind === 'car') addOBB(p.x, p.y + 0.8, p.z, 2.0, 1.6, 4.4, 0, p.ry, 0, 'metal');
+      if (kind === 'bench') addOBB(p.x, p.y + 0.28, p.z, 1.9, 0.56, 0.55, 0, p.ry, 0, 'wood');
+    });
+    im.instanceMatrix.needsUpdate = true;
+    scene.add(im);
+  }
+}
+
+/** One-off props that aren't worth instancing but need their own geometry. */
+function buildSpecialProp(d){
+  const [x, y, z] = d.pos;
+  if (d.kind === 'ladder'){
+    for (let i = 0; i < Math.floor(d.h/0.4); i++)
+      addGeo(new THREE.BoxGeometry(0.7, 0.05, 0.05), MAT.metal, M4(x, 0.4 + i*0.4, z));
+    for (const s of [-1,1]) addGeo(new THREE.CylinderGeometry(0.04,0.04,d.h,6), MAT.metal, M4(x + s*0.35, d.h/2, z));
+    LADDERS.push({ x, z, y0: 0, y1: d.h });
+  }
+  if (d.kind === 'sign'){
+    addGeo(new THREE.BoxGeometry(12, 3, 0.3), MAT.sign, M4(x, y, z));
+    for (const s of [-1,1]) addGeo(new THREE.CylinderGeometry(0.14,0.14,y,8), MAT.metal, M4(x + s*5, y/2, z));
+    addOBB(x, y/2, z, 12, y, 0.4, 0,0,0, 'metal');
+  }
+  if (d.kind === 'billboard'){
+    addGeo(new THREE.BoxGeometry(12, 6, 0.4), MAT.bill, M4(x, y, z));
+    for (const s of [-1,1]) addGeo(new THREE.CylinderGeometry(0.16,0.16,y-3,8), MAT.metal, M4(x + s*4.6, (y-3)/2, z));
+    addOBB(x, y, z, 12, 6, 0.5, 0,0,0, 'metal');
+  }
+  if (d.kind === 'fibre'){       // glowing strips down both tunnel walls
+    for (const s of [-1,1]) for (let i = 0; i < 3; i++)
+      addGeo(new THREE.BoxGeometry(0.1, 0.12, d.len), i === 1 ? MAT.neonY : MAT.neon,
+             M4(x + s*5.4, y + i*1.1 - 1.1, z));
+  }
+}
+const LADDERS = [];
+
+/* ══════════════════════════════════════════════════════════════════════════
+   8. PHYSICS — collision queries + the skater model
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const _cand = [], _rcand = [];
+const _lp = new THREE.Vector3(), _ln = new THREE.Vector3(), _wp = new THREE.Vector3();
+
+/** Finish an OBB so ray/point queries never allocate. */
+function finishOBB(c){
+  c.mtx = new THREE.Matrix4().compose(c.p, c.q, new THREE.Vector3(1,1,1));
+  c.inv.copy(c.mtx).invert();
+  c.qi = c.q.clone().invert();
+  c.dLocal = new THREE.Vector3(0,-1,0).applyQuaternion(c.qi);
+  c.rad = c.h.length();
+}
+/** Vertical ray down an OBB. Returns true and fills out.y / out.n on a hit. */
+function obbRayDown(c, x, z, out){
+  _lp.set(x, c.p.y + c.rad + 1, z).applyMatrix4(c.inv);
+  const o = [_lp.x, _lp.y, _lp.z], d = [c.dLocal.x, c.dLocal.y, c.dLocal.z], h = [c.h.x, c.h.y, c.h.z];
+  let tmin = -Infinity, tmax = Infinity, axis = 1;
+  for (let i = 0; i < 3; i++){
+    if (Math.abs(d[i]) < 1e-7){ if (Math.abs(o[i]) > h[i]) return false; continue; }
+    let t1 = (-h[i]-o[i])/d[i], t2 = (h[i]-o[i])/d[i];
+    if (t1 > t2){ const t = t1; t1 = t2; t2 = t; }
+    if (t1 > tmin){ tmin = t1; axis = i; }
+    if (t2 < tmax) tmax = t2;
+  }
+  if (tmax < Math.max(tmin, 0)) return false;
+  _lp.x += c.dLocal.x * tmin; _lp.y += c.dLocal.y * tmin; _lp.z += c.dLocal.z * tmin;
+  _wp.copy(_lp).applyMatrix4(c.mtx);
+  out.y = _wp.y;
+  _ln.set(0,0,0); _ln.setComponent(axis, [c.dLocal.x, c.dLocal.y, c.dLocal.z][axis] > 0 ? -1 : 1);
+  out.n.copy(_ln).applyQuaternion(c.q);
+  if (out.n.y < 0.02) return false;                 // vertical faces are walls, not floors
+  return true;
+}
+/** Height + normal on a cylindrical transition. */
+function arcAt(c, x, z, out){
+  const dx = x - c.cx, dz = z - c.cz;
+  const u = dx*c.cos + dz*c.sin, a = -dx*c.sin + dz*c.cos;
+  if (Math.abs(a) > c.len/2 || u < c.u0 || u > c.u1) return false;
+  const k = c.r*c.r - u*u; if (k <= 0) return false;
+  out.y = c.cy - Math.sqrt(k);
+  out.n.set(-u*c.cos, c.cy - out.y, -u*c.sin).normalize();
+  return true;
+}
+/** Height + normal in a radial bowl. */
+function bowlAt(c, x, z, out){
+  const dx = x - c.cx, dz = z - c.cz, d = Math.hypot(dx, dz);
+  if (d > c.rin + c.r) return false;
+  if (d <= c.rin){ out.y = c.cy; out.n.set(0,1,0); return true; }
+  const t = d - c.rin, k = c.r*c.r - t*t; if (k <= 0) return false;
+  out.y = c.cy + c.r - Math.sqrt(k);
+  const slope = t / Math.sqrt(k);
+  out.n.set(-dx/d * slope, 1, -dz/d * slope).normalize();
+  return true;
+}
+
+const _probe = { y:0, n:new THREE.Vector3() };
+/**
+ * Highest walkable surface at (x,z) that sits at or below yFrom.
+ * This replaces raycasting the scene graph: one hash lookup, a handful of
+ * analytic tests, no BVH, no per-triangle work.
+ */
+function groundAt(x, z, yFrom, out){
+  out.hit = false; out.y = -1e6; out.mat = 'concrete';
+  hashCol.query(x, z, _cand, 0.5);
+  for (let i = 0; i < _cand.length; i++){
+    const c = COL[_cand[i]];
+    let ok = false;
+    if (c.kind === 'obb') ok = obbRayDown(c, x, z, _probe);
+    else if (c.kind === 'arc') ok = arcAt(c, x, z, _probe);
+    else ok = bowlAt(c, x, z, _probe);
+    if (!ok) continue;
+    if (_probe.y <= yFrom && _probe.y > out.y){
+      out.y = _probe.y; out.n.copy(_probe.n); out.mat = c.mat; out.hit = true;
+    }
+  }
+  return out;
+}
+const GA = { hit:false, y:0, n:new THREE.Vector3(0,1,0), mat:'concrete' };
+const GB = { hit:false, y:0, n:new THREE.Vector3(0,1,0), mat:'concrete' };
+
+/**
+ * Push a sphere out of solid geometry. Used for the body capsule, the ragdoll
+ * points and loose boards, so walls stop you instead of swallowing you.
+ * Returns the penetration depth (0 when free) and fills `nrm`.
+ */
+const _pl = new THREE.Vector3(), _cl = new THREE.Vector3(), _dv = new THREE.Vector3();
+function pushOut(p, radius, nrm){
+  let depth = 0; nrm.set(0,0,0);
+  hashCol.query(p.x, p.z, _cand, radius + 0.5);
+  for (let i = 0; i < _cand.length; i++){
+    const c = COL[_cand[i]];
+    if (c.kind === 'obb'){
+      _pl.copy(p).applyMatrix4(c.inv);
+      const inside = Math.abs(_pl.x) < c.h.x && Math.abs(_pl.y) < c.h.y && Math.abs(_pl.z) < c.h.z;
+      if (inside){
+        // Least-penetration axis: the cheapest believable way out of a box.
+        const dx = c.h.x - Math.abs(_pl.x), dy = c.h.y - Math.abs(_pl.y), dz = c.h.z - Math.abs(_pl.z);
+        const m = Math.min(dx, dy, dz);
+        _ln.set(0,0,0);
+        if (m === dx) _ln.x = Math.sign(_pl.x) || 1; else if (m === dy) _ln.y = Math.sign(_pl.y) || 1;
+        else _ln.z = Math.sign(_pl.z) || 1;
+        _ln.applyQuaternion(c.q);
+        const d = m + radius;
+        p.addScaledVector(_ln, d); nrm.add(_ln); depth = Math.max(depth, d);
+      } else {
+        _cl.set(clamp(_pl.x, -c.h.x, c.h.x), clamp(_pl.y, -c.h.y, c.h.y), clamp(_pl.z, -c.h.z, c.h.z));
+        _dv.copy(_pl).sub(_cl); const L = _dv.length();
+        if (L < radius && L > 1e-6){
+          _dv.multiplyScalar(1/L).applyQuaternion(c.q);
+          const d = radius - L;
+          p.addScaledVector(_dv, d); nrm.add(_dv); depth = Math.max(depth, d);
+        }
+      }
+    } else {
+      const ok = c.kind === 'arc' ? arcAt(c, p.x, p.z, _probe) : bowlAt(c, p.x, p.z, _probe);
+      if (ok && p.y < _probe.y + radius){
+        const d = _probe.y + radius - p.y;
+        p.addScaledVector(_probe.n, d); nrm.add(_probe.n); depth = Math.max(depth, d);
+      }
+    }
+  }
+  if (depth > 0) nrm.normalize();
+  return depth;
+}
+
+/** Closest grind line to a point, if it is within `maxD`. */
+const _seg = new THREE.Vector3(), _cp = new THREE.Vector3();
+function nearestRail(p, maxD, out){
+  let best = 1e9; out.rail = null;
+  hashRail.query(p.x, p.z, _rcand, maxD + 1.5);
+  for (let i = 0; i < _rcand.length; i++){
+    const r = RAILS[_rcand[i]];
+    for (let s = 0; s < r.segs.length; s++){
+      const sg = r.segs[s];
+      let t = _seg.copy(p).sub(sg.a).dot(sg.d) / (sg.L*sg.L);
+      t = clamp(t, 0, 1);
+      _cp.copy(sg.a).addScaledVector(sg.d, t);
+      const d = _cp.distanceTo(p);
+      if (d < best && d < maxD){
+        best = d; out.rail = r; out.seg = s; out.t = t; out.dist = d;
+        out.point.copy(_cp); out.dir.copy(sg.dir);
+      }
+    }
+  }
+  return out.rail ? out : null;
+}
+const RAILHIT = { rail:null, seg:0, t:0, dist:0, point:new THREE.Vector3(), dir:new THREE.Vector3() };
+
+/* ── Skater state ────────────────────────────────────────────────────────── */
+const P = {
+  pos: new THREE.Vector3(0, 0.2, 18),
+  vel: new THREE.Vector3(),
+  prevPos: new THREE.Vector3(),
+  yaw: Math.PI, up: new THREE.Vector3(0,1,0), nrm: new THREE.Vector3(0,1,0),
+  mode: 'skate', grounded: true, surf: 'pavers',
+  crouch: 0, charge: 0, charging: false, pushCd: 0, pumped: 0,
+  spin: 0, flip: 0, shove: 0, airTime: 0, hang: 0,
+  trick: null, grab: null, grabTime: 0,
+  stance: 1,                    // +1 rolling nose-first, -1 fakie
+  sw: false,                    // riding switch
+  rail: null, railSeg: 0, railT: 0, railDir: new THREE.Vector3(), railKind:'rail', railDist: 0,
+  bal: 0, balV: 0, balAxis: 'roll',
+  manual: 0,                    // 0 none, +1 tail, -1 nose
+  combo: [], mult: 1, comboPts: 0, score: 0, best: 0, slams: 0, bestTrick: '',
+  ragTimer: 0, immune: 0, sketchy: 0, slowmo: 0,
+  onFoot: false, walkPhase: 0, walkGrounded: true, carrying: false, climbing: null,
+  spawn: { p:new THREE.Vector3(0, 0.2, 18), yaw: Math.PI },
+  gapArm: [], lastTrickName: '', wheelSpin: 0, boardTilt: 0
+};
+
+const Keys = {};
+const Mouse = { down:false, rdown:false, dx:0, dy:0, path:[], sx:0, sy:0 };
+
+/** Direction helpers built from the skater yaw. */
+const fwd = (out) => out.set(Math.sin(P.yaw), 0, Math.cos(P.yaw));
+const right = (out) => out.set(Math.cos(P.yaw), 0, -Math.sin(P.yaw));
+
+/** Project v onto the plane defined by n (in place). */
+function projectPlane(v, n){ return v.addScaledVector(n, -v.dot(n)); }
+
+/* ── The wheel probes ────────────────────────────────────────────────────── */
+const wheelPts = [[0.10, 0.29],[-0.10, 0.29],[0.10,-0.29],[-0.10,-0.29]];
+const _wn = new THREE.Vector3(), _wf = new THREE.Vector3(), _wr = new THREE.Vector3();
+/**
+ * Four wheel probes give an averaged contact plane. Averaging normals (rather
+ * than fitting a plane to hit points) is cheap and behaves well on transitions
+ * because the analytic surfaces already return exact normals.
+ */
+function sampleContact(pos, yaw, out){
+  _wf.set(Math.sin(yaw), 0, Math.cos(yaw)); _wr.set(Math.cos(yaw), 0, -Math.sin(yaw));
+  out.y = -1e6; out.hit = false; _wn.set(0,0,0);
+  let n = 0, best = -1e6, mat = 'concrete';
+  for (let i = 0; i < 4; i++){
+    const [ox, oz] = wheelPts[i];
+    const x = pos.x + _wr.x*ox + _wf.x*oz, z = pos.z + _wr.z*ox + _wf.z*oz;
+    groundAt(x, z, pos.y + 0.6, GB);
+    if (!GB.hit) continue;
+    _wn.add(GB.n); n++;
+    if (GB.y > best){ best = GB.y; mat = GB.mat; }
+  }
+  if (!n) return out;
+  out.hit = true; out.y = best; out.mat = mat; out.n.copy(_wn.multiplyScalar(1/n)).normalize();
+  return out;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   9. TRICKS — data table, Flick-It recogniser, scoring and combos
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* axis: 'roll' flips the board along its length, 'shove' spins it under you,
+   'both' does the two at once (tre flips and their family). */
+const TRICKS = [
+  { id:'ollie',      name:'Ollie',               input:'Flick up',                 base:100, axis:'none',  revs:0,  dur:0.40 },
+  { id:'boneless',   name:'Boneless',            input:'Tiny flick, no charge',    base:70,  axis:'none',  revs:0,  dur:0.35 },
+  { id:'kickflip',   name:'Kickflip',            input:'Flick up-left',            base:150, axis:'roll',  revs:1,  dur:0.55 },
+  { id:'heelflip',   name:'Heelflip',            input:'Flick up-right',           base:150, axis:'roll',  revs:-1, dur:0.55 },
+  { id:'shove',      name:'Pop Shove-it',        input:'Flick left',               base:120, axis:'shove', revs:1,  dur:0.50 },
+  { id:'fsshove',    name:'Frontside Shove-it',  input:'Flick right',              base:130, axis:'shove', revs:-1, dur:0.50 },
+  { id:'varial',     name:'Varial Kickflip',     input:'Flick down-left',          base:260, axis:'both',  revs:1,  dur:0.65 },
+  { id:'varialheel', name:'Varial Heelflip',     input:'Flick down-right',         base:270, axis:'both',  revs:-1, dur:0.65 },
+  { id:'bigspin',    name:'Bigspin',             input:'Flick straight down',      base:300, axis:'shove', revs:2,  dur:0.70 },
+  { id:'treflip',    name:'360 Flip',            input:'Quarter-circle left',      base:400, axis:'both',  revs:1,  dur:0.75 },
+  { id:'hardflip',   name:'Hardflip',            input:'Quarter-circle right',     base:420, axis:'both',  revs:-1, dur:0.75 },
+  { id:'impossible', name:'Impossible',          input:'Half-circle',              base:520, axis:'shove', revs:2,  dur:0.80 }
+];
+const TRICK = {}; TRICKS.forEach(t => TRICK[t.id] = t);
+
+const GRABS = [
+  { id:'indy',      name:'Indy',      a:0,             base:80 },
+  { id:'method',    name:'Method',    a:Math.PI*0.75,  base:120 },
+  { id:'melon',     name:'Melon',     a:Math.PI,       base:95 },
+  { id:'nosegrab',  name:'Nosegrab',  a:Math.PI*0.5,   base:90 },
+  { id:'tail',      name:'Tail',      a:-Math.PI*0.5,  base:90 },
+  { id:'stalefish', name:'Stalefish', a:-Math.PI*0.25, base:110 }
+];
+const GRIND_NAMES = {
+  par: ['50-50','5-0','Nosegrind','Crooked Grind','Smith Grind','Feeble Grind'],
+  perp:['Boardslide','Lipslide','Tailslide','Noseslide']
+};
+const SPIN_MULT = [[900,7],[720,4.5],[540,3],[360,2],[180,1.4]];
+
+/**
+ * Flick-It: classify the last ~260ms of mouse travel by net direction,
+ * path length and total turning. Curvature is what separates a tre flip
+ * (quarter circle) from a plain shove-it (straight left).
+ */
+function classifyFlick(path, charge){
+  const now = performance.now();
+  const pts = [];
+  for (let i = 0; i < path.length; i++) if (now - path[i].t < 260) pts.push(path[i]);
+  if (pts.length < 3) return { id: charge > 0.12 ? 'ollie' : 'boneless' };
+
+  let len = 0, turn = 0, prevA = null;
+  for (let i = 1; i < pts.length; i++){
+    const dx = pts[i].x - pts[i-1].x, dy = pts[i].y - pts[i-1].y;
+    const d = Math.hypot(dx, dy); if (d < 0.6) continue;
+    len += d;
+    const a = Math.atan2(dy, dx);
+    if (prevA !== null){ let t = a - prevA; while (t > Math.PI) t -= TAU; while (t < -Math.PI) t += TAU; turn += t; }
+    prevA = a;
+  }
+  const f = pts[0], l = pts[pts.length-1];
+  const nx = l.x - f.x, ny = l.y - f.y, mag = Math.hypot(nx, ny);
+  if (mag < 15 && len < 34) return { id: charge > 0.12 ? 'ollie' : 'boneless' };
+  if (Math.abs(turn) > 2.9) return { id:'impossible' };
+  if (Math.abs(turn) > 1.35) return { id: nx < 0 ? 'treflip' : 'hardflip' };
+
+  // Compass with 36-degree cardinals and 54-degree diagonals: flips are the
+  // tricks players reach for, so the diagonals get the bigger targets.
+  const a = Math.atan2(-ny, nx);                      // screen Y grows downward
+  let id;
+  if (a > 1.257 && a <= 1.885) id = 'ollie';
+  else if (a > 1.885 && a <= 2.827) id = 'kickflip';
+  else if (a > 0.314 && a <= 1.257) id = 'heelflip';
+  else if (a > 2.827 || a <= -2.827) id = 'shove';
+  else if (a > -0.314 && a <= 0.314) id = 'fsshove';
+  else if (a > -1.257 && a <= -0.314) id = 'varialheel';
+  else if (a <= -1.885) id = 'varial';
+  else id = 'bigspin';
+  // "Load down then flick up" is the nollie version of the same trick.
+  const dippedFirst = (pts[1].y - pts[0].y) > 7 && ny < -10;
+  return { id, nollie: dippedFirst && (id === 'ollie' || id === 'kickflip' || id === 'heelflip') };
+}
+
+function grabFromMouse(dx, dy){
+  const a = Math.atan2(-dy, dx);
+  let best = GRABS[0], bd = 9;
+  for (const g of GRABS){ let d = Math.abs(angDiff(a, g.a)); if (d < bd){ bd = d; best = g; } }
+  return best;
+}
+
+function spinMultiplier(deg){ for (const [d, m] of SPIN_MULT) if (deg >= d - 40) return [d, m]; return [0, 1]; }
+
+/** Assemble the trick string exactly the way a Skate player would say it. */
+function trickName(t, spinDeg, spinDir, grab, nollie){
+  const parts = [];
+  if (nollie) parts.push('Nollie');
+  else if (P.sw) parts.push('Switch');
+  else if (P.stance < 0) parts.push('Fakie');
+  if (spinDeg >= 140){
+    const front = (spinDir < 0) === (P.stance > 0);
+    parts.push(front ? 'Frontside' : 'Backside', String(spinDeg));
+  }
+  if (t && t.id !== 'ollie') parts.push(t.name);
+  else if (!parts.length || spinDeg < 140) parts.push(t ? t.name : 'Ollie');
+  if (grab) parts.push(grab.name);
+  return parts.join(' ');
+}
+
+/* ── Combo bookkeeping ───────────────────────────────────────────────────── */
+function comboAdd(name, pts){
+  P.combo.push({ name, pts });
+  P.mult = 1 + 0.5 * (P.combo.length - 1);
+  P.comboPts += pts;
+  if (pts >= 400) Audio5G.score();
+  hudCombo();
+}
+function comboBank(){
+  if (!P.combo.length) return;
+  const total = Math.round(P.comboPts * P.mult);
+  P.score += total;
+  if (total > P.best){ P.best = total; P.bestTrick = P.combo.map(c => c.name).join(' → '); netPushBest(); }
+  if (total > 900) toast(`+${fmt(total)}`, '');
+  P.combo.length = 0; P.comboPts = 0; P.mult = 1;
+  hudCombo(); hudScore();
+}
+function comboLose(){ P.combo.length = 0; P.comboPts = 0; P.mult = 1; hudCombo(); hudScore(); }
+
+/* ── Gaps ────────────────────────────────────────────────────────────────── */
+function armGaps(){
+  P.gapArm.length = 0;
+  for (const g of GAPS) if (P.pos.distanceTo(g.a) < g.ar) P.gapArm.push(g);
+}
+function checkGaps(){
+  for (const g of P.gapArm){
+    if (P.pos.distanceTo(g.b) < g.br){
+      const pts = Math.round(g.pts * P.mult);
+      P.score += pts; comboAdd(g.name, g.pts);
+      toast(`${g.name}  +${fmt(pts)}`, 'gap'); Audio5G.gap(); hudScore();
+    }
+  }
+  P.gapArm.length = 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   10. RAGDOLL — 11 verlet point masses, distance + soft angle constraints
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const RJ = ['head','chest','pelvis','elbowL','elbowR','handL','handR','kneeL','kneeR','footL','footR'];
+const RI = {}; RJ.forEach((n,i) => RI[n] = i);
+const BONES = [                                   // [a, b, restLength]
+  ['head','chest',0.37], ['chest','pelvis',0.40],
+  ['chest','elbowL',0.47], ['elbowL','handL',0.26],
+  ['chest','elbowR',0.47], ['elbowR','handR',0.26],
+  ['pelvis','kneeL',0.39], ['kneeL','footL',0.30],
+  ['pelvis','kneeR',0.39], ['kneeR','footR',0.30],
+  // Shape-keepers: without these the torso folds into spaghetti.
+  ['head','pelvis',0.74], ['elbowL','elbowR',0.74], ['kneeL','kneeR',0.30],
+  ['pelvis','elbowL',0.62], ['pelvis','elbowR',0.62]
+];
+const LIMITS = [                                  // [a, c, minimum distance] — no backwards joints
+  ['chest','handL',0.30], ['chest','handR',0.30],
+  ['pelvis','footL',0.32], ['pelvis','footR',0.32]
+];
+const STAND = {
+  head:[0,1.56,0.02], chest:[0,1.19,0], pelvis:[0,0.79,0],
+  elbowL:[-0.40,0.92,0.03], elbowR:[0.40,0.92,0.03],
+  handL:[-0.47,0.70,0.10], handR:[0.47,0.70,0.10],
+  kneeL:[-0.14,0.43,0.03], kneeR:[0.14,0.43,0.03],
+  footL:[-0.15,0.07,0.09], footR:[0.15,0.07,0.09]
+};
+
+class Ragdoll {
+  constructor(){
+    this.p = RJ.map(() => new THREE.Vector3());
+    this.q = RJ.map(() => new THREE.Vector3());     // previous positions
+    this.t = 0; this.settled = false; this.blend = 0;
+    this.nrm = new THREE.Vector3();
+  }
+  /** Seed from a standing pose at `pos`, then inherit the skater's momentum. */
+  start(pos, yaw, vel, kick){
+    const s = Math.sin(yaw), c = Math.cos(yaw);
+    for (let i = 0; i < RJ.length; i++){
+      const o = STAND[RJ[i]];
+      const x = o[0]*c + o[2]*s, z = -o[0]*s + o[2]*c;
+      this.p[i].set(pos.x + x, pos.y + o[1], pos.z + z);
+      // Previous position encodes velocity: v = (p - q) / dt.
+      this.q[i].copy(this.p[i]).addScaledVector(vel, -TUNING.fixed);
+      if (kick) this.q[i].addScaledVector(kick, -TUNING.fixed * rr(0.6, 1.4));
+    }
+    // A little tumble so slams read as slams rather than a dropped mannequin.
+    this.q[RI.head].y -= 0.012; this.q[RI.footL].y += 0.006; this.q[RI.footR].y += 0.006;
+    this.t = 0; this.settled = false; this.blend = 0;
+  }
+  impulse(v){ for (let i = 0; i < this.p.length; i++) this.q[i].addScaledVector(v, -TUNING.fixed * rr(.7,1.3)); }
+  step(dt){
+    this.t += dt;
+    const g = TUNING.gravity * dt * dt, d = TUNING.rag.damp;
+    for (let i = 0; i < this.p.length; i++){
+      const p = this.p[i], q = this.q[i];
+      const vx = (p.x - q.x) * d, vy = (p.y - q.y) * d, vz = (p.z - q.z) * d;
+      q.copy(p);
+      p.set(p.x + vx, p.y + vy + g, p.z + vz);
+    }
+    for (let it = 0; it < TUNING.rag.iters; it++){
+      for (const [a, b, L] of BONES) this._link(RI[a], RI[b], L, 0.5);
+      for (const [a, c, L] of LIMITS){
+        const A = this.p[RI[a]], C = this.p[RI[c]];
+        if (A.distanceTo(C) < L) this._link(RI[a], RI[c], L, 0.28);
+      }
+    }
+    this._collide();
+  }
+  _link(i, j, L, k){
+    const a = this.p[i], b = this.p[j];
+    _v1.copy(b).sub(a); const d = _v1.length(); if (d < 1e-6) return;
+    const diff = (d - L) / d * k;
+    a.addScaledVector(_v1, diff); b.addScaledVector(_v1, -diff);
+  }
+  _collide(){
+    const r = 0.13, fric = TUNING.rag.fric, rest = TUNING.rag.rest;
+    for (let i = 0; i < this.p.length; i++){
+      const p = this.p[i], q = this.q[i];
+      // Read the velocity BEFORE any positional correction. Reading it after
+      // folds the penetration fix into the velocity, so every contact hands the
+      // body free energy — that is what makes a Verlet ragdoll trampoline on
+      // the ground instead of settling.
+      _v1.copy(p).sub(q);
+      _v2.set(0, 0, 0);
+      let hit = false;
+      if (pushOut(p, r, this.nrm) > 0){ _v2.add(this.nrm); hit = true; }
+      groundAt(p.x, p.z, p.y + 0.02, GB);
+      if (GB.hit && p.y < GB.y + r){ p.y = GB.y + r; _v2.add(GB.n); hit = true; }
+      if (!hit) continue;
+      if (_v2.lengthSq() < 1e-8) _v2.set(0, 1, 0); else _v2.normalize();
+      const vn = _v1.dot(_v2);
+      if (vn >= 0){ q.copy(p).sub(_v1); continue; }        // already separating
+      _v3.copy(_v1).addScaledVector(_v2, -vn).multiplyScalar(1 - fric);
+      // Bounce only off a real impact; slow contacts just lie down.
+      if (-vn > TUNING.fixed * 26) _v3.addScaledVector(_v2, -vn * rest);
+      if (_v3.lengthSq() < 4e-7) _v3.set(0, 0, 0);         // let it fall asleep
+      q.copy(p).sub(_v3);
+    }
+  }
+  avgSpeed(){
+    let s = 0;
+    for (let i = 0; i < this.p.length; i++) s += this.p[i].distanceTo(this.q[i]);
+    return s / this.p.length / TUNING.fixed;
+  }
+  centre(out){
+    out.set(0,0,0);
+    for (const p of this.p) out.add(p);
+    return out.multiplyScalar(1/this.p.length);
+  }
+  /** Pull every joint toward a clean standing pose — the get-up blend. */
+  toStand(pos, yaw, k){
+    const s = Math.sin(yaw), c = Math.cos(yaw);
+    const px = pos.x, py = pos.y, pz = pos.z;   // copy: `pos` may be _v1 itself
+    for (let i = 0; i < RJ.length; i++){
+      const o = STAND[RJ[i]];
+      _v1.set(px + o[0]*c + o[2]*s, py + o[1], pz - o[0]*s + o[2]*c);
+      this.p[i].lerp(_v1, k); this.q[i].lerp(_v1, k);
+    }
+  }
+}
+
+const DOWN_AXIS = new THREE.Vector3(0,-1,0), UP_AXIS = new THREE.Vector3(0,1,0);
+const _stand = new THREE.Vector3();
+const _aim = new THREE.Vector3();
+function aimBone(bone, worldTarget, useUp){
+  bone.parent.updateMatrixWorld();
+  _aim.copy(worldTarget);
+  bone.parent.worldToLocal(_aim).sub(bone.position);
+  if (_aim.lengthSq() < 1e-8) return;
+  _aim.normalize();
+  bone.quaternion.setFromUnitVectors(useUp ? UP_AXIS : DOWN_AXIS, _aim);
+}
+/** Render a ragdoll by hanging the customised rig off the 11 points. */
+function poseRagdoll(rig, rd){
+  const b = rig.bones, p = rd.p;
+  b.pelvis.position.set(0,0,0);
+  rig.root.position.copy(p[RI.pelvis]);
+  _v1.copy(p[RI.chest]).sub(p[RI.pelvis]).normalize();
+  rig.root.quaternion.setFromUnitVectors(UP_AXIS, _v1);
+  rig.root.updateMatrixWorld(true);
+  aimBone(b.chest, p[RI.head], true);
+  b.chest.updateMatrixWorld(true);
+  aimBone(b.upL, p[RI.elbowL]);  aimBone(b.upR, p[RI.elbowR]);
+  b.upL.updateMatrixWorld(true); b.upR.updateMatrixWorld(true);
+  aimBone(b.foreL, p[RI.handL]); aimBone(b.foreR, p[RI.handR]);
+  aimBone(b.thighL, p[RI.kneeL]); aimBone(b.thighR, p[RI.kneeR]);
+  b.thighL.updateMatrixWorld(true); b.thighR.updateMatrixWorld(true);
+  aimBone(b.shinL, p[RI.footL]); aimBone(b.shinR, p[RI.footR]);
+}
+
+/* ── Loose board: a box that tumbles, rolls and comes to rest ────────────── */
+const loose = { pos:new THREE.Vector3(), vel:new THREE.Vector3(), yaw:0, spin:0,
+                pitch:0, roll:0, active:false, rest:0 };
+function stepLoose(dt){
+  if (!loose.active) return;
+  loose.vel.y += TUNING.gravity * dt;
+  loose.pos.addScaledVector(loose.vel, dt);
+  loose.yaw += loose.spin * dt;
+  groundAt(loose.pos.x, loose.pos.z, loose.pos.y + 0.4, GB);
+  if (GB.hit && loose.pos.y <= GB.y + 0.06){
+    loose.pos.y = GB.y + 0.06;
+    const vn = loose.vel.dot(GB.n);
+    if (vn < 0){ loose.vel.addScaledVector(GB.n, -vn * 1.25); }
+    projectPlane(_v1.copy(loose.vel), GB.n);
+    loose.vel.multiplyScalar(Math.exp(-1.1 * dt));
+    loose.spin *= Math.exp(-3 * dt);
+    loose.roll = damp(loose.roll, 0, 6, dt); loose.pitch = damp(loose.pitch, 0, 6, dt);
+    // Gravity still pulls it down slopes, which is why boards run away from you.
+    _v1.set(0, TUNING.gravity, 0); projectPlane(_v1, GB.n);
+    loose.vel.addScaledVector(_v1, dt * 0.5);
+    if (loose.vel.lengthSq() < 0.04) loose.rest += dt; else loose.rest = 0;
+  } else {
+    loose.pitch += loose.spin * dt * 0.6;
+    loose.roll += dt * loose.spin * 0.35;
+  }
+  pushOut(loose.pos, 0.2, _v1);
+  if (loose.pos.y < -30) loose.active = false;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   11. PLAYER — state machine: skate / manual / air / grind / walk / ragdoll
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const CT = { hit:false, y:0, n:new THREE.Vector3(0,1,0), mat:'concrete' };
+const IN = { steer:0, push:false, brake:false, charge:false, grab:false, sprint:false,
+             jump:false, balance:0, spin:0, pitch:0 };
+const rag = new Ragdoll();
+let pushAnim = 1, grindDist = 0, comboTimer = 0;
+
+function trickRot(tr){
+  const dir = Math.sign(tr.revs || 1);
+  const roll  = (tr.axis === 'roll'  || tr.axis === 'both')  ? Math.abs(tr.revs) * dir : 0;
+  const shove = (tr.axis === 'shove' || tr.axis === 'both')
+    ? (tr.id === 'bigspin' || tr.id === 'impossible' || tr.id === 'treflip' || tr.id === 'hardflip' ? 1 : 0.5) * dir : 0;
+  return { roll, shove };
+}
+
+/* ── Ground: the whole speed economy lives in these 40 lines ─────────────── */
+function stepGround(dt){
+  sampleContact(P.pos, P.yaw, CT);
+  if (!CT.hit || P.pos.y > CT.y + 0.34){ P.mode = 'air'; P.grounded = false; armGaps(); return; }
+
+  P.grounded = true; P.surf = CT.mat;
+  P.pos.y = CT.y;
+  // Critically damped alignment to the contact plane (~0.15s settle) is what
+  // makes ramps feel like ramps instead of a series of flat faces.
+  P.nrm.lerp(CT.n, 1 - Math.exp(-13 * dt)).normalize();
+
+  projectPlane(P.vel, P.nrm);
+  _v1.set(0, TUNING.gravity, 0); projectPlane(_v1, P.nrm);
+  P.vel.addScaledVector(_v1, dt);
+
+  const speed = P.vel.length();
+  const t = clamp(speed / TUNING.maxSpeed, 0, 1);
+  const turnRate = lerp(TUNING.turn.lo, TUNING.turn.hi, t) * DEG;
+  const steer = P.manual ? IN.steer * 0.4 : IN.steer;
+  P.yaw -= steer * turnRate * dt;
+
+  // Grip: kill lateral velocity fast when gripping, slowly when sliding.
+  fwd(_wf); projectPlane(_wf, P.nrm).normalize();
+  const vf = P.vel.dot(_wf);
+  _v2.copy(P.vel).addScaledVector(_wf, -vf);
+  const lat = _v2.length();
+  const slip = Math.atan2(lat, Math.abs(vf) + 0.01);
+  const sliding = slip > TUNING.grip.slipDeg * DEG || (IN.brake && Math.abs(steer) > 0.5 && speed > 6);
+  _v2.multiplyScalar(Math.exp(-(sliding ? 2.6 : 15) * dt));
+  P.vel.copy(_wf).multiplyScalar(vf).add(_v2);
+  if (sliding && speed > 5 && rng() < 0.5) spark(P.pos, P.surf);
+
+  P.stance = vf >= -0.4 ? 1 : -1;
+  P.wheelSpin += speed * dt;
+
+  if (P.pushCd > 0) P.pushCd -= dt;
+  if (IN.push && P.pushCd <= 0 && !P.charging && !P.manual){
+    const scale = clamp(1 - Math.abs(vf) / TUNING.push.max, 0, 1);
+    P.vel.addScaledVector(_wf, TUNING.push.impulse * scale * P.stance);
+    P.pushCd = TUNING.push.cd; pushAnim = 0;
+  }
+  if (IN.brake){
+    const s = P.vel.length();
+    if (s > 0.15) P.vel.addScaledVector(_v3.copy(P.vel).multiplyScalar(1/s), TUNING.brake * dt);
+    else P.vel.set(0,0,0);
+  }
+  const f = TUNING.fric[P.surf] ?? 0.14;
+  P.vel.multiplyScalar(Math.exp(-f * dt));
+  if (P.vel.lengthSq() > TUNING.maxSpeed*TUNING.maxSpeed) P.vel.setLength(TUNING.maxSpeed);
+
+  // Manual balance rides the pitch axis; a manual keeps a combo alive.
+  if (P.manual){
+    const drift = TUNING.manual.drift * (0.5 + clamp(speed/16, 0, 1));
+    P.balV += (rr(-1, 1) * 0.55 + P.bal * 2.1) * drift * dt;
+    P.balV -= IN.balance * 3.6 * dt;
+    P.balV *= Math.exp(-1.8 * dt);
+    P.bal = clamp(P.bal + P.balV * dt, -1.2, 1.2);
+    if (Math.abs(P.bal) >= 1 || speed < 1.2){
+      if (Math.abs(P.bal) >= 1) return bail('manual');
+      endManual();
+    }
+  }
+
+  // Roll onto a ledge lip or a rail you are already level with.
+  if (!P.manual && speed > 3 && nearestRail(P.pos, TUNING.grind.snap, RAILHIT)
+      && Math.abs(RAILHIT.point.y - P.pos.y) < 0.22) tryGrind();
+
+  P.pos.addScaledVector(P.vel, dt);
+  bodyCollide(dt);
+}
+
+/* ── Air ─────────────────────────────────────────────────────────────────── */
+function stepAir(dt){
+  P.airTime += dt;
+  P.vel.y += TUNING.gravity * dt;
+  P.vel.multiplyScalar(Math.max(0, 1 - TUNING.airDrag * dt));
+  const dyaw = -(IN.steer + IN.spin) * TUNING.air.yaw * DEG * dt;
+  P.yaw += dyaw; P.spin += dyaw;
+  P.boardTilt = clamp(P.boardTilt + IN.pitch * TUNING.air.pitch * DEG * dt, -1.2, 1.2);
+  P.nrm.lerp(UP_AXIS, 1 - Math.exp(-4 * dt)).normalize();
+
+  if (P.trick){
+    const tr = P.trick.t, rot = trickRot(tr);
+    P.trick.prog = Math.min(1, P.trick.prog + dt / tr.dur);
+    const e = easeOut(P.trick.prog);
+    P.flip  = rot.roll  * TAU * e;
+    P.shove = rot.shove * TAU * e;
+  }
+  if (P.grab) P.grabTime += dt;
+
+  P.pos.addScaledVector(P.vel, dt);
+
+  // Rails are checked before the ground: that is how you land *on* a handrail.
+  if (nearestRail(P.pos, TUNING.grind.snap, RAILHIT) && Math.abs(RAILHIT.point.y - P.pos.y) < 0.30
+      && P.vel.y < 1.5 && !P.grab){ if (tryGrind()) return; }
+
+  sampleContact(P.pos, P.yaw, CT);
+  if (CT.hit && P.vel.y <= 0 && P.pos.y <= CT.y + 0.12){ tryLand(CT); return; }
+
+  // Slow-mo on the last third of a second before a big landing.
+  if (CT.hit && P.airTime > 0.75){
+    const drop = P.pos.y - CT.y, tToLand = P.vel.y < -0.2 ? drop / -P.vel.y : 9;
+    if (tToLand < 0.35 && (P.trick || P.grab || Math.abs(P.spin) > 2)) P.slowmo = 0.35;
+  }
+  bodyCollide(dt);
+  if (P.pos.y < -14) respawn();
+}
+
+/** Body capsule vs walls. A hard closing hit ends the run. */
+function bodyCollide(dt){
+  _v1.copy(P.pos).addScaledVector(P.nrm, 0.75);
+  const d = pushOut(_v1, 0.42, _v2);
+  if (d > 0){
+    // Horizontal only. A vertical push from a wall could bury the skater under
+    // the ground slab, where groundAt finds nothing and you fall forever.
+    _v2.y = 0;
+    if (_v2.lengthSq() < 1e-5) return;
+    _v2.normalize();
+    const closing = -P.vel.dot(_v2);
+    P.pos.addScaledVector(_v2, d);
+    if (closing > TUNING.wallBail && P.mode !== 'walk'){ bail('wall'); return; }
+    P.vel.addScaledVector(_v2, Math.max(0, closing) * (P.mode === 'walk' ? 1 : 0.85));
+  }
+  void dt;
+}
+
+/* ── Pop / Flick-It release ──────────────────────────────────────────────── */
+function releaseCharge(){
+  if (!P.charging) return;
+  P.charging = false;
+  if (P.mode === 'grind'){ popOutOfGrind(); return; }
+  if (P.mode === 'walk' || P.mode === 'ragdoll'){ P.charge = 0; return; }
+  if (!P.grounded){ P.charge = 0; return; }
+  pop();
+}
+function pop(){
+  const flick = classifyFlick(Mouse.path, P.charge);
+  const tr = TRICK[flick.id] || TRICK.ollie;
+  const v = TUNING.pop.base + TUNING.pop.charge * P.charge;
+  P.vel.addScaledVector(P.nrm, v * (P.nrm.y > 0.2 ? 1 : 0.6));
+  // Pumping: releasing a loaded crouch on the way up a transition pays speed.
+  if (P.nrm.y < 0.94 && P.charge > 0.3 && P.vel.y > 0.5){
+    const s = Math.hypot(P.vel.x, P.vel.z);
+    if (s > 0.5){ const k = 1 + TUNING.pump; P.vel.x *= k; P.vel.z *= k; }
+  }
+  if (P.manual) endManual();
+  P.pos.y += 0.04;
+  P.trick = { t: tr, nollie: !!flick.nollie, prog: 0 };
+  P.flip = 0; P.shove = 0; P.spin = 0; P.airTime = 0; P.hang = 0;
+  P.boardTilt = 0; P.charge = 0; P.crouch = 0;
+  P.mode = 'air'; P.grounded = false;
+  Audio5G.pop(); armGaps();
+}
+
+/* ── Landing ─────────────────────────────────────────────────────────────── */
+function tryLand(ct){
+  const hv = _v1.set(P.vel.x, 0, P.vel.z), spd = hv.length();
+  let yawErr = 0, fakie = false;
+  if (spd > 1.0){
+    let d = Math.abs(angDiff(P.yaw, Math.atan2(hv.x, hv.z)));
+    if (d > Math.PI/2){ d = Math.PI - d; fakie = true; }
+    yawErr = d;
+  }
+  let flipRem = 0, shoveRem = 0;
+  if (P.trick){
+    const ft = Math.abs(P.flip) / TAU, st = Math.abs(P.shove) / TAU;
+    flipRem  = Math.abs(ft - Math.round(ft)) * TAU;
+    shoveRem = Math.abs(st - Math.round(st)) * TAU;
+  }
+  const vImp = Math.abs(P.vel.y);
+  const errs = [
+    yawErr / (TUNING.land.yawTol * DEG),
+    Math.max(flipRem, shoveRem) / (TUNING.land.flipTol * DEG),
+    Math.abs(P.boardTilt) / (TUNING.land.rollTol * DEG),
+    vImp / TUNING.land.vImpact
+  ];
+  const over = errs.filter(e => e > 1);
+  // One near-miss is "sketchy" — a wobble and half points. Two, or one bad
+  // miss, is a bail. Players forgive a hard game; they don't forgive a random one.
+  if (over.length > 1 || (over.length === 1 && over[0] > 1.35)) return bail('land');
+  const sketchy = over.length === 1;
+
+  P.pos.y = ct.y; P.nrm.copy(ct.n); P.grounded = true;
+  projectPlane(P.vel, ct.n);
+  P.vel.multiplyScalar(sketchy ? 0.78 : clamp(1 - vImp/90, 0.82, 1));
+  if (fakie) P.stance = -1;
+  P.boardTilt = 0; P.sketchy = sketchy ? 0.5 : 0;
+
+  scoreLanding(sketchy);
+  checkGaps();
+  shake(clamp(vImp/22, 0, 1) * 0.5);
+  Audio5G.land(vImp);
+  P.mode = P.manual ? 'manual' : 'skate';
+  P.trick = null; P.grab = null; P.grabTime = 0; P.flip = 0; P.shove = 0; P.hang = 0;
+  comboTimer = 1.6;
+}
+
+function scoreLanding(sketchy){
+  const deg = Math.round(Math.abs(P.spin) / DEG / 180) * 180;
+  const [sdeg, smul] = spinMultiplier(deg);
+  const tr = P.trick ? P.trick.t : null;
+  if (!tr && !P.grab && sdeg < 180) return;                 // just a roll-away
+  let pts = (tr ? tr.base : 60) * (smul || 1);
+  if (P.grab) pts += P.grab.g.base * (1 + Math.min(P.grabTime, 2) * 0.6);
+  if (sketchy) pts *= 0.5;
+  const name = (sketchy ? 'Sketchy ' : '') +
+               trickName(tr, sdeg, Math.sign(P.spin) || 1, P.grab ? P.grab.g : null, P.trick && P.trick.nollie);
+  comboAdd(name, Math.round(pts));
+  P.lastTrickName = name;
+  netTrick(name, Math.round(pts * P.mult));
+  trickPop(name);
+  P.spin = 0;
+}
+
+/* ── Grinds ──────────────────────────────────────────────────────────────── */
+function tryGrind(){
+  const r = RAILHIT.rail;
+  fwd(_wf);
+  let a = Math.abs(angDiff(Math.atan2(_wf.x, _wf.z), Math.atan2(RAILHIT.dir.x, RAILHIT.dir.z)));
+  if (a > Math.PI/2) a = Math.PI - a;
+  const parallel = a < 40 * DEG, perpendicular = a > 50 * DEG;
+  if (!parallel && !perpendicular) return false;
+  const speed = P.vel.length();
+  if (speed < 1.2) return false;
+
+  P.mode = 'grind'; P.rail = r; P.railSeg = RAILHIT.seg; P.railT = RAILHIT.t;
+  P.railKind = r.kind; P.railDir.copy(RAILHIT.dir);
+  P.railSign = P.vel.dot(RAILHIT.dir) >= 0 ? 1 : -1;
+  P.grindSpeed = Math.max(2.5, Math.abs(P.vel.dot(RAILHIT.dir)) || speed * 0.8);
+  P.pos.copy(RAILHIT.point);
+  P.bal = rr(-0.12, 0.12); P.balV = 0; grindDist = 0;
+  P.nrm.set(0,1,0);
+  if (parallel){
+    const names = GRIND_NAMES.par;
+    const idx = P.manual > 0 ? 1 : P.manual < 0 ? 2 : (Math.abs(P.bal) > 0.08 ? 3 + (rng() < .5 ? 0 : 1) : 0);
+    P.grindName = names[Math.min(idx, names.length-1)];
+    P.yaw = Math.atan2(P.railDir.x * P.railSign, P.railDir.z * P.railSign);
+  } else {
+    const names = GRIND_NAMES.perp;
+    P.grindName = names[P.manual > 0 ? 2 : P.manual < 0 ? 3 : (rng() < 0.5 ? 0 : 1)];
+    P.yaw = Math.atan2(P.railDir.z * P.railSign, P.railDir.x * P.railSign);
+  }
+  P.grindPerp = perpendicular;
+  P.manual = 0;
+  P.trick = null; P.flip = 0; P.shove = 0; P.grab = null;
+  if (Math.abs(P.spin) > 2.4) scoreLanding(false); else P.spin = 0;
+  P.grindPts = 0;
+  Audio5G.setGrind(true, P.grindSpeed, r.mat);
+  return true;
+}
+function stepGrind(dt){
+  const r = P.rail, sg = r.segs[P.railSeg];
+  // Gravity along the rail: downhill rails give speed, uphill ones eat it.
+  P.grindSpeed += TUNING.gravity * sg.dir.y * P.railSign * dt;
+  P.grindSpeed *= Math.exp(-(r.mat === 'metal' ? 0.10 : 0.30) * dt);
+  P.railT += (P.grindSpeed * P.railSign) * dt / sg.L;
+
+  while (P.railT > 1 || P.railT < 0){
+    const next = P.railSeg + (P.railT > 1 ? 1 : -1);
+    if (next < 0 || next >= r.segs.length){ exitGrind(true); return; }
+    P.railT = P.railT > 1 ? P.railT - 1 : P.railT + 1;
+    P.railSeg = next; P.railDir.copy(r.segs[next].dir);
+    if (!P.grindPerp) P.yaw = Math.atan2(P.railDir.x * P.railSign, P.railDir.z * P.railSign);
+  }
+  const s2 = r.segs[P.railSeg];
+  P.pos.copy(s2.a).addScaledVector(s2.d, P.railT);
+  P.vel.copy(s2.dir).multiplyScalar(P.grindSpeed * P.railSign);
+  P.nrm.lerp(UP_AXIS, 1 - Math.exp(-10*dt)).normalize();
+
+  // Balance: noise + speed drift, corrected with A/D. Ledges drift gentler.
+  const drift = (P.railKind === 'ledge' ? TUNING.grind.drift.ledge : TUNING.grind.drift.rail)
+              * (0.55 + clamp(P.grindSpeed/16, 0, 1));
+  P.balV += (rr(-1,1) * 0.7 + P.bal * 2.4) * drift * dt;
+  P.balV -= IN.balance * 3.8 * dt;
+  P.balV *= Math.exp(-1.6 * dt);
+  P.bal = clamp(P.bal + P.balV * dt, -1.25, 1.25);
+  if (Math.abs(P.bal) >= 1) return bail('grind');
+  if (P.grindSpeed < 0.9) return exitGrind(false);
+
+  const d = Math.abs(P.grindSpeed) * dt;
+  grindDist += d; P.grindPts += TUNING.grind.pts * d;
+  if (rng() < 0.55) spark(P.pos, r.mat);
+  Audio5G.setGrind(true, Math.abs(P.grindSpeed), r.mat);
+  hudBalance(true, P.bal, P.grindName);
+}
+function bankGrind(){
+  if (P.grindPts > 0){
+    comboAdd(`${P.grindName} (${grindDist.toFixed(0)}m)`, Math.round(P.grindPts));
+    netTrick(P.grindName, Math.round(P.grindPts * P.mult));
+  }
+  P.grindPts = 0; grindDist = 0;
+  Audio5G.setGrind(false, 0, 'metal'); hudBalance(false);
+}
+function exitGrind(offEnd){
+  bankGrind();
+  P.mode = 'air'; P.grounded = false; P.rail = null;
+  if (offEnd) P.vel.y = Math.max(P.vel.y, 1.2);
+  P.trick = null; P.spin = 0; P.airTime = 0; armGaps();
+}
+function popOutOfGrind(){
+  bankGrind();
+  const flick = classifyFlick(Mouse.path, P.charge);
+  const tr = TRICK[flick.id] || TRICK.ollie;
+  P.rail = null;
+  P.vel.y = TUNING.pop.base * 0.8 + TUNING.pop.charge * P.charge;
+  P.trick = { t: tr, nollie: !!flick.nollie, prog: 0 };
+  P.flip = 0; P.shove = 0; P.spin = 0; P.charge = 0; P.crouch = 0;
+  P.mode = 'air'; P.grounded = false; P.airTime = 0;
+  Audio5G.pop(); armGaps();
+}
+
+/* ── Manuals ─────────────────────────────────────────────────────────────── */
+function startManual(dir){
+  if (P.mode !== 'skate' || !P.grounded || P.manual) return;
+  if (P.vel.lengthSq() < 2) return;
+  P.manual = dir; P.mode = 'manual'; P.bal = rr(-0.1, 0.1); P.balV = 0; P.manualDist = 0;
+}
+function endManual(){
+  if (!P.manual) return;
+  comboAdd(P.manual > 0 ? 'Manual' : 'Nose Manual', Math.round(90 + P.manualDist * 12));
+  P.manual = 0; P.mode = 'skate'; hudBalance(false);
+}
+
+/* ── Bails ───────────────────────────────────────────────────────────────── */
+function bail(reason){
+  if (P.mode === 'ragdoll') return;
+  if (P.mode === 'grind'){ Audio5G.setGrind(false, 0, 'metal'); P.grindPts = 0; }
+  const kick = _v1.copy(P.vel).multiplyScalar(0.35);
+  kick.y += reason === 'wall' ? 1.5 : 0.6;
+  rag.start(P.pos, P.yaw, P.vel, kick);
+  if (!P.onFoot) dropBoard(true);
+  P.mode = 'ragdoll'; P.ragTimer = 0; P.rail = null; P.manual = 0;
+  P.trick = null; P.grab = null; P.slams++;
+  comboLose(); hudBalance(false); hudScore();
+  shake(0.8); Audio5G.bail();
+  if (reason !== 'manual-bail') toast('SLAM', 'slam');
+  netSlam();
+}
+function stepRagdollMode(dt){
+  rag.step(dt);
+  P.ragTimer += dt;
+  rag.centre(P.pos);
+  P.pos.y = rag.p[RI.pelvis].y - 0.78;
+  if (P.pos.y < -30) return respawn();
+  const slow = rag.avgSpeed() < 1.1;
+  if (P.ragTimer > TUNING.rag.minTime && slow){
+    // Blend the joints back to a standing pose, then hand control back.
+    rag.blend += dt / TUNING.rag.blend;
+    groundAt(rag.p[RI.pelvis].x, rag.p[RI.pelvis].z, rag.p[RI.pelvis].y + 1.2, GB);
+    const gy = GB.hit ? GB.y : rag.p[RI.pelvis].y - 0.78;
+    _stand.set(rag.p[RI.pelvis].x, gy, rag.p[RI.pelvis].z);
+    rag.toStand(_stand, P.yaw, clamp(dt * 9, 0, 1));
+    if (rag.blend >= 1) getUp(_stand);
+  }
+}
+function getUp(pos){
+  P.pos.copy(pos); P.vel.set(0,0,0); P.nrm.set(0,1,0);
+  P.bal = 0; P.balV = 0; P.spin = 0; P.flip = 0; P.shove = 0; P.boardTilt = 0;
+  P.sketchy = 0; rag.blend = 0;
+  if (P.onFoot){ P.mode = 'walk'; }
+  else { P.mode = 'skate'; P.grounded = true; loose.active = false; }
+}
+
+/* ── On foot ─────────────────────────────────────────────────────────────── */
+function hopOff(){
+  if (P.onFoot || P.mode === 'ragdoll') return;
+  if (P.mode === 'grind') bankGrind(); else comboBank();
+  P.onFoot = true; P.mode = 'walk'; P.manual = 0; P.rail = null; P.trick = null; P.grab = null;
+  dropBoard(false);
+  P.vel.y = Math.max(P.vel.y, 2.6);
+  P.vel.x *= 0.55; P.vel.z *= 0.55;
+  hudBalance(false);
+}
+function dropBoard(tumble){
+  loose.active = true; loose.held = false;
+  loose.pos.copy(P.pos); loose.vel.copy(P.vel);
+  loose.yaw = P.yaw; loose.rest = 0;
+  loose.spin = tumble ? rr(-6, 6) : rr(-0.6, 0.6);
+  if (tumble){ loose.vel.y += 2.2; loose.pitch = rr(-1,1); }
+  P.carrying = false;
+}
+function pickUpBoard(){ loose.active = false; P.carrying = true; Audio5G.ui(true); }
+function throwBoard(){
+  if (!P.carrying) return;
+  P.carrying = false; loose.active = true;
+  fwd(_wf);
+  loose.pos.copy(P.pos).addScaledVector(_wf, 0.5); loose.pos.y += 1.1;
+  loose.vel.copy(_wf).multiplyScalar(9).add(_v1.set(0, 3.2, 0)).add(P.vel);
+  loose.spin = rr(-9, 9); loose.rest = 0;
+  Audio5G.ui(false);
+}
+function mountBoard(keepMomentum){
+  P.onFoot = false; P.carrying = false; loose.active = false;
+  P.mode = 'skate'; P.grounded = true;
+  if (!keepMomentum) P.vel.multiplyScalar(0.6);
+  P.bal = 0; P.balV = 0;
+}
+/** F does the obvious thing for wherever you happen to be standing. */
+function footAction(){
+  if (!P.onFoot) return hopOff();
+  if (P.carrying) return mountBoard(false);
+  if (loose.active && P.pos.distanceTo(loose.pos) < 2.2){
+    const running = P.vel.lengthSq() > 9;
+    return running ? mountBoard(true) : pickUpBoard();
+  }
+  // No board nearby: call it back so you can never strand yourself.
+  loose.active = true; loose.pos.copy(P.pos); loose.vel.set(0,0,0);
+  loose.rest = 0; pickUpBoard();
+}
+function stepWalk(dt){
+  const sp = IN.sprint ? TUNING.walk.sprint : TUNING.walk.speed;
+  P.yaw -= IN.steer * 2.7 * dt;
+  fwd(_wf);
+  const drive = (IN.push ? 1 : 0) - (IN.brake ? 1 : 0);
+  const target = _v1.copy(_wf).multiplyScalar(drive * sp);
+
+  // Ladders: hold forward at the base of one and you climb it.
+  P.climbing = null;
+  for (const L of LADDERS){
+    if (Math.hypot(P.pos.x - L.x, P.pos.z - L.z) < 1.0 && P.pos.y < L.y1 - 0.2){ P.climbing = L; break; }
+  }
+  if (P.climbing && drive > 0){
+    P.vel.set(0, 2.4, 0);
+    P.pos.addScaledVector(P.vel, dt);
+    P.walkPhase += dt * 6;
+    return;
+  }
+  P.vel.x = damp(P.vel.x, target.x, 12, dt);
+  P.vel.z = damp(P.vel.z, target.z, 12, dt);
+  P.vel.y += TUNING.gravity * dt;
+
+  const stepUp = P.walkGrounded ? TUNING.walk.step : 0.05;
+  P.pos.addScaledVector(P.vel, dt);
+  groundAt(P.pos.x, P.pos.z, P.pos.y + stepUp, GB);
+  if (GB.hit && P.pos.y <= GB.y + 0.02){
+    P.pos.y = GB.y; P.walkGrounded = true; P.surf = GB.mat;
+    if (P.vel.y < 0) P.vel.y = 0;
+    if (P.vel.y < -14) bail('fall');
+    if (IN.jump){ P.vel.y = TUNING.walk.jump; P.walkGrounded = false; }
+  } else P.walkGrounded = false;
+
+  const hs = Math.hypot(P.vel.x, P.vel.z);
+  P.walkPhase += hs * dt * 1.9;
+  if (P.walkGrounded && hs > 0.6 && Math.floor(P.walkPhase/Math.PI) !== Math.floor((P.walkPhase - hs*dt*1.9)/Math.PI)) Audio5G.step();
+  bodyCollide(dt);
+  // Boot a loose board around — 20 lines of pure fun.
+  if (loose.active && P.pos.distanceTo(loose.pos) < 0.75 && hs > 1.2){
+    _v1.copy(loose.pos).sub(P.pos).setY(0).normalize();
+    loose.vel.addScaledVector(_v1, hs * 0.9); loose.vel.y += 1.4; loose.spin += rr(-4,4); loose.rest = 0;
+    Audio5G.step();
+  }
+  if (P.pos.y < -14) respawn();
+}
+
+/* ── Spawns ──────────────────────────────────────────────────────────────── */
+let beaconGrp = null, beaconRing = null, beaconLabel = null;
+function setSpawn(){
+  P.spawn.p.copy(P.pos); P.spawn.yaw = P.yaw;
+  localStorage.setItem('ollieHawk.spawn', JSON.stringify({ p:P.spawn.p.toArray(), yaw:P.spawn.yaw }));
+  netPushSpawn();
+  placeBeacon(P.spawn.p, profile.n || 'You');
+  toast('Spawn set here', 'gap'); Audio5G.gap(); flashScreen(0.25);
+}
+function placeBeacon(p, name){
+  if (!beaconGrp){
+    beaconGrp = new THREE.Group();
+    const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 3.2, 14, 1, true),
+      new THREE.MeshBasicMaterial({ color:COLORS.teal, transparent:true, opacity:.28, side:THREE.DoubleSide }));
+    pil.position.y = 1.6; beaconGrp.add(pil);
+    beaconRing = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.05, 6, 20),
+      new THREE.MeshBasicMaterial({ color:COLORS.yellow }));
+    beaconRing.rotation.x = Math.PI/2; beaconRing.position.y = 0.6; beaconGrp.add(beaconRing);
+    beaconLabel = makeLabel(name); beaconLabel.position.y = 3.6; beaconGrp.add(beaconLabel);
+    scene.add(beaconGrp);
+  }
+  beaconGrp.position.copy(p); beaconGrp.visible = true;
+}
+function respawn(){
+  flashScreen(0.5);
+  P.pos.copy(P.spawn.p); P.yaw = P.spawn.yaw;
+  P.vel.set(0,0,0); P.nrm.set(0,1,0); P.mode = P.onFoot ? 'walk' : 'skate';
+  P.grounded = true; P.rail = null; P.manual = 0; P.trick = null; P.grab = null;
+  P.bal = 0; P.balV = 0; P.spin = 0; P.flip = 0; P.shove = 0; P.boardTilt = 0;
+  P.charge = 0; P.charging = false; P.crouch = 0; P.slowmo = 0; rag.blend = 0;
+  CAM.yaw = P.yaw;
+  comboLose(); hudBalance(false);
+  if (!P.onFoot){ loose.active = false; P.carrying = false; }
+  groundAt(P.pos.x, P.pos.z, P.pos.y + 2, GB);
+  if (GB.hit) P.pos.y = GB.y;
+}
+/** A saved spawn inside geometry or under the map snaps back to safety. */
+function validateSpawn(p, yaw){
+  if (!p || !isFinite(p.x) || p.y < -30 || Math.abs(p.x) > 240 || Math.abs(p.z) > 240) return null;
+  const v = new THREE.Vector3(p.x, p.y, p.z);
+  groundAt(v.x, v.z, v.y + 3, GB);
+  if (GB.hit && Math.abs(GB.y - v.y) < 4){ v.y = GB.y; }
+  else { groundAt(v.x, v.z, 400, GB); if (!GB.hit) return null; v.y = GB.y; }
+  const probe = v.clone(); probe.y += 0.8;
+  if (pushOut(probe, 0.4, _v1) > 0.5) return null;
+  return { p:v, yaw: yaw || 0 };
+}
+function spawnAtZone(id){
+  const z = ZONES.find(x => x.id === id); if (!z) return;
+  P.spawn.p.set(z.p[0], z.p[1], z.p[2]); P.spawn.yaw = z.yaw;
+  respawn();
+}
+
+/* ── Particles: sparks and dust, pooled, zero allocation per frame ───────── */
+const PCOUNT = 260;
+const pPos = new Float32Array(PCOUNT * 3), pVel = new Float32Array(PCOUNT * 3);
+const pLife = new Float32Array(PCOUNT), pCol = new Float32Array(PCOUNT * 3);
+let pHead = 0, particles = null;
+function initParticles(scene){
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
+  particles = new THREE.Points(g, new THREE.PointsMaterial({ size:0.13, vertexColors:true,
+    transparent:true, opacity:.95, depthWrite:false, blending:THREE.AdditiveBlending }));
+  particles.frustumCulled = false; scene.add(particles);
+  for (let i = 0; i < PCOUNT; i++) pPos[i*3+1] = -999;
+}
+const SPARK_COL = { metal:[1,.9,.35], concrete:[1,.83,.4], marble:[1,.95,.7], wood:[1,.6,.25],
+                    asphalt:[.9,.9,.9], road:[.9,.9,.9], grass:[.5,.9,.5], pavers:[1,.85,.5] };
+function spark(pos, mat){
+  const c = SPARK_COL[mat] || SPARK_COL.concrete;
+  for (let k = 0; k < 3; k++){
+    const i = pHead = (pHead + 1) % PCOUNT;
+    pPos[i*3] = pos.x + rr(-.08,.08); pPos[i*3+1] = pos.y + 0.03; pPos[i*3+2] = pos.z + rr(-.08,.08);
+    pVel[i*3] = rr(-1.6,1.6); pVel[i*3+1] = rr(0.6,2.6); pVel[i*3+2] = rr(-1.6,1.6);
+    pCol[i*3] = c[0]; pCol[i*3+1] = c[1]; pCol[i*3+2] = c[2];
+    pLife[i] = rr(0.22, 0.5);
+  }
+  if (rng() < 0.25) Audio5G.spark();
+}
+function stepParticles(dt){
+  for (let i = 0; i < PCOUNT; i++){
+    if (pLife[i] <= 0){ if (pPos[i*3+1] > -900) pPos[i*3+1] = -999; continue; }
+    pLife[i] -= dt;
+    pVel[i*3+1] -= 12 * dt;
+    pPos[i*3] += pVel[i*3]*dt; pPos[i*3+1] += pVel[i*3+1]*dt; pPos[i*3+2] += pVel[i*3+2]*dt;
+    if (pLife[i] <= 0) pPos[i*3+1] = -999;
+  }
+  particles.geometry.attributes.position.needsUpdate = true;
+  particles.geometry.attributes.color.needsUpdate = true;
+}
+
+/* ── Trail ribbon behind the board while airborne ────────────────────────── */
+const TRAILN = 46;
+let trailLine = null, trailPos = null, trailHead = 0, trailFill = 0;
+function initTrail(scene, colour){
+  trailPos = new Float32Array(TRAILN * 3);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(trailPos, 3));
+  trailLine = new THREE.Line(g, new THREE.LineBasicMaterial({ color: colour, transparent:true, opacity:.75 }));
+  trailLine.frustumCulled = false; scene.add(trailLine);
+}
+function pushTrail(p, on){
+  if (!on){ trailFill = Math.max(0, trailFill - 2); }
+  else {
+    trailHead = (trailHead + 1) % TRAILN;
+    trailFill = Math.min(TRAILN, trailFill + 1);
+  }
+  // Rewrite the buffer in draw order so the line renders as one continuous ribbon.
+  for (let i = 0; i < TRAILN; i++){
+    const src = (trailHead - i + TRAILN * 2) % TRAILN;
+    if (i === 0 && on){ trailPos[src*3] = p.x; trailPos[src*3+1] = p.y; trailPos[src*3+2] = p.z; }
+  }
+  trailLine.geometry.setDrawRange(0, trailFill);
+  trailLine.geometry.attributes.position.needsUpdate = true;
+  trailLine.visible = trailFill > 2;
+}
+
+/* ── Character animation ─────────────────────────────────────────────────── */
+const _bq = new THREE.Quaternion(), _bm = new THREE.Matrix4();
+function orientTo(nrm, yaw, q){
+  _wf.set(Math.sin(yaw), 0, Math.cos(yaw));
+  _v2.copy(_wf).addScaledVector(nrm, -_wf.dot(nrm)).normalize();
+  _v3.crossVectors(nrm, _v2).normalize();
+  _bm.makeBasis(_v3, nrm, _v2);
+  return q.setFromRotationMatrix(_bm);
+}
+/** Procedural posing: every limb angle is a function of the state, no clips. */
+function poseSkater(rig, dt){
+  const b = rig.bones, t = performance.now() / 1000;
+  const speed = P.vel.length();
+  b.pelvis.position.y = 0.78;
+
+  if (P.mode === 'ragdoll'){ poseRagdoll(rig, rag); return; }
+
+  orientTo(P.nrm, P.yaw, _bq);
+  rig.root.quaternion.copy(_bq);
+  rig.root.position.copy(P.pos).addScaledVector(P.nrm, P.onFoot ? 0 : 0.09);
+
+  const set = (n, x, y, z) => { const o = b[n]; o.rotation.set(x, y, z); };
+  const carve = clamp(-IN.steer * clamp(speed/12, 0, 1), -1, 1);
+
+  if (P.mode === 'walk'){
+    const ph = P.walkPhase, sw = clamp(speed/5, 0.15, 1.3);
+    b.pelvis.position.y = 0.78 - Math.abs(Math.sin(ph)) * 0.05 * sw;
+    set('thighL', Math.sin(ph) * 0.85 * sw, 0, 0.06);
+    set('thighR', -Math.sin(ph) * 0.85 * sw, 0, -0.06);
+    set('shinL', Math.max(0, -Math.cos(ph)) * 0.9 * sw, 0, 0);
+    set('shinR', Math.max(0, Math.cos(ph)) * 0.9 * sw, 0, 0);
+    set('upL', -Math.sin(ph) * 0.7 * sw, 0, 0.42);
+    set('upR', Math.sin(ph) * 0.7 * sw, 0, -0.42);
+    set('foreL', -0.3, 0, 0); set('foreR', -0.3, 0, 0);
+    b.chest.rotation.set(Math.sin(ph*2)*0.04, -Math.sin(ph)*0.12, 0);
+    if (P.carrying){ set('upR', -1.5, 0, -0.5); set('foreR', -1.2, 0, 0); }
+    if (P.climbing && IN.push){ set('upL', -2.4, 0, 0.2); set('upR', -2.4, 0, -0.2);
+                                set('thighL', 0.9, 0, 0.1); set('thighR', 0.3, 0, -0.1); }
+    return;
+  }
+
+  // Skate stance: knees bent, arms out, front foot forward, shoulders counter-rotating.
+  const crouch = P.mode === 'grind' ? 0.35 : P.crouch;
+  const kneeBend = 0.55 + crouch * 0.75;
+  b.pelvis.position.y = 0.78 - crouch * 0.26;
+  set('thighL', kneeBend * -0.55, 0, 0.34 + (P.mode === 'grind' ? 0.34 : 0));
+  set('thighR', kneeBend * -0.55, 0, -0.34 - (P.mode === 'grind' ? 0.34 : 0));
+  set('shinL', kneeBend, 0, 0); set('shinR', kneeBend, 0, 0);
+  set('footL', 0, P.stance > 0 ? 1.2 : -1.2, 0); set('footR', 0, P.stance > 0 ? 1.2 : -1.2, 0);
+
+  let armL = 0.85, armR = 0.85, armFwdL = -0.2, armFwdR = -0.2;
+  b.chest.rotation.set(0, -carve * 0.45, 0);
+
+  if (P.mode === 'air'){
+    const tuck = clamp(Math.abs(P.vel.y) / 12 + Math.abs(IN.steer) * 0.5, 0, 1);
+    set('thighL', -0.9 - tuck*0.5, 0, 0.4); set('thighR', -0.9 - tuck*0.5, 0, -0.4);
+    set('shinL', 1.3 + tuck*0.5, 0, 0); set('shinR', 1.3 + tuck*0.5, 0, 0);
+    armL = 1.5 + tuck * 0.6; armR = 1.5 + tuck * 0.6;
+    if (P.grab){
+      // Reach toward the grab point; the arm that reaches depends on the grab.
+      const front = P.grab.g.id === 'nosegrab' || P.grab.g.id === 'method';
+      if (front){ armR = 2.2; armFwdR = 0.9; } else { armL = 2.2; armFwdL = 0.9; }
+    }
+  } else if (P.mode === 'grind'){
+    const wob = P.bal;
+    armL = 1.35 + wob * 0.4; armR = 1.35 - wob * 0.4;
+    b.chest.rotation.z = -wob * 0.22;
+    b.chest.rotation.y = P.grindPerp ? 0.9 : -carve * 0.3;
+  } else if (P.manual){
+    b.pelvis.rotation.x = P.manual > 0 ? -0.28 : 0.24;
+    armL = 1.5 + P.bal * 0.7; armR = 1.5 - P.bal * 0.7;
+    b.chest.rotation.z = -P.bal * 0.25;
+  } else {
+    b.pelvis.rotation.x = 0;
+    // Push cycle: the back leg reaches down and kicks, ~0.45s.
+    if (pushAnim < 0.45){
+      const k = pushAnim / 0.45, s = Math.sin(k * Math.PI);
+      set('thighR', -1.15 * s, 0, -0.12); set('shinR', 0.5 * s, 0, 0);
+      set('footR', 0, 0, 0);
+      armL = 0.6 + s * 0.5;
+    }
+    if (P.sketchy > 0){                                  // wobble after a sketchy landing
+      const wb = Math.sin(t * 34) * P.sketchy;
+      b.chest.rotation.z = wb * 0.25; armL += wb; armR -= wb;
+    }
+  }
+  set('upL', armFwdL, 0, armL); set('upR', armFwdR, 0, -armR);
+  set('foreL', -0.35, 0, 0.15); set('foreR', -0.35, 0, -0.15);
+  b.head.rotation.set(0, -carve * 0.3, 0);
+  void dt;
+}
+
+/** Where the board sits, and how it spins mid-trick. */
+function poseBoard(bo){
+  if (P.mode === 'ragdoll' || P.onFoot){
+    if (P.carrying){
+      bo.group.visible = true;
+      _v1.copy(P.pos).addScaledVector(UP_AXIS, 1.05);
+      fwd(_wf); _v1.addScaledVector(_wf, -0.1);
+      bo.group.position.copy(_v1);
+      bo.group.rotation.set(1.2, P.yaw + 0.4, 0.5);
+      return;
+    }
+    if (!loose.active){ bo.group.visible = false; return; }
+    bo.group.visible = true;
+    bo.group.position.copy(loose.pos);
+    bo.group.rotation.set(loose.pitch, loose.yaw, loose.roll);
+    return;
+  }
+  bo.group.visible = true;
+  bo.group.position.copy(P.pos);
+  orientTo(P.nrm, P.yaw, _bq);
+  if (P.manual){
+    _q1.setFromAxisAngle(new THREE.Vector3(1,0,0), P.manual > 0 ? -0.5 : 0.42);
+    _bq.multiply(_q1);
+  }
+  if (P.mode === 'air'){
+    if (P.boardTilt) _bq.multiply(_q1.setFromAxisAngle(new THREE.Vector3(1,0,0), P.boardTilt * 0.5));
+    if (P.shove) _bq.multiply(_q1.setFromAxisAngle(UP_AXIS, P.shove));
+    if (P.flip) _bq.multiply(_q1.setFromAxisAngle(new THREE.Vector3(0,0,1), P.flip));
+  }
+  if (P.mode === 'grind' && P.grindPerp) _bq.multiply(_q1.setFromAxisAngle(UP_AXIS, Math.PI/2));
+  bo.group.quaternion.copy(_bq);
+  const spin = P.wheelSpin / bo.wr;
+  for (const wmesh of bo.wheels) wmesh.rotation.x = spin;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   12. REMOTE — other skaters: interpolation buffer, LOD, nameplates
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function makeLabel(text, colour){
+  const pad = 10, f = 30;
+  const c = document.createElement('canvas'), g = c.getContext('2d');
+  g.font = `700 ${f}px "Segoe UI",Arial`;
+  c.width = Math.ceil(g.measureText(text).width) + pad*2; c.height = f + pad*2;
+  const g2 = c.getContext('2d');
+  g2.font = `700 ${f}px "Segoe UI",Arial`;
+  g2.fillStyle = 'rgba(28,31,34,.72)'; g2.fillRect(0,0,c.width,c.height);
+  g2.fillStyle = colour || '#F4F6F7'; g2.textBaseline = 'middle';
+  g2.fillText(text, pad, c.height/2 + 1);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:t, transparent:true, depthTest:false }));
+  s.scale.set(c.width/c.height * 0.42, 0.42, 1);
+  s.renderOrder = 5;
+  return s;
+}
+
+class Remote {
+  constructor(uid, data){
+    this.uid = uid; this.buf = []; this.name = data.n || 'Skater';
+    this.prof = Object.assign({}, DEFAULT_PROFILE, data.c || {});
+    this.rig = makeOllie(this.prof);
+    this.board = makeBoard(this.prof);
+    this.grp = new THREE.Group();
+    this.grp.add(this.rig.root); this.grp.add(this.board.group);
+    this.label = makeLabel(this.name, '#FFD600'); this.grp.add(this.label);
+    this.rag = new Ragdoll();
+    this.pop = null; this.popT = 0;
+    this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
+    this.yaw = 0; this.mode = 'skate'; this.a = { crouch:0, phase:0, bal:0, grab:0 };
+    this.lastTs = performance.now();
+    scene.add(this.grp);
+  }
+  update(data){
+    this.lastTs = performance.now();
+    if (data.n && data.n !== this.name){ this.name = data.n;
+      this.grp.remove(this.label); this.label = makeLabel(this.name, '#FFD600'); this.grp.add(this.label); }
+    if (data.c){ Object.assign(this.prof, data.c); recolour(this.rig, this.prof); }
+    if (data.p) this.buf.push({ t: performance.now(), p:data.p, r:data.r || [0,0,0], v:data.v || [0,0,0],
+                                m:data.m || 'skate', a:data.a || null, rg:data.rg || null });
+    if (this.buf.length > 24) this.buf.shift();
+    if (data.t && data.t.name && data.t.ts !== this.lastTrickTs){ this.lastTrickTs = data.t.ts; this.showPop(data.t.name); }
+    this.score = data.s || 0; this.best = data.b || 0;
+    if (data.sp) this.spawnPub = data.sp;
+  }
+  showPop(name){
+    if (this.pop) this.grp.remove(this.pop);
+    this.pop = makeLabel(name, '#FF3D71'); this.popT = 2.2; this.grp.add(this.pop);
+    Audio5G.remotePop(this.pos);
+  }
+  /**
+   * Render 120ms in the past so we always have two samples to blend between;
+   * if packets stall, extrapolate with the last velocity for up to 250ms and
+   * then freeze rather than sliding the player through a wall.
+   */
+  step(dt, camPos){
+    const target = performance.now() - TUNING.net.interp * 1000;
+    let a = null, b = null;
+    for (let i = this.buf.length - 1; i >= 0; i--){
+      if (this.buf[i].t <= target){ a = this.buf[i]; b = this.buf[i+1] || null; break; }
+    }
+    if (!a) a = this.buf[0];
+    if (!a) return;
+    if (b){
+      const k = clamp((target - a.t) / Math.max(1, b.t - a.t), 0, 1);
+      this.pos.set(lerp(a.p[0], b.p[0], k), lerp(a.p[1], b.p[1], k), lerp(a.p[2], b.p[2], k));
+      this.yaw = a.r[0] + angDiff(a.r[0], b.r[0]) * k;
+      this.vel.set(b.v[0], b.v[1], b.v[2]);
+    } else {
+      const over = clamp((target - a.t) / 1000, 0, TUNING.net.extrap);
+      this.pos.set(a.p[0] + a.v[0]*over, a.p[1] + a.v[1]*over, a.p[2] + a.v[2]*over);
+      this.yaw = a.r[0]; this.vel.set(a.v[0], a.v[1], a.v[2]);
+    }
+    this.mode = a.m;
+    if (a.a){ this.a.crouch = a.a[0]; this.a.phase = a.a[1]; this.a.bal = a.a[2]; this.a.grab = a.a[3]; }
+
+    const d = this.pos.distanceTo(camPos);
+    this.grp.visible = d < 250;
+    if (!this.grp.visible) return;
+    this.label.visible = d < 80;
+    this.label.position.copy(this.pos).add(_v1.set(0, 2.5, 0));
+    if (this.pop){ this.popT -= dt;
+      this.pop.position.copy(this.pos).add(_v1.set(0, 3.1 + (2.2 - this.popT)*0.6, 0));
+      this.pop.material.opacity = clamp(this.popT, 0, 1);
+      if (this.popT <= 0){ this.grp.remove(this.pop); this.pop = null; } }
+
+    if (a.rg && a.m === 'ragdoll'){
+      for (let i = 0; i < RJ.length; i++){
+        const t3 = a.rg[i]; if (!t3) continue;
+        this.rag.p[i].lerp(_v1.set(t3[0], t3[1], t3[2]), clamp(dt*14, 0, 1));
+      }
+      poseRagdoll(this.rig, this.rag);
+      this.board.group.visible = false;
+      return;
+    }
+    // LOD: full pose up close, a static stance further out, nothing past 250m.
+    const near = d < 60 && animatedRemotes < 12;
+    if (near) animatedRemotes++;
+    poseRemote(this, near);
+  }
+  dispose(){ scene.remove(this.grp); }
+}
+let animatedRemotes = 0;
+
+function poseRemote(R, full){
+  const rig = R.rig, b = rig.bones;
+  orientTo(UP_AXIS, R.yaw, _bq);
+  rig.root.quaternion.copy(_bq);
+  rig.root.position.copy(R.pos).addScaledVector(UP_AXIS, R.mode === 'walk' ? 0 : 0.09);
+  R.board.group.visible = R.mode !== 'walk';
+  R.board.group.position.copy(R.pos);
+  R.board.group.quaternion.copy(_bq);
+  if (!full){ b.pelvis.position.y = 0.78; return; }
+  const c = R.a.crouch, sp = R.vel.length();
+  b.pelvis.position.y = 0.78 - c * 0.26;
+  const bend = 0.55 + c * 0.75;
+  if (R.mode === 'walk'){
+    const ph = R.a.phase * TAU, sw = clamp(sp/5, .2, 1.2);
+    b.thighL.rotation.set(Math.sin(ph)*0.85*sw, 0, 0.06);
+    b.thighR.rotation.set(-Math.sin(ph)*0.85*sw, 0, -0.06);
+    b.shinL.rotation.x = Math.max(0, -Math.cos(ph))*0.9*sw;
+    b.shinR.rotation.x = Math.max(0, Math.cos(ph))*0.9*sw;
+    b.upL.rotation.set(-Math.sin(ph)*0.7*sw, 0, 0.42);
+    b.upR.rotation.set(Math.sin(ph)*0.7*sw, 0, -0.42);
+  } else {
+    b.thighL.rotation.set(bend*-0.55, 0, 0.34); b.thighR.rotation.set(bend*-0.55, 0, -0.34);
+    b.shinL.rotation.x = bend; b.shinR.rotation.x = bend;
+    const arm = R.mode === 'air' ? 1.6 : R.mode === 'grind' ? 1.35 : 0.85;
+    b.upL.rotation.set(R.a.grab ? 0.9 : -0.2, 0, arm + R.a.bal*0.4);
+    b.upR.rotation.set(-0.2, 0, -(arm - R.a.bal*0.4));
+    b.footL.rotation.y = 1.2; b.footR.rotation.y = 1.2;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   13. NET — Firebase presence, sync, hits, chat, spawns, leaderboard
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const NET = { on:false, db:null, uid:null, room:'campus-1', fns:null,
+              refs:{}, last:0, lastSent:null, remotes:new Map(), chat:[], hitCd:0 };
+
+async function initNet(room){
+  NET.room = room;
+  try {
+    const [appM, authM, dbM] = await Promise.all([
+      import('firebase/app'), import('firebase/auth'), import('firebase/database')
+    ]);
+    if (!firebaseConfig.databaseURL || firebaseConfig.databaseURL.includes('YOUR_PROJECT'))
+      throw new Error('Firebase config not filled in');
+    const app = appM.initializeApp(firebaseConfig);
+    const auth = authM.getAuth(app);
+    const cred = await authM.signInAnonymously(auth);
+    NET.uid = cred.user.uid;
+    NET.fns = dbM; NET.db = dbM.getDatabase(app);
+    const { ref, onChildAdded, onChildChanged, onChildRemoved, onDisconnect, query, limitToLast } = dbM;
+
+    NET.refs.me = ref(NET.db, `rooms/${room}/players/${NET.uid}`);
+    NET.refs.players = ref(NET.db, `rooms/${room}/players`);
+    NET.refs.hits = ref(NET.db, `rooms/${room}/hits/${NET.uid}`);
+    NET.refs.chat = query(ref(NET.db, `rooms/${room}/chat`), limitToLast(40));
+    NET.refs.spawn = ref(NET.db, `spawns/${NET.uid}`);
+    NET.refs.lb = ref(NET.db, 'leaderboard');
+
+    onDisconnect(NET.refs.me).remove();
+    await dbM.set(NET.refs.me, localPacket(true));
+
+    onChildAdded(NET.refs.players, s => { if (s.key !== NET.uid) addRemote(s.key, s.val()); });
+    onChildChanged(NET.refs.players, s => { if (s.key !== NET.uid) addRemote(s.key, s.val()); });
+    onChildRemoved(NET.refs.players, s => dropRemote(s.key));
+    onChildAdded(NET.refs.hits, s => { applyHit(s.val()); dbM.remove(s.ref); });
+    onChildAdded(NET.refs.chat, s => pushChat(s.val()));
+
+    // Restore a spawn saved on another device.
+    const snap = await dbM.get(NET.refs.spawn);
+    if (snap.exists()){
+      const v = snap.val();
+      const ok = validateSpawn({ x:v.p[0], y:v.p[1], z:v.p[2] }, v.yaw);
+      if (ok){ P.spawn.p.copy(ok.p); P.spawn.yaw = ok.yaw; placeBeacon(P.spawn.p, profile.n || 'You'); }
+    }
+    NET.on = true; netBadge(false); setDot('ok');
+  } catch (e){
+    console.warn('[net] offline:', e && e.message);
+    NET.on = false; netBadge(true); setDot('off');
+  }
+}
+
+function localPacket(full){
+  const p = [round2(P.pos.x), round2(P.pos.y), round2(P.pos.z)];
+  const pk = {
+    m: P.mode, p,
+    r: [round1(P.yaw), round1(P.boardTilt), round1(P.bal)],
+    v: [round1(P.vel.x), round1(P.vel.y), round1(P.vel.z)],
+    a: [round2(P.crouch), round2(P.walkPhase % 1), round2(P.bal), P.grab ? 1 : 0],
+    s: Math.round(P.score), b: Math.round(P.best)
+  };
+  if (P.mode === 'ragdoll') pk.rg = rag.p.map(v => [round2(v.x), round2(v.y), round2(v.z)]);
+  if (full || NET.dirtyProfile){
+    pk.n = profile.n || 'Skater';
+    pk.c = { sk:profile.sk, sh:profile.sh, pt:profile.pt, sc:profile.sc, hat:profile.hat, acc:profile.acc,
+             deck:profile.deck, gfx:profile.gfx, dcol:profile.dcol, grip:profile.grip,
+             trk:profile.trk, whl:profile.whl, wsz:profile.wsz, trail:profile.trail };
+    NET.dirtyProfile = false;
+  }
+  if (profile.beacon) pk.sp = [round2(P.spawn.p.x), round2(P.spawn.p.y), round2(P.spawn.p.z)];
+  return pk;
+}
+const round1 = n => Math.round(n * 10) / 10;
+const round2 = n => Math.round(n * 100) / 100;
+
+function netTick(now){
+  if (!NET.on) return;
+  const hz = P.mode === 'ragdoll' ? TUNING.net.ragHz : TUNING.net.hz;
+  if (now - NET.last < 1000 / hz) return;
+  NET.last = now;
+  const pk = localPacket(false);
+  // Only write when something actually moved: idle players cost nothing.
+  const key = pk.m + pk.p.join() + pk.r.join() + (pk.rg ? 'r' : '');
+  if (key === NET.lastSent && !pk.n) return;
+  NET.lastSent = key;
+  pk.ts = NET.fns.serverTimestamp();
+  NET.fns.update(NET.refs.me, pk).catch(() => setDot('warn'));
+  // Prune anyone whose packets stopped arriving.
+  const cutoff = performance.now() - TUNING.net.stale;
+  for (const [uid, r] of NET.remotes) if (r.lastTs < cutoff) dropRemote(uid);
+}
+function addRemote(uid, data){
+  if (!data) return;
+  let r = NET.remotes.get(uid);
+  if (!r){
+    if (NET.remotes.size >= TUNING.net.cap - 1) return;
+    r = new Remote(uid, data); NET.remotes.set(uid, r); hudPlayers();
+  }
+  r.update(data);
+}
+function dropRemote(uid){
+  const r = NET.remotes.get(uid);
+  if (r){ r.dispose(); NET.remotes.delete(uid); hudPlayers(); }
+}
+function netTrick(name, pts){
+  if (!NET.on) return;
+  NET.fns.update(NET.refs.me, { t:{ name, pts, ts: Date.now() } }).catch(()=>{});
+}
+function netSlam(){ if (NET.on) NET.fns.update(NET.refs.me, { m:'ragdoll' }).catch(()=>{}); }
+function netPushBest(){
+  if (!NET.on) return;
+  NET.fns.set(NET.fns.ref(NET.db, `leaderboard/${NET.uid}`),
+    { n: profile.n || 'Skater', best: Math.round(P.best), ts: Date.now() }).catch(()=>{});
+}
+function netPushSpawn(){
+  if (!NET.on) return;
+  NET.fns.set(NET.refs.spawn, { p:[round2(P.spawn.p.x), round2(P.spawn.p.y), round2(P.spawn.p.z)],
+    yaw: round1(P.spawn.yaw), n: profile.n || 'Skater', public: !!profile.beacon }).catch(()=>{});
+}
+function netChat(msg){
+  if (!NET.on){ pushChat({ n: profile.n || 'You', msg }); return; }
+  NET.fns.push(NET.fns.ref(NET.db, `rooms/${NET.room}/chat`),
+    { n: profile.n || 'Skater', msg, ts: Date.now() }).catch(()=>{});
+}
+async function netLeaderboard(){
+  if (!NET.on) return [];
+  try {
+    const snap = await NET.fns.get(NET.refs.lb);
+    if (!snap.exists()) return [];
+    return Object.values(snap.val()).sort((a,b) => b.best - a.best).slice(0, 8);
+  } catch { return []; }
+}
+
+/**
+ * Body-checks. Each client only ever simulates its own ragdoll: we detect the
+ * overlap locally and write an impulse to the *victim's* node, they apply it
+ * and broadcast the resulting joints. Both players then see the same slam.
+ */
+function checkHits(dt){
+  NET.hitCd -= dt;
+  if (!NET.on || !profile.contact || P.mode === 'ragdoll' || NET.hitCd > 0) return;
+  for (const [uid, r] of NET.remotes){
+    if (r.mode === 'ragdoll') continue;
+    const d = P.pos.distanceTo(r.pos);
+    if (d > 1.1) continue;
+    _v1.copy(P.vel).sub(r.vel);
+    const rel = _v1.length();
+    if (rel < TUNING.hitSpeed) continue;
+    _v2.copy(r.pos).sub(P.pos).setY(0.35).normalize().multiplyScalar(rel * 0.75);
+    NET.fns.push(NET.fns.ref(NET.db, `rooms/${NET.room}/hits/${uid}`),
+      { from: profile.n || 'Skater', imp:[round1(_v2.x), round1(_v2.y), round1(_v2.z)], ts: Date.now() }).catch(()=>{});
+    NET.hitCd = 0.8;
+    toast(`You wrecked ${r.name}`, 'slam'); Audio5G.hit(); shake(0.4);
+    break;
+  }
+}
+function applyHit(h){
+  if (!h || !profile.contact || P.immune > 0) return;
+  P.immune = 0.8;
+  const v = new THREE.Vector3(h.imp[0], h.imp[1], h.imp[2]);
+  if (P.mode === 'ragdoll') rag.impulse(v);
+  else { P.vel.add(v); bail('hit'); }
+  toast(`${h.from} body-checked you`, 'slam'); Audio5G.hit(); shake(0.6);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   14. CAMERA — chase, cinematic, bail and photo modes
+   ══════════════════════════════════════════════════════════════════════════ */
+
+let renderer, scene, camera, composer, bloom, sun, sky, previewScene, previewCam, previewRig, previewBoard;
+let me = null, meBoard = null;
+
+const CAM = { pos:new THREE.Vector3(0, 4, 30), look:new THREE.Vector3(),
+              shake:0, fov:62, yaw:Math.PI, mode:'chase', photo:new THREE.Vector3(0,6,20),
+              photoYaw:0, photoPitch:-0.2, behind:false, first:false };
+const _cf = new THREE.Vector3(), _ct = new THREE.Vector3(), _cd = new THREE.Vector3(), _cs = new THREE.Vector3();
+
+/** Pull the camera in until it has line of sight; never let it pass through. */
+function camCollide(from, to){
+  _cd.copy(to).sub(from);
+  const len = _cd.length(); if (len < 0.01) return to;
+  _cd.multiplyScalar(1/len);
+  for (let i = 1; i <= 7; i++){
+    const t = len * i / 7;
+    _cs.copy(from).addScaledVector(_cd, t);
+    if (pushOut(_cs, 0.35, _v1) > 0.02) return to.copy(from).addScaledVector(_cd, Math.max(0.6, len*(i-1)/7));
+  }
+  return to;
+}
+function updateCamera(dt){
+  if (CAM.mode === 'photo'){
+    const sp = (Keys.shift ? 22 : 9) * dt;
+    _cf.set(Math.sin(CAM.photoYaw)*Math.cos(CAM.photoPitch), Math.sin(CAM.photoPitch), Math.cos(CAM.photoYaw)*Math.cos(CAM.photoPitch));
+    if (Keys.w) CAM.photo.addScaledVector(_cf, sp);
+    if (Keys.s) CAM.photo.addScaledVector(_cf, -sp);
+    _v1.set(_cf.z, 0, -_cf.x).normalize();
+    if (Keys.d) CAM.photo.addScaledVector(_v1, sp);
+    if (Keys.a) CAM.photo.addScaledVector(_v1, -sp);
+    if (Keys.e) CAM.photo.y += sp; if (Keys.q) CAM.photo.y -= sp;
+    camera.position.copy(CAM.photo);
+    camera.lookAt(_ct.copy(CAM.photo).add(_cf));
+    camera.fov = damp(camera.fov, 58, 6, dt); camera.updateProjectionMatrix();
+    return;
+  }
+  const speed = P.vel.length();
+  const focus = _ct.copy(renderPos).addScaledVector(UP_AXIS, P.mode === 'ragdoll' ? 0.8 : 1.15);
+  // Follow the direction of travel rather than the board. Riding fakie or
+  // sliding a rail sideways then keeps the camera behind you, and spins read
+  // as the skater turning in front of a steady camera instead of the world
+  // whipping around. Below walking pace it falls back to the board heading.
+  const hsp = Math.hypot(P.vel.x, P.vel.z);
+  const tYaw = hsp > 2.2 ? Math.atan2(P.vel.x, P.vel.z) : renderYaw;
+  CAM.yaw += angDiff(CAM.yaw, tYaw) * (1 - Math.exp(-TUNING.cam.turn * dt));
+  const yaw = CAM.behind ? CAM.yaw + Math.PI : CAM.yaw;
+  const off = TUNING.cam.off;
+  let back = off.z, up = off.y;
+  if (P.mode === 'air'){ back -= clamp(P.airTime, 0, 2.5) * 0.75; up += clamp(P.airTime, 0, 2.5) * 0.3; }
+  if (P.mode === 'ragdoll'){ back -= 1.1; up += 0.8; }
+  if (CAM.first){
+    camera.position.copy(focus).addScaledVector(_v1.set(Math.sin(yaw),0,Math.cos(yaw)), 0.18);
+    camera.position.y += 0.32;
+    camera.lookAt(_v2.copy(camera.position).add(_v1.set(Math.sin(yaw), -0.12, Math.cos(yaw))));
+    camera.fov = damp(camera.fov, 78, 5, dt); camera.updateProjectionMatrix();
+    return;
+  }
+  _cf.set(Math.sin(yaw) * back, up, Math.cos(yaw) * back);
+  _v2.copy(focus).add(_cf);
+  camCollide(focus, _v2);
+  // Exponential smoothing, then a hard cap on how far the camera may trail.
+  // A plain spring has steady-state lag proportional to speed, which is what
+  // pushes a chase camera out to ten metres the moment you get going.
+  CAM.pos.lerp(_v2, 1 - Math.exp(-TUNING.cam.stiff * dt));
+  _v1.copy(CAM.pos).sub(_v2);
+  const lag = _v1.length();
+  if (lag > TUNING.cam.maxLag) CAM.pos.copy(_v2).addScaledVector(_v1, TUNING.cam.maxLag / lag);
+
+  camera.position.copy(CAM.pos);
+  if (CAM.shake > 0){
+    camera.position.x += rr(-1,1) * CAM.shake * 0.35;
+    camera.position.y += rr(-1,1) * CAM.shake * 0.35;
+    CAM.shake = Math.max(0, CAM.shake - dt * 2.4);
+  }
+  camera.lookAt(focus);
+  const tf = lerp(TUNING.cam.fovLo, TUNING.cam.fovHi, clamp(speed / TUNING.maxSpeed, 0, 1))
+           + (P.airTime > 2.5 ? 6 : 0);
+  camera.fov = damp(camera.fov, tf, 4, dt);
+  camera.updateProjectionMatrix();
+}
+function shake(a){ CAM.shake = Math.min(1.4, CAM.shake + a); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   15. UI — menu wiring, HUD, toasts, customiser preview
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const el = {
+  boot:$('#boot'), bootfill:$('#bootfill'), bootmsg:$('#bootmsg'), menu:$('#menu'), hud:$('#hud'),
+  score:$('#sScore'), best:$('#sBest'), kmh:$('#sKmh'), pushdot:$('#pushdot'),
+  comboWrap:$('#combo'), comboStr:$('#comboStr'), comboMul:$('#comboMul'),
+  ring:$('#ringFill'), flick:$('#flickLine'), balance:$('#balance'), balbar:$('#balbar').querySelector('i'),
+  balLbl:$('#balLbl'), toasts:$('#toasts'), chatlog:$('#chatlog'), chatin:$('#chatin'), chatbox:$('#chatbox'),
+  hint:$('#hint'), netbadge:$('#netbadge'), dbg:$('#dbg'), dot:$('#dot'), plist:$('#plist'),
+  roomName:$('#roomName'), pause:$('#pause'), book:$('#trickbook'), flash:$('#flash'),
+  touch:$('#touch'), reticle:$('#reticle')
+};
+let profile = Object.assign({}, DEFAULT_PROFILE);
+
+function loadProfile(){
+  try {
+    const raw = localStorage.getItem('ollieHawk.profile');
+    if (raw) profile = Object.assign({}, DEFAULT_PROFILE, JSON.parse(raw));
+  } catch {}
+  if (!profile.n) profile.n = 'Ollie_' + Math.floor(rng()*90 + 10);
+  const sp = localStorage.getItem('ollieHawk.spawn');
+  if (sp){ try {
+    const v = JSON.parse(sp);
+    const ok = validateSpawn({ x:v.p[0], y:v.p[1], z:v.p[2] }, v.yaw);
+    if (ok){ P.spawn.p.copy(ok.p); P.spawn.yaw = ok.yaw; }
+  } catch {} }
+}
+function saveProfile(){
+  try { localStorage.setItem('ollieHawk.profile', JSON.stringify(profile)); } catch {}
+  NET.dirtyProfile = true;
+}
+
+function toast(msg, cls){
+  const d = document.createElement('div');
+  d.className = 'toast ' + (cls || ''); d.textContent = msg;
+  el.toasts.appendChild(d);
+  setTimeout(() => { d.style.transition = 'opacity .4s'; d.style.opacity = '0';
+                     setTimeout(() => d.remove(), 420); }, 1700);
+  while (el.toasts.children.length > 4) el.toasts.firstChild.remove();
+}
+function trickPop(name){ toast(name, ''); }
+function flashScreen(a){
+  el.flash.style.opacity = String(a);
+  setTimeout(() => { el.flash.style.opacity = '0'; }, 240);
+}
+function hudScore(){
+  el.score.textContent = fmt(P.score);
+  el.best.textContent = `Best combo ${fmt(P.best)} · Slams ${P.slams}`;
+}
+function hudCombo(){
+  if (!P.combo.length){ el.comboWrap.classList.remove('on'); return; }
+  el.comboWrap.classList.add('on');
+  el.comboStr.innerHTML = P.combo.map(c => c.name).join(' <em>→</em> ');
+  el.comboMul.textContent = `×${P.mult.toFixed(1)} = ${fmt(P.comboPts * P.mult)}`;
+  el.comboMul.classList.remove('pulse'); void el.comboMul.offsetWidth; el.comboMul.classList.add('pulse');
+}
+function hudBalance(on, v, label){
+  el.balance.classList.toggle('on', !!on);
+  if (on){ el.balbar.style.left = `${50 + clamp(v, -1, 1) * 46}%`; el.balLbl.textContent = (label || 'BALANCE').toUpperCase(); }
+}
+function hudPlayers(){
+  const rows = [`<div class="pr me"><span>${escapeHtml(profile.n)}</span><span>${fmt(P.score)}</span></div>`];
+  for (const r of NET.remotes.values())
+    rows.push(`<div class="pr"><span>${escapeHtml(r.name)}</span><span>${fmt(r.score || 0)}</span></div>`);
+  el.plist.innerHTML = rows.join('');
+  const rc = $('#roomCount'); if (rc) rc.textContent = `${NET.remotes.size + 1} skating`;
+}
+const escapeHtml = s => (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function setDot(state){ el.dot.className = state === 'ok' ? 'ok' : state === 'off' ? 'off' : ''; }
+function netBadge(show){ el.netbadge.classList.toggle('hide', !show); }
+function pushChat(m){
+  if (!m || !m.msg) return;
+  NET.chat.push(m); if (NET.chat.length > 40) NET.chat.shift();
+  const d = document.createElement('div');
+  d.innerHTML = `<b>${escapeHtml(m.n || '?')}</b> ${escapeHtml(m.msg)}`;
+  el.chatlog.appendChild(d);
+  while (el.chatlog.children.length > 8) el.chatlog.firstChild.remove();
+  setTimeout(() => { d.style.transition = 'opacity .6s'; d.style.opacity = '0';
+                     setTimeout(() => d.remove(), 700); }, 8000);
+}
+
+/* ── Customiser ──────────────────────────────────────────────────────────── */
+const SLOTS = {
+  sk:{ pal:PAL.skin }, sh:{ pal:PAL.cloth }, pt:{ pal:PAL.cloth }, sc:{ pal:PAL.shoe },
+  dcol:{ pal:PAL.deck }, grip:{ pal:PAL.grip }, trk:{ pal:PAL.truck }, whl:{ pal:PAL.wheel }, trail:{ pal:PAL.trail },
+  hat:{ opts:['None','Cap','Beanie','Helmet','Bucket'] },
+  acc:{ opts:['None','Backpack','Lanyard','Headphones','Sunnies'] },
+  deck:{ opts:['Popsicle','Cruiser','Fish'] },
+  gfx:{ opts: GFX_KEYS.map(k => GFX_NAMES[k]) },
+  wsz:{ opts:['52mm','56mm','60mm'] },
+  contact:{ opts:['Ghost','Full contact'] },
+  music:{ opts:['Off','On'] },
+  beacon:{ opts:['Private','Public'] },
+  contact2:{ opts:['Ghost','Full contact'], key:'contact' },
+  shadow:{ opts:['Low','High'] }
+};
+function buildCustomiser(){
+  for (const host of $$('[data-slot]')){
+    const slot = host.dataset.slot, def = SLOTS[slot]; if (!def) continue;
+    const key = def.key || slot;
+    host.innerHTML = '';
+    const items = def.pal || def.opts;
+    items.forEach((v, i) => {
+      const b = document.createElement('button');
+      if (def.pal) b.style.background = hex(v); else b.textContent = v;
+      b.onclick = () => {
+        profile[key] = i; saveProfile(); markSlots(); refreshLook(); Audio5G.ui(true);
+        if (key === 'music') Audio5G.toggleMusic(!!i);
+        if (key === 'shadow' && sun) sun.castShadow = i > 0;
+        if (key === 'beacon') netPushSpawn();
+      };
+      host.appendChild(b);
+    });
+  }
+  markSlots();
+}
+function markSlots(){
+  for (const host of $$('[data-slot]')){
+    const def = SLOTS[host.dataset.slot]; if (!def) continue;
+    const key = def.key || host.dataset.slot;
+    Array.from(host.children).forEach((b, i) => b.classList.toggle('on', profile[key] === i));
+  }
+}
+/** Rebuild only what changed: colours recolour, geometry swaps rebuild. */
+let lastBoardKey = '';
+function refreshLook(){
+  const key = [profile.deck, profile.gfx, profile.dcol, profile.grip, profile.trk, profile.whl, profile.wsz].join('|');
+  const rebuild = key !== lastBoardKey; lastBoardKey = key;
+  if (previewRig){
+    recolour(previewRig, profile);
+    if (rebuild){
+      previewScene.remove(previewBoard.group);
+      previewBoard = makeBoard(profile);
+      previewBoard.group.position.y = 0.02; previewScene.add(previewBoard.group);
+    }
+  }
+  if (me){
+    recolour(me, profile);
+    if (rebuild && meBoard){ scene.remove(meBoard.group); meBoard = makeBoard(profile); scene.add(meBoard.group); }
+  }
+  if (trailLine) trailLine.material.color.setHex(PAL.trail[profile.trail]);
+}
+
+function buildTrickBook(){
+  const body = $('#tbBody');
+  const rows = TRICKS.map(t => `<tr><td>${t.name}</td><td>${t.input}</td><td>${t.base}</td></tr>`)
+    .concat(GRABS.map(g => `<tr><td>${g.name}</td><td>Hold right mouse, aim ${g.id === 'indy' ? 'right' : g.id === 'melon' ? 'left' : g.id === 'nosegrab' ? 'up' : g.id === 'tail' ? 'down' : g.id === 'method' ? 'up-left' : 'down-right'}</td><td>${g.base}</td></tr>`))
+    .concat(GRIND_NAMES.par.map(n => `<tr><td>${n}</td><td>Land parallel on a rail or ledge</td><td>26/m</td></tr>`))
+    .concat(GRIND_NAMES.perp.map(n => `<tr><td>${n}</td><td>Land across a rail or ledge</td><td>26/m</td></tr>`))
+    .concat([`<tr><td>Manual</td><td>Ctrl while rolling</td><td>90+</td></tr>`,
+             `<tr><td>Nose Manual</td><td>Shift while rolling</td><td>90+</td></tr>`,
+             `<tr><td>Revert</td><td>Q or E just after landing</td><td>keeps combo</td></tr>`]);
+  body.innerHTML = rows.join('');
+  $('#tbSearch').oninput = e => {
+    const q = e.target.value.toLowerCase();
+    Array.from(body.children).forEach(tr => {
+      tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  };
+}
+function buildZoneButtons(){
+  const host = $('#zoneBtns'); host.innerHTML = '';
+  const mk = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.onclick = fn; host.appendChild(b); };
+  mk('My spawn', () => { closeModals(); respawn(); });
+  for (const z of ZONES) mk(z.name, () => { closeModals(); spawnAtZone(z.id); });
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   16. MAIN — scene, input, fixed-step loop
+   ══════════════════════════════════════════════════════════════════════════ */
+
+let state = 'boot';
+const renderPos = new THREE.Vector3(0, 0.2, 18);
+let renderYaw = Math.PI, prevYaw = Math.PI;
+const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
+let debugOn = false, noclip = false, wireGrp = null;
+let frameAvg = 16, pixelScale = IS_TOUCH ? 0.8 : 1, physMs = 0, netMs = 0;
+
+function makeSky(){
+  const geo = new THREE.SphereGeometry(600, 24, 16);
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false,
+    uniforms: { top:{ value:new THREE.Color(0x2f9ea6) }, bot:{ value:new THREE.Color(0xf7e2a0) } },
+    vertexShader: `varying float h; void main(){ h = normalize(position).y;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `uniform vec3 top; uniform vec3 bot; varying float h;
+      void main(){ gl_FragColor = vec4(mix(bot, top, clamp(h*1.5+0.15,0.0,1.0)), 1.0); }`
+  });
+  const dome = new THREE.Mesh(geo, mat);
+  dome.frustumCulled = false;
+  // A handful of flat low-poly clouds, no more.
+  const cloudMat = new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:.78 });
+  for (let i = 0; i < 14; i++){
+    const g = new THREE.Group();
+    for (let k = 0; k < 3; k++){
+      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(rr(6, 13), 0), cloudMat);
+      m.position.set(rr(-14,14), rr(-2,2), rr(-8,8)); m.scale.y = 0.42; g.add(m);
+    }
+    g.position.set(rr(-260,260), rr(70,110), rr(-260,260));
+    dome.add(g);
+  }
+  return dome;
+}
+
+function initScene(){
+  const canvas = $('#gl');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: !IS_TOUCH, powerPreference:'high-performance' });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2) * pixelScale);
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0xe4dcb4, 0.0026);
+  camera = new THREE.PerspectiveCamera(62, innerWidth/innerHeight, 0.1, 900);
+
+  const hemi = new THREE.HemisphereLight(0xfff0c4, 0x2a3a38, 1.05);
+  scene.add(hemi);
+  sun = new THREE.DirectionalLight(0xffe9b0, 1.6);
+  sun.position.set(-50, 42, -30); sun.castShadow = true;
+  sun.shadow.mapSize.set(IS_TOUCH ? 1024 : 2048, IS_TOUCH ? 1024 : 2048);
+  const sc = sun.shadow.camera;
+  sc.left = -34; sc.right = 34; sc.top = 34; sc.bottom = -34; sc.near = 1; sc.far = 160;
+  sun.shadow.bias = -0.0012;
+  scene.add(sun); scene.add(sun.target);
+  sky = makeSky(); scene.add(sky);
+
+  // Point lights only where they earn their keep: the tower and the tunnel.
+  const towerLight = new THREE.PointLight(0xFFD600, 40, 60, 2); towerLight.position.set(0, 22, -164);
+  scene.add(towerLight);
+  for (let i = 0; i < 3; i++){
+    const l = new THREE.PointLight(0x00A3A6, 26, 34, 2);
+    l.position.set(0, -3.4, 40 + i*26); scene.add(l);
+  }
+
+  if (!IS_TOUCH){
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.42, 0.7, 0.86);
+    composer.addPass(bloom);
+  }
+}
+function initPreview(){
+  previewScene = new THREE.Scene();
+  previewCam = new THREE.PerspectiveCamera(38, innerWidth/innerHeight, 0.1, 60);
+  previewCam.position.set(2.4, 1.5, 3.2);
+  previewScene.add(new THREE.HemisphereLight(0xffffff, 0x334044, 1.5));
+  const key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(3, 6, 4); previewScene.add(key);
+  const plinth = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.5, 0.22, 28), MAT.dteal);
+  plinth.position.y = -0.11; previewScene.add(plinth);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.36, 0.03, 6, 40), MAT.yellow);
+  ring.rotation.x = Math.PI/2; previewScene.add(ring);
+  previewRig = makeOllie(profile);
+  previewBoard = makeBoard(profile);
+  previewBoard.group.position.y = 0.02;
+  previewScene.add(previewRig.root); previewScene.add(previewBoard.group);
+  previewScene.background = new THREE.Color(0x101315);
+}
+
+/* ── Input ───────────────────────────────────────────────────────────────── */
+const Pad = { charging:false, prev:{} };
+const Touch = { steer:0, push:false, brake:false, grab:false, active:false, id:-1, ox:0, oy:0,
+                fid:-1, fx:0, fy:0, flicking:false };
+
+function bindInput(){
+  const canvas = $('#gl');
+  addEventListener('keydown', e => {
+    const k = e.code;
+    if (k === 'Tab'){ if (state === 'play') e.preventDefault(); return; }
+    if (chatOpen){
+      if (k === 'Enter'){ const v = el.chatbox.value.trim(); if (v) netChat(v.slice(0,120));
+                          el.chatbox.value = ''; toggleChat(false); }
+      if (k === 'Escape') toggleChat(false);
+      return;
+    }
+    if (Keys[k]) return;                       // ignore auto-repeat
+    Keys[k] = true;
+    Keys.w = Keys.KeyW; Keys.a = Keys.KeyA; Keys.s = Keys.KeyS; Keys.d = Keys.KeyD;
+    Keys.q = Keys.KeyQ; Keys.e = Keys.KeyE; Keys.shift = Keys.ShiftLeft || Keys.ShiftRight;
+    if (state !== 'play') return;
+    switch (k){
+      case 'Escape': togglePause(); break;
+      case 'KeyB': case 'Numpad0': if (P.mode !== 'ragdoll') bail('manual-bail'); break;
+      case 'KeyF': footAction(); break;
+      case 'KeyG': throwBoard(); break;
+      case 'KeyT': setSpawn(); break;
+      case 'KeyR': respawn(); break;
+      case 'KeyV': CAM.first = !CAM.first; break;
+      case 'KeyC': CAM.behind = true; break;
+      case 'KeyP': CAM.mode = CAM.mode === 'photo' ? 'chase' : 'photo';
+                   if (CAM.mode === 'photo'){ CAM.photo.copy(camera.position); el.hud.classList.add('hide'); }
+                   else el.hud.classList.remove('hide'); break;
+      case 'KeyH': toggleBook(); break;
+      case 'Enter': toggleChat(true); break;
+      case 'ControlLeft': case 'ControlRight': startManual(1); break;
+      case 'ShiftLeft': if (!P.onFoot) startManual(-1); break;
+      case 'KeyQ': revert(-1); break;
+      case 'KeyE': revert(1); break;
+      case 'Space': if (P.onFoot) IN.jump = true; break;
+      case 'F3': e.preventDefault(); debugOn = !debugOn; el.dbg.classList.toggle('hide', !debugOn); break;
+      case 'F4': e.preventDefault(); noclip = !noclip; toast(noclip ? 'Noclip on' : 'Noclip off', ''); break;
+      case 'F8': e.preventDefault(); toggleWire(); break;
+      default:
+        if (/^Digit[1-6]$/.test(k) && P.mode === 'air' && !P.trick){
+          const ids = ['ollie','kickflip','heelflip','shove','treflip','impossible'];
+          P.trick = { t: TRICK[ids[+k.slice(5) - 1]], nollie:false, prog:0 };
+        }
+    }
+  });
+  addEventListener('keyup', e => {
+    Keys[e.code] = false;
+    Keys.w = Keys.KeyW; Keys.a = Keys.KeyA; Keys.s = Keys.KeyS; Keys.d = Keys.KeyD;
+    Keys.q = Keys.KeyQ; Keys.e = Keys.KeyE; Keys.shift = Keys.ShiftLeft || Keys.ShiftRight;
+    if (e.code === 'KeyC') CAM.behind = false;
+    if (e.code === 'Space') IN.jump = false;
+    if (e.code === 'ControlLeft' || e.code === 'ControlRight' || e.code === 'ShiftLeft') endManual();
+  });
+  addEventListener('blur', () => { for (const k in Keys) Keys[k] = false; });
+
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('mousedown', e => {
+    if (state !== 'play') return;
+    if (CAM.mode !== 'photo' && !document.pointerLockElement && !IS_TOUCH) canvas.requestPointerLock();
+    if (e.button === 0) startCharge();
+    if (e.button === 2){ Mouse.rdown = true; startGrab(); }
+    if (e.button === 1){ e.preventDefault(); if (P.mode !== 'ragdoll') bail('manual-bail'); }
+  });
+  addEventListener('mouseup', e => {
+    if (e.button === 0) releaseCharge();
+    if (e.button === 2){ Mouse.rdown = false; P.grab = null; }
+  });
+  addEventListener('mousemove', e => {
+    const dx = e.movementX || 0, dy = e.movementY || 0;
+    if (CAM.mode === 'photo'){ CAM.photoYaw -= dx * 0.0022; CAM.photoPitch = clamp(CAM.photoPitch - dy*0.0022, -1.4, 1.4); return; }
+    Mouse.dx = dx; Mouse.dy = dy;
+    if (Mouse.down){
+      Mouse.sx += dx; Mouse.sy += dy;
+      Mouse.path.push({ x:Mouse.sx, y:Mouse.sy, t:performance.now() });
+      if (Mouse.path.length > 80) Mouse.path.shift();
+    }
+    if (Mouse.rdown && P.mode === 'air') startGrab();
+  });
+
+  if (IS_TOUCH) bindTouch();
+}
+function startCharge(){
+  Mouse.down = true; Mouse.path.length = 0; Mouse.sx = 0; Mouse.sy = 0;
+  if (P.mode === 'skate' || P.mode === 'manual' || P.mode === 'grind') P.charging = true;
+}
+function startGrab(){
+  if (P.mode !== 'air') return;
+  const g = grabFromMouse(Mouse.dx || 1, Mouse.dy || 0);
+  if (!P.grab){ P.grab = { g }; P.grabTime = 0; }
+  else P.grab.g = g;
+}
+function revert(dir){
+  if (comboTimer <= 0 || !P.grounded || P.mode === 'ragdoll') return;
+  P.yaw += Math.PI * (dir > 0 ? 1 : -1);
+  P.stance = -P.stance;
+  comboAdd('Revert', 70); comboTimer = 1.2;
+}
+function bindTouch(){
+  el.touch.classList.remove('hide');
+  const base = $('#stickBase'), knob = $('#stickKnob'), L = $('#stickL'), R = $('#padR');
+  L.addEventListener('touchstart', e => {
+    const t = e.changedTouches[0]; Touch.id = t.identifier; Touch.ox = t.clientX; Touch.oy = t.clientY;
+    base.style.display = 'block';
+    base.style.left = (t.clientX - L.getBoundingClientRect().left - 56) + 'px';
+    base.style.top = (t.clientY - L.getBoundingClientRect().top - 56) + 'px';
+  }, { passive:true });
+  L.addEventListener('touchmove', e => {
+    for (const t of e.changedTouches) if (t.identifier === Touch.id){
+      const dx = clamp((t.clientX - Touch.ox)/46, -1, 1), dy = clamp((t.clientY - Touch.oy)/46, -1, 1);
+      Touch.steer = dx; Touch.push = dy < -0.45; Touch.brake = dy > 0.5;
+      knob.style.left = `calc(50% + ${dx*30}px)`; knob.style.top = `calc(50% + ${dy*30}px)`;
+    }
+  }, { passive:true });
+  const endL = () => { Touch.id = -1; Touch.steer = 0; Touch.push = false; Touch.brake = false;
+                       base.style.display = 'none'; knob.style.left = '50%'; knob.style.top = '50%'; };
+  L.addEventListener('touchend', endL); L.addEventListener('touchcancel', endL);
+  // The right half of the screen is the Flick-It surface.
+  R.addEventListener('touchstart', e => {
+    const t = e.changedTouches[0]; Touch.fid = t.identifier; Touch.fx = t.clientX; Touch.fy = t.clientY;
+    startCharge();
+  }, { passive:true });
+  R.addEventListener('touchmove', e => {
+    for (const t of e.changedTouches) if (t.identifier === Touch.fid){
+      Mouse.sx = t.clientX - Touch.fx; Mouse.sy = t.clientY - Touch.fy;
+      Mouse.dx = Mouse.sx; Mouse.dy = Mouse.sy;
+      Mouse.path.push({ x:Mouse.sx, y:Mouse.sy, t:performance.now() });
+      if (Mouse.path.length > 80) Mouse.path.shift();
+    }
+  }, { passive:true });
+  const endR = () => { Touch.fid = -1; releaseCharge(); };
+  R.addEventListener('touchend', endR); R.addEventListener('touchcancel', endR);
+  for (const b of $$('#tbtns button')){
+    const kind = b.dataset.t;
+    b.addEventListener('touchstart', e => { e.preventDefault();
+      if (kind === 'push') Touch.push = true;
+      if (kind === 'brake') Touch.brake = true;
+      if (kind === 'grab'){ Mouse.rdown = true; startGrab(); }
+      if (kind === 'foot') footAction();
+    });
+    b.addEventListener('touchend', e => { e.preventDefault();
+      if (kind === 'push') Touch.push = false;
+      if (kind === 'brake') Touch.brake = false;
+      if (kind === 'grab'){ Mouse.rdown = false; P.grab = null; }
+    });
+  }
+}
+
+/** Gamepad: right stick is Flick-It, exactly like the mouse gesture. */
+function readPad(){
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let pad = null;
+  for (const p of pads) if (p && p.connected){ pad = p; break; }
+  if (!pad) return { steer:0, push:false, brake:false, spin:0 };
+  const ax = pad.axes, bt = pad.buttons;
+  const rx = ax[2] || 0, ry = ax[3] || 0;
+  const loaded = ry > 0.45;
+  if (loaded && !Pad.charging){ Pad.charging = true; startCharge(); }
+  if (Pad.charging){
+    Mouse.sx += rx * 26; Mouse.sy += ry * 26;
+    Mouse.path.push({ x:Mouse.sx, y:Mouse.sy, t:performance.now() });
+    if (Mouse.path.length > 80) Mouse.path.shift();
+    if (ry < 0.15){ Pad.charging = false; releaseCharge(); }
+  }
+  const press = (i) => bt[i] && bt[i].pressed;
+  if (press(0) && !Pad.prev[0]) footAction();
+  if (press(1) && !Pad.prev[1] && P.mode !== 'ragdoll') bail('manual-bail');
+  if (press(2) && !Pad.prev[2]){ Mouse.rdown = true; startGrab(); }
+  if (!press(2) && Pad.prev[2]){ Mouse.rdown = false; P.grab = null; }
+  if (press(3) && !Pad.prev[3]) startManual(1);
+  for (let i = 0; i < 6; i++) Pad.prev[i] = press(i);
+  return {
+    steer: Math.abs(ax[0]) > 0.15 ? ax[0] : 0,
+    push: (bt[7] && bt[7].value > 0.35) || press(7),
+    brake: (bt[6] && bt[6].value > 0.35) || press(6),
+    spin: (press(5) ? 1 : 0) - (press(4) ? 1 : 0)
+  };
+}
+function readInput(){
+  const pad = readPad();
+  IN.steer = clamp((Keys.d ? 1 : 0) - (Keys.a ? 1 : 0) + Touch.steer + pad.steer, -1, 1);
+  IN.balance = -IN.steer;
+  IN.spin = pad.spin;
+  IN.push = !!(Keys.w || Touch.push || pad.push);
+  IN.brake = !!(Keys.s || Touch.brake || pad.brake);
+  IN.sprint = !!Keys.shift;
+  IN.pitch = (Keys.s ? 1 : 0) - (Keys.w ? 1 : 0);
+}
+
+/* ── Modals ──────────────────────────────────────────────────────────────── */
+let chatOpen = false, paused = false, started = false;
+function closeModals(){ el.pause.classList.add('hide'); el.book.classList.add('hide'); paused = false; }
+function togglePause(){
+  paused = !paused;
+  el.pause.classList.toggle('hide', !paused);
+  if (paused){ document.exitPointerLock && document.exitPointerLock();
+    netLeaderboard().then(list => {
+      $('#lbList').innerHTML = list.length
+        ? list.map((r,i) => `${i+1}. ${escapeHtml(r.n)} — ${fmt(r.best)}`).join('<br>')
+        : 'No scores posted yet. Land something huge.'; });
+  }
+}
+function toggleBook(){ el.book.classList.toggle('hide'); }
+function toggleChat(on){
+  chatOpen = on;
+  el.chatin.classList.toggle('hide', !on);
+  if (on){ el.chatbox.focus(); document.exitPointerLock && document.exitPointerLock(); }
+  else el.chatbox.blur();
+}
+function toggleWire(){
+  if (wireGrp){ scene.remove(wireGrp); wireGrp = null; return; }
+  wireGrp = new THREE.Group();
+  const m = new THREE.LineBasicMaterial({ color:0x00ff9a });
+  for (const c of COL){
+    if (c.kind === 'obb'){
+      const g = new THREE.BoxGeometry(c.h.x*2, c.h.y*2, c.h.z*2);
+      const w2 = new THREE.LineSegments(new THREE.EdgesGeometry(g), m);
+      w2.position.copy(c.p); w2.quaternion.copy(c.q); wireGrp.add(w2);
+    } else if (c.kind === 'arc'){
+      const pts = [];
+      for (let i = 0; i <= 12; i++){
+        const u = lerp(c.u0, c.u1, i/12), y = c.cy - Math.sqrt(Math.max(0, c.r*c.r - u*u));
+        pts.push(new THREE.Vector3(c.cx + u*c.cos, y, c.cz + u*c.sin));
+      }
+      wireGrp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), m));
+    } else {
+      const pts = [];
+      for (let i = 0; i <= 24; i++){ const a = i/24*TAU, R = c.rin + c.r;
+        pts.push(new THREE.Vector3(c.cx + Math.cos(a)*R, c.cy + c.r, c.cz + Math.sin(a)*R)); }
+      wireGrp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), m));
+    }
+  }
+  const rm = new THREE.LineBasicMaterial({ color:0xFFD600 });
+  for (const r of RAILS) wireGrp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(r.pts), rm));
+  scene.add(wireGrp);
+}
+
+/* ── Menu wiring ─────────────────────────────────────────────────────────── */
+function bindMenu(){
+  for (const b of $$('.tabs button')) b.onclick = () => {
+    $$('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+    $$('.tabpane').forEach(p => p.classList.toggle('on', p.id === 'pane-' + b.dataset.tab));
+    Audio5G.ui(true);
+  };
+  const nameIn = $('#uname'); nameIn.value = profile.n;
+  nameIn.oninput = () => { profile.n = sanitize(nameIn.value) || 'Skater'; saveProfile(); };
+  const roomIn = $('#room'); roomIn.value = profile.room;
+  roomIn.oninput = () => { profile.room = (roomIn.value || 'campus-1').replace(/[^a-z0-9-]/gi,'').slice(0,18); saveProfile(); };
+  const bindVol = (a, b2) => {
+    const m = $(a), s = $(b2);
+    m.value = profile.volm; s.value = profile.vols;
+    m.oninput = () => { profile.volm = +m.value; Audio5G.setVol(+m.value/100, null); saveProfile(); };
+    s.oninput = () => { profile.vols = +s.value; Audio5G.setVol(null, +s.value/100); saveProfile(); };
+  };
+  bindVol('#volm', '#vols'); bindVol('#pvolm', '#pvols');
+  $('#playBtn').onclick = startGame;
+  for (const b of $$('#pause .btnrow button, #trickbook .btnrow button')){
+    const a = b.dataset.p; if (!a) continue;
+    b.onclick = () => {
+      Audio5G.ui(true);
+      if (a === 'resume') togglePause();
+      if (a === 'closebook') toggleBook();
+      if (a === 'respawn'){ closeModals(); respawn(); }
+      if (a === 'setspawn'){ closeModals(); setSpawn(); }
+      if (a === 'custom'){ closeModals(); el.menu.classList.remove('hide'); state = 'menu'; }
+      if (a === 'quit') quitToMenu();
+    };
+  }
+}
+function startGame(){
+  Audio5G.init(); Audio5G.resume();
+  Audio5G.setVol(profile.volm/100, profile.vols/100);
+  Audio5G.toggleMusic(!!profile.music);
+  el.menu.classList.add('hide'); el.hud.classList.remove('hide');
+  closeModals();
+  const first = !started; started = true; state = 'play';
+  if (!first){                                                   // re-customise mid-session
+    refreshLook();
+    if (NET.on) NET.fns.set(NET.refs.me, localPacket(true)).catch(()=>{});
+    if (!IS_TOUCH) $('#gl').requestPointerLock && $('#gl').requestPointerLock();
+    return;
+  }
+  me = makeOllie(profile); scene.add(me.root);
+  meBoard = makeBoard(profile); scene.add(meBoard.group);
+  initTrail(scene, PAL.trail[profile.trail]);
+  P.pos.copy(P.spawn.p); P.yaw = P.spawn.yaw; P.prevPos.copy(P.pos);
+  renderPos.copy(P.pos); renderYaw = prevYaw = P.yaw; CAM.yaw = P.yaw;
+  el.roomName.textContent = profile.room;
+  hudScore(); hudPlayers();
+  initNet(profile.room);
+  showHint();
+  if (!IS_TOUCH) $('#gl').requestPointerLock && $('#gl').requestPointerLock();
+}
+function quitToMenu(){
+  closeModals();
+  // Keep the connection alive: startGame() re-publishes presence on the way back in.
+  if (NET.on) NET.fns.remove(NET.refs.me).catch(()=>{});
+  for (const uid of Array.from(NET.remotes.keys())) dropRemote(uid);
+  comboBank();
+  el.hud.classList.add('hide'); el.menu.classList.remove('hide');
+  state = 'menu';
+  document.exitPointerLock && document.exitPointerLock();
+}
+let hintT = 0;
+function showHint(){
+  hintT = 30;
+  el.hint.innerHTML = IS_TOUCH
+    ? 'Left thumb steers · right thumb loads and flicks the trick · FOOT hops off'
+    : '<kbd>W</kbd> push · <kbd>A</kbd><kbd>D</kbd> carve · hold <kbd>LMB</kbd> and flick to trick · <kbd>Ctrl</kbd> manual · <kbd>F</kbd> hop off · <kbd>T</kbd> set spawn · <kbd>R</kbd> respawn · <kbd>H</kbd> trick book';
+}
+
+/* ── Per-frame HUD ───────────────────────────────────────────────────────── */
+function hudFrame(dt){
+  el.kmh.textContent = Math.round(P.vel.length() * 3.6);
+  el.pushdot.classList.toggle('on', P.pushCd > 0);
+  const C = 169.6;
+  el.ring.setAttribute('stroke-dashoffset', String(C - C * (P.charging ? P.charge : 0)));
+  if (Mouse.down || Touch.fid >= 0){
+    const m = Math.min(26, Math.hypot(Mouse.sx, Mouse.sy) * 0.5), a = Math.atan2(Mouse.sy, Mouse.sx);
+    el.flick.setAttribute('x2', String(38 + Math.cos(a)*m));
+    el.flick.setAttribute('y2', String(38 + Math.sin(a)*m));
+  } else { el.flick.setAttribute('x2', '38'); el.flick.setAttribute('y2', '38'); }
+  if (P.mode === 'manual') hudBalance(true, P.bal, P.manual > 0 ? 'MANUAL' : 'NOSE MANUAL');
+  else if (P.mode !== 'grind') hudBalance(false);
+  if (hintT > 0){ hintT -= dt; if (hintT <= 0) el.hint.textContent = ''; }
+  if (debugOn){
+    const info = renderer.info.render;
+    el.dbg.textContent =
+`fps    ${(1000/frameAvg).toFixed(0)}   res ${pixelScale.toFixed(2)}
+draws  ${info.calls}   tris ${(info.triangles/1000).toFixed(1)}k
+phys   ${physMs.toFixed(2)}ms   net ${netMs.toFixed(2)}ms
+state  ${P.mode}${P.onFoot ? ' (foot)' : ''}  stance ${P.stance > 0 ? 'reg' : 'fakie'}
+vel    ${P.vel.length().toFixed(1)} m/s   surf ${P.surf}
+pos    ${P.pos.x.toFixed(1)} ${P.pos.y.toFixed(1)} ${P.pos.z.toFixed(1)}
+net    ${NET.on ? 'online' : 'offline'}  peers ${NET.remotes.size}  cols ${COL.length}`;
+  }
+}
+
+/* ── Fixed step ──────────────────────────────────────────────────────────── */
+function stepFixed(dt){
+  if (noclip){
+    fwd(_wf);
+    const sp = (Keys.shift ? 40 : 16) * dt;
+    if (Keys.w) P.pos.addScaledVector(_wf, sp);
+    if (Keys.s) P.pos.addScaledVector(_wf, -sp);
+    P.yaw -= IN.steer * 2 * dt;
+    if (Keys.Space) P.pos.y += sp; if (Keys.ControlLeft) P.pos.y -= sp;
+    P.vel.set(0,0,0); return;
+  }
+  switch (P.mode){
+    case 'skate': case 'manual': stepGround(dt); break;
+    case 'air':     stepAir(dt); break;
+    case 'grind':   stepGrind(dt); break;
+    case 'walk':    stepWalk(dt); break;
+    case 'ragdoll': stepRagdollMode(dt); break;
+  }
+  stepLoose(dt);
+  if (P.immune > 0) P.immune -= dt;
+  if (P.sketchy > 0) P.sketchy = Math.max(0, P.sketchy - dt * 1.4);
+  if (pushAnim < 1) pushAnim += dt;
+  if (P.manual) P.manualDist += P.vel.length() * dt;
+  if (comboTimer > 0){
+    comboTimer -= dt;
+    if (comboTimer <= 0 && (P.mode === 'skate' || P.mode === 'walk') && !P.manual) comboBank();
+  }
+  if (P.charging){
+    P.charge = Math.min(1, P.charge + dt / TUNING.pop.chargeTime);
+    P.crouch = damp(P.crouch, 0.28 + 0.72 * P.charge, 14, dt);
+  } else P.crouch = damp(P.crouch, P.mode === 'air' ? 0.18 : 0, 10, dt);
+  if (P.grab && P.mode !== 'air'){ P.grab = null; }
+}
+
+/* ── Main loop ───────────────────────────────────────────────────────────── */
+let acc = 0, lastT = performance.now(), previewSpin = 0;
+function autoRes(){
+  // Drop resolution before dropping frames; recover when there is headroom.
+  if (frameAvg > 20 && pixelScale > 0.65) pixelScale = Math.max(0.65, pixelScale - 0.05);
+  else if (frameAvg < 13.5 && pixelScale < 1) pixelScale = Math.min(1, pixelScale + 0.02);
+  else return;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2) * pixelScale);
+  if (composer) composer.setSize(innerWidth, innerHeight);
+}
+function loop(now){
+  requestAnimationFrame(loop);
+  const raw = Math.min(0.06, (now - lastT) / 1000); lastT = now;
+  frameAvg = frameAvg * 0.9 + raw * 100;
+  if (state === 'boot') return;
+
+  if (state === 'menu'){
+    previewSpin += raw * 0.55;
+    previewRig.root.rotation.y = previewSpin;
+    previewBoard.group.rotation.y = previewSpin;
+    previewBoard.group.position.y = 0.02 + Math.sin(previewSpin*2)*0.02;
+    previewRig.bones.pelvis.position.y = 0.78;
+    previewRig.bones.upL.rotation.set(-0.2, 0, 0.9); previewRig.bones.upR.rotation.set(-0.2, 0, -0.9);
+    previewRig.bones.thighL.rotation.set(-0.3, 0, 0.3); previewRig.bones.thighR.rotation.set(-0.3, 0, -0.3);
+    previewRig.bones.shinL.rotation.x = 0.55; previewRig.bones.shinR.rotation.x = 0.55;
+    previewCam.aspect = innerWidth/innerHeight; previewCam.updateProjectionMatrix();
+    previewCam.lookAt(0, 0.85, 0);
+    renderer.render(previewScene, previewCam);
+    return;
+  }
+
+  readInput();
+  if (P.slowmo > 0) P.slowmo -= raw;
+  const dt = raw * (P.slowmo > 0 ? 0.45 : 1);
+  autoRes();
+
+  acc += dt;
+  const t0 = performance.now();
+  let steps = 0;
+  while (acc >= TUNING.fixed && steps < 8){
+    P.prevPos.copy(P.pos); prevYaw = P.yaw;
+    stepFixed(TUNING.fixed);
+    acc -= TUNING.fixed; steps++;
+  }
+  physMs = performance.now() - t0;
+  const alpha = clamp(acc / TUNING.fixed, 0, 1);
+  renderPos.copy(P.prevPos).lerp(P.pos, alpha);
+  renderYaw = prevYaw + angDiff(prevYaw, P.yaw) * alpha;
+
+  // Visuals
+  poseSkater(me, raw);
+  poseBoard(meBoard);
+  pushTrail(P.pos, P.mode === 'air');
+  stepParticles(raw);
+  if (beaconRing) beaconRing.rotation.z += raw * 1.6;
+
+  animatedRemotes = 0;
+  for (const r of NET.remotes.values()) r.step(raw, camera.position);
+
+  updateCamera(raw);
+  Audio5G.listen(camera);
+  Audio5G.setRoll(P.vel.length(), P.surf, P.grounded && P.mode !== 'air' && !P.onFoot);
+  if (P.mode !== 'grind') Audio5G.setGrind(false, 0, 'metal');
+
+  // Shadow frustum follows the skater in a tight box.
+  sun.position.set(renderPos.x - 46, renderPos.y + 44, renderPos.z - 30);
+  sun.target.position.copy(renderPos); sun.target.updateMatrixWorld();
+  sky.position.set(renderPos.x, 0, renderPos.z);
+
+  const t1 = performance.now();
+  netTick(now); checkHits(raw);
+  netMs = performance.now() - t1;
+  if ((now | 0) % 500 < 17) hudPlayers();
+  hudFrame(raw);
+
+  if (composer && !IS_TOUCH) composer.render(); else renderer.render(scene, camera);
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  if (composer) composer.setSize(innerWidth, innerHeight);
+});
+addEventListener('beforeunload', () => { if (NET.on) NET.fns.remove(NET.refs.me); });
+
+/* ── Boot ────────────────────────────────────────────────────────────────── */
+function bootStep(pct, msg){
+  el.bootfill.style.width = pct + '%';
+  if (msg) el.bootmsg.textContent = msg;
+  return new Promise(r => setTimeout(r, 16));
+}
+async function boot(){
+  await bootStep(8, 'Connecting to the network…');
+  initScene();
+  await bootStep(26, 'Pouring concrete…');
+  buildWorld(scene);
+  for (const c of COL) if (c.kind === 'obb') finishOBB(c);
+  await bootStep(64, 'Bolting on the coping…');
+  initParticles(scene);
+  loadProfile();
+  const ok = validateSpawn(P.spawn.p, P.spawn.yaw);
+  if (ok){ P.spawn.p.copy(ok.p); P.spawn.yaw = ok.yaw; }
+  else { P.spawn.p.set(0, 0.2, 18); P.spawn.yaw = Math.PI; }
+  P.pos.copy(P.spawn.p); P.yaw = P.spawn.yaw;
+  await bootStep(82, 'Waxing the ledges…');
+  initPreview();
+  buildCustomiser(); buildTrickBook(); buildZoneButtons(); bindMenu(); bindInput();
+  refreshLook();
+  await bootStep(100, 'Ready');
+  el.boot.classList.add('hide');
+  el.menu.classList.remove('hide');
+  state = 'menu';
+  requestAnimationFrame(loop);
+}
+boot();
+</script>
+</body>
+</html>
