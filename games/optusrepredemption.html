@@ -107,18 +107,22 @@
   #subs .who{font-family:var(--slab);letter-spacing:.2em;font-size:.66em;
     display:block;margin-bottom:.34em;color:var(--yes);opacity:.95}
   #subs .who.ollie{color:#FFE45C}
+  #subs .who.named{color:#7fd6d8}
   #subs .line{color:#F4EEDF}
 
   /* Contextual prompts — small, quiet, bottom-right */
-  #prompts{position:absolute;right:26px;bottom:30px;text-align:right;
-    display:flex;flex-direction:column;gap:7px;align-items:flex-end}
-  .prompt{font-size:13px;color:#d8cdb2;text-shadow:0 1px 4px #000;
-    display:flex;align-items:center;gap:9px;opacity:0;transform:translateX(8px);
-    transition:opacity .2s,transform .2s}
-  .prompt.on{opacity:.92;transform:none}
-  .prompt b{font-family:var(--slab);font-size:11px;letter-spacing:.1em;
-    border:1px solid rgba(232,223,200,.45);border-radius:3px;padding:3px 7px;
-    min-width:24px;text-align:center;background:rgba(0,0,0,.32);font-weight:400}
+  #prompts{position:absolute;right:30px;bottom:34px;text-align:right;
+    display:flex;flex-direction:column;gap:10px;align-items:flex-end}
+  .prompt{font-size:17px;color:#f2e9d2;
+    text-shadow:0 2px 5px rgba(0,0,0,.95),0 0 14px rgba(0,0,0,.75);
+    display:flex;align-items:center;gap:12px;opacity:0;transform:translateX(8px);
+    transition:opacity .2s,transform .2s;letter-spacing:.012em}
+  .prompt.on{opacity:1;transform:none}
+  .prompt b{font-family:var(--slab);font-size:15px;letter-spacing:.1em;
+    border:1.5px solid rgba(255,214,0,.72);border-radius:4px;padding:5px 11px;
+    min-width:34px;text-align:center;background:rgba(12,10,7,.72);
+    color:#FFD600;font-weight:400;
+    box-shadow:0 2px 8px rgba(0,0,0,.6),inset 0 0 12px rgba(255,214,0,.10)}
 
   /* Toast — used sparingly; never as a mission ending (§9) */
   #toast{position:absolute;left:50%;top:19%;transform:translateX(-50%);
@@ -184,7 +188,8 @@
 
   @media (max-width:760px){
     #vitals{width:104px;height:104px;left:16px;bottom:16px}
-    #prompts{right:14px;bottom:20px}
+    #prompts{right:16px;bottom:22px}
+    .prompt{font-size:15px} .prompt b{font-size:13px;padding:4px 9px}
     #ledgerTabs{width:150px}
   }
   @media (prefers-reduced-motion:reduce){
@@ -297,12 +302,27 @@ const CFG = {
   LATITUDE:  -27.5 * Math.PI / 180,   // southern frontier: sun tracks north
 
   /* --- Vegetation ------------------------------------------------------- */
+  TOWN_BUILD_R:   760,    // a town assembles when you get this close
+  TOWN_RELEASE_R: 1000,
+  NPC_SIM_R:      110,    // townsfolk think within this range
+  NPC_DRAW_R:     150,
+  TOWN_LIGHTS:      4,    // real point lights chasing the nearest lamps
   DISTANT_DROP: 3.2,      // margin keeping the horizon mesh under real ground
   GRASS_NEAR_COLS: 168,   // 168^2 cells at 0.42u  -> dense, ~35u reach
   GRASS_FAR_COLS:  132,   // 132^2 cells at 1.55u  -> coarse, ~100u reach
   GRASS_NEAR_R:    34,
   GRASS_FAR_R:     98,
   TREE_R:      420,
+
+  /* --- Regions, roads and rail ------------------------------------------ */
+  BIOME_SCALE:  330,      // mean width of a biome region, world units
+  ROAD_W:       6.4,      // graded carriageway width
+  ROAD_GRID:    32,       // A* node spacing when routing between towns
+  ROAD_MAX_GRADE: 0.42,   // steepest slope a wagon road will take
+  TOWN_MIN_GAP: 420,      // no two towns closer together than this
+  POLE_SPACING: 46,       // telegraph poles along the roads
+  RAIL_GAUGE:   1.6,
+  SLEEPER_SPACING: 2.4,
 
   /* --- Rendering -------------------------------------------------------- */
   EXPOSURE:  1.10,
@@ -1946,10 +1966,34 @@ class Terrain {
         const basinMask = M.sat((u-0.10)*3.0)*M.sat(1-Math.abs(v+0.02)*2.6);
         const basin = -M.sat(NZ.fbm(u*5.5-9, v*5.5+4, 3)*0.5+0.5)*basinMask;
 
-        let hh = cont*0.30 + ridge*0.86 + mesa*0.30 + basin*0.12;
+        /* Secondary ranges. The single spine left most of the map flat and
+           featureless; three warped ridge fields at different scales and
+           orientations give the country real shape wherever you stand. */
+        const [r2u,r2v] = NZ.warp(u*4.1+11, v*4.1-7, 0.30, 2.2);
+        const range2 = NZ.ridged(r2u*3.4, r2v*3.4, 5)
+                     * M.sat(NZ.fbm(u*1.7-4, v*1.7+9, 2)*0.9+0.35);
+        const [r3u,r3v] = NZ.warp(v*6.6-19, u*6.6+23, 0.26, 2.6);
+        const range3 = NZ.ridged(r3u*5.2, r3v*5.2, 4)
+                     * M.sat(NZ.fbm(u*2.3+15, v*2.3-11, 2)*0.85+0.20);
+
+        /* Rolling hill country: the mid-frequency layer that stops open ground
+           reading as a putting green. */
+        const hills = NZ.fbm(u*13, v*13, 4)*0.5+0.5;
+        const hillMask = M.sat(NZ.fbm(u*2.6-31, v*2.6+17, 2)*1.2+0.45);
+
+        /* Badlands: inverted ridges cut into gullies and fluted walls. */
+        const badMask = M.sat(NZ.fbm(u*3.1+55, v*3.1-42, 3)*1.4 - 0.28);
+        const bad = (1 - NZ.ridged(u*26, v*26, 4)) * badMask;
+
+        let hh = cont*0.30
+               + ridge*0.86 + range2*0.34 + range3*0.19
+               + mesa*0.30 + basin*0.12
+               + hills*hillMask*0.115
+               - bad*0.085;
         hh *= edge*0.85 + 0.15;
         hh -= oceanPull*0.34;
-        hh += NZ.fbm(u*9.5, v*9.5, 4)*0.045;          // medium relief
+        hh += NZ.fbm(u*9.5, v*9.5, 4)*0.055;          // medium relief
+        hh += NZ.fbm(u*31, v*31, 3)*0.016;            // fine relief
 
         h[j*N+i] = hh * CFG.PEAK - 14;
       }
@@ -2074,6 +2118,75 @@ class Terrain {
     }
   }
 
+  /* --- Roads ------------------------------------------------------------
+     A road is written into three places: the heightfield (graded so a wagon
+     could actually take it), the road mask (used by the terrain shader, the
+     scatter and the footstep surface), and a centreline the props follow. */
+  gradeRoad(points, width){
+    if(!this.road) this.road = new Float32Array(this.N*this.N);
+    const N=this.N, st=this.step, h=this.h, road=this.road;
+    const halfW = width*0.5, feather = width*1.05;
+    for(let s=0;s<points.length-1;s++){
+      const a=points[s], b=points[s+1];
+      const seg = Math.hypot(b.x-a.x, b.z-a.z);
+      const steps = Math.max(1, Math.ceil(seg/(st*0.45)));
+      for(let k=0;k<=steps;k++){
+        const t=k/steps;
+        const wx = M.lerp(a.x,b.x,t), wz = M.lerp(a.z,b.z,t);
+        const wy = M.lerp(a.y,b.y,t);
+        const cx=(wx+CFG.HALF)/st, cz=(wz+CFG.HALF)/st;
+        const rr=(halfW+feather)/st;
+        const i0=Math.max(0,Math.floor(cx-rr)), i1=Math.min(N-1,Math.ceil(cx+rr));
+        const j0=Math.max(0,Math.floor(cz-rr)), j1=Math.min(N-1,Math.ceil(cz+rr));
+        for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){
+          const d = Math.hypot(i-cx, j-cz)*st;
+          if(d > halfW+feather) continue;
+          const w = 1 - M.smooth(M.sat((d-halfW)/feather));
+          const idx = j*N+i;
+          h[idx] = M.lerp(h[idx], wy, w*0.92);
+          road[idx] = Math.max(road[idx], w);
+        }
+      }
+    }
+  }
+
+  /* The mask the terrain shader samples, so the carriageway is visibly a
+     road rather than just a smooth patch of grass. */
+  roadTexture(){
+    const N=this.N, data=new Uint8Array(N*N*4);
+    const r = this.road || new Float32Array(N*N);
+    for(let i=0;i<N*N;i++){
+      const v = M.sat(r[i])*255;
+      data[i*4]=v; data[i*4+1]=v; data[i*4+2]=v; data[i*4+3]=255;
+    }
+    const t = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+    t.minFilter = t.magFilter = THREE.LinearFilter;
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+    t.colorSpace = THREE.NoColorSpace;
+    t.needsUpdate = true;
+    return t;
+  }
+  roadAt(wx,wz){ return this.road ? this.sample(this.road, wx, wz) : 0; }
+
+  /* Level a bench of ground for a settlement. The centre goes flat and the
+     edge feathers back into the landscape, so a town sits ON the country
+     rather than being stamped into it. */
+  flattenDisc(wx, wz, radius, feather, targetH){
+    const N=this.N, h=this.h, st=this.step;
+    const cx = (wx+CFG.HALF)/st, cz = (wz+CFG.HALF)/st;
+    const rr = radius/st, ff = feather/st;
+    const i0=Math.max(0,Math.floor(cx-rr-ff)), i1=Math.min(N-1,Math.ceil(cx+rr+ff));
+    const j0=Math.max(0,Math.floor(cz-rr-ff)), j1=Math.min(N-1,Math.ceil(cz+rr+ff));
+    for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){
+      const d = Math.hypot(i-cx, j-cz);
+      if(d > rr+ff) continue;
+      const w = 1 - M.smooth(M.sat((d-rr)/Math.max(ff,1e-3)));
+      const k = j*N+i;
+      h[k] = M.lerp(h[k], targetH, w);
+      this.river[k] *= (1-w*0.85);       // no creek running through the saloon
+    }
+  }
+
   /* Open the waterline. Heights within the band are pushed away from sea level
      so the water plane can never graze the ground and speckle it. */
   shapeShore(band=2.2){
@@ -2114,8 +2227,17 @@ class Terrain {
     // Detail is suppressed inside river channels so water beds stay smooth, and
     // flattened near the waterline so beaches and lake beds read as beaches.
     const rv = this.sample(this.river, wx, wz);
+    const rd = this.road ? this.sample(this.road, wx, wz) : 0;
     const shore = M.sat(Math.abs(base - CFG.SEA)/2.6);
-    return base + this.detail(wx,wz)*(1-rv*0.85)*shore;
+    let flat = 1 - rd*0.94;
+    if(this.flatZones){
+      for(let i=0;i<this.flatZones.length;i++){
+        const z = this.flatZones[i];
+        const d = Math.hypot(wx-z.x, wz-z.z);
+        if(d < z.r + z.f) flat = Math.min(flat, M.smooth(M.sat((d-z.r)/z.f))*0.94+0.06);
+      }
+    }
+    return base + this.detail(wx,wz)*(1-rv*0.85)*shore*flat;
   }
 
   /* A coarse height map of the waterline band, uploaded once so the water
@@ -2170,24 +2292,52 @@ class Terrain {
       default:           g = 0.72*M.lerp(0.5,1,moist);
     }
     g *= (1-steep);
+    if(this.road){
+      const rd = this.sample(this.road, wx, wz);
+      g *= M.sat(1 - rd*2.4);       // nothing grows in a wheel rut
+      out.road = rd;
+    } else out.road = 0;
     out.y = y; out.slope = slope; out.grass = g; out.moist = moist;
     return out;
   }
 
+  /* Regions, not quadrants.
+
+     The old field split the whole 4096 square into four huge wedges, so from
+     any given spot you could ride for ten minutes and see one biome. This
+     partitions the map into heavily domain-warped cells around 330 units
+     across and picks a biome per cell, weighted by that cell's own altitude
+     and moisture. Neighbouring cells usually differ, so a short ride crosses
+     several distinct kinds of country — while altitude and the waterline still
+     override everything, because snow belongs on peaks and reeds belong in
+     water no matter what the cell rolled. */
   biomeAt(wx,wz,knownH){
-    const u = wx/CFG.WORLD, v = wz/CFG.WORLD;
-    const [du,dv] = NZ.warp(u*2.0, v*2.0, 0.10, 2.0);   // warped, never blocky
-    const wu = du/2.0, wv = dv/2.0;
     const h = (knownH !== undefined) ? knownH : this.heightAt(wx,wz);
-    const w = [0,0,0,0,0];
-    w[BIOME.RIDGE]  = M.sat((-wv-0.10)*4.0) * M.sat((h-52)/70 + 0.30);
-    w[BIOME.FLATS]  = M.sat((-wu-0.05)*3.2) * M.sat((wv+0.02)*3.0);
-    w[BIOME.COPPER] = M.sat((wu-0.11)*3.6)  * M.sat(1-Math.abs(wv+0.03)*3.2);
-    w[BIOME.DELTA]  = M.sat((wv-0.16)*3.8)  * M.sat((wu+0.06)*2.6);
-    w[BIOME.GRASS]  = 0.55;
-    let bi=0, bv=-1;
-    for(let i=0;i<5;i++) if(w[i]>bv){ bv=w[i]; bi=i; }
-    return bi;
+    if(h > CFG.SNOWLINE - 34) return BIOME.RIDGE;
+    if(h < CFG.SEA + 3.0)     return BIOME.DELTA;
+
+    const S = CFG.BIOME_SCALE;
+    const [wu,wv] = NZ.warp(wx/S, wz/S, 0.62, 1.30);
+    const ci = Math.floor(wu), cj = Math.floor(wv);
+    const r = M.hash(ci*73856093 ^ cj*19349663);
+
+    // Cell character comes from where the cell actually sits.
+    const moist = this.sample(this.moist, wx, wz);
+    const alt   = M.sat((h - 30)/110);
+    const dry   = 1 - moist;
+    const low   = 1 - M.sat((h - CFG.SEA)/26);
+
+    const w = [
+      /* FLATS  */ 0.55 + dry*1.55 - alt*0.70,
+      /* RIDGE  */ 0.30 + alt*2.10,
+      /* GRASS  */ 0.95 + moist*0.95 - alt*0.45,
+      /* COPPER */ 0.50 + dry*0.85 + M.sat(alt*1.4-0.15)*0.55,
+      /* DELTA  */ 0.28 + moist*1.35 + low*1.05,
+    ];
+    let sum=0; for(let i=0;i<5;i++){ w[i]=Math.max(0.02,w[i]); sum+=w[i]; }
+    let acc=0, pick=r*sum;
+    for(let i=0;i<5;i++){ acc+=w[i]; if(pick<=acc) return i; }
+    return BIOME.GRASS;
   }
 
   /* ---- Splat weights (rock / grass / sand / snow) ---------------------- */
@@ -2214,6 +2364,14 @@ class Terrain {
     // River banks are wet mud, not sand.
     const rv = this.sample(this.river,wx,wz);
     if(rv>0.02){ b = M.lerp(b, 0.9, rv*0.6); c *= (1-rv*0.7); }
+    // A graded road is bare, packed earth: no grass, no snow, some gravel.
+    if(this.road){
+      const rd = M.sat(this.sample(this.road,wx,wz)*1.15);
+      if(rd > 0.01){
+        b *= (1-rd); d *= (1-rd*0.9);
+        a = M.lerp(a, 0.42, rd); c = M.lerp(c, 0.58, rd);
+      }
+    }
 
     const s = a+b+c+d || 1;
     return [a/s,b/s,c/s,d/s, biome];
@@ -2297,7 +2455,7 @@ class Terrain {
    standard material rather than writing a custom one keeps shadows, fog,
    and the light rig working for free.
    ========================================================================== */
-function makeTerrainMaterial(lib){
+function makeTerrainMaterial(lib, roadTex){
   const mat = new THREE.MeshStandardMaterial({
     vertexColors:true, roughness:1.0, metalness:0.0,
     normalMap: lib.g_rock.normalMap,
@@ -2310,6 +2468,7 @@ function makeTerrainMaterial(lib){
     tRockR:{value:lib.g_rock.roughnessMap}, tGrassR:{value:lib.g_grass.roughnessMap},
     tSandR:{value:lib.g_sand.roughnessMap}, tSnowR:{value:lib.g_snow.roughnessMap},
     uTile:{value:0.085}, uMacro:{value:0.0042}, uWetness:{value:0.0},
+    uRoad:{value:roadTex||null}, uInvWorld:{value:1/CFG.WORLD},
   };
   mat.userData.uniforms = uni;
   mat.onBeforeCompile = (sh)=>{
@@ -2326,7 +2485,8 @@ function makeTerrainMaterial(lib){
       .replace('#include <common>', `#include <common>
         uniform sampler2D tRock,tGrass,tSand,tSnow;
         uniform sampler2D tRockR,tGrassR,tSandR,tSnowR;
-        uniform float uTile,uMacro,uWetness;
+        uniform float uTile,uMacro,uWetness,uInvWorld;
+        uniform sampler2D uRoad;
         varying vec4 vSplat;
         varying vec3 vWPos;`)
       .replace('#include <map_fragment>', `
@@ -2341,6 +2501,17 @@ function makeTerrainMaterial(lib){
         vec3 cSnow = mix(texture2D(tSnow ,duv).rgb, texture2D(tSnow ,duv2).rgb, mblend*0.5);
         vec3 splatCol = cRock*w.x + cGras*w.y + cSand*w.z + cSnow*w.w;
         diffuseColor.rgb *= splatCol * 2.05;
+        /* The carriageway. Packed earth, darkened, with two paler wheel ruts
+           worn into it — the detail that makes a road read as travelled. */
+        float rdm = texture2D(uRoad, vWPos.xz*uInvWorld + 0.5).r;
+        if(rdm > 0.01){
+          float across = fract(vWPos.x*0.11 + vWPos.z*0.11);
+          float rut = smoothstep(0.34,0.42,rdm) * (1.0-smoothstep(0.72,0.86,rdm));
+          vec3 roadCol = vec3(0.230,0.196,0.156) * (0.86 + rut*0.30);
+          roadCol *= 0.90 + 0.20*fract(sin(dot(floor(vWPos.xz*0.6),
+                                               vec2(12.9898,78.233)))*43758.5);
+          diffuseColor.rgb = mix(diffuseColor.rgb, roadCol, smoothstep(0.06,0.55,rdm));
+        }
         // Wetness darkens and smooths the surface (§15).
         diffuseColor.rgb *= mix(1.0, 0.62, uWetness);`)
       .replace('#include <roughnessmap_fragment>', `
@@ -2354,7 +2525,7 @@ function makeTerrainMaterial(lib){
         roughnessFactor = mix(roughnessFactor, 0.14, uWetness);
         roughnessFactor = clamp(roughnessFactor, 0.04, 1.0);`);
   };
-  mat.customProgramCacheKey = ()=> 'terrain-splat-v1';
+  mat.customProgramCacheKey = ()=> 'terrain-splat-v2';
   return mat;
 }
 
@@ -2956,6 +3127,14 @@ class Vegetation {
       const slope = this.terrain.slopeAt(wx,wz);
       const biome = this.terrain.biomeAt(wx,wz);
       const moist = this.terrain.sample(this.terrain.moist,wx,wz);
+      // No timber in the middle of a road or a town.
+      if(this.terrain.roadAt && this.terrain.roadAt(wx,wz) > 0.14) continue;
+      if(this.terrain.flatZones){
+        let inTown = false;
+        for(const z of this.terrain.flatZones)
+          if(Math.hypot(wx-z.x, wz-z.z) < z.r*0.94){ inTown = true; break; }
+        if(inTown) continue;
+      }
       const dens = this._densityFor(biome, moist, slope, h);
       if(rnd() > dens) continue;
       // Clumping: trees like company.
@@ -3667,6 +3846,8 @@ function buildJarrad(lib){
    five gaits. Idle, turns and reactions are authored explicitly.
    Convention: character faces +Z. Positive thigh X swings the leg BACK.
    ========================================================================== */
+const LEG_LEN = 0.84;      // hip to sole, the radius the foot swings on
+
 function makeLocomotionClip(name, p){
   const { stride, lift, armSwing, bounce, lean, hipRoll, shoulderCounter,
           heel, dur, elbow=0.25 } = p;
@@ -3718,24 +3899,32 @@ function makeLocomotionClip(name, p){
   tracks.head = t.map((tt,i)=>[tt, -lean*0.30, 0, 0]);
 
   const root = t.map((tt,i)=>[tt, 0, bob[i]*0.14, 0]);
-  return new Clip(name, dur, tracks, {root,
+  const clip = new Clip(name, dur, tracks, {root,
     events:[{t:dur*0.02,tag:'stepL'},{t:dur*0.52,tag:'stepR'}]});
+  /* Distance this cycle actually carries the body: two steps, each the arc the
+     planted foot sweeps through. Playback is tied to this so a given ground
+     speed always plays the cycle at the rate that keeps the feet stuck to the
+     floor. */
+  clip.groundSpeed = 4*Math.sin(stride)*LEG_LEN/dur;
+  return clip;
 }
 
 function buildPlayerClips(anim){
   /* Five gaits, tuned so each has its own weight and posture. */
-  anim.add(makeLocomotionClip('walk', { stride:0.36, lift:0.62, armSwing:0.26,
-    bounce:0.030, lean:0.030, hipRoll:0.055, shoulderCounter:0.075,
-    heel:0.20, dur:1.16, elbow:0.22 }));
-  anim.add(makeLocomotionClip('jog', { stride:0.52, lift:0.95, armSwing:0.46,
-    bounce:0.050, lean:0.095, hipRoll:0.070, shoulderCounter:0.120,
-    heel:0.26, dur:0.78, elbow:0.55 }));
-  anim.add(makeLocomotionClip('run', { stride:0.68, lift:1.28, armSwing:0.66,
-    bounce:0.072, lean:0.170, hipRoll:0.078, shoulderCounter:0.160,
-    heel:0.30, dur:0.62, elbow:0.85 }));
-  anim.add(makeLocomotionClip('sprint', { stride:0.84, lift:1.55, armSwing:0.86,
-    bounce:0.090, lean:0.290, hipRoll:0.082, shoulderCounter:0.200,
-    heel:0.34, dur:0.52, elbow:1.05 }));
+  /* Strides and cycle times are tuned so each clip's own ground speed lands on
+     the speed it is used at — walk 1.55, jog 3.30, run 5.10, sprint 6.90. */
+  anim.add(makeLocomotionClip('walk', { stride:0.46, lift:0.78, armSwing:0.38,
+    bounce:0.032, lean:0.035, hipRoll:0.060, shoulderCounter:0.095,
+    heel:0.22, dur:0.96, elbow:0.24 }));
+  anim.add(makeLocomotionClip('jog', { stride:0.62, lift:1.05, armSwing:0.58,
+    bounce:0.052, lean:0.105, hipRoll:0.072, shoulderCounter:0.130,
+    heel:0.27, dur:0.59, elbow:0.62 }));
+  anim.add(makeLocomotionClip('run', { stride:0.85, lift:1.34, armSwing:0.78,
+    bounce:0.074, lean:0.185, hipRoll:0.080, shoulderCounter:0.170,
+    heel:0.31, dur:0.495, elbow:0.90 }));
+  anim.add(makeLocomotionClip('sprint', { stride:1.00, lift:1.58, armSwing:0.95,
+    bounce:0.092, lean:0.300, hipRoll:0.084, shoulderCounter:0.205,
+    heel:0.35, dur:0.415, elbow:1.08 }));
 
   /* Idle — authored. Weight settles onto the right leg, hands rest, the
      satchel hand drifts to the strap. */
@@ -3906,8 +4095,9 @@ function buildPlayerClips(anim){
    All of it runs in fixedUpdate.
    ========================================================================== */
 class Player {
-  constructor(terrain, lib, scene){
+  constructor(terrain, lib, scene, colliders){
     this.terrain = terrain;
+    this.colliders = colliders;
     const built = buildJarrad(lib);
     this.rig = built.rig; this.mesh = built.mesh; this.mats = built.mats;
     this.object = built.group;
@@ -4088,7 +4278,19 @@ class Player {
     const lim = CFG.HALF - 6;
     px = M.clamp(px, -lim, lim); pz = M.clamp(pz, -lim, lim);
 
-    const ground = t.heightAt(px, pz);
+    /* Buildings are solid. Resolve horizontally first, then work out what we
+       are standing on — which may be a boardwalk rather than the ground. */
+    let ground = t.heightAt(px, pz);
+    if(this.colliders){
+      const probe = this._probe || (this._probe = new THREE.Vector3());
+      probe.set(px, this.pos.y, pz);
+      if(this.colliders.resolve(probe, CFG.PLAYER_R, CFG.PLAYER_H)){
+        this.vel.x *= 0.55; this.vel.z *= 0.55;
+      }
+      px = probe.x; pz = probe.z;
+      const deck = this.colliders.support(px, pz, this.pos.y, CFG.PLAYER_R);
+      if(deck > ground) ground = deck;
+    }
     if(ny <= ground + 0.02){
       // Ground snap with step-up.
       if(this.vel.y <= 0.01){
@@ -4128,15 +4330,18 @@ class Player {
       return;
     }
     this.idleTimer = 0;
-    /* Blend space by speed. Playback rate is tied to ground speed so feet
-       never skate — this is what makes it read as root motion. */
-    let clip, ref;
-    if(s < CFG.SPD_WALK*1.25){ clip='walk';  ref=CFG.SPD_WALK; }
-    else if(s < CFG.SPD_JOG*1.20){ clip='jog';   ref=CFG.SPD_JOG; }
-    else if(s < CFG.SPD_RUN*1.12){ clip='run';   ref=CFG.SPD_RUN; }
-    else { clip='sprint'; ref=CFG.SPD_SPRINT; }
+    /* Pick the cycle whose own ground speed is closest to how fast he is
+       actually travelling, then play it at exactly the rate that speed
+       demands. That is what makes it read as root motion instead of a
+       treadmill. */
+    let clip = 'walk', best = 1e9;
+    for(const name of ['walk','jog','run','sprint']){
+      const gs = this.anim.clips[name].groundSpeed;
+      const err = Math.abs(Math.log(Math.max(s,0.2)/gs));
+      if(err < best){ best = err; clip = name; }
+    }
     this.anim.play(clip, 0.22);
-    this.anim.speed = M.clamp(s/ref, 0.62, 1.55);
+    this.anim.speed = M.clamp(s/this.anim.clips[clip].groundSpeed, 0.55, 1.6);
     // Breathing doubles when working hard.
     this.anim.setAdditive('breathe', M.lerp(1.0, 2.2, M.sat((s-2)/5)));
   }
@@ -4161,18 +4366,14 @@ class Player {
     else if(s[2] > 0.45) surface = 'sand';
     else if(s[0] > 0.45) surface = 'gravel';
     else if(s[1] > 0.45) surface = 'grass';
+    if(t.roadAt && t.roadAt(this.pos.x, this.pos.z) > 0.35) surface = 'gravel';
     if(t.sample(t.river, this.pos.x, this.pos.z) > 0.3) surface = 'water';
     this.onStep(surface, M.sat(this.speed/CFG.SPD_SPRINT), this.pos);
   }
 
   _updateMounted(dt){
     const h = this.mounted;
-    this.pos.copy(h.saddlePoint());
     this.yaw = h.yaw;
-    this.object.position.copy(this.pos);
-    this.object.rotation.y = this.yaw;
-    this.object.rotation.z = -h.bank*0.55;
-    this.object.rotation.x = h.pitch*0.4;
     const fast = M.sat((h.speed - CFG.HORSE.TROT)/(CFG.HORSE.GALLOP-CFG.HORSE.TROT));
     this.anim.play(fast > 0.45 ? 'ride_fast' : 'ride', 0.35);
     this.anim.speed = fast > 0.45 ? M.clamp(h.speed/CFG.HORSE.GALLOP,0.7,1.4) : 1;
@@ -4190,11 +4391,26 @@ class Player {
     const rm = this.anim.rootMotion;
     this.mesh.position.y = rm ? rm.y : 0;
 
+    /* Mounted, he is pinned to the saddle bone rather than to a fixed offset
+       from the horse's origin. The bone carries the gait's body roll and the
+       terrain pitch with it, so he stops sliding off over rough ground. */
+    if(this.mounted) this._snapToSaddle();
+
     // IK works in world space, so the whole chain has to be current first.
     this.object.updateMatrixWorld(true);
     if(!this.mounted && this.grounded) this._footIK();
     if(lookTarget) IK.look(this.rig.byName.head, lookTarget, 0.4, 0.85);
     this.rig.root.updateMatrixWorld(true);
+  }
+
+  _snapToSaddle(){
+    const h = this.mounted;
+    h.saddleWorld(this.pos);
+    this.pos.y -= 0.92;                    // pelvis height above his own origin
+    this.object.position.copy(this.pos);
+    this._rideEuler = this._rideEuler || new THREE.Euler(0,0,0,'YXZ');
+    this._rideEuler.set(h.pitch*0.42, h.yaw, h.bank*0.62);
+    this.object.quaternion.setFromEuler(this._rideEuler);
   }
 
   /* Feet plant on the actual ground (§5.2). Raycast is a height query — the
@@ -4229,8 +4445,8 @@ class Player {
    CAMERA — collision-aware spring arm (§5.1)
    ========================================================================== */
 class OrbitCam {
-  constructor(camera, terrain){
-    this.cam = camera; this.terrain = terrain;
+  constructor(camera, terrain, colliders){
+    this.cam = camera; this.terrain = terrain; this.colliders = colliders;
     this.yaw = 0; this.pitch = -0.16;
     this.dist = CFG.CAM.DIST; this.distVel = 0;
     this.curDist = CFG.CAM.DIST;
@@ -4291,7 +4507,11 @@ class OrbitCam {
       const t = i/steps;
       const p = head.clone().lerp(desired, t);
       const g = this.terrain.heightAt(p.x, p.z) + 0.42;
-      if(p.y < g){ hit = this.dist*t*0.94; break; }
+      // Pull in for walls as well as ground, so the camera never ends up
+      // inside a saloon while the player is standing outside it.
+      if(p.y < g || (this.colliders && this.colliders.blocked(p.x, p.z, 0.30))){
+        hit = this.dist*t*0.94; break;
+      }
     }
     if(hit < this.curDist) this.curDist = M.damp(this.curDist, hit, 26, dt);
     else this.curDist = M.damp(this.curDist, hit, 4.2, dt);
@@ -4730,8 +4950,9 @@ const OLLIE_LINES = {
    HORSE CONTROLLER
    ========================================================================== */
 class Horse {
-  constructor(terrain, lib, scene){
+  constructor(terrain, lib, scene, colliders){
     this.terrain = terrain;
+    this.colliders = colliders;
     const built = buildOllie(lib);
     this.rig = built.rig; this.mesh = built.mesh; this.mats = built.mats;
     this.object = built.group;
@@ -4772,12 +4993,15 @@ class Horse {
     this.object.rotation.y = yaw;
   }
 
-  /* Where the rider sits — the saddle, at the right height, in world space. */
-  saddlePoint(){
-    const s = this._tmp.set(0, 1.90, 0.22);
-    s.applyAxisAngle(new THREE.Vector3(0,1,0), this.yaw);
-    return s.add(this.pos).clone().sub(new THREE.Vector3(0, 0.98, 0));
+  /* Where the rider sits. Taken from the spine bone rather than from a fixed
+     offset on the root, so it inherits the gait's body roll, the terrain pitch
+     and the bank through a turn — all the motion a rider should be glued to. */
+  saddleWorld(out){
+    const b = this.rig.byName.spine1;
+    return (out || new THREE.Vector3()).set(0, 0.345, -0.195)
+             .applyMatrix4(b.matrixWorld);
   }
+  saddlePoint(){ return this.saddleWorld(new THREE.Vector3()); }
   headPoint(){
     const s = new THREE.Vector3(0, 2.16, 1.34);
     s.applyAxisAngle(new THREE.Vector3(0,1,0), this.yaw);
@@ -4872,7 +5096,15 @@ class Horse {
     const nz = this.pos.z + f.z*this.speed*dt;
     const lim = CFG.HALF-8;
     this.pos.x = M.clamp(nx,-lim,lim); this.pos.z = M.clamp(nz,-lim,lim);
-    const gh = this.terrain.heightAt(this.pos.x, this.pos.z);
+    /* A horse is wider than a man and will not walk through a saloon wall. */
+    if(this.colliders && this.colliders.resolve(this.pos, 0.95, 2.2)){
+      this.speed *= 0.55;
+    }
+    let gh = this.terrain.heightAt(this.pos.x, this.pos.z);
+    if(this.colliders){
+      const deck = this.colliders.support(this.pos.x, this.pos.z, this.pos.y, 0.95);
+      if(deck > gh) gh = deck;
+    }
     // Slopes slow her and pitch the body.
     const ahead = this.terrain.heightAt(this.pos.x+f.x*1.4, this.pos.z+f.z*1.4);
     const grade = (ahead - gh)/1.4;
@@ -4930,6 +5162,8 @@ class Horse {
     }
 
     this.object.position.copy(this.pos);
+    // YXZ: yaw first, then pitch, then roll — the order a body actually moves in.
+    this.object.rotation.order = 'YXZ';
     this.object.rotation.set(this.pitch*0.6, this.yaw, this.bank);
 
     /* Dirt accumulates as she works and washes off in rain (§6). */
@@ -4984,6 +5218,8 @@ class Horse {
 
   update(dt, lookTarget){
     this.anim.update(dt);
+    // Skeleton must be current before the rider reads the saddle bone off it.
+    this.object.updateMatrixWorld(true);
     // Mouth flap while speaking is driven by the audio envelope; the jaw bone
     // is written after the animator so it always wins.
     if(this.mouthOpen !== undefined){
@@ -5951,9 +6187,14 @@ class Ledger {
         break;
       case 'Compendium':
         html = `<h2>Compendium</h2><div class="sub">Filling in as you find things</div>`;
+        html += `<h2 style="margin-top:2px">Regions</h2>`;
         for(const b of BIOME_NAMES)
           html += row(b, g.discovered.has(b) ? 'Visited' : '—');
-        html += row('Ollie', `Bond ${g.horse.bond.toFixed(1)} of 4`);
+        html += `<h2>Settlements</h2>`;
+        for(const t of (g.towns ? g.towns.list : []))
+          html += row(t.name, g.discovered.has(t.name) ? t.blurb : '—');
+        html += `<h2>Ollie</h2>`;
+        html += row('Bond', `${g.horse.bond.toFixed(1)} of 4`);
         break;
       case 'Stats':
         html = `<h2>Jarrad Gaunt</h2><div class="sub">Sales manager, unemployed</div>`;
@@ -6270,6 +6511,155 @@ class Particles {
   }
 }
 /* ==========================================================================
+   COLLISION
+   Buildings are solid. A uniform grid holds oriented boxes; anything that
+   moves resolves against the boxes in the cells it overlaps.
+
+   Two jobs, not one:
+     · block   — you cannot walk through a wall
+     · support — you CAN walk onto a boardwalk, a porch or a loading dock,
+                 because a box top under your feet counts as ground
+
+   Everything is axis-aligned in its own local frame and rotated by a single
+   yaw, which is all a frontier town ever needs and is far cheaper than a
+   general convex solver.
+   ========================================================================== */
+class Colliders {
+  constructor(cell = 10){
+    this.cell = cell;
+    this.grid = new Map();          // "i,j" -> [box, ...]
+    this.groups = new Map();        // owner key -> [box, ...]
+    this._tmp = new THREE.Vector3();
+  }
+  _key(i,j){ return i + ',' + j; }
+  _cellsFor(b, fn){
+    const c = this.cell;
+    const r = Math.hypot(b.hw, b.hd);
+    const i0 = Math.floor((b.x - r)/c), i1 = Math.floor((b.x + r)/c);
+    const j0 = Math.floor((b.z - r)/c), j1 = Math.floor((b.z + r)/c);
+    for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++) fn(this._key(i,j));
+  }
+
+  /* hw/hh/hd are half-extents. y is the BOTTOM of the box. */
+  addBox(owner, x, y, z, hw, hh, hd, yaw = 0, opts = {}){
+    const b = { x, y, z, hw, hh, hd,
+                c: Math.cos(-yaw), s: Math.sin(-yaw),
+                top: y + hh*2, solid: opts.solid !== false,
+                climb: opts.climb !== false };
+    this._cellsFor(b, k=>{
+      let arr = this.grid.get(k);
+      if(!arr) this.grid.set(k, arr = []);
+      arr.push(b);
+    });
+    let g = this.groups.get(owner);
+    if(!g) this.groups.set(owner, g = []);
+    g.push(b);
+    return b;
+  }
+
+  /* Add every box a building needs from its own local part list. */
+  addFromParts(owner, parts, mtx, yaw, minHeight = 0.9){
+    const v = new THREE.Vector3();
+    for(const part of parts){
+      const g = part.geo;
+      if(!g.boundingBox) g.computeBoundingBox();
+      const bb = g.boundingBox;
+      const hh = (bb.max.y - bb.min.y)/2;
+      v.set((bb.min.x+bb.max.x)/2, bb.min.y, (bb.min.z+bb.max.z)/2)
+       .applyMatrix4(mtx);
+      // Anything shorter than a knee is not a wall — it is a floor. Porches,
+      // decks and loading docks become surfaces you can step up onto.
+      const low = hh*2 < minHeight;
+      this.addBox(owner, v.x, v.y, v.z,
+        (bb.max.x-bb.min.x)/2, hh, (bb.max.z-bb.min.z)/2, yaw,
+        low ? { solid:false, climb:true } : {});
+    }
+  }
+
+  remove(owner){
+    const g = this.groups.get(owner);
+    if(!g) return;
+    const dead = new Set(g);
+    for(const b of g) this._cellsFor(b, k=>{
+      const arr = this.grid.get(k);
+      if(!arr) return;
+      const kept = arr.filter(x=>!dead.has(x));
+      if(kept.length) this.grid.set(k, kept); else this.grid.delete(k);
+    });
+    this.groups.delete(owner);
+  }
+
+  _near(x, z, radius, fn){
+    const c = this.cell;
+    const i0 = Math.floor((x-radius)/c), i1 = Math.floor((x+radius)/c);
+    const j0 = Math.floor((z-radius)/c), j1 = Math.floor((z+radius)/c);
+    for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){
+      const arr = this.grid.get(this._key(i,j));
+      if(arr) for(let k=0;k<arr.length;k++) fn(arr[k]);
+    }
+  }
+
+  /* Highest box top the mover could be standing on. Anything within stepUp of
+     the feet counts, which is what lets you walk up onto a boardwalk without
+     a jump and without a ramp. */
+  support(x, z, feetY, radius, stepUp = CFG.STEP_UP){
+    let best = -Infinity;
+    this._near(x, z, radius, b=>{
+      if(!b.climb) return;
+      if(b.top > feetY + stepUp) return;         // that is a wall, not a step
+      if(b.top < best) return;
+      const dx = x-b.x, dz = z-b.z;
+      const lx = dx*b.c - dz*b.s, lz = dx*b.s + dz*b.c;
+      if(Math.abs(lx) > b.hw + radius*0.6) return;
+      if(Math.abs(lz) > b.hd + radius*0.6) return;
+      best = b.top;
+    });
+    return best;
+  }
+
+  /* Push a capsule out of anything it is inside. Resolves on the axis of least
+     penetration in the box's own frame, so you slide along a wall instead of
+     sticking to it. Boxes whose top is below the mover's feet + step are
+     ignored: those are things you are standing on, not things in your way. */
+  resolve(pos, radius, height, stepUp = CFG.STEP_UP){
+    let hit = false;
+    for(let iter=0; iter<3; iter++){
+      let moved = false;
+      this._near(pos.x, pos.z, radius + 3, b=>{
+        if(!b.solid) return;
+        if(b.top <= pos.y + stepUp) return;      // walkable, handled by support
+        if(b.y >= pos.y + height) return;        // overhead, e.g. a balcony
+        const dx = pos.x-b.x, dz = pos.z-b.z;
+        const lx = dx*b.c - dz*b.s, lz = dx*b.s + dz*b.c;
+        const ox = b.hw + radius - Math.abs(lx);
+        const oz = b.hd + radius - Math.abs(lz);
+        if(ox <= 0 || oz <= 0) return;
+        let px=0, pz=0;
+        if(ox < oz) px = Math.sign(lx || 1)*ox; else pz = Math.sign(lz || 1)*oz;
+        // Back into world space (inverse of the yaw used above).
+        pos.x += px*b.c + pz*b.s;
+        pos.z += -px*b.s + pz*b.c;
+        moved = true; hit = true;
+      });
+      if(!moved) break;
+    }
+    return hit;
+  }
+
+  /* Cheap line-of-sight test, used to keep the camera out of buildings. */
+  blocked(x, z, radius){
+    let any = false;
+    this._near(x, z, radius, b=>{
+      if(any || !b.solid) return;
+      const dx = x-b.x, dz = z-b.z;
+      const lx = dx*b.c - dz*b.s, lz = dx*b.s + dz*b.c;
+      if(Math.abs(lx) < b.hw+radius && Math.abs(lz) < b.hd+radius) any = true;
+    });
+    return any;
+  }
+  get count(){ let n=0; for(const g of this.groups.values()) n+=g.length; return n; }
+}
+/* ==========================================================================
    WORLD_STREAMER
    128-unit cells. Load radius 5, unload at 7. Chunk contents build on a
    staggered per-frame budget so there is never a hitch (§3.4). Distant terrain
@@ -6523,12 +6913,16 @@ class Game {
       ['raising the ranges',             ()=>this._terrainBase()],
       ['forty passes of rain',           ()=>this._erode()],
       ['cutting the rivers to the sea',  ()=>this._rivers()],
+      ['surveying six townsites',        ()=>this._towns()],
+      ['routing the roads',              ()=>this._roads()],
       ['hanging the sky',                ()=>this._sky()],
       ['grinding the colour grades',     ()=>this._post()],
       ['growing things that have roots', ()=>this._veg()],
       ['articulating a man',             ()=>this._player()],
       ['articulating a horse',           ()=>this._horse()],
       ['tuning the wire',                ()=>this._audio()],
+      ['raising the townsfolk',          ()=>this._folk()],
+      ['building Yes Gulch',             ()=>this._homeTown()],
       ['populating the near country',    ()=>this._firstChunks()],
     ];
     let done = 0;
@@ -6572,15 +6966,30 @@ class Game {
   _rivers(){
     this.terrain.carveRivers();
     this.terrain.shapeShore();
+  }
+  /* Townsites are chosen and levelled BEFORE moisture, the shore texture or a
+     single chunk is meshed, so everything downstream sees the graded ground. */
+  _towns(){
+    this.colliders = new Colliders(10);
+    this.towns = new Towns(this.terrain, this.lib, this.colliders);
+    this.towns.place();
+  }
+  /* Roads are routed and graded before moisture, the shore texture or a single
+     chunk is meshed, so everything downstream sees the finished ground. */
+  _roads(){
+    this.roads = new Roads(this.terrain);
+    this.roads.build(this.towns.list);
     this.terrain.buildMoisture();
   }
 
   _sky(){
     this.sky = new Sky(this.scene, this.noiseTex);
-    this.terrainMat = makeTerrainMaterial(this.lib);
+    this.roadTex = this.terrain.roadTexture();
+    this.terrainMat = makeTerrainMaterial(this.lib, this.roadTex);
     /* Water: one big plane at sea level plus the Delta. Rivers read through
        the wet splat and the carved channels. */
     this.waterMat = makeWater(this.noiseTex, this.terrain.shoreTexture());
+
     const wgeo = new THREE.PlaneGeometry(CFG.WORLD*1.2, CFG.WORLD*1.2, 160, 160);
     wgeo.rotateX(-Math.PI/2);
     this.water = new THREE.Mesh(wgeo, this.waterMat);
@@ -6598,6 +7007,8 @@ class Game {
   }
 
   _veg(){
+    this.towns.scene = this.scene;
+    this.roads.buildGeometry(this.lib, this.scene, this.colliders);
     this.veg = new Vegetation(this.terrain, this.lib);
     this.grass = makeGrassField(this.terrain, this.quality);
     this.grass.add(this.scene);
@@ -6608,12 +7019,22 @@ class Game {
   }
 
   _player(){
-    this.player = new Player(this.terrain, this.lib, this.scene);
-    /* Open on the road out of Yes Gulch, in the grasslands. */
-    const sx = -140, sz = -40;
+    this.player = new Player(this.terrain, this.lib, this.scene, this.colliders);
+    /* Open on the road just outside Yes Gulch. */
+    const home = this.towns.list[0];
+    const out = this.roads.routes.find(r=>r.a===home.key || r.b===home.key);
+    let sx = home.x + home.radius*0.85, sz = home.z + home.radius*0.35;
+    if(out){
+      const along = Math.min(out.length*0.55, home.radius + 42);
+      const s = this.roads.sampleRoute(out, along);
+      sx = s.pos.x; sz = s.pos.z;
+    }
     this.player.spawn(sx, sz);
+    // Never wake up inside a wall.
+    this.colliders.resolve(this.player.pos, CFG.PLAYER_R, CFG.PLAYER_H);
+    this.player.object.position.copy(this.player.pos);
     this.player.setAct(1);
-    this.cam = new OrbitCam(this.camera, this.terrain);
+    this.cam = new OrbitCam(this.camera, this.terrain, this.colliders);
     this.cam.yaw = 2.1;
     this.cam.smoothTarget.copy(this.player.eyePos);
     this.ui = new UI();
@@ -6622,7 +7043,7 @@ class Game {
   }
 
   _horse(){
-    this.horse = new Horse(this.terrain, this.lib, this.scene);
+    this.horse = new Horse(this.terrain, this.lib, this.scene, this.colliders);
     this.horse.spawn(this.player.pos.x + 3.2, this.player.pos.z + 1.4, 2.4);
     this.horse.bond = 2.0;
   }
@@ -6652,6 +7073,35 @@ class Game {
         ()=>{ this.horse.mouthOpen = 0; },
         ()=> this.horse.headPoint());        // the voice rides with her
     };
+  }
+
+  _folk(){
+    this.folk = new Townsfolk(this.terrain, this.lib, this.scene, this.colliders);
+    this.folk.onSpeak = (npc, line)=>{
+      this.ui.say(npc.name, line, undefined, npc.named ? 'named' : '');
+      this.audio.speak(line, VOICE[npc.voice] || VOICE.conway,
+        npc.pos.clone().setY(npc.pos.y+1.6), null, null,
+        ()=> npc.pos.clone().setY(npc.pos.y+1.6));
+    };
+    /* Two lamps follow whichever windows are nearest — a full point light per
+       lamp post would cost more than the whole town is worth. */
+    this.townLights = [];
+    for(let i=0;i<CFG.TOWN_LIGHTS;i++){
+      const l = new THREE.PointLight(0xffb14a, 0, 16, 2);
+      l.visible = false; this.scene.add(l); this.townLights.push(l);
+    }
+  }
+
+  /* The largest town is the one you start beside, and it is the most
+     expensive to assemble. Build it during boot so the only noticeable town
+     build in the whole game happens behind the loading bar. */
+  _homeTown(){
+    const home = this.towns.list[0];
+    const g = this.towns._build(home);
+    this.scene.add(g);
+    this.towns.built.set(home.key, g);
+    this.folk.populate(home, g);
+    this.discovered.add(home.name);
   }
 
   async _firstChunks(){
@@ -6715,6 +7165,15 @@ class Game {
     this.weather.update(dt, this.player.pos, biome);
     this.discovered.add(BIOME_NAMES[biome]);
 
+    /* Settlements assemble and release around the player; their residents
+       only think when he is close enough to notice them. */
+    const town = this.towns.update(this.player.pos,
+      (t,g)=>{ this.folk.populate(t,g);
+               this.ui.toast(t.name.toUpperCase(), t.blurb, 4.5);
+               this.discovered.add(t.name); },
+      (t)=> this.folk.release(t));
+    this.folk.fixedUpdate(dt, this.tod.hour, this.player.pos);
+
     if(this.player.mounted){
       this.horse.fixedUpdate(dt, inp, this.cam.yaw, this.worldState());
       this.player.fixedUpdate(dt, inp, this.cam.yaw);
@@ -6732,7 +7191,7 @@ class Game {
       wetness: this.weather.wetness,
       inWater: this.terrain.sample(this.terrain.river,
                  this.horse.pos.x, this.horse.pos.z) > 0.4,
-      inTown: false,
+      inTown: !!this.towns.current,
       nearTower: false,
     };
   }
@@ -6787,8 +7246,10 @@ class Game {
 
     /* Animation + IK. */
     const lookAt = p.mounted ? null : h.headPoint();
-    p.update(dt, (!p.mounted && p.pos.distanceTo(h.pos)<7) ? lookAt : null);
+    // Horse first: the rider is pinned to her saddle bone, so her skeleton has
+    // to be solved for this frame before he reads it.
     h.update(dt, p.mounted ? null : p.eyePos.clone());
+    p.update(dt, (!p.mounted && p.pos.distanceTo(h.pos)<7) ? lookAt : null);
 
     /* Camera. */
     const focus = p.mounted
@@ -6863,8 +7324,34 @@ class Game {
                L.setOrientation(fwd.x,fwd.y,fwd.z,up.x,up.y,up.z); }
       // Music state follows the world: town/tension hooks land with the
       // mission engine; for now speed and night drive it.
-      const st = (p.mounted && h.speed > CFG.HORSE.CANTER) ? 'tension' : 'explore';
-      if(this.audio.music.state !== st) this.audio.music.setState(st);
+      if(!this.towns.current){
+        const st = (p.mounted && h.speed > CFG.HORSE.CANTER) ? 'tension' : 'explore';
+        if(this.audio.music.state !== st) this.audio.music.setState(st);
+      }
+    }
+
+    /* Townsfolk, lamplight and the town's own sound. */
+    this.nearNpc = this.folk.update(dt, p.eyePos.clone(), p.pos, this.ui, this.audio);
+    this.towns.setNight(this.tod.nightAmt);
+    this._placeTownLights();
+    const inTown = this.towns.current;
+    if(inTown !== this._lastTown){
+      this._lastTown = inTown;
+      if(this.audio.ready){
+        this.audio.music.setState(inTown ? 'town' : 'explore');
+        this.audio.setReverb(inTown ? 'store' : 'outdoor');
+      }
+    }
+    this.ui.setPrompt('talk','F',
+      this.nearNpc ? `Speak to ${this.nearNpc.named ? this.nearNpc.name : 'them'}`
+                   : '', !!this.nearNpc);
+    if(this.nearNpc && inp.once('KeyF')){
+      const n = this.nearNpc;
+      const pool = n.lines || n.barks || [];
+      if(pool.length) this.folk.onSpeak(n, pool[(n._li = ((n._li|0)+1)) % pool.length]);
+      n.spokenT = 6;
+      p.anim.playOverride('tip_hat', UPPER_MASK, 1, 0.10, false);
+      setTimeout(()=>p.anim.stopOverride('tip_hat'), 1350);
     }
 
     /* HUD. */
@@ -6872,11 +7359,38 @@ class Game {
     this.ui.drawCompass(this.cam.yaw + Math.PI);
     this.ui.updateSubs(dt);
     document.getElementById('clock').textContent =
-      `${this.tod.clockString()} · ${BIOME_NAMES[biome]}`;
+      `${this.tod.clockString()} · ${this.towns.current ? this.towns.current.name
+                                                        : BIOME_NAMES[biome]}`;
 
     /* Render. */
     this.composer.render(this.elapsed);
     inp.endFrame();
+  }
+
+  /* Only a handful of real lights exist; they chase the nearest lamps so a
+     town glows after dark without paying for a light per post. */
+  _placeTownLights(){
+    const night = this.tod.nightAmt;
+    if(night < 0.12){
+      for(const l of this.townLights) l.visible = false;
+      return;
+    }
+    const cands = [];
+    for(const [key, g] of this.towns.built){
+      for(const p of (g.userData.lamps||[])){
+        const d = p.distanceToSquared(this.player.pos);
+        if(d < 3600) cands.push([d, p]);
+      }
+    }
+    cands.sort((a,b)=>a[0]-b[0]);
+    for(let i=0;i<this.townLights.length;i++){
+      const l = this.townLights[i];
+      if(i < cands.length){
+        l.position.copy(cands[i][1]);
+        l.visible = true;
+        l.intensity = night*9.5*M.sat(1 - cands[i][0]/3600);
+      } else l.visible = false;
+    }
   }
 
   /* --- Adaptive quality: watch a 2s window and step down (§20) ---------- */
@@ -6937,6 +7451,8 @@ class Game {
         `quality  ${QUALITY[this.quality].name}\n`+
         `draws    ${r.calls}   tris ${(r.triangles/1000).toFixed(0)}k\n`+
         `chunks   ${this.streamer.loaded.size} (+${this.streamer.queue.length} queued)\n`+
+        `towns    ${this.towns.built.size} built   folk ${this.folk.all.length}\n`+
+        `colliders ${this.colliders.count}   road ${this.terrain.roadAt(this.player.pos.x,this.player.pos.z).toFixed(2)}\n`+
         `grass    ${this.grass.count}\n`+
         `particles ${this.particles.active}\n`+
         `pos      ${this.player.pos.x.toFixed(0)}, ${this.player.pos.y.toFixed(1)}, ${this.player.pos.z.toFixed(0)}\n`+
@@ -6947,6 +7463,2107 @@ class Game {
   }
 }
 
+/* ==========================================================================
+   SETTLEMENTS
+   Six towns (§4.6). Every building is grown from parameters, every sign is
+   painted onto a canvas at runtime, and every town is laid out along a street
+   whose angle, width and building mix come from its own seed. Nothing here is
+   placed by hand except the towns' names and characters.
+
+   The four names the brief insists on appear here as PLACES — Conway Creek,
+   Pudmenzky Flats, McRoberts Crossing, Dedman Gulch — and again in the NPC
+   module as PEOPLE.
+   ========================================================================== */
+
+const TOWNS = [
+  { key:'gulch',    name:'Yes Gulch',          biome:BIOME.GRASS,
+    near:[-150,-60],  size:22, character:'company',
+    blurb:'A company town that forgot to ask what the company was for.' },
+  { key:'conway',   name:'Conway Creek',       biome:BIOME.DELTA,
+    near:[260, 520],  size:18, character:'river',
+    blurb:'Built on a bend, flooded twice, rebuilt on the same bend.' },
+  { key:'pudmenzky',name:'Pudmenzky Flats',    biome:BIOME.FLATS,
+    near:[-560, 180], size:15, character:'dust',
+    blurb:'Salt, wind, and a man who will not sell.' },
+  { key:'mcroberts',name:'McRoberts Crossing', biome:BIOME.GRASS,
+    near:[420, -180], size:20, character:'law',
+    blurb:'Where the road, the river and the law all meet and disagree.' },
+  { key:'dedman',   name:'Dedman Gulch',       biome:BIOME.COPPER,
+    near:[620, 120],  size:17, character:'mine',
+    blurb:'Copper wire went in. Very little came back out.' },
+  { key:'signal',   name:'Signal Ridge Camp',  biome:BIOME.RIDGE,
+    near:[-260,-520], size:13, character:'camp',
+    blurb:'Tents, a cookfire, and the highest bar of reception in the country.' },
+];
+
+/* ---- Painted signage -----------------------------------------------------
+   Canvas 2D and system fonts only. A sign is a texture, so each one is unique
+   without a single image file. */
+function makeSignTexture(text, opts={}){
+  const { w=512, h=160, bg='#2a2118', ink='#e6dcc0', accent=null,
+          serif=true, worn=0.5 } = opts;
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const c = cv.getContext('2d');
+  c.fillStyle = bg; c.fillRect(0,0,w,h);
+
+  // Plank seams and grain, so a sign reads as painted wood, not a decal.
+  c.globalAlpha = 0.16; c.strokeStyle = '#000'; c.lineWidth = 2;
+  for(let y=h*0.33; y<h; y+=h*0.34){ c.beginPath(); c.moveTo(0,y); c.lineTo(w,y); c.stroke(); }
+  for(let i=0;i<180;i++){
+    c.globalAlpha = 0.05 + Math.random()*0.06;
+    c.fillStyle = Math.random()<0.5 ? '#000' : '#fff';
+    c.fillRect(Math.random()*w, Math.random()*h, 40+Math.random()*120, 1);
+  }
+  c.globalAlpha = 1;
+
+  if(accent){
+    c.strokeStyle = accent; c.lineWidth = 5;
+    c.strokeRect(11, 11, w-22, h-22);
+  }
+  const family = serif ? '"Bookman Old Style", Georgia, serif'
+                       : '"Trebuchet MS", "Gill Sans", sans-serif';
+  let size = Math.floor(h*0.42);
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  do { c.font = `${size}px ${family}`; size -= 2; }
+  while(c.measureText(text).width > w*0.86 && size > 12);
+  c.fillStyle = 'rgba(0,0,0,0.55)';
+  c.fillText(text, w/2+3, h/2+3);
+  c.fillStyle = ink;
+  c.fillText(text, w/2, h/2);
+
+  // Wear: scratch the paint back off.
+  c.globalCompositeOperation = 'destination-out';
+  for(let i=0;i<Math.floor(worn*260);i++){
+    c.globalAlpha = 0.05 + Math.random()*0.18;
+    c.beginPath();
+    c.ellipse(Math.random()*w, Math.random()*h, 1+Math.random()*9,
+              1+Math.random()*3, Math.random()*3.14, 0, 6.28);
+    c.fill();
+  }
+  c.globalCompositeOperation = 'source-over';
+  c.globalAlpha = 1;
+
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  t.needsUpdate = true;
+  return t;
+}
+
+/* ---- Geometry merge (no skinning; buildings do not bend) ---------------- */
+function mergeParts(parts){
+  const pos=[], nrm=[], uv=[], idx=[], groups=[];
+  let vOff=0, iOff=0;
+  for(const part of parts){
+    const g = part.geo;
+    const p=g.attributes.position, n=g.attributes.normal, u=g.attributes.uv;
+    for(let i=0;i<p.count;i++){
+      pos.push(p.getX(i),p.getY(i),p.getZ(i));
+      nrm.push(n?n.getX(i):0, n?n.getY(i):1, n?n.getZ(i):0);
+      uv.push(u?u.getX(i):0, u?u.getY(i):0);
+    }
+    const cnt = g.index ? g.index.count : p.count;
+    for(let i=0;i<cnt;i++) idx.push((g.index?g.index.getX(i):i)+vOff);
+    groups.push({start:iOff, count:cnt, material:part.group|0});
+    vOff += p.count; iOff += cnt;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('normal',   new THREE.Float32BufferAttribute(nrm,3));
+  geo.setAttribute('uv',       new THREE.Float32BufferAttribute(uv,2));
+  geo.setIndex(idx.length>65535 ? new THREE.Uint32BufferAttribute(idx,1)
+                                : new THREE.Uint16BufferAttribute(idx,1));
+  // Merge adjacent groups that share a material — fewer draw calls.
+  groups.sort((a,b)=>a.material-b.material || a.start-b.start);
+  for(const g of groups) geo.addGroup(g.start, g.count, g.material);
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+/* ==========================================================================
+   BUILDING GENERATOR
+   Material slots: 0 board · 1 timber · 2 roof · 3 glass · 4 stone · 5 metal
+   Every archetype returns geometry in its own local frame, front facing +Z.
+   ========================================================================== */
+const BM = { BOARD:0, TIMBER:1, ROOF:2, GLASS:3, STONE:4, METAL:5 };
+
+function bldBox(x,y,z, w,h,d, group, parts, uvScale=0.5){
+  const g = new THREE.BoxGeometry(w,h,d);
+  const uvA = g.attributes.uv;
+  for(let i=0;i<uvA.count;i++)
+    uvA.setXY(i, uvA.getX(i)*w*uvScale, uvA.getY(i)*h*uvScale);
+  g.translate(x,y,z);
+  parts.push({geo:g, group});
+  return g;
+}
+function bldPrism(x,y,z, w,h,d, group, parts){
+  const hw=w/2, hd=d/2;
+  const P=[ -hw,0,-hd,  hw,0,-hd,  hw,0,hd,  -hw,0,hd,   0,h,-hd,  0,h,hd ];
+  const I=[ 0,4,1, 2,5,3, 0,3,5, 0,5,4, 1,4,5, 1,5,2, 0,1,2, 0,2,3 ];
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(P,3));
+  g.setIndex(I); g.computeVertexNormals();
+  const uvArr = new Float32Array(12);
+  for(let i=0;i<6;i++){ uvArr[i*2]=P[i*3]*0.4; uvArr[i*2+1]=P[i*3+2]*0.4; }
+  g.setAttribute('uv', new THREE.BufferAttribute(uvArr,2));
+  g.translate(x,y,z);
+  parts.push({geo:g, group});
+}
+function bldPost(x,z, y0,y1, r, group, parts, seed=0){
+  const g = new THREE.CylinderGeometry(r*(0.92+M.imperfection(seed,0.08)), r,
+                                       y1-y0, 6, 1);
+  g.translate(x, (y0+y1)/2, z);
+  parts.push({geo:g, group});
+}
+/* A porch: floor, roof, posts, and the rail that makes it a place to stand. */
+function bldPorch(parts, w, d, depth, height, rail, rnd){
+  bldBox(0, height, d/2+depth/2, w+0.3, 0.16, depth, BM.ROOF, parts);
+  bldBox(0, 0.10, d/2+depth/2, w+0.5, 0.20, depth+0.3, BM.BOARD, parts);
+  for(const sx of [-w/2+0.3, w/2-0.3])
+    bldPost(sx, d/2+depth-0.15, 0.2, height, 0.075, BM.TIMBER, parts, sx*13);
+  if(rail){
+    for(const sx of [-w/2+0.3, w/2-0.3])
+      bldBox(sx, 0.72, d/2+depth-0.15, 0.10, 1.0, 0.10, BM.TIMBER, parts);
+    bldBox(0, 1.02, d/2+depth-0.15, w*0.55, 0.09, 0.09, BM.TIMBER, parts);
+  }
+}
+function bldWindows(parts, w, d, y, count, ww, wh){
+  for(let i=0;i<count;i++){
+    const sx = count===1 ? 0 : -w/2 + (i+0.5)*(w/count);
+    bldBox(sx, y, d/2+0.23, ww, wh, 0.08, BM.GLASS, parts);
+  }
+}
+
+const BUILDINGS = {
+  /* ---- The plain false-front shop, the backbone of every street --------- */
+  store(rnd, name){
+    const parts=[], signs=[], lamps=[];
+    const w = M.range(rnd, 5.4, 8.2), d = M.range(rnd, 6.4, 9.4);
+    const wallH = M.range(rnd, 3.3, 4.1);
+    const frontH = wallH + M.range(rnd, 1.0, 2.0);
+    bldBox(0, wallH/2, 0, w, wallH, d, BM.BOARD, parts);
+    bldPrism(0, wallH, 0, w+0.24, 1.2, d+0.2, BM.ROOF, parts);
+    bldBox(0, frontH/2, d/2+0.10, w+0.16, frontH, 0.24, BM.BOARD, parts);
+    bldBox(0, frontH+0.10, d/2+0.10, w+0.44, 0.24, 0.42, BM.TIMBER, parts);
+    bldPorch(parts, w, d, M.range(rnd,1.8,2.6), 2.85, rnd()<0.45, rnd);
+    bldBox(0, 1.05, d/2+0.22, 1.02, 2.10, 0.10, BM.TIMBER, parts);
+    bldWindows(parts, w*0.86, d, 1.72, 2, 1.42, 1.30);
+    signs.push({ text:name, x:0, y:frontH-0.70, z:d/2+0.26, w:w*0.80, h:0.90 });
+    lamps.push({ x:w/2-0.5, y:2.62, z:d/2+2.0 });
+    return { parts, signs, lamps, w:w+0.6, d:d+3.2, h:frontH };
+  },
+
+  /* ---- Saloon: the loudest building in any of these towns --------------- */
+  saloon(rnd, name){
+    const parts=[], signs=[], lamps=[];
+    const w = M.range(rnd, 8.4, 10.6), d = M.range(rnd, 9.0, 11.5);
+    const h1 = 3.6, h2 = 3.2, H = h1+h2;
+    bldBox(0, H/2, 0, w, H, d, BM.BOARD, parts);
+    bldPrism(0, H, 0, w+0.26, 1.3, d+0.22, BM.ROOF, parts);
+    bldBox(0, H+0.60, d/2+0.12, w+0.2, 1.2, 0.24, BM.BOARD, parts);
+    const bd = 2.6;
+    bldBox(0, h1, d/2+bd/2, w+0.4, 0.20, bd, BM.BOARD, parts);
+    bldBox(0, h1+0.58, d/2+bd-0.06, w+0.4, 0.10, 0.10, BM.TIMBER, parts);
+    for(let i=0;i<11;i++)
+      bldPost(-w/2+(i/10)*w, d/2+bd-0.06, h1+0.10, h1+0.60, 0.035,
+              BM.TIMBER, parts, i*7);
+    for(const sx of [-w/2+0.35, w/2-0.35]){
+      bldPost(sx, d/2+bd-0.2, 0.2, h1, 0.090, BM.TIMBER, parts, sx*11);
+      bldPost(sx, d/2+bd-0.2, h1+0.62, H+0.2, 0.072, BM.TIMBER, parts, sx*5);
+    }
+    bldBox(0, 0.10, d/2+bd/2, w+0.7, 0.20, bd+0.4, BM.BOARD, parts);
+    bldBox(0, 1.32, d/2+0.14, 1.80, 2.55, 0.14, BM.TIMBER, parts);
+    for(const sx of [-0.44, 0.44])
+      bldBox(sx, 1.20, d/2+0.24, 0.74, 1.22, 0.07, BM.BOARD, parts);
+    for(const sx of [-w/3.1, w/3.1]){
+      bldBox(sx, 1.88, d/2+0.13, 1.34, 1.50, 0.08, BM.GLASS, parts);
+      bldBox(sx, h1+1.60, d/2+0.13, 0.98, 1.34, 0.08, BM.GLASS, parts);
+    }
+    signs.push({ text:name, x:0, y:H+0.60, z:d/2+0.27, w:w*0.82, h:1.05,
+                 accent:'#FFD600' });
+    lamps.push({ x:-w/2+0.6, y:2.75, z:d/2+bd-0.3 });
+    lamps.push({ x: w/2-0.6, y:2.75, z:d/2+bd-0.3 });
+    return { parts, signs, lamps, w:w+0.8, d:d+bd+0.5, h:H+1.8 };
+  },
+
+  /* ---- Hotel: three storeys, because somebody has to be doing well ------ */
+  hotel(rnd, name){
+    const parts=[], signs=[], lamps=[];
+    const w = 10.5, d = 11.0, H = 10.2;
+    bldBox(0, 0.35, 0, w+0.8, 0.70, d+0.8, BM.STONE, parts);
+    bldBox(0, 0.7+H/2, 0, w, H, d, BM.BOARD, parts);
+    bldPrism(0, 0.7+H, 0, w+0.3, 1.5, d+0.25, BM.ROOF, parts);
+    for(let f=0; f<3; f++){
+      const y = 2.3 + f*3.2;
+      for(let i=0;i<4;i++)
+        bldBox(-w/2+(i+0.5)*(w/4), y, d/2+0.13, 1.05, 1.60, 0.08, BM.GLASS, parts);
+      if(f>0){
+        bldBox(0, y-1.05, d/2+0.85, w+0.3, 0.16, 1.7, BM.BOARD, parts);
+        bldBox(0, y-0.52, d/2+1.63, w+0.3, 0.09, 0.09, BM.TIMBER, parts);
+        for(let i=0;i<13;i++)
+          bldPost(-w/2+(i/12)*w, d/2+1.63, y-0.97, y-0.48, 0.032,
+                  BM.TIMBER, parts, i*3+f);
+      }
+    }
+    bldPorch(parts, w, d, 2.4, 3.0, true, rnd);
+    bldBox(0, 1.30, d/2+0.22, 1.60, 2.45, 0.12, BM.TIMBER, parts);
+    signs.push({ text:name, x:0, y:H-0.4, z:d/2+0.16, w:w*0.78, h:1.1 });
+    lamps.push({ x:0, y:2.9, z:d/2+2.1 });
+    return { parts, signs, lamps, w:w+0.9, d:d+3.0, h:H+2 };
+  },
+
+  /* ---- Bank: stone, columns, and the only door in town worth locking ---- */
+  bank(rnd, name){
+    const parts=[], signs=[], lamps=[];
+    const w = 8.6, d = 9.0, H = 5.6;
+    bldBox(0, 0.4, 0, w+1.0, 0.80, d+1.0, BM.STONE, parts);
+    bldBox(0, 0.8+H/2, 0, w, H, d, BM.STONE, parts);
+    // Pediment over four columns.
+    bldBox(0, 0.8+H+0.45, d/2+0.9, w+1.4, 0.9, 2.2, BM.STONE, parts);
+    bldPrism(0, 0.8+H+0.9, d/2+0.9, w+1.6, 1.1, 2.4, BM.STONE, parts);
+    for(let i=0;i<4;i++){
+      const sx = -w/2 + 0.7 + i*((w-1.4)/3);
+      bldPost(sx, d/2+1.5, 0.8, 0.8+H+0.4, 0.30, BM.STONE, parts, i*23);
+      bldBox(sx, 0.8+H+0.30, d/2+1.5, 0.78, 0.22, 0.78, BM.STONE, parts);
+      bldBox(sx, 0.95, d/2+1.5, 0.78, 0.30, 0.78, BM.STONE, parts);
+    }
+    bldBox(0, 0.10, d/2+1.6, w+1.2, 0.20, 2.8, BM.STONE, parts);
+    bldBox(0, 2.15, d/2+0.16, 1.55, 2.65, 0.14, BM.TIMBER, parts);
+    for(const sx of [-w/3, w/3])
+      bldBox(sx, 2.6, d/2+0.14, 1.05, 1.9, 0.08, BM.GLASS, parts);
+    signs.push({ text:name, x:0, y:0.8+H+0.45, z:d/2+2.05, w:w*0.8, h:0.72,
+                 bg:'#1e2320', ink:'#d8cfae' });
+    lamps.push({ x:w/2-0.8, y:3.1, z:d/2+2.2 });
+    return { parts, signs, lamps, w:w+1.4, d:d+3.4, h:H+3 };
+  },
+
+  /* ---- Church ---------------------------------------------------------- */
+  church(rnd, name){
+    const parts=[], signs=[], lamps=[];
+    const w = 7.0, d = M.range(rnd, 12, 15);
+    const wallH = 4.6;
+    bldBox(0, wallH/2, 0, w, wallH, d, BM.BOARD, parts);
+    bldPrism(0, wallH, 0, w+0.3, 2.8, d+0.25, BM.ROOF, parts);
+    const tz = d/2 - 1.2;
+    bldBox(0, 4.0, tz, 2.8, 8.0, 2.8, BM.BOARD, parts);
+    const spire = new THREE.ConeGeometry(2.05, 3.8, 4);
+    spire.rotateY(Math.PI/4); spire.translate(0, 9.9, tz);
+    parts.push({geo:spire, group:BM.ROOF});
+    bldBox(0, 12.1, tz, 0.10, 1.1, 0.10, BM.METAL, parts);
+    bldBox(0, 11.9, tz, 0.58, 0.10, 0.10, BM.METAL, parts);
+    bldBox(0, 1.32, tz+1.42, 1.25, 2.64, 0.12, BM.TIMBER, parts);
+    for(const sz of [-d/3.4, 0, d/3.4]) for(const sx of [-w/2-0.02, w/2+0.02])
+      bldBox(sx, 2.6, sz, 0.08, 2.1, 0.92, BM.GLASS, parts);
+    for(const sx of [-0.68,0.68])
+      bldBox(sx, 6.7, tz+1.42, 0.58, 0.95, 0.10, BM.GLASS, parts);
+    bldBox(0, 0.10, tz+2.0, 3.4, 0.20, 1.6, BM.BOARD, parts);
+    signs.push({ text:name, x:0, y:1.0, z:tz+1.50, w:2.3, h:0.46 });
+    lamps.push({ x:1.6, y:2.7, z:tz+1.6 });
+    return { parts, signs, lamps, w:w+0.5, d:d+1.6, h:13.5 };
+  },
+
+  /* ---- Courthouse: the law, with a portico to prove it ------------------ */
+  courthouse(rnd, name){
+    const parts=[], signs=[], lamps=[];
+    const w = 11.0, d = 10.0, H = 6.2;
+    bldBox(0, 0.5, 0, w+1.2, 1.0, d+1.2, BM.STONE, parts);
+    bldBox(0, 1.0+H/2, 0, w, H, d, BM.BOARD, parts);
+    bldPrism(0, 1.0+H, 0, w+0.4, 2.0, d+0.3, BM.ROOF, parts);
+    // Clock tower.
+    bldBox(0, 1.0+H+1.6, 0, 2.6, 3.4, 2.6, BM.BOARD, parts);
+    const cap = new THREE.ConeGeometry(1.9, 2.0, 8);
+    cap.translate(0, 1.0+H+4.2, 0); parts.push({geo:cap, group:BM.ROOF});
+    for(const [ox,oz] of [[0,1.35],[0,-1.35],[1.35,0],[-1.35,0]])
+      bldBox(ox, 1.0+H+1.8, oz, ox?0.06:1.3, 1.3, oz?0.06:1.3, BM.GLASS, parts);
+    for(let i=0;i<5;i++){
+      const sx=-w/2+0.8+i*((w-1.6)/4);
+      bldPost(sx, d/2+1.6, 1.0, 1.0+H-0.2, 0.24, BM.TIMBER, parts, i*31);
+    }
+    bldBox(0, 1.0+H-0.1, d/2+1.6, w+0.6, 0.35, 3.4, BM.ROOF, parts);
+    bldBox(0, 0.10, d/2+1.7, w+0.8, 0.20, 3.6, BM.BOARD, parts);
+    bldBox(0, 2.35, d/2+0.16, 1.70, 2.70, 0.14, BM.TIMBER, parts);
+    bldWindows(parts, w*0.8, d, 3.2, 4, 1.05, 1.9);
+    signs.push({ text:name, x:0, y:1.0+H-0.55, z:d/2+3.32, w:w*0.62, h:0.68 });
+    lamps.push({ x:-w/2+0.9, y:3.2, z:d/2+3.2 });
+    lamps.push({ x: w/2-0.9, y:3.2, z:d/2+3.2 });
+    return { parts, signs, lamps, w:w+1.4, d:d+4.4, h:H+7 };
+  },
+
+  /* ---- Jail: small, stone, barred ------------------------------------- */
+  jail(rnd, name){
+    const parts=[], signs=[], lamps=[];
+    const w = 6.4, d = 6.8, H = 3.6;
+    bldBox(0, 0.3, 0, w+0.6, 0.60, d+0.6, BM.STONE, parts);
+    bldBox(0, 0.6+H/2, 0, w, H, d, BM.STONE, parts);
+    bldPrism(0, 0.6+H, 0, w+0.25, 0.9, d+0.2, BM.ROOF, parts);
+    bldBox(0, 1.65, d/2+0.16, 1.10, 2.20, 0.12, BM.METAL, parts);
+    for(const sx of [-w/3.2, w/3.2]){
+      bldBox(sx, 2.35, d/2+0.14, 0.90, 0.88, 0.08, BM.GLASS, parts);
+      for(let b=0;b<4;b++)
+        bldBox(sx-0.36+b*0.24, 2.35, d/2+0.19, 0.055, 0.94, 0.055, BM.METAL, parts);
+    }
+    signs.push({ text:name, x:0, y:3.5, z:d/2+0.16, w:3.2, h:0.62,
+                 bg:'#20211c' });
+    lamps.push({ x:0, y:2.9, z:d/2+0.5 });
+    return { parts, signs, lamps, w:w+0.7, d:d+0.8, h:H+1.5 };
+  },
+
+  /* ---- Warehouse / freight depot --------------------------------------- */
+  warehouse(rnd, name){
+    const parts=[], signs=[], lamps=[];
+    const w = M.range(rnd, 12, 17), d = 9.5, H = 5.4;
+    bldBox(0, H/2, 0, w, H, d, BM.BOARD, parts);
+    bldPrism(0, H, 0, w+0.35, 1.7, d+0.3, BM.ROOF, parts);
+    // Loading dock at wagon-bed height.
+    bldBox(0, 0.55, d/2+1.5, w+0.4, 1.10, 3.0, BM.BOARD, parts);
+    for(let i=0;i<5;i++)
+      bldPost(-w/2+(i+0.5)*(w/5), d/2+2.8, 0, 1.05, 0.09, BM.TIMBER, parts, i*9);
+    bldBox(0, 3.3, d/2+2.9, w+0.5, 0.16, 0.25, BM.ROOF, parts);
+    for(const sx of [-w/4, w/4])
+      bldBox(sx, 2.6, d/2+0.14, 2.6, 2.9, 0.14, BM.TIMBER, parts);
+    for(let i=0;i<6;i++)
+      bldBox(-w/2+(i+0.5)*(w/6), 4.5, d/2+0.13, 0.85, 0.85, 0.08, BM.GLASS, parts);
+    signs.push({ text:name||'FREIGHT', x:0, y:H-0.7, z:d/2+0.16, w:w*0.5, h:0.8 });
+    return { parts, signs, lamps, w:w+0.6, d:d+3.4, h:H+2 };
+  },
+
+  /* ---- Barn ------------------------------------------------------------- */
+  barn(rnd){
+    const parts=[], signs=[], lamps=[];
+    const w = 10, d = 12, H = 4.6;
+    bldBox(0, H/2, 0, w, H, d, BM.BOARD, parts);
+    // Gambrel roof: two pitches, the shape that says barn at any distance.
+    bldPrism(0, H, 0, w+0.3, 1.2, d+0.25, BM.ROOF, parts);
+    bldBox(0, H+1.15, 0, w*0.62, 0.1, d+0.25, BM.ROOF, parts);
+    bldPrism(0, H+1.2, 0, w*0.62, 2.1, d+0.25, BM.ROOF, parts);
+    bldBox(0, 2.1, d/2+0.14, 3.6, 4.1, 0.16, BM.TIMBER, parts);
+    bldBox(0, 5.2, d/2+0.14, 1.5, 1.5, 0.14, BM.TIMBER, parts);
+    bldBox(0, 6.5, d/2+0.9, 0.16, 0.16, 1.9, BM.TIMBER, parts);
+    return { parts, signs, lamps, w:w+0.5, d:d+0.6, h:H+3.4 };
+  },
+
+  stable(rnd, name){
+    const parts=[], signs=[], lamps=[];
+    const w = 9.0, d = 7.5, h = 3.8;
+    for(const sx of [-w/2, w/2]) bldBox(sx, h/2, 0, 0.24, h, d, BM.BOARD, parts);
+    bldBox(0, h/2, -d/2, w, h, 0.24, BM.BOARD, parts);
+    bldPrism(0, h, 0, w+0.3, 1.6, d+0.25, BM.ROOF, parts);
+    for(let i=0;i<3;i++)
+      bldPost(-w/2+(i+1)*w/4, d/2-0.2, 0, h, 0.115, BM.TIMBER, parts, i*17);
+    for(let i=0;i<2;i++)
+      bldBox(-w/4+i*w/2, 0.35, d/2-1.5, 1.6, 0.70, 0.95, BM.TIMBER, parts);
+    signs.push({ text:name||'LIVERY & FEED', x:0, y:h+0.6, z:d/2+0.06, w:3.4, h:0.64 });
+    return { parts, signs, lamps, w:w+0.5, d:d+0.5, h:h+1.6 };
+  },
+
+  office(rnd, name){
+    const parts=[], signs=[], lamps=[];
+    const w = 7.6, d = 8.4, H = 4.8;
+    bldBox(0, 0.32, 0, w+0.8, 0.64, d+0.8, BM.STONE, parts);
+    bldBox(0, 0.64+H/2, 0, w, H, d, BM.BOARD, parts);
+    bldPrism(0, 0.64+H, 0, w+0.3, 1.4, d+0.25, BM.ROOF, parts);
+    bldBox(0, 0.64+H+0.80, d/2+0.10, w+0.15, 1.6, 0.24, BM.BOARD, parts);
+    bldPorch(parts, w, d, 2.2, 3.1, true, rnd);
+    bldBox(0, 1.80, d/2+0.20, 1.20, 2.35, 0.12, BM.TIMBER, parts);
+    bldWindows(parts, w*0.8, d, 2.45, 2, 1.35, 1.55);
+    bldPost(w/2+1.8, -d/3, 0, 8.6, 0.14, BM.TIMBER, parts, 91);
+    bldBox(w/2+1.8, 8.0, -d/3, 2.0, 0.12, 0.12, BM.TIMBER, parts);
+    for(const ox of [-0.78, 0.78])
+      bldBox(w/2+1.8+ox, 8.18, -d/3, 0.12, 0.24, 0.12, BM.GLASS, parts);
+    signs.push({ text:name, x:0, y:0.64+H+0.80, z:d/2+0.26, w:w*0.86, h:1.0,
+                 accent:'#00A3A6', bg:'#14312f' });
+    lamps.push({ x:0, y:3.1, z:d/2+1.9 });
+    return { parts, signs, lamps, w:w+1.0, d:d+3.0, h:H+4 };
+  },
+
+  shack(rnd){
+    const parts=[], signs=[], lamps=[];
+    const w = M.range(rnd, 3.2, 4.8), d = M.range(rnd, 3.6, 5.2);
+    const h = M.range(rnd, 2.4, 3.1);
+    bldBox(0, h/2, 0, w, h, d, BM.BOARD, parts);
+    bldPrism(0, h, 0, w+0.2, M.range(rnd,0.55,1.0), d+0.18, BM.ROOF, parts);
+    bldBox(0, 0.98, d/2+0.06, 0.88, 1.95, 0.08, BM.TIMBER, parts);
+    if(rnd()<0.6) bldBox(w/3, 1.60, d/2+0.06, 0.72, 0.72, 0.06, BM.GLASS, parts);
+    bldPost(w/3, -d/4, h+0.4, h+1.6, 0.075, BM.METAL, parts, 3);
+    return { parts, signs, lamps, w:w+0.4, d:d+0.4, h:h+1.8 };
+  },
+
+  watertower(rnd){
+    const parts=[], signs=[], lamps=[];
+    const legH = M.range(rnd, 5.5, 7.6), r = 2.3;
+    for(let i=0;i<4;i++){
+      const a = i/4*Math.PI*2 + Math.PI/4;
+      const lx = Math.cos(a)*1.55, lz = Math.sin(a)*1.55;
+      const g = new THREE.CylinderGeometry(0.10, 0.15, legH, 5);
+      g.applyMatrix4(new THREE.Matrix4().makeRotationAxis(
+        new THREE.Vector3(-lz,0,lx).normalize(), -0.085));
+      g.translate(lx*1.35, legH/2, lz*1.35);
+      parts.push({geo:g, group:BM.TIMBER});
+    }
+    for(const yy of [legH*0.4, legH*0.75]){
+      const ring = new THREE.TorusGeometry(2.2, 0.045, 4, 12);
+      ring.rotateX(Math.PI/2); ring.translate(0, yy, 0);
+      parts.push({geo:ring, group:BM.METAL});
+    }
+    const tank = new THREE.CylinderGeometry(r, r*0.98, 3.6, 14, 1, true);
+    tank.translate(0, legH+1.8, 0); parts.push({geo:tank, group:BM.BOARD});
+    const lid = new THREE.ConeGeometry(r*1.09, 0.9, 14);
+    lid.translate(0, legH+3.95, 0); parts.push({geo:lid, group:BM.ROOF});
+    const base = new THREE.CircleGeometry(r, 14);
+    base.rotateX(Math.PI/2); base.translate(0, legH, 0);
+    parts.push({geo:base, group:BM.BOARD});
+    for(const yy of [legH+0.8, legH+2.9]){
+      const b = new THREE.TorusGeometry(r+0.04, 0.055, 4, 14);
+      b.rotateX(Math.PI/2); b.translate(0, yy, 0);
+      parts.push({geo:b, group:BM.METAL});
+    }
+    return { parts, signs, lamps, w:5.4, d:5.4, h:legH+4.5 };
+  },
+
+  /* ---- Mine headframe: the silhouette that defines a copper town -------- */
+  headframe(rnd){
+    const parts=[], signs=[], lamps=[];
+    const H = 13.5;
+    for(const [ox,oz] of [[-1.5,-1.5],[1.5,-1.5],[-1.5,1.5],[1.5,1.5]]){
+      const g = new THREE.CylinderGeometry(0.16, 0.22, H, 5);
+      g.applyMatrix4(new THREE.Matrix4().makeRotationAxis(
+        new THREE.Vector3(-oz,0,ox).normalize(), 0.075));
+      g.translate(ox, H/2, oz);
+      parts.push({geo:g, group:BM.TIMBER});
+    }
+    for(const y of [3.5, 7.0, 10.5]){
+      bldBox(0, y, -1.5, 3.2, 0.14, 0.14, BM.TIMBER, parts);
+      bldBox(0, y,  1.5, 3.2, 0.14, 0.14, BM.TIMBER, parts);
+      bldBox(-1.5, y, 0, 0.14, 0.14, 3.2, BM.TIMBER, parts);
+      bldBox( 1.5, y, 0, 0.14, 0.14, 3.2, BM.TIMBER, parts);
+    }
+    // Sheave wheel.
+    const wheel = new THREE.TorusGeometry(1.5, 0.16, 6, 18);
+    wheel.translate(0, H+0.4, 0); parts.push({geo:wheel, group:BM.METAL});
+    for(let i=0;i<6;i++){
+      const a=i/6*Math.PI*2;
+      const sp = new THREE.BoxGeometry(0.09, 2.9, 0.09);
+      sp.rotateZ(a); sp.translate(0, H+0.4, 0);
+      parts.push({geo:sp, group:BM.METAL});
+    }
+    bldBox(0, H+0.4, 0, 0.3, 0.3, 1.0, BM.METAL, parts);
+    // Ore chute running down to a bin.
+    bldBox(2.6, 4.0, 0, 3.0, 0.20, 1.6, BM.BOARD, parts);
+    bldBox(4.4, 2.2, 0, 2.2, 2.4, 2.0, BM.BOARD, parts);
+    bldBox(0, 0.6, 0, 3.6, 1.2, 3.6, BM.TIMBER, parts);
+    return { parts, signs, lamps, w:9.0, d:5.2, h:H+2 };
+  },
+
+  /* ---- Wind pump: the sound of the Flats -------------------------------- */
+  windpump(rnd){
+    const parts=[], signs=[], lamps=[];
+    const H = M.range(rnd, 7.0, 9.5);
+    for(const [ox,oz] of [[-0.9,-0.9],[0.9,-0.9],[-0.9,0.9],[0.9,0.9]]){
+      const g = new THREE.CylinderGeometry(0.06, 0.11, H, 4);
+      g.applyMatrix4(new THREE.Matrix4().makeRotationAxis(
+        new THREE.Vector3(-oz,0,ox).normalize(), 0.105));
+      g.translate(ox, H/2, oz); parts.push({geo:g, group:BM.METAL});
+    }
+    for(const y of [H*0.3, H*0.6, H*0.85]){
+      bldBox(0, y, -0.9*(1-y/H*0.5), 1.9, 0.06, 0.06, BM.METAL, parts);
+      bldBox(0, y,  0.9*(1-y/H*0.5), 1.9, 0.06, 0.06, BM.METAL, parts);
+    }
+    const hub = new THREE.CylinderGeometry(0.22,0.22,0.3,8);
+    hub.rotateX(Math.PI/2); hub.translate(0, H+0.5, 0.4);
+    parts.push({geo:hub, group:BM.METAL});
+    for(let i=0;i<14;i++){
+      const a = i/14*Math.PI*2;
+      const bl = new THREE.BoxGeometry(0.20, 1.5, 0.03);
+      bl.translate(0, 0.95, 0); bl.rotateZ(a); bl.rotateY(0.32);
+      bl.translate(0, H+0.5, 0.46);
+      parts.push({geo:bl, group:BM.METAL});
+    }
+    const rim = new THREE.TorusGeometry(1.62, 0.035, 4, 16);
+    rim.translate(0, H+0.5, 0.46); parts.push({geo:rim, group:BM.METAL});
+    bldBox(0, H+0.5, -1.3, 0.05, 1.1, 1.7, BM.METAL, parts);   // tail vane
+    bldBox(0, 0.45, 0, 2.2, 0.9, 2.2, BM.BOARD, parts);        // tank at the foot
+    return { parts, signs, lamps, w:3.6, d:3.6, h:H+2.2 };
+  },
+
+  /* ---- Tent: the whole of Signal Ridge Camp ---------------------------- */
+  tent(rnd){
+    const parts=[], signs=[], lamps=[];
+    const w = M.range(rnd, 3.0, 4.2), d = M.range(rnd, 3.6, 5.0), h = 2.3;
+    bldBox(0, 0.35, 0, w*0.94, 0.70, d*0.94, BM.BOARD, parts);
+    bldPrism(0, 0.7, 0, w, h, d, BM.ROOF, parts);
+    for(const sz of [-d/2, d/2]) bldPost(0, sz, 0, h+0.7, 0.055, BM.TIMBER, parts, sz);
+    for(const [ox,oz] of [[-w/2-0.7,-d/2-0.7],[w/2+0.7,-d/2-0.7],
+                          [-w/2-0.7,d/2+0.7],[w/2+0.7,d/2+0.7]]){
+      const g = new THREE.CylinderGeometry(0.02,0.02,
+        Math.hypot(1.0, h*0.8), 3);
+      g.rotateX(0.7); g.translate(ox*0.75, 0.7, oz*0.75);
+      parts.push({geo:g, group:BM.METAL});
+    }
+    return { parts, signs, lamps, w:w+1.6, d:d+1.6, h:h+0.8 };
+  },
+
+  /* ---- Aerial mast: the reason the camp exists at all ------------------- */
+  mast(rnd){
+    const parts=[], signs=[], lamps=[];
+    const H = M.range(rnd, 12, 17);
+    bldPost(0,0, 0, H, 0.20, BM.TIMBER, parts, 5);
+    for(let i=0;i<5;i++){
+      const y = H*(0.35 + i*0.14);
+      const len = 3.4 - i*0.42;
+      bldBox(0, y, 0, len, 0.09, 0.09, BM.TIMBER, parts);
+      for(const ox of [-len/2+0.2, len/2-0.2])
+        bldBox(ox, y+0.18, 0, 0.10, 0.22, 0.10, BM.GLASS, parts);
+    }
+    for(const a of [0, 2.09, 4.19]){
+      const g = new THREE.CylinderGeometry(0.03,0.03, H*1.15, 3);
+      g.rotateZ(0.30); g.rotateY(a);
+      g.translate(Math.cos(a)*H*0.19, H*0.48, Math.sin(a)*H*0.19);
+      parts.push({geo:g, group:BM.METAL});
+    }
+    return { parts, signs, lamps, w:4.0, d:4.0, h:H };
+  },
+};
+
+/* ---- Street furniture and outskirt features ------------------------------ */
+function makeProps(rnd, kind){
+  const parts=[];
+  switch(kind){
+    case 'hitch':
+      bldPost(-1.2, 0, 0, 1.20, 0.080, BM.TIMBER, parts, 1);
+      bldPost( 1.2, 0, 0, 1.20, 0.080, BM.TIMBER, parts, 2);
+      bldBox(0, 1.15, 0, 2.6, 0.12, 0.12, BM.TIMBER, parts);
+      break;
+    case 'barrel': {
+      const g = new THREE.CylinderGeometry(0.36,0.31,0.92,10);
+      g.translate(0,0.46,0); parts.push({geo:g, group:BM.BOARD});
+      for(const yy of [0.20,0.72]){
+        const r = new THREE.TorusGeometry(0.355,0.028,4,10);
+        r.rotateX(Math.PI/2); r.translate(0,yy,0);
+        parts.push({geo:r, group:BM.METAL});
+      }
+      break;
+    }
+    case 'crate': bldBox(0,0.29,0, 0.72,0.58,0.62, BM.BOARD, parts, 1.4); break;
+    case 'trough':
+      bldBox(0,0.28,0, 2.2,0.56,0.78, BM.BOARD, parts);
+      bldBox(0,0.50,0, 2.05,0.10,0.66, BM.GLASS, parts); break;
+    case 'fence':
+      for(let i=0;i<5;i++) bldPost(-2+i, 0, 0, 1.10, 0.058, BM.TIMBER, parts, i);
+      for(const yy of [0.48, 0.98]) bldBox(0,yy,0, 4.2,0.07,0.07, BM.TIMBER, parts);
+      break;
+    case 'lamp':
+      bldPost(0,0, 0, 2.95, 0.068, BM.METAL, parts, 4);
+      bldBox(0, 3.14, 0, 0.32, 0.38, 0.32, BM.GLASS, parts);
+      { const cap = new THREE.ConeGeometry(0.26, 0.26, 6);
+        cap.translate(0, 3.44, 0); parts.push({geo:cap, group:BM.METAL}); }
+      break;
+    case 'cart':
+      bldBox(0,0.85,0, 1.6,0.58,2.8, BM.BOARD, parts);
+      for(const sx of [-0.9,0.9]) for(const sz of [-0.9,1.0]){
+        const wl = new THREE.TorusGeometry(0.60,0.078,5,12);
+        wl.rotateY(Math.PI/2); wl.translate(sx,0.62,sz);
+        parts.push({geo:wl, group:BM.TIMBER});
+      }
+      bldBox(0,0.9,2.0, 0.10,0.10,1.6, BM.TIMBER, parts); break;
+    case 'headstone': {
+      const g = new THREE.BoxGeometry(0.44,0.72,0.11);
+      g.translate(0,0.36,0); parts.push({geo:g, group:BM.STONE});
+      const top = new THREE.CylinderGeometry(0.22,0.22,0.11,8,1,false,0,Math.PI);
+      top.rotateZ(Math.PI/2); top.rotateY(Math.PI/2); top.translate(0,0.72,0);
+      parts.push({geo:top, group:BM.STONE}); break;
+    }
+    case 'firepit': {
+      for(let i=0;i<9;i++){
+        const a=i/9*Math.PI*2;
+        const st = new THREE.DodecahedronGeometry(0.19,0);
+        st.translate(Math.cos(a)*0.78, 0.10, Math.sin(a)*0.78);
+        parts.push({geo:st, group:BM.STONE});
+      }
+      for(let i=0;i<5;i++){
+        const a=i/5*Math.PI*2;
+        const lg = new THREE.CylinderGeometry(0.06,0.075,1.0,5);
+        lg.rotateZ(0.95); lg.rotateY(a); lg.translate(0,0.32,0);
+        parts.push({geo:lg, group:BM.TIMBER});
+      }
+      break;
+    }
+    case 'orecart': {
+      bldBox(0,0.62,0, 1.0,0.62,1.5, BM.METAL, parts);
+      for(const sx of [-0.55,0.55]) for(const sz of [-0.5,0.5]){
+        const wl = new THREE.TorusGeometry(0.28,0.06,4,10);
+        wl.rotateY(Math.PI/2); wl.translate(sx,0.28,sz);
+        parts.push({geo:wl, group:BM.METAL});
+      }
+      break;
+    }
+    case 'woodpile':
+      for(let r=0;r<3;r++) for(let i=0;i<5-r;i++){
+        const g = new THREE.CylinderGeometry(0.11,0.11,1.5,6);
+        g.rotateZ(Math.PI/2);
+        g.translate((i-(4-r)/2)*0.23, 0.12+r*0.20, 0);
+        parts.push({geo:g, group:BM.TIMBER});
+      }
+      break;
+    case 'gallows':
+      bldPost(-1.3,0, 0, 3.6, 0.11, BM.TIMBER, parts, 1);
+      bldPost( 1.3,0, 0, 3.6, 0.11, BM.TIMBER, parts, 2);
+      bldBox(0, 3.55, 0, 3.0, 0.16, 0.16, BM.TIMBER, parts);
+      bldBox(0, 0.55, 0, 3.2, 0.16, 2.2, BM.BOARD, parts);
+      for(const sx of [-1.3,1.3]) bldPost(sx, 1.0, 0, 0.55, 0.09, BM.TIMBER, parts, 3);
+      break;
+  }
+  return parts;
+}
+/* ==========================================================================
+   TOWN PLANS
+   Six towns, six different shapes. A town is laid out in its own (u,v) frame —
+   u runs along the main axis, v across it — and each plan draws streets, a
+   square, and outskirts differently. That is what stops them all reading as
+   the same street with the signs swapped.
+   ========================================================================== */
+const STORE_NAMES = ['DRY GOODS','ASSAY OFFICE','HARDWARE','GENERAL STORE',
+  'BARBER','UNDERTAKER','TIN & WIRE','LAUNDRY','BOOTMAKER','POST & PARCEL',
+  'GUNSMITH','APOTHECARY','SADDLERY','MILLINER','BUTCHER','TAILOR',
+  'PHOTOGRAPHER','LAND AGENT','FEED & SEED','COOPER'];
+const SALOON_NAMES = ['THE BROKEN AERIAL','THE LAST BAR','THE DEAD ZONE',
+  'THE FULL SIGNAL','THE PATIENT MULE','THE CUT LINE','THE RELAY'];
+
+const PLANS = {
+  /* Yes Gulch — a company town: a long graded main street, a cross street,
+     a square in front of the telegraph office, freight sheds by the rail. */
+  company(T, town, ctx){
+    const S = 17;
+    T._row(town, ctx, { u0:-S*4.6, u1:S*4.6, side: 1, streetW:17,
+                        mix:['store','store','saloon','store','hotel','store',
+                             'bank','store','store','store'] });
+    T._row(town, ctx, { u0:-S*4.6, u1:S*4.6, side:-1, streetW:17,
+                        mix:['store','store','store','office','store','store',
+                             'church','store','stable','store'] });
+    // Cross street, running across the main one at the far end.
+    T._row(town, ctx, { u0:26, u1:26+S*3, side: 1, streetW:15, across:true,
+                        mix:['store','shack','store','store','shack'] });
+    T._row(town, ctx, { u0:26, u1:26+S*3, side:-1, streetW:15, across:true,
+                        mix:['warehouse','store','shack','store'] });
+    T._place(town, ctx, 'watertower', -S*5.4, 24, 0);
+    T._place(town, ctx, 'warehouse',  -S*5.6, -26, 1);
+    T._place(town, ctx, 'warehouse',  -S*4.0, -27, 1);
+    T._outskirt(town, ctx, 'corral',   S*5.6,  22);
+    T._outskirt(town, ctx, 'cemetery',-S*6.4, -34);
+    T._props(town, ctx, { lamp:9, hitch:7, barrel:16, crate:12, trough:3,
+                          cart:4, woodpile:4, fence:5 });
+  },
+
+  /* Conway Creek — the street bends with the water, and the town backs onto
+     a landing where everything arrives by boat. */
+  river(T, town, ctx){
+    const S = 13;
+    for(let i=0;i<10;i++){
+      const u = -S*3.4 + i*S*0.78;
+      const bend = Math.sin(i/9*Math.PI)*7.5;      // the street follows the bend
+      T._place(town, ctx, ['store','store','saloon','hotel','store','store',
+                           'office','store','store','church'][i],
+               u, 9.5 + bend, -1);
+    }
+    for(let i=0;i<8;i++){
+      const u = -S*3.0 + i*S*0.82;
+      const bend = Math.sin((i+0.5)/8*Math.PI)*7.5;
+      T._place(town, ctx, ['warehouse','store','store','stable','store',
+                           'shack','store','shack'][i],
+               u, -9.5 + bend, 1);
+    }
+    T._place(town, ctx, 'warehouse', S*3.4, -22, 1);
+    T._outskirt(town, ctx, 'jetty', -S*1.2, -34);
+    T._outskirt(town, ctx, 'corral', S*3.6, 20);
+    T._props(town, ctx, { lamp:7, hitch:6, barrel:20, crate:16, trough:2,
+                          cart:3, woodpile:3 });
+  },
+
+  /* Pudmenzky Flats — wide, spread out, and mostly empty. Buildings sit far
+     apart because there is nothing here to be close to. */
+  dust(T, town, ctx){
+    const S = 16;
+    T._row(town, ctx, { u0:-S*3.4, u1:S*3.4, side: 1, streetW:26, gap:[7,16],
+                        mix:['store','saloon','store','shack'] });
+    T._row(town, ctx, { u0:-S*3.2, u1:S*3.4, side:-1, streetW:26, gap:[7,16],
+                        mix:['office','store','shack','stable'] });
+    for(let i=0;i<5;i++)
+      T._place(town, ctx, 'windpump',
+        -S*3 + i*S*1.6, (i%2? 1:-1)*(30 + (i%3)*11), 0);
+    T._place(town, ctx, 'watertower', S*3.8, -14, 0);
+    T._outskirt(town, ctx, 'saltpan', 0, 44);
+    T._outskirt(town, ctx, 'cemetery', -S*4.2, 30);
+    T._props(town, ctx, { lamp:4, hitch:5, barrel:9, crate:6, trough:2,
+                          fence:9, woodpile:2 });
+  },
+
+  /* McRoberts Crossing — a genuine crossroads. Two full streets meeting at
+     right angles, the law on the corner, and a gallows nobody talks about. */
+  law(T, town, ctx){
+    const S = 15;
+    T._row(town, ctx, { u0:-S*3.6, u1:-14, side: 1, streetW:16,
+                        mix:['store','store','saloon','store'] });
+    T._row(town, ctx, { u0:-S*3.6, u1:-14, side:-1, streetW:16,
+                        mix:['store','stable','store','store'] });
+    T._row(town, ctx, { u0:16, u1:S*3.6, side: 1, streetW:16,
+                        mix:['hotel','store','store','store'] });
+    T._row(town, ctx, { u0:16, u1:S*3.6, side:-1, streetW:16,
+                        mix:['store','store','church','store'] });
+    T._row(town, ctx, { u0:16, u1:16+S*2.6, side: 1, streetW:15, across:true,
+                        mix:['store','store','shack'] });
+    T._row(town, ctx, { u0:-16-S*2.6, u1:-16, side:-1, streetW:15, across:true,
+                        mix:['bank','store','store'] });
+    // The four corners of the crossing.
+    T._place(town, ctx, 'courthouse',  0,  20, -1);
+    T._place(town, ctx, 'jail',       14, -19,  1);
+    T._place(town, ctx, 'office',    -15, -19,  1);
+    T._outskirt(town, ctx, 'gallowsyard', 22, -30);
+    T._outskirt(town, ctx, 'corral', -S*4.0, 26);
+    T._props(town, ctx, { lamp:10, hitch:8, barrel:12, crate:9, trough:4,
+                          cart:3, fence:4 });
+  },
+
+  /* Dedman Gulch — built up a slope around the headframe. Nothing is level,
+     nothing is square, and the tailings are creeping toward the shacks. */
+  mine(T, town, ctx){
+    const S = 13;
+    T._row(town, ctx, { u0:-S*2.6, u1:S*2.6, side: 1, streetW:13,
+                        mix:['store','saloon','store','store','office'] });
+    T._row(town, ctx, { u0:-S*2.6, u1:S*2.6, side:-1, streetW:13,
+                        mix:['store','store','stable','store','store'] });
+    T._place(town, ctx, 'headframe', S*2.4, -30, 1);
+    T._place(town, ctx, 'warehouse', S*1.0, -30, 1);
+    T._place(town, ctx, 'watertower', -S*3.0, -22, 0);
+    // Shanties climbing the hill behind the street, in rough terraces.
+    for(let i=0;i<12;i++){
+      const row = Math.floor(i/4);
+      T._place(town, ctx, 'shack',
+        -S*2.2 + (i%4)*S*1.15 + row*4.5, 24 + row*11, -1);
+    }
+    T._outskirt(town, ctx, 'tailings', S*3.6, -46);
+    T._outskirt(town, ctx, 'cemetery', -S*3.4, 30);
+    T._props(town, ctx, { lamp:6, hitch:5, barrel:14, crate:12, orecart:5,
+                          woodpile:5, trough:2, fence:3 });
+  },
+
+  /* Signal Ridge Camp — no permanent buildings at all. Tents in a horseshoe
+     around a fire, and the masts that are the whole point of the place. */
+  camp(T, town, ctx){
+    for(let i=0;i<11;i++){
+      const a = -1.15 + (i/10)*2.30;
+      const r = 15 + (i%3)*4.5;
+      T._place(town, ctx, 'tent', Math.sin(a)*r, Math.cos(a)*r, -1, a+Math.PI);
+    }
+    T._place(town, ctx, 'shack', -22, -6, 1);
+    T._place(town, ctx, 'stable', 24, -4, -1);
+    T._place(town, ctx, 'mast', -8, -30, 0);
+    T._place(town, ctx, 'mast',  9, -34, 0);
+    T._place(town, ctx, 'mast',  0, -46, 0);
+    T._place(town, ctx, 'watertower', 26, 20, 0);
+    T._props(town, ctx, { firepit:1, woodpile:6, crate:14, barrel:10,
+                          hitch:3, cart:2, lamp:2 });
+  },
+};
+
+/* ==========================================================================
+   TOWN MANAGER
+   ========================================================================== */
+class Towns {
+  constructor(terrain, lib, colliders){
+    this.terrain = terrain; this.lib = lib; this.colliders = colliders;
+    this.list = [];
+    this.built = new Map();
+    this.mats = this._materials(lib);
+    this.propGeo = {};
+    for(const k of ['hitch','barrel','crate','trough','fence','lamp','cart',
+                    'headstone','firepit','orecart','woodpile','gallows']){
+      this.propGeo[k] = mergeParts(makeProps(M.rng(k.length*77+k.charCodeAt(0)), k));
+    }
+    this.current = null;
+    this._buildingThisFrame = false;
+  }
+
+  _materials(lib){
+    const S=(t,extra={})=> new THREE.MeshStandardMaterial(Object.assign({
+      map:t.map, roughnessMap:t.roughnessMap, normalMap:t.normalMap,
+      roughness:1, metalness:0 }, extra));
+    const board  = S(lib.wood_weathered, {color:0xb9ac95});
+    const timber = S(lib.wood_dark,      {color:0x9b8b74});
+    const roof   = S(lib.wood_dark,      {color:0x6b6156});
+    const stone  = S(lib.rock_grey,      {color:0xa8a49c});
+    const metal  = S(lib.metal_iron,     {metalness:0.55, roughness:0.55});
+    const glass = new THREE.MeshStandardMaterial({
+      color:0x14161a, roughness:0.18, metalness:0.10,
+      emissive:new THREE.Color(0xffb347), emissiveIntensity:0.0 });
+    this.glass = glass;
+    return [board,timber,roof,glass,stone,metal];
+  }
+
+  /* ---- Site selection + grading ----------------------------------------- */
+  place(){
+    const T = this.terrain;
+    const taken = [];
+    for(const def of TOWNS){
+      const site = this._pickSite(def.near[0], def.near[1], 300, taken);
+      taken.push(site);
+      const radius = 34 + def.size*4.4;
+      T.flattenDisc(site.x, site.z, radius, radius*0.85, site.y);
+      (T.flatZones = T.flatZones || []).push(
+        { x:site.x, z:site.z, r:radius, f:radius*0.85 });
+      this.list.push(Object.assign({}, def, {
+        x:site.x, z:site.z, y:site.y, radius,
+        angle: M.rng(def.key.length*911 + def.key.charCodeAt(0))()*Math.PI*2,
+      }));
+    }
+    return this.list;
+  }
+
+  _pickSite(cx, cz, searchR, taken=[]){
+    const T = this.terrain;
+    let best=null, bestScore=-1e9;
+    for(let i=0;i<520;i++){
+      const a = (i*2.399963), r = searchR*Math.sqrt(i/520);
+      const x = M.clamp(cx + Math.cos(a)*r, -CFG.HALF+280, CFG.HALF-280);
+      const z = M.clamp(cz + Math.sin(a)*r, -CFG.HALF+280, CFG.HALF-280);
+      const y = T.heightAt(x,z);
+      if(y < CFG.SEA + 3.0 || y > CFG.SNOWLINE - 20) continue;
+      let relief = 0;
+      for(let k=0;k<10;k++){
+        const aa = k/10*Math.PI*2;
+        relief += Math.abs(T.heightAt(x+Math.cos(aa)*36, z+Math.sin(aa)*36) - y);
+      }
+      /* Two towns on top of each other is worse than a town on a slope, so
+         crowding is a hard reject rather than a penalty. */
+      let crowded = false;
+      for(const o of taken)
+        if(Math.hypot(x-o.x, z-o.z) < CFG.TOWN_MIN_GAP){ crowded = true; break; }
+      if(crowded) continue;
+      const score = -relief*1.4 - Math.hypot(x-cx, z-cz)*0.010
+                  + (T.sample(T.river,x,z) > 0.05 ? 7 : 0);
+      if(score > bestScore){ bestScore=score; best={x,z,y}; }
+    }
+    /* If nothing legal turned up, push away from the nearest neighbour and
+       take the best ground there rather than stacking two towns. */
+    if(!best && taken.length){
+      let near = taken[0], nd = Infinity;
+      for(const o of taken){ const d=Math.hypot(cx-o.x,cz-o.z);
+        if(d<nd){ nd=d; near=o; } }
+      const a = Math.atan2(cz-near.z, cx-near.x);
+      const x = M.clamp(near.x + Math.cos(a)*CFG.TOWN_MIN_GAP*1.15,
+                        -CFG.HALF+280, CFG.HALF-280);
+      const z = M.clamp(near.z + Math.sin(a)*CFG.TOWN_MIN_GAP*1.15,
+                        -CFG.HALF+280, CFG.HALF-280);
+      best = { x, z, y:T.heightAt(x,z) };
+    }
+    return best || {x:cx, z:cz, y:this.terrain.heightAt(cx,cz)};
+  }
+
+  /* ---- Town-space helpers ----------------------------------------------- */
+  _toWorld(town, u, v){
+    const ca=Math.cos(town.angle), sa=Math.sin(town.angle);
+    return new THREE.Vector3(town.x + u*ca - v*sa, 0, town.z + u*sa + v*ca);
+  }
+
+  /* Place one building at town-space (u,v). `side` is which way it faces:
+     +1 means it sits on the +v kerb and looks back toward the street. */
+  _place(town, ctx, kind, u, v, side, explicitRot){
+    const gen = BUILDINGS[kind];
+    if(!gen) return 0;
+    const name = kind==='store'  ? STORE_NAMES[(ctx.rnd()*STORE_NAMES.length)|0]
+              : kind==='saloon' ? SALOON_NAMES[(ctx.rnd()*SALOON_NAMES.length)|0]
+              : kind==='office' ? `${town.name.split(' ')[0].toUpperCase()} TELEGRAPH`
+              : kind==='hotel'  ? `${town.name.split(' ')[0].toUpperCase()} HOTEL`
+              : kind==='bank'   ? 'MERIDIAN BANK'
+              : kind==='church' ? 'ST. AERIAL'
+              : kind==='jail'   ? 'GAOL'
+              : kind==='courthouse' ? 'COURT HOUSE'
+              : kind==='warehouse'  ? 'GRAND MERIDIAN FREIGHT'
+              : undefined;
+    const b = gen(ctx.rnd, name);
+
+    /* A building's front is its local +Z. To face the street it must look
+       along -side in the town's v axis, which works out to these two angles. */
+    const rot = explicitRot !== undefined ? town.angle + explicitRot
+              : (side > 0 ? Math.PI - town.angle : -town.angle);
+    const p = this._toWorld(town, u, v + (side ? side*b.d*0.5 : 0));
+    p.y = this.terrain.heightAt(p.x, p.z);
+
+    const mtx = new THREE.Matrix4().compose(p,
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rot, 0)),
+      new THREE.Vector3(1,1,1));
+
+    for(const part of b.parts){
+      const g = part.geo.clone(); g.applyMatrix4(mtx);
+      ctx.parts.push({geo:g, group:part.group});
+    }
+    for(const s of b.signs)
+      ctx.signs.push({ text:s.text, pos:new THREE.Vector3(s.x,s.y,s.z).applyMatrix4(mtx),
+                       rot, w:s.w, h:s.h, accent:s.accent, bg:s.bg });
+    for(const l of b.lamps)
+      ctx.lamps.push(new THREE.Vector3(l.x,l.y,l.z).applyMatrix4(mtx));
+
+    // Colliders come straight off the parts, in the building's own frame.
+    ctx.colliderJobs.push({ parts:b.parts, mtx, rot });
+
+    // Somewhere for a person to stand: on the boardwalk, facing the road.
+    if(side){
+      ctx.npcSpots.push({
+        pos: this._toWorld(town, u, v - side*1.4).setY(0),
+        facing: rot + Math.PI, kind });
+    }
+    return b.w;
+  }
+
+  /* Fill a run of street with buildings, front doors on the kerb. */
+  _row(town, ctx, opts){
+    const { u0, u1, side, streetW, mix, gap=[1.2,3.6], across=false } = opts;
+    let u = u0;
+    let i = 0;
+    const kerb = side*(streetW/2);
+    while(u < u1 && i < 60){
+      const kind = mix[i % mix.length];
+      const w = across
+        ? this._place(town, ctx, kind, side*(streetW/2 + 5.0), u, 0,
+                      side>0 ? -Math.PI/2 : Math.PI/2)
+        : this._place(town, ctx, kind, u + 3, kerb, side);
+      if(across){
+        // Across-streets run along v, so advance v instead of u.
+        const b = w || 7;
+        ctx.acrossCursor = (ctx.acrossCursor||0);
+        u += b + M.range(ctx.rnd, gap[0], gap[1]);
+      } else {
+        u += (w||7) + M.range(ctx.rnd, gap[0], gap[1]);
+      }
+      i++;
+    }
+    // Boardwalk down the kerb — walkable, not solid.
+    if(!across){
+      const len = u - u0 + 6;
+      const p = this._toWorld(town, u0 + len/2 - 3, kerb - side*0.85);
+      p.y = this.terrain.heightAt(p.x, p.z);
+      const g = new THREE.BoxGeometry(len, 0.22, 1.7);
+      g.applyMatrix4(new THREE.Matrix4().compose(
+        new THREE.Vector3(p.x, p.y+0.11, p.z),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0, town.angle, 0)),
+        new THREE.Vector3(1,1,1)));
+      ctx.parts.push({geo:g, group:BM.BOARD});
+      ctx.walkways.push({ x:p.x, y:p.y, z:p.z, hw:len/2, hh:0.11, hd:0.85,
+                          yaw:town.angle });
+    }
+    ctx.streetLen = Math.max(ctx.streetLen||0, u - u0);
+  }
+
+  /* Outskirt features — the things that sit beyond the last building. */
+  _outskirt(town, ctx, kind, u, v){
+    const rnd = ctx.rnd;
+    const at = (uu,vv)=>{ const p=this._toWorld(town,uu,vv);
+                          p.y=this.terrain.heightAt(p.x,p.z); return p; };
+    switch(kind){
+      case 'corral': {
+        const R = 13;
+        for(let i=0;i<22;i++){
+          const a=i/22*Math.PI*2;
+          const p = at(u+Math.cos(a)*R, v+Math.sin(a)*R);
+          ctx.propInstances.push({kind:'fence', pos:p,
+            yaw: town.angle + a + Math.PI/2, skip:(i%11===0)});
+        }
+        ctx.propInstances.push({kind:'trough', pos:at(u,v+R-2.5), yaw:town.angle});
+        break;
+      }
+      case 'cemetery': {
+        for(let i=0;i<16;i++){
+          const gx = u + (i%4)*2.6 - 3.9, gz = v + Math.floor(i/4)*3.0 - 4.5;
+          ctx.propInstances.push({kind:'headstone', pos:at(gx,gz),
+            yaw: town.angle + M.imperfection(i*31, 0.12)});
+        }
+        for(let i=0;i<12;i++){
+          const a=i/12*Math.PI*2;
+          ctx.propInstances.push({kind:'fence',
+            pos:at(u+Math.cos(a)*9.5, v+Math.sin(a)*9.5),
+            yaw: town.angle + a + Math.PI/2});
+        }
+        break;
+      }
+      case 'gallowsyard':
+        ctx.propInstances.push({kind:'gallows', pos:at(u,v), yaw:town.angle});
+        for(let i=0;i<8;i++){
+          const a=i/8*Math.PI*2;
+          ctx.propInstances.push({kind:'fence',
+            pos:at(u+Math.cos(a)*7, v+Math.sin(a)*7),
+            yaw: town.angle + a + Math.PI/2});
+        }
+        break;
+      case 'tailings':
+        for(let i=0;i<9;i++){
+          const p = at(u + (rnd()-0.5)*30, v + (rnd()-0.5)*22);
+          const g = new THREE.ConeGeometry(M.range(rnd,3.5,7.5),
+                                           M.range(rnd,2.0,4.6), 7);
+          g.translate(p.x, p.y + 1.0, p.z);
+          ctx.parts.push({geo:g, group:BM.STONE});
+        }
+        break;
+      case 'saltpan':
+        for(let i=0;i<7;i++){
+          const p = at(u + (rnd()-0.5)*70, v + (rnd()-0.5)*40);
+          const g = new THREE.CircleGeometry(M.range(rnd,5,13), 12);
+          g.rotateX(-Math.PI/2);
+          g.translate(p.x, p.y + 0.06, p.z);
+          ctx.parts.push({geo:g, group:BM.STONE});
+        }
+        break;
+      case 'jetty': {
+        const p = at(u,v);
+        const len = 22;
+        const g = new THREE.BoxGeometry(3.4, 0.22, len);
+        g.applyMatrix4(new THREE.Matrix4().compose(
+          new THREE.Vector3(p.x, p.y+0.55, p.z),
+          new THREE.Quaternion().setFromEuler(new THREE.Euler(0, town.angle, 0)),
+          new THREE.Vector3(1,1,1)));
+        ctx.parts.push({geo:g, group:BM.BOARD});
+        ctx.walkways.push({x:p.x, y:p.y+0.44, z:p.z, hw:1.7, hh:0.11,
+                           hd:len/2, yaw:town.angle});
+        for(let i=0;i<8;i++){
+          const pp = at(u, v - len/2 + i*(len/7));
+          for(const ox of [-1.5,1.5]){
+            const post = new THREE.CylinderGeometry(0.14,0.16, 1.8, 6);
+            post.translate(pp.x+ox*Math.cos(town.angle), pp.y-0.2,
+                           pp.z+ox*Math.sin(town.angle));
+            ctx.parts.push({geo:post, group:BM.TIMBER});
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  /* Scatter street furniture along whatever streets the plan drew. */
+  _props(town, ctx, counts){
+    const rnd = ctx.rnd;
+    const reach = (ctx.streetLen||60)*0.55 + 10;
+    for(const [kind, n] of Object.entries(counts)){
+      for(let i=0;i<n;i++){
+        const u = M.range(rnd, -reach, reach);
+        const side = rnd()<0.5 ? 1 : -1;
+        const v = side*M.range(rnd, 5.5, 9.5);
+        const p = this._toWorld(town, u, v);
+        p.y = this.terrain.heightAt(p.x, p.z);
+        ctx.propInstances.push({ kind, pos:p,
+          yaw: town.angle + (rnd()-0.5)*0.6 });
+      }
+    }
+  }
+
+  /* ---- Assemble one town ------------------------------------------------ */
+  _build(town){
+    const ctx = {
+      rnd: M.rng(town.key.length*7919 + Math.floor(town.x)),
+      parts:[], signs:[], lamps:[], npcSpots:[], colliderJobs:[],
+      propInstances:[], walkways:[], streetLen:0,
+    };
+    (PLANS[town.character] || PLANS.company)(this, town, ctx);
+
+    const group = new THREE.Group();
+    const shell = new THREE.Mesh(mergeParts(ctx.parts), this.mats);
+    shell.castShadow = true; shell.receiveShadow = true;
+    shell.geometry.userData.owned = true;
+    group.add(shell);
+
+    /* Props, batched per kind. */
+    const byKind = {};
+    for(const p of ctx.propInstances){
+      if(p.skip) continue;
+      (byKind[p.kind] = byKind[p.kind] || []).push(p);
+    }
+    const mtx = new THREE.Matrix4();
+    for(const [kind, list] of Object.entries(byKind)){
+      if(!this.propGeo[kind]) continue;
+      const inst = new THREE.InstancedMesh(this.propGeo[kind], this.mats, list.length);
+      inst.castShadow = true; inst.receiveShadow = true;
+      list.forEach((p,i)=>{
+        mtx.compose(p.pos, new THREE.Quaternion().setFromEuler(
+          new THREE.Euler(0, p.yaw, 0)), new THREE.Vector3(1,1,1));
+        inst.setMatrixAt(i, mtx);
+        if(kind === 'lamp') ctx.lamps.push(p.pos.clone().setY(p.pos.y + 3.1));
+        // Waist-high furniture is solid; kerb-height clutter is not worth it.
+        if(kind==='trough'||kind==='cart'||kind==='orecart'||kind==='gallows')
+          this.colliders.addBox(town.key, p.pos.x, p.pos.y, p.pos.z,
+            1.1, 0.55, 0.6, p.yaw);
+      });
+      inst.instanceMatrix.needsUpdate = true;
+      group.add(inst);
+    }
+
+    /* Signs. */
+    for(const s of ctx.signs){
+      const geo = new THREE.PlaneGeometry(s.w, s.h);
+      const tex = makeSignTexture(s.text, { accent:s.accent, bg:s.bg,
+        worn: town.character==='dust' ? 0.9 : 0.45 });
+      const mesh = new THREE.Mesh(geo,
+        new THREE.MeshStandardMaterial({ map:tex, roughness:0.9 }));
+      mesh.position.copy(s.pos);
+      mesh.rotation.y = s.rot;
+      group.add(mesh);
+    }
+
+    /* Collision. Walls block; boardwalks, porches and the jetty carry you. */
+    for(const job of ctx.colliderJobs)
+      this.colliders.addFromParts(town.key, job.parts, job.mtx, job.rot);
+    for(const wk of ctx.walkways)
+      this.colliders.addBox(town.key, wk.x, wk.y, wk.z, wk.hw, wk.hh, wk.hd,
+        wk.yaw, { solid:false, climb:true });
+
+    group.userData.lamps = ctx.lamps;
+    group.userData.npcSpots = ctx.npcSpots;
+    const half = (ctx.streetLen||60)*0.5;
+    group.userData.street = {
+      angle: town.angle,
+      start: this._toWorld(town, -half, 0).setY(this.terrain.heightAt(town.x,town.z)),
+      end:   this._toWorld(town,  half, 0).setY(this.terrain.heightAt(town.x,town.z)),
+    };
+    group.userData.buildings = ctx.colliderJobs.length;
+    return group;
+  }
+
+  /* ---- Streaming --------------------------------------------------------- */
+  update(playerPos, onBuild, onRelease){
+    if(!this.scene) return null;
+    let inside = null, builtOne = false;
+    for(const town of this.list){
+      const d = Math.hypot(playerPos.x-town.x, playerPos.z-town.z);
+      if(d < town.radius + 30) inside = town;
+      const have = this.built.get(town.key);
+      // At most one town assembles per tick; two in a frame would be a hitch.
+      if(d < CFG.TOWN_BUILD_R && !have && !builtOne){
+        const g = this._build(town);
+        this.scene.add(g);
+        this.built.set(town.key, g);
+        builtOne = true;
+        onBuild && onBuild(town, g);
+      } else if(d > CFG.TOWN_RELEASE_R && have){
+        onRelease && onRelease(town, have);
+        this.scene.remove(have);
+        this.colliders.remove(town.key);
+        have.traverse(o=>{
+          if(o.isInstancedMesh) o.dispose();
+          else if(o.geometry && o.geometry.userData.owned) o.geometry.dispose();
+          if(o.material && o.material.map && o.material.map.isCanvasTexture){
+            o.material.map.dispose(); o.material.dispose();
+          }
+        });
+        this.built.delete(town.key);
+      }
+    }
+    this.current = inside;
+    return inside;
+  }
+
+  setNight(amount){ this.glass.emissiveIntensity = M.sat(amount)*1.35; }
+}
+/* ==========================================================================
+   ROADS, THE WIRE, AND THE LINE
+   Towns are joined by roads a wagon could actually take. Routes are found by
+   A* over a coarse grid where the cost of a step is its length multiplied by
+   how steep it is, so roads contour around hills, follow valleys, and cross
+   ridges at saddles rather than charging straight over the top.
+
+   Every road carries the telegraph beside it — which is the whole reason this
+   company exists — and one route carries rail.
+   ========================================================================== */
+
+class Roads {
+  constructor(terrain){
+    this.terrain = terrain;
+    this.routes = [];        // [{a,b,points,length,rail}]
+    this.poles = [];
+    this.G = CFG.ROAD_GRID;
+    this.NX = Math.floor(CFG.WORLD / this.G);
+  }
+
+  _h(i,j){
+    return this.terrain.heightAt(i*this.G - CFG.HALF + this.G/2,
+                                 j*this.G - CFG.HALF + this.G/2);
+  }
+
+  /* ---- A* over the coarse grid ------------------------------------------
+     Cost punishes grade hard and water absolutely. The heuristic is straight
+     line distance, which is admissible because no step is ever cheaper than
+     its own length. */
+  route(ax, az, bx, bz){
+    // Two attempts: an ordinary wagon road first, then a rougher track that
+    // will take grades no coach would enjoy. A straight line is the last
+    // resort and it means the two towns genuinely cannot be joined.
+    return this._search(ax,az,bx,bz, CFG.ROAD_MAX_GRADE)
+        || this._search(ax,az,bx,bz, CFG.ROAD_MAX_GRADE*1.75)
+        || this._straight(ax,az,bx,bz);
+  }
+
+  _straight(ax,az,bx,bz){
+    const pts=[];
+    for(let k=0;k<=14;k++){
+      const t=k/14, x=M.lerp(ax,bx,t), z=M.lerp(az,bz,t);
+      pts.push(new THREE.Vector3(x, this.terrain.heightAt(x,z), z));
+    }
+    return pts;
+  }
+
+  _search(ax, az, bx, bz, maxGrade){
+    const G=this.G, NX=this.NX;
+    const toI = (w)=> M.clamp(Math.round((w + CFG.HALF - G/2)/G), 1, NX-2);
+    const si = toI(ax), sj = toI(az), gi = toI(bx), gj = toI(bz);
+    const idx = (i,j)=> j*NX+i;
+    /* Binary heap. A linear scan for the cheapest open node turns A* into an
+       O(n^2) crawl on a 128x128 grid, which is why the first version gave up
+       and fell back to straight lines. */
+    const heap = [], heapF = [];
+    const push = (node, f)=>{
+      heap.push(node); heapF.push(f);
+      let i = heap.length-1;
+      while(i > 0){
+        const p = (i-1)>>1;
+        if(heapF[p] <= heapF[i]) break;
+        [heap[p],heap[i]]=[heap[i],heap[p]]; [heapF[p],heapF[i]]=[heapF[i],heapF[p]];
+        i = p;
+      }
+    };
+    const pop = ()=>{
+      const top = heap[0];
+      const n = heap.pop(), f = heapF.pop();
+      if(heap.length){
+        heap[0]=n; heapF[0]=f;
+        let i=0;
+        for(;;){
+          const l=i*2+1, r=l+1; let m=i;
+          if(l<heap.length && heapF[l]<heapF[m]) m=l;
+          if(r<heap.length && heapF[r]<heapF[m]) m=r;
+          if(m===i) break;
+          [heap[m],heap[i]]=[heap[i],heap[m]]; [heapF[m],heapF[i]]=[heapF[i],heapF[m]];
+          i=m;
+        }
+      }
+      return top;
+    };
+    const gScore = new Float64Array(NX*NX).fill(Infinity);
+    const fScore = new Float64Array(NX*NX).fill(Infinity);
+    const from   = new Int32Array(NX*NX).fill(-1);
+    const closed = new Uint8Array(NX*NX);
+    const hCache = new Float32Array(NX*NX).fill(NaN);
+    const H = (i,j)=>{ const k=idx(i,j);
+      if(Number.isNaN(hCache[k])) hCache[k] = this._h(i,j);
+      return hCache[k]; };
+    const heur = (i,j)=> Math.hypot(i-gi, j-gj)*G;
+
+    gScore[idx(si,sj)] = 0;
+    fScore[idx(si,sj)] = heur(si,sj);
+    push(idx(si,sj), fScore[idx(si,sj)]);
+    let guard = 0;
+
+    while(heap.length && guard++ < 400000){
+      const cur = pop();
+      if(closed[cur]) continue;
+      if(cur === idx(gi,gj)){
+        const pts=[];
+        let n=cur;
+        while(n !== -1){
+          const i=n%NX, j=(n/NX)|0;
+          pts.push(new THREE.Vector3(i*G-CFG.HALF+G/2, H(i,j), j*G-CFG.HALF+G/2));
+          n = from[n];
+        }
+        return pts.reverse();
+      }
+      closed[cur]=1;
+      const ci=cur%NX, cj=(cur/NX)|0, ch=H(ci,cj);
+      for(let d=0;d<8;d++){
+        const di=[1,1,0,-1,-1,-1,0,1][d], dj=[0,1,1,1,0,-1,-1,-1][d];
+        const ni=ci+di, nj=cj+dj;
+        if(ni<1||nj<1||ni>=NX-1||nj>=NX-1) continue;
+        const nk=idx(ni,nj);
+        if(closed[nk]) continue;
+        const nh = H(ni,nj);
+        if(nh < CFG.SEA + 1.2) continue;                 // no fords, no bridges yet
+        const run = Math.hypot(di,dj)*G;
+        const grade = Math.abs(nh-ch)/run;
+        if(grade > maxGrade) continue;                   // a wagon simply cannot
+        // Steep is expensive, very steep is ruinous; flat river flats are cheap.
+        const cost = run * (1 + grade*14 + Math.pow(grade*3.4, 3));
+        const tentative = gScore[cur] + cost;
+        if(tentative >= gScore[nk]) continue;
+        from[nk]=cur; gScore[nk]=tentative;
+        fScore[nk]=tentative + heur(ni,nj);
+        push(nk, fScore[nk]);
+      }
+    }
+    return null;
+  }
+
+  /* Chaikin smoothing turns the grid staircase into something a coach could
+     drive, then heights are re-sampled and the profile is smoothed so the road
+     rises and falls gently instead of tracking every bump. */
+  /* Turn the grid staircase into a road.
+
+     Chaikin rounds the corners; the line is then resampled to a fixed spacing
+     so the vertical work below behaves predictably. The profile matters more
+     than the plan: a surveyed road climbs at a steady, gentle rate and cuts or
+     fills to hold it. Sampling the terrain and calling that a road is what
+     produced 60% grades — the road was simply following every bump. */
+  _smooth(pts){
+    let p = pts;
+    for(let s=0;s<3;s++){
+      const out=[p[0]];
+      for(let i=0;i<p.length-1;i++){
+        const a=p[i], b=p[i+1];
+        out.push(new THREE.Vector3(a.x*0.75+b.x*0.25, 0, a.z*0.75+b.z*0.25));
+        out.push(new THREE.Vector3(a.x*0.25+b.x*0.75, 0, a.z*0.25+b.z*0.75));
+      }
+      out.push(p[p.length-1]);
+      p = out;
+    }
+
+    // Uniform 5-unit spacing.
+    const STEP = 5;
+    const uni = [p[0].clone()];
+    let carry = 0;
+    for(let i=0;i<p.length-1;i++){
+      const a=p[i], b=p[i+1];
+      const seg = Math.hypot(b.x-a.x, b.z-a.z);
+      if(seg < 1e-4) continue;
+      let d = STEP - carry;
+      while(d <= seg){
+        const t = d/seg;
+        uni.push(new THREE.Vector3(M.lerp(a.x,b.x,t), 0, M.lerp(a.z,b.z,t)));
+        d += STEP;
+      }
+      carry = (carry + seg) % STEP;
+    }
+    uni.push(p[p.length-1].clone());
+    p = uni;
+    const n = p.length;
+    if(n < 3){ for(const q of p) q.y = this.terrain.heightAt(q.x,q.z); return p; }
+
+    const ground = p.map(q=> this.terrain.heightAt(q.x, q.z));
+    let y = ground.slice();
+
+    // Long-wavelength smoothing: 34 passes over 5-unit samples means the
+    // profile is averaged across roughly 60 metres of road.
+    const smoothPass = (arr, times)=>{
+      for(let s=0;s<times;s++){
+        const c = arr.slice();
+        for(let i=1;i<n-1;i++) arr[i] = (c[i-1] + c[i]*2 + c[i+1])*0.25;
+      }
+    };
+    smoothPass(y, 34);
+
+    /* Hold a comfortable ruling gradient. Two sweeps: forward, then back. */
+    const MAXG = 0.115, rise = MAXG*STEP;
+    for(let i=1;i<n;i++)   y[i] = M.clamp(y[i], y[i-1]-rise, y[i-1]+rise);
+    for(let i=n-2;i>=0;i--) y[i] = M.clamp(y[i], y[i+1]-rise, y[i+1]+rise);
+
+    /* Cut and fill, but only so much: a road may sit in a shallow cutting or
+       on a low embankment, not on a viaduct. */
+    const MAXDEV = 4.5;
+    for(let i=0;i<n;i++)
+      y[i] = M.clamp(y[i], ground[i]-MAXDEV, ground[i]+MAXDEV);
+    smoothPass(y, 8);
+    for(let i=1;i<n;i++)   y[i] = M.clamp(y[i], y[i-1]-rise, y[i-1]+rise);
+    for(let i=n-2;i>=0;i--) y[i] = M.clamp(y[i], y[i+1]-rise, y[i+1]+rise);
+
+    // Both ends meet their town exactly.
+    y[0] = ground[0]; y[n-1] = ground[n-1];
+    for(let i=0;i<n;i++) p[i].y = y[i];
+    return p;
+  }
+
+  /* ---- Build the network ------------------------------------------------
+     A minimum spanning tree guarantees every town is reachable; two extra
+     short links stop the map being a dead-end tree and give the player loops
+     to ride. */
+  build(towns){
+    const n = towns.length;
+    const pairs=[];
+    for(let i=0;i<n;i++) for(let j=i+1;j<n;j++)
+      pairs.push({i,j,d:Math.hypot(towns[i].x-towns[j].x, towns[i].z-towns[j].z)});
+    pairs.sort((a,b)=>a.d-b.d);
+
+    const parent = [...Array(n).keys()];
+    const find = (x)=> parent[x]===x ? x : (parent[x]=find(parent[x]));
+    const chosen=[];
+    for(const p of pairs){
+      const ra=find(p.i), rb=find(p.j);
+      if(ra===rb) continue;
+      parent[ra]=rb; chosen.push(p);
+      if(chosen.length === n-1) break;
+    }
+    let extra = 0;
+    for(const p of pairs){
+      if(extra >= 2) break;
+      if(chosen.some(c=>c.i===p.i && c.j===p.j)) continue;
+      chosen.push(p); extra++;
+    }
+
+    for(const p of chosen){
+      const A=towns[p.i], B=towns[p.j];
+      const raw = this.route(A.x, A.z, B.x, B.z);
+      const pts = this._smooth(raw);
+      this.terrain.gradeRoad(pts, CFG.ROAD_W);
+      let len=0;
+      for(let i=0;i<pts.length-1;i++) len += pts[i].distanceTo(pts[i+1]);
+      this.routes.push({ a:A.key, b:B.key, points:pts, length:len, rail:false });
+    }
+
+    /* The line: whichever pair of towns is longest and flattest gets rail. */
+    let best=null, bestScore=-1;
+    for(const r of this.routes){
+      let grade=0;
+      for(let i=0;i<r.points.length-1;i++)
+        grade += Math.abs(r.points[i+1].y - r.points[i].y);
+      const score = r.length/(1 + grade*0.4);
+      if(score > bestScore){ bestScore=score; best=r; }
+    }
+    if(best) best.rail = true;
+    this.railRoute = best;
+    return this.routes;
+  }
+
+  /* Sample a point and a direction some distance along a route. */
+  sampleRoute(route, dist){
+    const p = route.points;
+    let acc=0;
+    for(let i=0;i<p.length-1;i++){
+      const seg = p[i].distanceTo(p[i+1]);
+      if(acc+seg >= dist){
+        const t=(dist-acc)/seg;
+        return { pos:new THREE.Vector3().lerpVectors(p[i],p[i+1],t),
+                 dir:new THREE.Vector3().subVectors(p[i+1],p[i]).normalize() };
+      }
+      acc += seg;
+    }
+    return { pos:p[p.length-1].clone(),
+             dir:new THREE.Vector3().subVectors(p[p.length-1],p[p.length-2]).normalize() };
+  }
+
+  /* ======================================================================
+     GEOMETRY — telegraph poles, wire, rail, milestones
+     ====================================================================== */
+  buildGeometry(lib, scene, colliders){
+    const group = new THREE.Group();
+    const poleParts=[], wireParts=[], railParts=[], sleeperParts=[], stoneParts=[];
+
+    /* One pole, built once and instanced along every route. */
+    const poleGeo = (()=>{
+      const parts=[];
+      const g = new THREE.CylinderGeometry(0.10, 0.15, 7.6, 6);
+      g.translate(0, 3.8, 0); parts.push({geo:g, group:0});
+      const arm = new THREE.BoxGeometry(1.75, 0.11, 0.11);
+      arm.translate(0, 7.05, 0); parts.push({geo:arm, group:0});
+      for(const ox of [-0.68, 0.68]){
+        const ins = new THREE.CylinderGeometry(0.055,0.045,0.20,6);
+        ins.translate(ox, 7.22, 0); parts.push({geo:ins, group:1});
+      }
+      const brace = new THREE.BoxGeometry(0.07,0.07,0.90);
+      brace.translate(0, 6.72, 0); parts.push({geo:brace, group:0});
+      return mergeParts(parts);
+    })();
+
+    const poleMat = [
+      new THREE.MeshStandardMaterial({ map:lib.wood_dark.map,
+        roughnessMap:lib.wood_dark.roughnessMap, normalMap:lib.wood_dark.normalMap,
+        color:0x8a7a63, roughness:1 }),
+      new THREE.MeshStandardMaterial({ color:0x2a4f52, roughness:0.25,
+        metalness:0.1 }),
+    ];
+
+    /* Walk every route, dropping poles and stringing wire between them. */
+    const poleMatrices=[];
+    const wireSegs=[];
+    for(const r of this.routes){
+      let prev=null;
+      for(let d=CFG.POLE_SPACING*0.5; d<r.length; d+=CFG.POLE_SPACING){
+        const s = this.sampleRoute(r, d);
+        const side = new THREE.Vector3(-s.dir.z, 0, s.dir.x)
+                       .multiplyScalar(CFG.ROAD_W*0.5 + 2.2);
+        const p = s.pos.clone().add(side);
+        p.y = this.terrain.heightAt(p.x, p.z);
+        const yaw = Math.atan2(s.dir.x, s.dir.z);
+        poleMatrices.push(new THREE.Matrix4().compose(p,
+          new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0)),
+          new THREE.Vector3(1,1,1)));
+        this.poles.push(p);
+        if(prev) wireSegs.push([prev, p]);
+        prev = p;
+      }
+    }
+    const poles = new THREE.InstancedMesh(poleGeo, poleMat, poleMatrices.length);
+    poles.castShadow = true; poles.receiveShadow = true;
+    poleMatrices.forEach((m,i)=>poles.setMatrixAt(i,m));
+    poles.instanceMatrix.needsUpdate = true;
+    group.add(poles);
+
+    /* Wire. Two strands per span, each hanging in a real catenary sag — a
+       straight line between poles is the single most obvious tell that a
+       telegraph was drawn rather than strung. */
+    const wirePts=[];
+    for(const [a,b] of wireSegs){
+      const span = a.distanceTo(b);
+      const sag = Math.min(1.5, span*0.045);
+      for(const ox of [-0.68, 0.68]){
+        let last=null;
+        for(let k=0;k<=6;k++){
+          const t=k/6;
+          const x = M.lerp(a.x,b.x,t), z = M.lerp(a.z,b.z,t);
+          const dir = new THREE.Vector3(b.x-a.x,0,b.z-a.z).normalize();
+          const side = new THREE.Vector3(-dir.z,0,dir.x).multiplyScalar(ox);
+          const y = M.lerp(a.y,b.y,t) + 7.22 - sag*4*t*(1-t);
+          const p = new THREE.Vector3(x+side.x, y, z+side.z);
+          if(last) wirePts.push(last.x,last.y,last.z, p.x,p.y,p.z);
+          last = p;
+        }
+      }
+    }
+    if(wirePts.length){
+      const wg = new THREE.BufferGeometry();
+      wg.setAttribute('position', new THREE.Float32BufferAttribute(wirePts,3));
+      const wire = new THREE.LineSegments(wg,
+        new THREE.LineBasicMaterial({ color:0x1a1714, transparent:true,
+                                      opacity:0.72, fog:true }));
+      wire.frustumCulled = false;
+      group.add(wire);
+    }
+
+    /* ---- Rail ----------------------------------------------------------- */
+    if(this.railRoute){
+      const r = this.railRoute;
+      const sleeperGeo = new THREE.BoxGeometry(2.5, 0.16, 0.26);
+      const sleeperMat = new THREE.MeshStandardMaterial({
+        map:lib.wood_dark.map, normalMap:lib.wood_dark.normalMap,
+        color:0x4a4038, roughness:1 });
+      const count = Math.floor(r.length/CFG.SLEEPER_SPACING);
+      const sleepers = new THREE.InstancedMesh(sleeperGeo, sleeperMat, count);
+      sleepers.receiveShadow = true;
+      const railPts=[[],[]];
+      const mtx = new THREE.Matrix4();
+      for(let i=0;i<count;i++){
+        const s = this.sampleRoute(r, i*CFG.SLEEPER_SPACING);
+        const side = new THREE.Vector3(-s.dir.z, 0, s.dir.x);
+        // The line runs beside the road, not down the middle of it.
+        const base = s.pos.clone().addScaledVector(side, -(CFG.ROAD_W*0.5 + 4.5));
+        base.y = this.terrain.heightAt(base.x, base.z) + 0.10;
+        const yaw = Math.atan2(s.dir.x, s.dir.z);
+        mtx.compose(base, new THREE.Quaternion().setFromEuler(
+          new THREE.Euler(0, yaw, 0)), new THREE.Vector3(1,1,1));
+        sleepers.setMatrixAt(i, mtx);
+        for(let k=0;k<2;k++){
+          const off = (k? 1:-1)*CFG.RAIL_GAUGE*0.5;
+          railPts[k].push(new THREE.Vector3(
+            base.x + side.x*off, base.y + 0.20, base.z + side.z*off));
+        }
+      }
+      sleepers.instanceMatrix.needsUpdate = true;
+      group.add(sleepers);
+
+      // Rails as continuous ribbons of steel.
+      const railMat = new THREE.MeshStandardMaterial({
+        color:0x5a5148, roughness:0.42, metalness:0.65 });
+      for(const line of railPts){
+        const P=[], I=[];
+        for(let i=0;i<line.length;i++){
+          const p = line[i];
+          const nx = (i<line.length-1?line[i+1]:line[i-1]||p);
+          const d = new THREE.Vector3().subVectors(nx,p).normalize();
+          const s = new THREE.Vector3(-d.z,0,d.x).multiplyScalar(0.075);
+          P.push(p.x-s.x, p.y, p.z-s.z,  p.x+s.x, p.y, p.z+s.z,
+                 p.x-s.x, p.y+0.16, p.z-s.z,  p.x+s.x, p.y+0.16, p.z+s.z);
+          if(i>0){
+            const o=(i-1)*4;
+            I.push(o+2,o+6,o+3, o+3,o+6,o+7);     // top face
+            I.push(o+0,o+1,o+4, o+1,o+5,o+4);     // bottom
+            I.push(o+0,o+4,o+2, o+2,o+4,o+6);     // outer web
+            I.push(o+1,o+3,o+5, o+3,o+7,o+5);     // inner web
+          }
+        }
+        const rg = new THREE.BufferGeometry();
+        rg.setAttribute('position', new THREE.Float32BufferAttribute(P,3));
+        rg.setIndex(I); rg.computeVertexNormals();
+        const mesh = new THREE.Mesh(rg, railMat);
+        mesh.castShadow = false; mesh.receiveShadow = true;
+        mesh.frustumCulled = false;
+        group.add(mesh);
+      }
+    }
+
+    /* ---- Milestones ------------------------------------------------------
+       A cut stone every so often, so the roads have a sense of distance. */
+    const stoneGeo = (()=>{
+      const parts=[];
+      const g = new THREE.BoxGeometry(0.46, 0.86, 0.22);
+      g.translate(0, 0.43, 0); parts.push({geo:g, group:0});
+      const cap = new THREE.CylinderGeometry(0.24,0.24,0.12,8,1,false,0,Math.PI);
+      cap.rotateZ(Math.PI/2); cap.rotateY(Math.PI/2); cap.translate(0,0.86,0);
+      parts.push({geo:cap, group:0});
+      return mergeParts(parts);
+    })();
+    const stoneMat = new THREE.MeshStandardMaterial({
+      map:lib.rock_grey.map, normalMap:lib.rock_grey.normalMap,
+      color:0xbdb6a6, roughness:0.92 });
+    const stoneMtx=[];
+    for(const r of this.routes){
+      for(let d=120; d<r.length-60; d+=240){
+        const s = this.sampleRoute(r, d);
+        const side = new THREE.Vector3(-s.dir.z,0,s.dir.x)
+                       .multiplyScalar(CFG.ROAD_W*0.5 + 1.1);
+        const p = s.pos.clone().add(side);
+        p.y = this.terrain.heightAt(p.x,p.z) - 0.05;
+        stoneMtx.push(new THREE.Matrix4().compose(p,
+          new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(0, Math.atan2(s.dir.x,s.dir.z)+Math.PI/2, 0)),
+          new THREE.Vector3(1,1,1)));
+      }
+    }
+    const stones = new THREE.InstancedMesh(stoneGeo, stoneMat, stoneMtx.length);
+    stones.castShadow = true;
+    stoneMtx.forEach((m,i)=>stones.setMatrixAt(i,m));
+    stones.instanceMatrix.needsUpdate = true;
+    group.add(stones);
+
+    group.traverse(o=>{ if(o.geometry) o.geometry.userData.owned = true; });
+    scene.add(group);
+    this.group = group;
+
+    /* Poles are solid. Nothing else out here is worth a collider. */
+    for(const p of this.poles)
+      colliders.addBox('roads', p.x, p.y, p.z, 0.20, 3.8, 0.20, 0, {climb:false});
+
+    return group;
+  }
+
+  /* Nearest point on any road — used to tell the player they are on one. */
+  nearestRoadDist(x, z){
+    let best = Infinity;
+    for(const r of this.routes){
+      const p = r.points;
+      for(let i=0;i<p.length;i+=2){
+        const d = (p[i].x-x)*(p[i].x-x) + (p[i].z-z)*(p[i].z-z);
+        if(d < best) best = d;
+      }
+    }
+    return Math.sqrt(best);
+  }
+}
+/* ==========================================================================
+   NPCS — TOWNSFOLK
+   Built on the same 23-bone skeleton as Jarrad, which means they inherit his
+   entire clip library for nothing: walk, jog, idle, the weight-shift, the
+   turns. Bodies come from four shared geometries so a town of a dozen people
+   costs four skinned meshes' worth of vertex data.
+
+   The four names the brief requires appear here as PEOPLE — Marguerite Conway,
+   Old Man Pudmenzky, Sheriff McRoberts, and the Widow Dedman — matching the
+   four places in the settlement module.
+   ========================================================================== */
+
+const NPC_PALETTES = [
+  { coat:0x4a4238, shirt:0xcfc4a8, hat:0x2b2620, skin:0xd6ab86 },
+  { coat:0x6b5a44, shirt:0xb9ae95, hat:0x3a332a, skin:0xc79a72 },
+  { coat:0x39434a, shirt:0xd8d2bd, hat:0x22262a, skin:0xe0bb99 },
+  { coat:0x5a4a4a, shirt:0xc2b6a0, hat:0x30282a, skin:0xbb8f6a },
+  { coat:0x2f3a34, shirt:0xcabfa4, hat:0x241f1c, skin:0xc9a07c },
+];
+
+/* Named characters. Each is a fixed resident of one town, with their own look,
+   voice profile and lines. */
+const NAMED = [
+  { id:'conway', name:'MARGUERITE CONWAY', town:'conway', voice:'conway',
+    palette:2, hat:'bonnet', scale:0.96,
+    lines:[ "You're the one they sent. You're smaller than the letter suggested.",
+            "The water takes the road twice a year. We have stopped arguing with it.",
+            "If you are selling, sell to me last. I'll want to hear the others first." ] },
+  { id:'pudmenzky', name:'OLD MAN PUDMENZKY', town:'pudmenzky', voice:'pudmenzky',
+    palette:1, hat:'wide', scale:1.04,
+    lines:[ "Forty years on this flat. Never needed a wire yet.",
+            "You'll tell me it's progress. Everyone tells me it's progress.",
+            "Sit down, then. If you're going to waste my afternoon, waste it sitting." ] },
+  { id:'mcroberts', name:'SHERIFF McROBERTS', town:'mcroberts', voice:'mcroberts',
+    palette:3, hat:'wide', scale:1.06,
+    lines:[ "Keep the horse off the boardwalk and we'll get along.",
+            "I know what you do for a living. I haven't decided about it yet.",
+            "Two men came through asking after you. I told them nothing useful." ] },
+  { id:'dedman', name:'THE WIDOW DEDMAN', town:'dedman', voice:'conway',
+    palette:0, hat:'bonnet', scale:0.94,
+    lines:[ "My husband put that wire in the ground. It's still there. So is he.",
+            "The company pays on the first. It has not been the first for some time.",
+            "You have an honest face. That's usually the expensive kind." ] },
+];
+
+/* Ambient barks. Short, in character, never plot-critical. */
+const TOWN_BARKS = {
+  company:[ "Line's down past the ridge again.",
+            "They're paying in scrip this month. Scrip.",
+            "Morning. Mind the third board, it's gone." ],
+  river:  [ "River's up. It's always up.",
+            "You'll want the ferry, and the ferry wants coin.",
+            "Fish are running. Nobody's fishing." ],
+  dust:   [ "Wind took my washing to the next county.",
+            "Water's two bits. Don't look at me like that.",
+            "Nothing grows here but opinions." ],
+  law:    [ "Sheriff's in. Behave accordingly.",
+            "Court sits Thursday. Bring a hat.",
+            "Road's clear as far as the crossing." ],
+  mine:   [ "Copper's down. Everything's down.",
+            "Shaft four's still flooded.",
+            "You hear that? No. Exactly." ],
+  camp:   [ "Four bars up here. Four.",
+            "Coffee's on if you're stopping.",
+            "Colder than it looks. It always is." ],
+};
+
+/* ---- Body variants -------------------------------------------------------
+   Four bodies, built once and shared. Each NPC gets its own Skeleton so they
+   animate independently, but the vertex data is common. */
+function buildTownsfolkVariant(lib, variant){
+  const def = boneDefFromWorld(JARRAD_BONES);
+  const rig = makeSkeleton(def);
+  rig.weightScale = { pelvis:1.5, spine1:1.2, head:1.6, jaw:0.5,
+                      clavL:0.6, clavR:0.6, toeL:0.7, toeR:0.7 };
+  const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+  const parts=[]; const push=(g,m)=>parts.push({geo:g, group:m});
+  const MAT = { COAT:0, SHIRT:1, SKIN:2, BOOT:3, HAT:4 };
+
+  const stout = variant===1 ? 1.16 : (variant===3 ? 0.90 : 1.0);
+  const skirt = (variant===2);      // a long skirt instead of trousers
+
+  /* Torso */
+  push(limbGeometry(V(0,0.96,0), V(0,1.32,0.01), 0.165*stout, 0.200*stout,
+       {radial:10, rings:3, squashX:1.26, squashZ:0.88, bulge:0.06}), MAT.SHIRT);
+  push(limbGeometry(V(0,1.30,0.01), V(0,1.54,0.005), 0.200*stout, 0.208*stout,
+       {radial:10, rings:2, squashX:1.36, squashZ:0.82}), MAT.SHIRT);
+  push(limbGeometry(V(0,1.52,0.005), V(0,0.98,0), 0.216*stout, 0.192*stout,
+       {radial:11, rings:4, squashX:1.34, squashZ:0.92}), MAT.COAT);
+
+  /* Head */
+  push(blobGeometry(V(0,1.695,-0.004), 0.094, 0.110, 0.104, 12), MAT.SKIN);
+  push(blobGeometry(V(0,1.645, 0.028), 0.078, 0.066, 0.082, 10), MAT.SKIN);
+  push(blobGeometry(V(0,1.690, 0.094), 0.019, 0.028, 0.025, 6),  MAT.SKIN);
+  push(blobGeometry(V(0,1.722,-0.014), 0.098, 0.096, 0.104, 10), MAT.HAT);
+  push(limbGeometry(V(0,1.545,0), V(0,1.645,-0.004), 0.055, 0.050,
+       {radial:8, rings:2}), MAT.SKIN);
+
+  /* Arms */
+  for(const s of [1,-1]){
+    push(limbGeometry(V(s*0.20,1.495,0), V(s*0.21,1.225,-0.010),
+         0.068*stout, 0.052, {radial:7, rings:3, bulge:0.12}), MAT.COAT);
+    push(limbGeometry(V(s*0.21,1.225,-0.010), V(s*0.218,0.972,-0.005),
+         0.052, 0.040, {radial:7, rings:3}), MAT.COAT);
+    push(blobGeometry(V(s*0.220,0.940,0.004), 0.033, 0.050, 0.024, 8), MAT.SKIN);
+    push(blobGeometry(V(s*0.186,1.500,0.000), 0.080, 0.072, 0.082, 8), MAT.COAT);
+  }
+
+  /* Legs, or a skirt */
+  if(skirt){
+    push(limbGeometry(V(0,1.00,0), V(0,0.10,-0.01), 0.205, 0.360,
+         {radial:14, rings:4, tipRound:false}), MAT.COAT);
+    for(const s of [1,-1])
+      push(limbGeometry(V(s*0.09,0.16,0.02), V(s*0.09,0.045,0.10),
+           0.052, 0.046, {radial:7, rings:2}), MAT.BOOT);
+  } else {
+    for(const s of [1,-1]){
+      push(limbGeometry(V(s*0.105,0.935,0), V(s*0.110,0.520,-0.010),
+           0.092*stout, 0.068, {radial:8, rings:3, bulge:0.10}), MAT.COAT);
+      push(limbGeometry(V(s*0.110,0.520,-0.010), V(s*0.112,0.130,0),
+           0.068, 0.050, {radial:8, rings:3}), MAT.COAT);
+      push(limbGeometry(V(s*0.112,0.300,-0.004), V(s*0.112,0.075,0.004),
+           0.066, 0.058, {radial:8, rings:2}), MAT.BOOT);
+      push(limbGeometry(V(s*0.112,0.048,-0.040), V(s*0.112,0.042,0.150),
+           0.055, 0.040, {radial:7, rings:2, squashZ:0.9}), MAT.BOOT);
+    }
+  }
+  return { geo: skinParts(parts, rig, {power:3.0}), skirt };
+}
+
+/* Hats are separate small meshes parented to the head bone, so one body can
+   wear a stovepipe, a wide brim or a bonnet. */
+function makeHat(kind){
+  const parts=[];
+  const V=(x,y,z)=>new THREE.Vector3(x,y,z);
+  if(kind==='bonnet'){
+    parts.push({geo:blobGeometry(V(0,0.045,-0.02), 0.115,0.100,0.118, 12), group:0});
+    parts.push({geo:limbGeometry(V(0,0.02,0.06), V(0,0.05,0.13), 0.135,0.105,
+      {radial:12, rings:2, squashZ:0.55, tipRound:false}), group:0});
+  } else if(kind==='wide'){
+    parts.push({geo:limbGeometry(V(0,0.075,-0.01), V(0,0.195,-0.012), 0.100,0.090,
+      {radial:14, rings:2}), group:0});
+    parts.push({geo:limbGeometry(V(0,0.070,-0.01), V(0,0.086,-0.01), 0.255,0.248,
+      {radial:16, rings:2, squashZ:1.05, tipRound:false}), group:0});
+  } else {  // derby
+    parts.push({geo:limbGeometry(V(0,0.070,-0.01), V(0,0.170,-0.012), 0.098,0.092,
+      {radial:12, rings:2}), group:0});
+    parts.push({geo:limbGeometry(V(0,0.066,-0.01), V(0,0.080,-0.01), 0.170,0.164,
+      {radial:14, rings:2, tipRound:false}), group:0});
+  }
+  return mergeParts(parts);
+}
+
+/* ==========================================================================
+   NPC
+   ========================================================================== */
+class NPC {
+  constructor(opts){
+    const { terrain, variant, palette, hat, scale, name, voice, lines,
+            home, facing, scene, lib, colliders } = opts;
+    this.terrain = terrain;
+    this.colliders = colliders;
+    this.name = name; this.voice = voice || 'conway';
+    this.lines = lines || null;
+    this.named = !!lines;
+
+    const rig = makeSkeleton(boneDefFromWorld(JARRAD_BONES));
+    this.rig = rig;
+    const P = NPC_PALETTES[palette % NPC_PALETTES.length];
+    const S=(t,col)=> new THREE.MeshStandardMaterial({
+      map:t.map, roughnessMap:t.roughnessMap, normalMap:t.normalMap,
+      color:col, roughness:1, metalness:0 });
+    this.mats = [
+      S(lib.cloth_coat,  P.coat),
+      S(lib.cloth_shirt, P.shirt),
+      S(lib.skin_pale,   P.skin),
+      S(lib.leather_boot,0xffffff),
+      S(lib.cloth_coat,  P.hat),
+    ];
+    this.mesh = new THREE.SkinnedMesh(variant.geo, this.mats);
+    this.mesh.castShadow = true; this.mesh.receiveShadow = true;
+    this.mesh.frustumCulled = false;
+    this.mesh.add(rig.root);
+    this.mesh.updateMatrixWorld(true);
+    this.mesh.bind(rig.skeleton);
+
+    if(hat){
+      const hatMesh = new THREE.Mesh(makeHat(hat),
+        new THREE.MeshStandardMaterial({ map:lib.cloth_coat.map, color:P.hat,
+          roughness:1 }));
+      hatMesh.castShadow = true;
+      rig.byName.head.add(hatMesh);
+    }
+
+    this.object = new THREE.Group();
+    this.object.add(this.mesh);
+    this.object.scale.setScalar(scale || 1);
+    scene.add(this.object);
+
+    this.anim = new Animator(rig);
+    buildPlayerClips(this.anim);       // the whole player library, free
+    this.anim.play('idle', 0);
+    this.anim.setAdditive('breathe', 1.0);
+    this.anim.time = Math.random()*4;  // desynchronise the crowd
+
+    this.home = home.clone();
+    this.pos = home.clone();
+    this.pos.y = terrain.heightAt(this.pos.x, this.pos.z);
+    this.yaw = facing || 0;
+    this.speed = 0;
+    this.target = null;
+    this.waitT = 1 + Math.random()*8;
+    this.route = [];
+    this.spokenT = 0;
+    this.active = true;
+    this.object.position.copy(this.pos);
+    this.object.rotation.y = this.yaw;
+  }
+
+  setRoute(points){ this.route = points; }
+
+  /* Simple daily rhythm: out and about by day, drifting home after dark. */
+  fixedUpdate(dt, hour, playerPos){
+    const dayTime = hour > 6.5 && hour < 20.5;
+
+    if(this.waitT > 0 && !this.target){
+      this.waitT -= dt;
+      if(this.waitT <= 0){
+        if(!dayTime || Math.random() < 0.3){
+          this.target = this.home.clone();
+        } else if(this.route.length){
+          this.target = this.route[(Math.random()*this.route.length)|0].clone();
+        } else {
+          const a = Math.random()*Math.PI*2, r = 3 + Math.random()*9;
+          this.target = this.home.clone().add(
+            new THREE.Vector3(Math.cos(a)*r, 0, Math.sin(a)*r));
+        }
+      }
+    }
+
+    let want = 0;
+    if(this.target){
+      const d = new THREE.Vector3().subVectors(this.target, this.pos); d.y=0;
+      const dist = d.length();
+      if(dist < 0.7){
+        this.target = null;
+        this.waitT = dayTime ? (3 + Math.random()*14) : (10 + Math.random()*30);
+      } else {
+        this.yaw = M.angDamp(this.yaw, Math.atan2(d.x,d.z), 5.0, dt);
+        want = dist > 3 ? CFG.SPD_WALK*M.range(Math.random, 0.72, 1.0) : CFG.SPD_WALK*0.55;
+      }
+    }
+    /* Stand aside when the player rides straight at them. */
+    const dp = Math.hypot(playerPos.x-this.pos.x, playerPos.z-this.pos.z);
+    if(dp < 2.2){
+      const away = new THREE.Vector3(this.pos.x-playerPos.x, 0, this.pos.z-playerPos.z);
+      if(away.lengthSq() > 0.01){
+        away.normalize();
+        this.pos.addScaledVector(away, dt*1.6);
+      }
+    }
+
+    this.speed = M.damp(this.speed, want, 6, dt);
+    if(this.speed > 0.05){
+      this.pos.x += Math.sin(this.yaw)*this.speed*dt;
+      this.pos.z += Math.cos(this.yaw)*this.speed*dt;
+    }
+    // Townsfolk respect the same walls the player does.
+    if(this.colliders){
+      if(this.colliders.resolve(this.pos, 0.30, 1.7)) this.target = null;
+      let g = this.terrain.heightAt(this.pos.x, this.pos.z);
+      const deck = this.colliders.support(this.pos.x, this.pos.z, this.pos.y, 0.30);
+      if(deck > g) g = deck;
+      this.pos.y = M.damp(this.pos.y, g, 14, dt);
+    } else {
+      this.pos.y = M.damp(this.pos.y, this.terrain.heightAt(this.pos.x,this.pos.z), 14, dt);
+    }
+    this.object.position.copy(this.pos);
+    this.object.rotation.y = this.yaw;
+
+    if(this.spokenT > 0) this.spokenT -= dt;
+  }
+
+  update(dt, lookTarget){
+    if(this.speed < 0.2){
+      this.anim.play('idle', 0.4);
+      this.anim.speed = 1;
+    } else {
+      const gs = this.anim.clips.walk.groundSpeed;
+      this.anim.play('walk', 0.28);
+      this.anim.speed = M.clamp(this.speed/gs, 0.6, 1.4);
+    }
+    this.anim.update(dt);
+    if(lookTarget){
+      this.object.updateMatrixWorld(true);
+      IK.look(this.rig.byName.head, lookTarget, 0.32, 0.75);
+    }
+    this.rig.root.updateMatrixWorld(true);
+  }
+
+  /* Freeze distant townsfolk: pose stays put, no clip evaluation, no IK. */
+  setActive(on){ this.active = on; this.object.visible = on; }
+}
+
+/* ==========================================================================
+   NPC MANAGER
+   ========================================================================== */
+class Townsfolk {
+  constructor(terrain, lib, scene, colliders){
+    this.terrain = terrain; this.lib = lib; this.scene = scene;
+    this.colliders = colliders;
+    this.variants = [];
+    for(let i=0;i<4;i++) this.variants.push(buildTownsfolkVariant(lib, i));
+    this.byTown = new Map();
+    this.all = [];
+    this.onSpeak = null;
+    this._greetT = 0;
+  }
+
+  populate(town, group){
+    const rnd = M.rng(town.key.length*3301 + Math.floor(town.z));
+    const spots = group.userData.npcSpots || [];
+    const street = group.userData.street;
+    const route = [];
+    if(street){
+      for(let i=0;i<6;i++){
+        const t = i/5;
+        route.push(new THREE.Vector3(
+          M.lerp(street.start.x, street.end.x, t), 0,
+          M.lerp(street.start.z, street.end.z, t)));
+      }
+    }
+    const list = [];
+    // Capped: every resident is five draw calls, and a crowd is not the point.
+    const count = Math.min(spots.length, 16, 6 + Math.round(town.size*0.55));
+
+    for(let i=0;i<count;i++){
+      const spot = spots[i % spots.length];
+      const hat = ['wide','derby','bonnet',null][Math.floor(rnd()*4)];
+      const npc = new NPC({
+        terrain:this.terrain, lib:this.lib, scene:this.scene,
+        colliders:this.colliders,
+        variant:this.variants[Math.floor(rnd()*4)],
+        palette:Math.floor(rnd()*4),
+        hat, scale: M.range(rnd, 0.93, 1.07),
+        name: 'TOWNSFOLK', voice: rnd()<0.5 ? 'conway' : 'mcroberts',
+        home: spot.pos.clone(), facing: spot.facing,
+      });
+      npc.barks = TOWN_BARKS[town.character] || TOWN_BARKS.company;
+      npc.setRoute(route);
+      list.push(npc);
+    }
+
+    /* The town's named resident, standing outside the biggest building. */
+    const named = NAMED.find(n=>n.town === town.key);
+    if(named && spots.length){
+      const spot = spots[0];
+      const npc = new NPC({
+        terrain:this.terrain, lib:this.lib, scene:this.scene,
+        colliders:this.colliders,
+        variant:this.variants[named.palette % 4],
+        palette:named.palette, hat:named.hat, scale:named.scale,
+        name:named.name, voice:named.voice, lines:named.lines,
+        home: spot.pos.clone().add(new THREE.Vector3(1.4,0,0)),
+        facing: spot.facing,
+      });
+      npc.barks = named.lines;
+      npc.setRoute([]);            // named residents keep their post
+      list.push(npc);
+    }
+
+    this.byTown.set(town.key, list);
+    this.all.push(...list);
+  }
+
+  release(town){
+    const list = this.byTown.get(town.key);
+    if(!list) return;
+    for(const npc of list){
+      this.scene.remove(npc.object);
+      npc.mats.forEach(m=>m.dispose());
+      const i = this.all.indexOf(npc);
+      if(i>=0) this.all.splice(i,1);
+    }
+    this.byTown.delete(town.key);
+  }
+
+  fixedUpdate(dt, hour, playerPos){
+    for(const npc of this.all){
+      const d = Math.hypot(npc.pos.x-playerPos.x, npc.pos.z-playerPos.z);
+      npc.setActive(d < CFG.NPC_DRAW_R);
+      if(d < CFG.NPC_SIM_R) npc.fixedUpdate(dt, hour, playerPos);
+    }
+  }
+
+  update(dt, playerEye, playerPos, ui, audio){
+    this._greetT -= dt;
+    let nearest = null, nd = 1e9;
+    for(const npc of this.all){
+      if(!npc.active) continue;
+      const d = npc.pos.distanceTo(playerPos);
+      npc.update(dt, d < 12 ? playerEye : null);
+      if(d < nd){ nd = d; nearest = npc; }
+    }
+    /* Somebody says something when you walk past. Not everybody, not often. */
+    if(nearest && nd < 6.5 && this._greetT <= 0 && nearest.spokenT <= 0){
+      this._greetT = 9 + Math.random()*12;
+      nearest.spokenT = 45;
+      const pool = nearest.barks || [];
+      if(pool.length && this.onSpeak){
+        const line = pool[(Math.random()*pool.length)|0];
+        this.onSpeak(nearest, line);
+      }
+    }
+    return nearest && nd < 3.2 ? nearest : null;
+  }
+}
 /* ==========================================================================
    ENTRY
    ========================================================================== */
