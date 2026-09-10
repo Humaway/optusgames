@@ -89,6 +89,29 @@
   #vitals{position:absolute;left:26px;bottom:26px;width:132px;height:132px;
     transition:opacity .6s}
   #vitals.idle{opacity:.16}
+  #hud.cine #vitals,#hud.cine #compass,#hud.cine #clock,#hud.cine #prompts,
+  #hud.cine #objective{opacity:0;transition:opacity .4s}
+
+  /* Persistent objective line, under the clock. */
+  #objective{position:absolute;top:66px;left:50%;transform:translateX(-50%);
+    font-family:var(--slab);font-size:12.5px;letter-spacing:.13em;
+    color:#f0e6cb;text-shadow:0 2px 6px #000,0 0 16px #000;opacity:0;
+    transition:opacity .5s;white-space:nowrap;text-transform:uppercase}
+  #objective.on{opacity:.95}
+  #objective b{color:var(--yes);font-weight:400;margin-right:.55em}
+
+  /* Title reveal on the last shot of the opening. */
+  #titleCard{position:fixed;inset:0;z-index:66;pointer-events:none;
+    display:flex;align-items:center;justify-content:center;flex-direction:column;
+    opacity:0;transition:opacity 2.4s ease}
+  #titleCard.on{opacity:1}
+  #titleCard .big{font-family:var(--slab);font-size:clamp(30px,6.2vw,84px);
+    letter-spacing:.16em;color:#F4EEDF;text-shadow:0 4px 26px #000,0 0 60px #000;
+    text-align:center;line-height:1.06}
+  #titleCard .big em{display:block;font-style:normal;color:var(--yes);
+    font-size:.62em;letter-spacing:.34em;margin-bottom:.22em}
+  #titleCard .rule{width:min(38vw,340px);height:1px;margin-top:22px;
+    background:linear-gradient(90deg,transparent,rgba(244,238,223,.55),transparent)}
   #compass{position:absolute;top:14px;left:50%;transform:translateX(-50%);
     width:min(46vw,460px);height:26px;overflow:hidden;
     mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent);
@@ -104,6 +127,9 @@
     line-height:1.42;text-shadow:0 2px 7px #000,0 0 22px #000;opacity:0;
     transition:opacity .28s}
   #subs.on{opacity:1}
+  /* Lift the subtitles clear of the letterbox during a cutscene. */
+  #subs{transition:opacity .28s,bottom .5s cubic-bezier(.4,0,.2,1)}
+  #hud.cine #subs{bottom:calc(12% + 30px)}
   #subs .who{font-family:var(--slab);letter-spacing:.2em;font-size:.66em;
     display:block;margin-bottom:.34em;color:var(--yes);opacity:.95}
   #subs .who.ollie{color:#FFE45C}
@@ -206,9 +232,12 @@
   <div id="clock"></div>
   <div id="toast"><div class="t"></div><div class="s"></div></div>
   <div id="prompts"></div>
+  <div id="objective"></div>
   <div id="subs"><span class="who"></span><span class="line"></span></div>
 </div>
 
+<div id="titleCard"><div class="big"><em>OPTUS</em>REP REDEMPTION</div>
+  <div class="rule"></div></div>
 <div id="bars"><i class="t"></i><i class="b"></i></div>
 <div id="veil"></div>
 <div id="dbg"></div>
@@ -248,10 +277,14 @@ import * as THREE from 'three';
    ========================================================================== */
 const CFG = {
   /* --- World -------------------------------------------------------- */
-  WORLD:      4096,          // playable square, world units (1 unit ~= 1 metre)
-  HALF:       2048,
+  /* The square was 4096 with six towns in it, which left most of the map as
+     country nobody had a reason to cross. Shrinking the world and pushing the
+     settlements out to its corners means the same ride takes you past more of
+     it — the map is smaller and the country feels larger. */
+  WORLD:      2816,          // playable square, world units (1 unit ~= 1 metre)
+  HALF:       1408,
   CHUNK:      128,           // streaming cell size (§3.4)
-  CHUNKS:     32,            // WORLD / CHUNK
+  CHUNKS:     22,            // WORLD / CHUNK
   LOAD_R:     5,             // load radius in cells
   UNLOAD_R:   7,             // unload radius (hysteresis)
   CHUNK_BUDGET_MS: 4,        // max generation time per frame — no hitches
@@ -287,7 +320,7 @@ const CFG = {
 
   /* --- Horse ---------------------------------------------------------- */
   HORSE: { WALK: 1.8, TROT: 4.4, CANTER: 8.2, GALLOP: 13.6,
-           ACCEL: 5.2, BRAKE: 9.0, TURN: 1.85, WHISTLE_R: 120 },
+           ACCEL: 5.2, BRAKE: 9.0, TURN: 1.85, WHISTLE_R: 420 },
 
   /* --- Camera (§5.1) --------------------------------------------------- */
   CAM: { DIST: 4.2, UP: 1.70, RIGHT: 0.60, MIN_DIST: 0.85,
@@ -302,8 +335,8 @@ const CFG = {
   LATITUDE:  -27.5 * Math.PI / 180,   // southern frontier: sun tracks north
 
   /* --- Vegetation ------------------------------------------------------- */
-  TOWN_BUILD_R:   760,    // a town assembles when you get this close
-  TOWN_RELEASE_R: 1000,
+  TOWN_BUILD_R:   620,    // a town assembles when you get this close
+  TOWN_RELEASE_R: 860,
   NPC_SIM_R:      110,    // townsfolk think within this range
   NPC_DRAW_R:     150,
   TOWN_LIGHTS:      4,    // real point lights chasing the nearest lamps
@@ -315,14 +348,18 @@ const CFG = {
   TREE_R:      420,
 
   /* --- Regions, roads and rail ------------------------------------------ */
-  BIOME_SCALE:  330,      // mean width of a biome region, world units
+  BIOME_SCALE:  235,      // mean width of a biome region, world units
   ROAD_W:       6.4,      // graded carriageway width
   ROAD_GRID:    32,       // A* node spacing when routing between towns
   ROAD_MAX_GRADE: 0.42,   // steepest slope a wagon road will take
-  TOWN_MIN_GAP: 420,      // no two towns closer together than this
+  TOWN_MIN_GAP: 620,      // no two towns closer together than this
   POLE_SPACING: 46,       // telegraph poles along the roads
   RAIL_GAUGE:   1.6,
   SLEEPER_SPACING: 2.4,
+  RAIL_W:       9.0,      // graded formation width for the permanent way
+  RAIL_MAX_GRADE: 0.035,  // 1 in 28 — about all an adhesion locomotive will take
+  TRAIN_SPEED:  18.0,     // ~65 km/h, and it makes the line usable
+  TRAIN_DWELL:  34,       // seconds standing at each platform
 
   /* --- Rendering -------------------------------------------------------- */
   EXPOSURE:  1.10,
@@ -909,7 +946,7 @@ const TEX = (()=>{
     lib.cloth_coat  = cloth('coat',  0.62,0.06,0.14,180,0.7);   // charcoal frock coat
     lib.cloth_coatV = cloth('coatV', 0.50,0.55,0.24,190,0.25);  // teal-corded waistcoat
     lib.cloth_shirt = cloth('shirt', 0.11,0.14,0.62,210,0.5);
-    lib.cloth_navy  = cloth('navy',  0.62,0.42,0.13,200,0.10);  // Vane's suit
+    lib.cloth_navy  = cloth('navy',  0.62,0.42,0.13,200,0.10);  // Rennick's suit
     lib.cloth_jersey= cloth('jersey',0.63,0.50,0.16,240,0.05);  // post-game unlock
     lib.leather_boot= leather('boot',0.055,0.44,0.14);
     lib.leather_tack= leather('tack',0.070,0.48,0.22);
@@ -2124,7 +2161,16 @@ class Terrain {
      scatter and the footstep surface), and a centreline the props follow. */
   gradeRoad(points, width){
     if(!this.road) this.road = new Float32Array(this.N*this.N);
-    const N=this.N, st=this.step, h=this.h, road=this.road;
+    return this.gradeCorridor(points, width, this.road, 0.92);
+  }
+  /* The permanent way gets a wider formation and is cut and filled harder:
+     a railway holds its gradient through the country, it does not follow it. */
+  gradeRail(points, width){
+    if(!this.rail) this.rail = new Float32Array(this.N*this.N);
+    return this.gradeCorridor(points, width, this.rail, 0.99);
+  }
+  gradeCorridor(points, width, mask, blend){
+    const N=this.N, st=this.step, h=this.h, road=mask;
     const halfW = width*0.5, feather = width*1.05;
     for(let s=0;s<points.length-1;s++){
       const a=points[s], b=points[s+1];
@@ -2143,7 +2189,7 @@ class Terrain {
           if(d > halfW+feather) continue;
           const w = 1 - M.smooth(M.sat((d-halfW)/feather));
           const idx = j*N+i;
-          h[idx] = M.lerp(h[idx], wy, w*0.92);
+          h[idx] = M.lerp(h[idx], wy, w*blend);
           road[idx] = Math.max(road[idx], w);
         }
       }
@@ -2167,6 +2213,8 @@ class Terrain {
     return t;
   }
   roadAt(wx,wz){ return this.road ? this.sample(this.road, wx, wz) : 0; }
+  railAt(wx,wz){ return this.rail ? this.sample(this.rail, wx, wz) : 0; }
+  gradedAt(wx,wz){ return Math.max(this.roadAt(wx,wz), this.railAt(wx,wz)); }
 
   /* Level a bench of ground for a settlement. The centre goes flat and the
      edge feathers back into the landscape, so a town sits ON the country
@@ -2227,9 +2275,10 @@ class Terrain {
     // Detail is suppressed inside river channels so water beds stay smooth, and
     // flattened near the waterline so beaches and lake beds read as beaches.
     const rv = this.sample(this.river, wx, wz);
-    const rd = this.road ? this.sample(this.road, wx, wz) : 0;
+    const rd = Math.max(this.road ? this.sample(this.road, wx, wz) : 0,
+                        this.rail ? this.sample(this.rail, wx, wz) : 0);
     const shore = M.sat(Math.abs(base - CFG.SEA)/2.6);
-    let flat = 1 - rd*0.94;
+    let flat = 1 - rd*0.96;
     if(this.flatZones){
       for(let i=0;i<this.flatZones.length;i++){
         const z = this.flatZones[i];
@@ -2292,11 +2341,10 @@ class Terrain {
       default:           g = 0.72*M.lerp(0.5,1,moist);
     }
     g *= (1-steep);
-    if(this.road){
-      const rd = this.sample(this.road, wx, wz);
-      g *= M.sat(1 - rd*2.4);       // nothing grows in a wheel rut
-      out.road = rd;
-    } else out.road = 0;
+    const rdv = this.road ? this.sample(this.road, wx, wz) : 0;
+    const rlv = this.rail ? this.sample(this.rail, wx, wz) : 0;
+    g *= M.sat(1 - Math.max(rdv, rlv)*2.4);   // nothing grows in a rut or on ballast
+    out.road = rdv;
     out.y = y; out.slope = slope; out.grass = g; out.moist = moist;
     return out;
   }
@@ -3243,7 +3291,12 @@ function limbGeometry(a, b, r0, r1, opts={}){
   const dir = new THREE.Vector3().subVectors(b,a);
   const len = dir.length();
   dir.normalize();
-  const up = Math.abs(dir.y)>0.96 ? new THREE.Vector3(1,0,0) : new THREE.Vector3(0,1,0);
+  /* Pick the reference axis so that squashX always means world X for an
+     upright limb. With (1,0,0) here the cross product handed back +Z as the
+     "right" axis, which silently swapped squashX and squashZ on every vertical
+     limb in the game — Jarrad's chest was being built 0.46 deep and 0.27 wide
+     instead of the other way round. */
+  const up = Math.abs(dir.y)>0.96 ? new THREE.Vector3(0,0,-1) : new THREE.Vector3(0,1,0);
   const right = new THREE.Vector3().crossVectors(dir,up).normalize();
   const fwd = new THREE.Vector3().crossVectors(right,dir).normalize();
   const P=[], N=[], U=[], I=[];
@@ -3531,7 +3584,24 @@ class Animator {
     return a;
   }
 
+  /* Hold a single pose and stop evaluating anything else. Used for cutscenes:
+     a character breathing and shifting weight a metre from the lens reads as
+     twitching, not as life. */
+  freeze(name, t=0){ this.frozen = name; this.frozenT = t; }
+  unfreeze(){ this.frozen = null; }
+
   update(dt){
+    if(this.frozen && this.clips[this.frozen]){
+      zeroPose(this.pA);
+      this.clips[this.frozen].sample(this.frozenT, this.pA);
+      for(const b of this.rig.bones){
+        const p = this.pA[b.name], bd = this.bind[b.name];
+        if(p) b.rotation.set(bd.x+p.x, bd.y+p.y, bd.z+p.z);
+        else  b.rotation.copy(bd);
+      }
+      this.rootMotion = null;
+      return;
+    }
     this.time += dt*this.speed;
     this.prevTime += dt*this.speed;
     if(this.blend < 1) this.blend = M.sat(this.blend + dt/this.blendTime);
@@ -3637,22 +3707,42 @@ const IK = (()=>{
     lower.quaternion.setFromAxisAngle(HINGE_X, bendLocal);
     lower.updateMatrixWorld(true);
   }
-  /* Simple aim: point a bone's +Y at a world target. */
-  function look(bone, targetWorld, weight=1, maxAngle=1.2){
+  /* Aim a bone at a world target.
+
+     The old version pointed the bone's +Y at the target and then REPLACED the
+     bone's rotation with the result. Both are wrong for a head or a neck: +Y
+     is a spine's axis, not its facing, so aiming it at anything wrenches the
+     bone ninety degrees, and replacing the rotation throws the animation away.
+
+     This works out the small additional rotation that brings the bone's own
+     rest facing onto the target, clamps it, and applies it ON TOP of whatever
+     the animator just posed. */
+  const _lv = new THREE.Vector3(), _lv2 = new THREE.Vector3();
+  const _lq = new THREE.Quaternion(), _lq2 = new THREE.Quaternion();
+  const _lid = new THREE.Quaternion();
+  const FWD_Z = new THREE.Vector3(0,0,1);
+  function look(bone, targetWorld, weight=1, maxAngle=0.7, restDir){
+    if(!targetWorld) return;
     bone.updateMatrixWorld(true);
-    const p = new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld);
-    const parentQ = bone.parent ? bone.parent.getWorldQuaternion(new THREE.Quaternion())
-                                : new THREE.Quaternion();
-    const dir = new THREE.Vector3().subVectors(targetWorld,p).normalize();
-    const localDir = dir.clone().applyQuaternion(parentQ.clone().invert());
-    const rest = new THREE.Vector3(0,1,0);
-    const want = new THREE.Quaternion().setFromUnitVectors(rest, localDir);
-    // Clamp how far the neck will crank.
-    const ang = 2*Math.acos(M.clamp(want.w,-1,1));
-    if(ang > maxAngle){
-      want.slerp(new THREE.Quaternion(), 1 - maxAngle/ang);
-    }
-    bone.quaternion.slerp(want, weight);
+    const p = _lv.setFromMatrixPosition(bone.matrixWorld);
+    const d = _lv2.subVectors(targetWorld, p);
+    if(d.lengthSq() < 1e-4) return;
+    d.normalize();
+    const parentQ = bone.parent
+      ? bone.parent.getWorldQuaternion(_lq)
+      : _lq.identity();
+    const localDir = d.applyQuaternion(_lq2.copy(parentQ).invert());
+
+    // Where the bone is facing right now, after the animation.
+    const rest = restDir || FWD_Z;
+    const cur = _lv.copy(rest).applyQuaternion(bone.quaternion).normalize();
+    const delta = _lq2.setFromUnitVectors(cur, localDir);
+
+    let ang = 2*Math.acos(M.clamp(Math.abs(delta.w), -1, 1));
+    const k = weight * (ang > 1e-4 ? Math.min(1, maxAngle/ang) : 1);
+    _lid.identity();
+    _lid.slerp(delta, M.sat(k));
+    bone.quaternion.premultiply(_lid);
   }
   return { solve, look };
 })();
@@ -3703,6 +3793,7 @@ function boneDefFromWorld(list){
 }
 
 /* Upper-body mask for override clips (aiming, hat-tip, lasso twirl). */
+const PLAYER_HEAD_FWD = new THREE.Vector3(0,0,1);
 const UPPER_MASK = { spine2:1, spine3:1, neck:1, head:1,
   clavL:1, armL:1, forearmL:1, handL:1, clavR:1, armR:1, forearmR:1, handR:1 };
 
@@ -3713,8 +3804,10 @@ function buildJarrad(lib){
   const def = boneDefFromWorld(JARRAD_BONES);
   const rig = makeSkeleton(def);
   // Bias skinning so the coat skirt follows the pelvis, not the thighs.
-  rig.weightScale = { pelvis:1.5, spine1:1.2, head:1.6, jaw:0.5,
-                      clavL:0.6, clavR:0.6, toeL:0.7, toeR:0.7 };
+  rig.weightScale = { pelvis:1.7, spine1:1.5, spine2:1.5, spine3:1.4,
+                      head:1.8, jaw:0.4, neck:1.1,
+                      clavL:0.45, clavR:0.45, armL:0.8, armR:0.8,
+                      thighL:0.85, thighR:0.85, toeL:0.7, toeR:0.7 };
 
   const V = (x,y,z)=> new THREE.Vector3(x,y,z);
   const parts = [];
@@ -3725,25 +3818,31 @@ function buildJarrad(lib){
      5 shirt linen · 6 satchel leather */
   const MAT = { COAT:0, VEST:1, SKIN:2, BOOT:3, HAT:4, SHIRT:5, BAG:6 };
 
-  /* --- Torso: three stacked solids so the silhouette tapers correctly --- */
-  push(limbGeometry(V(0,0.96,0), V(0,1.30,0.01), 0.165, 0.205,
-       {radial:12, rings:4, squashX:1.28, squashZ:0.86, bulge:0.05}), MAT.VEST);
-  push(limbGeometry(V(0,1.28,0.01), V(0,1.54,0.005), 0.205, 0.215,
-       {radial:12, rings:3, squashX:1.42, squashZ:0.80}), MAT.SHIRT);
-  /* Coat body — sits over the torso, slightly proud of it. */
-  push(limbGeometry(V(0,1.52,0.005), V(0,0.90,0), 0.228, 0.196,
-       {radial:14, rings:5, squashX:1.40, squashZ:0.92}), MAT.COAT);
+  /* --- Torso ------------------------------------------------------------
+     Built to measured proportions rather than by eye. A man of 1.80 m has
+     shoulders about 0.46 m across and a chest about 0.24 m deep; the previous
+     build was 0.64 wide and 0.42 deep, which is why he read as a slab. Waist
+     comes in to 0.34, and the coat sits 25 mm proud of the body, not 60. */
+  push(limbGeometry(V(0,0.96,0), V(0,1.28,0.005), 0.150, 0.168,
+       {radial:12, rings:4, squashX:1.04, squashZ:0.66, bulge:0.04}), MAT.VEST);
+  push(limbGeometry(V(0,1.26,0.005), V(0,1.52,0.004), 0.168, 0.186,
+       {radial:12, rings:3, squashX:1.10, squashZ:0.62}), MAT.SHIRT);
+  /* Coat body — over the torso, and tapered in at the waist. */
+  push(limbGeometry(V(0,1.50,0.004), V(0,1.14,0), 0.196, 0.164,
+       {radial:14, rings:3, squashX:1.05, squashZ:0.68}), MAT.COAT);
+  push(limbGeometry(V(0,1.16,0), V(0,0.94,0), 0.164, 0.172,
+       {radial:14, rings:2, squashX:1.02, squashZ:0.70}), MAT.COAT);
   /* Coat skirt — flares below the belt. This is the read at distance. */
-  push(limbGeometry(V(0,0.94,0), V(0,0.50,-0.02), 0.200, 0.290,
-       {radial:14, rings:4, squashX:1.30, squashZ:1.00, tipRound:false}), MAT.COAT);
+  push(limbGeometry(V(0,0.95,0), V(0,0.50,-0.02), 0.176, 0.248,
+       {radial:14, rings:4, squashX:1.10, squashZ:0.88, tipRound:false}), MAT.COAT);
   /* Lapels: two thin slabs angled off the chest. */
   for(const s of [1,-1]){
-    push(limbGeometry(V(s*0.055,1.50,0.095), V(s*0.135,1.20,0.055), 0.030, 0.052,
+    push(limbGeometry(V(s*0.048,1.49,0.082), V(s*0.112,1.20,0.050), 0.026, 0.044,
          {radial:5, rings:2, squashZ:0.4}), MAT.COAT);
   }
   /* Collar */
-  push(limbGeometry(V(0,1.545,-0.02), V(0,1.60,-0.015), 0.115, 0.100,
-       {radial:12, rings:2, squashX:1.3, squashZ:1.0, tipRound:false}), MAT.COAT);
+  push(limbGeometry(V(0,1.540,-0.018), V(0,1.596,-0.014), 0.096, 0.084,
+       {radial:12, rings:2, squashX:1.18, squashZ:0.92, tipRound:false}), MAT.COAT);
 
   /* --- Head: skull, jaw, brow, nose, ears ------------------------------- */
   push(blobGeometry(V(0,1.695,-0.004), 0.098, 0.115, 0.108, 16), MAT.SKIN);
@@ -3770,9 +3869,9 @@ function buildJarrad(lib){
 
   /* --- Arms ------------------------------------------------------------- */
   for(const s of [1,-1]){
-    push(limbGeometry(V(s*0.205,1.495,0), V(s*0.213,1.225,-0.010), 0.072, 0.056,
+    push(limbGeometry(V(s*0.205,1.495,0), V(s*0.213,1.225,-0.010), 0.062, 0.048,
          {radial:9, rings:4, bulge:0.14}), MAT.COAT);
-    push(limbGeometry(V(s*0.213,1.225,-0.010), V(s*0.220,0.972,-0.005), 0.056, 0.042,
+    push(limbGeometry(V(s*0.213,1.225,-0.010), V(s*0.220,0.972,-0.005), 0.048, 0.037,
          {radial:9, rings:4, bulge:0.08}), MAT.COAT);
     // Cuff
     push(limbGeometry(V(s*0.218,1.010,-0.006), V(s*0.220,0.978,-0.005), 0.050, 0.046,
@@ -3783,13 +3882,13 @@ function buildJarrad(lib){
          {radial:6, rings:2}), MAT.SKIN);
     push(limbGeometry(V(s*0.198,0.930,0.010), V(s*0.176,0.906,0.034), 0.017, 0.013,
          {radial:5, rings:1}), MAT.SKIN);
-    // Shoulder pad — the broad-shouldered read.
-    push(blobGeometry(V(s*0.190,1.500,0.000), 0.086, 0.076, 0.088, 10), MAT.COAT);
+    // Shoulder cap. Enough to read as broad, not enough to read as armour.
+    push(blobGeometry(V(s*0.178,1.498,0.000), 0.070, 0.066, 0.070, 10), MAT.COAT);
   }
 
   /* --- Legs and boots --------------------------------------------------- */
   for(const s of [1,-1]){
-    push(limbGeometry(V(s*0.108,0.935,0), V(s*0.112,0.520,-0.010), 0.098, 0.072,
+    push(limbGeometry(V(s*0.108,0.935,0), V(s*0.112,0.520,-0.010), 0.086, 0.064,
          {radial:10, rings:4, bulge:0.12}), MAT.COAT);
     push(limbGeometry(V(s*0.112,0.520,-0.010), V(s*0.114,0.130,0), 0.072, 0.052,
          {radial:10, rings:4, bulge:0.10}), MAT.COAT);
@@ -3802,14 +3901,14 @@ function buildJarrad(lib){
   }
 
   /* --- Belt and satchel of contracts ------------------------------------ */
-  push(limbGeometry(V(0,0.955,0), V(0,0.990,0), 0.212, 0.212,
-       {radial:14, rings:1, squashX:1.32, squashZ:0.94, tipRound:false}), MAT.BAG);
-  push(boxGeometry(V(0.245,0.900,0.030), 0.150, 0.185, 0.085, 0.14), MAT.BAG);
-  push(boxGeometry(V(0.245,0.968,0.030), 0.158, 0.052, 0.095, 0.10), MAT.BAG);
-  push(limbGeometry(V(0.190,1.050,0.010), V(0.098,1.420,-0.055), 0.020, 0.020,
+  push(limbGeometry(V(0,0.955,0), V(0,0.990,0), 0.180, 0.180,
+       {radial:14, rings:1, squashX:1.14, squashZ:0.78, tipRound:false}), MAT.BAG);
+  push(boxGeometry(V(0.218,0.900,0.030), 0.140, 0.175, 0.080, 0.14), MAT.BAG);
+  push(boxGeometry(V(0.218,0.966,0.030), 0.148, 0.050, 0.090, 0.10), MAT.BAG);
+  push(limbGeometry(V(0.170,1.048,0.010), V(0.086,1.410,-0.050), 0.018, 0.018,
        {radial:5, rings:3, squashZ:0.4}), MAT.BAG);
 
-  const geo = skinParts(parts, rig, {power:3.0});
+  const geo = skinParts(parts, rig, {power:3.6});
 
   const S = (t, extra={})=> new THREE.MeshStandardMaterial(Object.assign({
     map:t.map, roughnessMap:t.roughnessMap, normalMap:t.normalMap,
@@ -4398,8 +4497,10 @@ class Player {
 
     // IK works in world space, so the whole chain has to be current first.
     this.object.updateMatrixWorld(true);
-    if(!this.mounted && this.grounded) this._footIK();
-    if(lookTarget) IK.look(this.rig.byName.head, lookTarget, 0.4, 0.85);
+    if(!this.mounted && this.grounded && !this.suspendIK) this._footIK();
+    // A head faces +Z in this rig; a glance, not a stare.
+    if(lookTarget) IK.look(this.rig.byName.head, lookTarget, 0.28, 0.60,
+                           PLAYER_HEAD_FWD);
     this.rig.root.updateMatrixWorld(true);
   }
 
@@ -4549,6 +4650,9 @@ class OrbitCam {
 
    Facing convention: +Z forward, same as the player.
    ========================================================================== */
+
+/* neck3 (0,2.08,1.16) -> head (0,2.16,1.34): up and forward, not straight up. */
+const OLLIE_NECK_FWD = new THREE.Vector3(0, 0.406, 0.914).normalize();
 
 const OLLIE_BONES = [
   ['pelvis',   null,        0.00, 1.42, -0.75],
@@ -4870,11 +4974,22 @@ const OLLIE_LINES = {
     "Take your time. I'm not going anywhere. I literally can't.",
     "You ever think about how far a sound travels out here? I do.",
     "Someone should build something here. Not us. Someone.",
+    "Do you ever wonder what the horses are thinking? I'll save you the trouble. Grass.",
+    "That's the third hawk this morning. I'm counting. It's what I have.",
+    "I've decided I like this valley. You may quote me.",
+    "Nothing out here for miles. That's either peaceful or ominous.",
+    "I'd like it on the record that I suggested the other road.",
+    "You've gone quiet. That usually means we're lost.",
+    "Smell that? Rain, two days out. I'm rarely wrong about rain.",
+    "There's a fence post over there with no fence. Think about that.",
+    "One day there'll be wire all the way across this. I'll have been here first."
   ],
   mount: [
     "Right. Where are we ruining our day today?",
     "Both hands, Jarrad. You know what happened last time.",
     "Up you get. Mind the coat.",
+    "Comfortable? Good. Neither am I.",
+    "Say the word. Or don't. I'll guess."
   ],
   dismount: [
     "I'll be here. Obviously.",
@@ -4885,6 +5000,9 @@ const OLLIE_LINES = {
     "This is the fastest I've been all week and I'm counting Tuesday.",
     "If a fence appears I'm going over it and you're coming with me.",
     "Whoo! Sorry. Professional. Whoo.",
+    "Hold on. HOLD ON.",
+    "This is what I'm for. THIS.",
+    "Tell me when to stop. Actually don't."
   ],
   fall: [
     "Ow. That one's going on the incident report.",
@@ -4895,6 +5013,7 @@ const OLLIE_LINES = {
     "Four bars. Four whole bars, Jarrad.",
     "Feel that? That's coverage. That's what that is.",
     "I get better signal here than the man who built it.",
+    "Somebody strung that by hand. Every foot of it."
   ],
   lowBond: [
     "You didn't brush me. I noticed.",
@@ -4905,6 +5024,8 @@ const OLLIE_LINES = {
     "Good day for it.",
     "You're standing straighter. I can feel it through the saddle.",
     "Whatever it is, we've had worse.",
+    "You'll do. I've decided.",
+    "I'd follow you into most things. Not water. Most things."
   ],
   water: [
     "Cold. Very cold. Continuing anyway.",
@@ -4914,6 +5035,8 @@ const OLLIE_LINES = {
     "Sky's doing something tonight.",
     "Everything sounds bigger after dark. Including me.",
     "There's a light on out there. Someone's still awake.",
+    "You should sleep. I'll keep watch. I don't sleep well anyway.",
+    "That's not a coyote. That's a man pretending to be a coyote."
   ],
   snow: [
     "My legs have gone quiet. Is that normal?",
@@ -4926,6 +5049,9 @@ const OLLIE_LINES = {
   town: [
     "Lamps are on. That's your doing.",
     "People came back. I counted.",
+    "Smells like bread. Follow the bread.",
+    "Somebody's watching us from that window. Wave.",
+    "I'll wait by the rail. Try not to be memorable."
   ],
   boss: [
     "You've got this. I've seen the numbers.",
@@ -5032,7 +5158,7 @@ class Horse {
     const fresh = pool.filter(l => !this.spokenAt[l] || now-this.spokenAt[l] > 300);
     const list = fresh.length ? fresh : pool;
     const line = list[(Math.random()*list.length)|0];
-    if(!force && this._lastSpeak && now - this._lastSpeak < 6) return;
+    if(!force && this._lastSpeak && now - this._lastSpeak < 22) return;
     this._lastSpeak = now;
     this.spokenAt[line] = now;
     this.onSpeak(line, this.headPoint());
@@ -5077,15 +5203,21 @@ class Horse {
     } else {
       /* Riderless: graze, or path back to the player when whistled. */
       if(this.followTarget){
+        // Chase where he IS, not where he was when you whistled.
+        if(this.followLive) this.followTarget.copy(this.followLive());
         const d = this.followTarget.clone().sub(this.pos); d.y = 0;
         const dist = d.length();
-        if(dist > 3.0){
-          this.yaw = M.angDamp(this.yaw, Math.atan2(d.x,d.z), 3.0, dt);
-          this.speed = M.damp(this.speed, dist > 22 ? C.CANTER : C.TROT, C.ACCEL, dt);
+        if(dist > 3.4){
+          const want = this._steer(Math.atan2(d.x,d.z), dist);
+          this.yaw = M.angDamp(this.yaw, want, 3.4, dt);
+          // She hurries if she is a long way off, and settles as she arrives.
+          const gait = dist > 90 ? C.GALLOP : dist > 26 ? C.CANTER : C.TROT;
+          this.speed = M.damp(this.speed, gait, C.ACCEL, dt);
         } else { this.speed = M.damp(this.speed,0,C.BRAKE,dt); this.followTarget=null; }
       } else {
         this.speed = M.damp(this.speed, 0, C.BRAKE, dt);
-        this.grazing = this.speed < 0.15;
+        // Head down eating is the wrong pose for a horse who is mid-sentence.
+        this.grazing = !this.inScene && this.speed < 0.15;
       }
       this.stamina = Math.min(this.staminaMax, this.stamina + 6*dt);
     }
@@ -5177,9 +5309,10 @@ class Horse {
 
   _chatter(dt, world){
     this._chatT = (this._chatT||0) + dt;
-    if(this._chatT < 11) return;
+    // She is company, not a radio. Roughly one remark a minute at most.
+    if(this._chatT < 38) return;
     this._chatT = 0;
-    if(Math.random() > 0.42) return;
+    if(Math.random() > 0.34) return;
     const C = CFG.HORSE;
     if(this.stamina < 22) return this.say('tired');
     if(this.speed > C.CANTER*1.05) return this.say('gallop');
@@ -5203,11 +5336,34 @@ class Horse {
     this.speed = 0;
     return true;
   }
-  whistleTo(pos){
+  /* Fan out from the direction she wants to go and take the first heading
+     that is not into a wall. Enough to get her round a building or a fence;
+     she is not solving a maze, she is walking round a shed. */
+  _steer(desired, dist){
+    if(!this.colliders) return desired;
+    const probe = Math.min(9, 3.5 + dist*0.08);
+    for(const off of [0, 0.30, -0.30, 0.62, -0.62, 0.95, -0.95, 1.35, -1.35]){
+      const a = desired + off;
+      const px = this.pos.x + Math.sin(a)*probe;
+      const pz = this.pos.z + Math.cos(a)*probe;
+      const mx = this.pos.x + Math.sin(a)*probe*0.5;
+      const mz = this.pos.z + Math.cos(a)*probe*0.5;
+      if(!this.colliders.blocked(px,pz,1.1) && !this.colliders.blocked(mx,mz,1.1)){
+        // Also refuse anything she plainly cannot climb.
+        const g0 = this.terrain.heightAt(this.pos.x,this.pos.z);
+        const g1 = this.terrain.heightAt(px,pz);
+        if((g1-g0)/probe < 0.85) return a;
+      }
+    }
+    return desired;
+  }
+
+  whistleTo(pos, live){
     const d = this.pos.distanceTo(pos);
-    const range = CFG.HORSE.WHISTLE_R * (0.45 + this.bond*0.1375);
+    const range = CFG.HORSE.WHISTLE_R * (0.55 + this.bond*0.1125);
     if(d > range) return false;
     this.followTarget = pos.clone();
+    this.followLive = live || null;
     return true;
   }
   addBond(amount){
@@ -5225,8 +5381,10 @@ class Horse {
     if(this.mouthOpen !== undefined){
       this.rig.byName.jaw.rotation.x += this.mouthOpen*0.30;
     }
+    /* Her neck runs up and forward, so its rest facing is neither +Y nor +Z.
+       Aiming the wrong axis is what had her upper body corkscrewing. */
     if(lookTarget && this.speed < 1.2)
-      IK.look(this.rig.byName.neck3, lookTarget, 0.22, 0.55);
+      IK.look(this.rig.byName.neck3, lookTarget, 0.16, 0.42, OLLIE_NECK_FWD);
     this.rig.root.updateMatrixWorld(true);
   }
 }
@@ -5264,7 +5422,7 @@ class Audio {
       const g = c.createGain(); g.gain.value = gain; g.connect(this.master);
       this[name] = g; return g;
     };
-    bus('musicBus', 0.42);
+    bus('musicBus', 0.30);
     bus('sfxBus',   0.90);
     bus('voiceBus', 1.00);
     bus('ambBus',   0.62);
@@ -5385,7 +5543,7 @@ class Audio {
   }
 
   /* Karplus-Strong pluck — the guitar and the banjo in the score. */
-  pluck(freq, dur, gainNode, bright=0.5, level=0.4){
+  pluck(freq, dur, gainNode, bright=0.5, level=0.4, when=0){
     const c=this.ctx, sr=c.sampleRate;
     const N=Math.max(2, Math.floor(sr/freq));
     const buf=c.createBuffer(1, Math.ceil(sr*dur), sr);
@@ -5404,7 +5562,7 @@ class Audio {
       d[i]=v*level;
     }
     const src=c.createBufferSource(); src.buffer=buf;
-    src.connect(gainNode); src.start();
+    src.connect(gainNode); src.start(when || 0);
     return src;
   }
 
@@ -5796,192 +5954,378 @@ const VOICE = {
   conway:      { pitch: 196, formant:1.10, rate:1.00, breath:0.16, rasp:0.02, vibrato:0.014 },
   pudmenzky:   { pitch: 84,  formant:0.90, rate:0.78, breath:0.36, rasp:0.55, vibrato:0.006 },
   mcroberts:   { pitch: 92,  formant:0.94, rate:0.86, breath:0.12, rasp:0.24, vibrato:0.005 },
-  vane:        { pitch: 116, formant:1.02, rate:0.82, breath:0.04, rasp:0.00, vibrato:0.003 },
+  rennick:     { pitch: 116, formant:1.02, rate:0.82, breath:0.04, rasp:0.00, vibrato:0.003 },
 };
 
 /* ==========================================================================
-   SCORE — adaptive generative music with an authored main theme (§16).
-   Stems fade by game state. The theme is a real melody in an note array, not
-   an arpeggiator.
+   SCORE
+   Rewritten. The old cue was one four-bar loop of plucks over a sawtooth pad
+   with a noise snare on top, which is why it wore out inside a minute and
+   scraped at the ears.
+
+   Now there are six authored pieces, each with its own key, tempo, harmonic
+   plan and instrumentation, and the score cross-fades between them over eight
+   seconds. Exploration rotates through three of them so the same music never
+   plays for more than a few minutes at a stretch.
+
+   Everything is voiced softly: sine and triangle sources, slow attacks, and
+   every part filtered before it reaches the bus. Nothing in here is a raw
+   sawtooth and nothing is a burst of white noise.
    ========================================================================== */
+
+/* Scale degrees are semitones from the tonic. Melodies are written as
+   [degree, beats]; null is a rest. */
+const TRACKS = {
+  /* --- Exploration ---------------------------------------------------- */
+  open_country: {
+    bpm: 62, key: -3, feel: 'wide',
+    prog: [[0,7,12],[-5,2,7],[-4,3,8],[-5,2,7]],
+    bars: 4, lead: 'harmonica', leadEvery: 2,
+    melody: [[12,3],[10,1],[7,4],[8,3],[7,1],[3,4],[5,2],[7,2],[3,6],[null,2]],
+    pluck: 0.30, pad: 0.055, bass: 0.10, air: 0.9,
+  },
+  long_road: {
+    bpm: 72, key: 0, feel: 'walking',
+    prog: [[0,3,7],[-4,0,3],[5,8,12],[-2,3,7]],
+    bars: 4, lead: 'guitar', leadEvery: 2,
+    melody: [[0,2],[3,1],[5,1],[7,4],[5,2],[3,2],[2,4],[0,2],[-2,2],[0,4]],
+    pluck: 0.34, pad: 0.045, bass: 0.13, air: 0.55,
+  },
+  high_ground: {
+    bpm: 54, key: 2, feel: 'still',
+    prog: [[0,7,14],[-5,0,7],[2,9,14],[-3,4,9]],
+    bars: 4, lead: 'fiddle', leadEvery: 3,
+    melody: [[7,6],[9,2],[12,6],[10,2],[7,4],[5,4],[3,8]],
+    pluck: 0.16, pad: 0.075, bass: 0.07, air: 1.0,
+  },
+  /* --- Situational ------------------------------------------------------ */
+  town: {
+    bpm: 88, key: 0, feel: 'warm',
+    prog: [[0,4,7],[5,9,12],[-3,2,7],[-5,0,4]],
+    bars: 4, lead: 'guitar', leadEvery: 1,
+    melody: [[7,1],[9,1],[12,2],[9,1],[7,1],[4,2],[5,1],[7,1],[9,2],[7,4]],
+    pluck: 0.40, pad: 0.030, bass: 0.16, air: 0.30, swing: 0.14,
+  },
+  tension: {
+    bpm: 78, key: -3, feel: 'low',
+    prog: [[0,3,7],[0,3,8],[-2,1,5],[0,3,7]],
+    bars: 4, lead: null, leadEvery: 0,
+    melody: null,
+    pluck: 0.12, pad: 0.085, bass: 0.22, air: 0.45, pulse: true,
+  },
+  negotiation: {
+    bpm: 66, key: -1, feel: 'close',
+    prog: [[0,3,7],[-1,3,6],[0,3,7],[-2,2,5]],
+    bars: 4, lead: null, leadEvery: 0,
+    melody: null,
+    pluck: 0.10, pad: 0.070, bass: 0.09, air: 0.20, clock: true,
+  },
+};
+
+/* Which pieces may play in each situation. Exploration has three so the road
+   never sounds the same for long. */
+const STATE_TRACKS = {
+  explore: ['open_country','long_road','high_ground'],
+  town:    ['town'],
+  tension: ['tension'],
+  negotiation: ['negotiation'],
+  combat:  ['tension'],
+};
+
 class Score {
   constructor(audio){
     this.A = audio;
     this.ctx = audio.ctx;
-    this.key = 0;                        // semitone transpose, changes per act
+    this.enabled = true;
     this.state = 'explore';
-    this.targets = { explore:1, tension:0, combat:0, town:0, negotiation:0 };
-    this.gains = {};
-    for(const k of Object.keys(this.targets)){
-      const g = this.ctx.createGain(); g.gain.value = k==='explore'?0.0:0.0;
-      g.connect(audio.musicBus); this.gains[k]=g;
-    }
-    this.bpm = 76;
+
+    /* A gentle shelf across the whole score, plus a slow limiter. Music should
+       sit under the world, not in front of it. */
+    const c = this.ctx;
+    this.tone = c.createBiquadFilter();
+    this.tone.type = 'lowpass'; this.tone.frequency.value = 3400;
+    this.tone.Q.value = 0.4;
+    this.soft = c.createDynamicsCompressor();
+    this.soft.threshold.value = -26; this.soft.knee.value = 22;
+    this.soft.ratio.value = 3; this.soft.attack.value = 0.15;
+    this.soft.release.value = 0.6;
+    this.tone.connect(this.soft).connect(audio.musicBus);
+
+    /* Two decks, so one piece can fade out while the next fades in. */
+    this.deck = [this._makeDeck(), this._makeDeck()];
+    this.active = 0;
+    this.deck[0].name = 'open_country';
+    this.deck[0].gain.gain.value = 0.0;
+    this.deck[0].target = 1;
+
     this.beat = 0;
     this.nextTime = 0;
-    this.enabled = true;
-
-    /* THE MAIN THEME.
-       D natural minor, 4/4, stated in full at the Act I title card, the Act IV
-       cabin, and the ending. Written as an actual melody. */
-    this.THEME = [
-      // [scale degree semitone from D, beats]
-      [ 0,1],[ 3,1],[ 7,2],   [ 5,1],[ 3,1],[ 2,2],
-      [ 0,1],[ 3,1],[ 7,1],[10,1], [12,3],[null,1],
-      [10,1],[ 8,1],[ 7,2],   [ 5,1],[ 3,1],[ 5,2],
-      [ 3,1],[ 2,1],[ 0,4],[null,2],
-    ];
-    /* Chord bed under the theme: Dm — Bb — F — C. */
-    this.PROG = [[0,3,7],[ -2,2,5],[3,7,10],[-5,-1,2]];
+    this.rotateIn = 150 + Math.random()*90;
+    this.since = 0;
   }
-  note(semi){ return 146.83 * Math.pow(2, (semi + this.key)/12); }  // D3 root
 
+  _makeDeck(){
+    const g = this.ctx.createGain();
+    g.gain.value = 0;
+    g.connect(this.tone);
+    return { gain:g, name:null, target:0, beat:0 };
+  }
+
+  /* ---- State ------------------------------------------------------------ */
   setState(s){
-    for(const k of Object.keys(this.targets)) this.targets[k] = 0;
-    this.targets[s] = 1;
+    if(this.state === s) return;
     this.state = s;
-    // Exploration always keeps a floor so the world is never silent.
-    if(s !== 'combat') this.targets.explore = Math.max(this.targets.explore, 0.35);
+    const pool = STATE_TRACKS[s] || STATE_TRACKS.explore;
+    this._crossfadeTo(pool[(Math.random()*pool.length)|0]);
   }
-  setKey(semi){ this.key = semi; }
+  _crossfadeTo(name){
+    const cur = this.deck[this.active];
+    if(cur.name === name) return;
+    const nxt = this.deck[1-this.active];
+    nxt.name = name; nxt.beat = 0; nxt.target = 1;
+    cur.target = 0;
+    this.active = 1-this.active;
+    this.since = 0;
+    this.rotateIn = 150 + Math.random()*120;
+  }
+  setKey(){ /* the pieces carry their own keys now */ }
+
+  note(semi, key){ return 146.83 * Math.pow(2, (semi + key)/12); }
 
   update(dt){
     if(!this.enabled || !this.ctx) return;
     const t = this.A.now();
-    for(const k of Object.keys(this.gains)){
-      this.gains[k].gain.setTargetAtTime(this.targets[k]*0.9, t, 1.6);
+    this.since += dt;
+
+    /* Eight-second cross-fades: long enough that you notice the music has
+       changed only after it has. */
+    for(const d of this.deck)
+      d.gain.gain.setTargetAtTime(d.target*0.85, t, 2.6);
+
+    // Rotate exploration pieces so the road music keeps moving.
+    if(this.state === 'explore' && this.since > this.rotateIn){
+      const pool = STATE_TRACKS.explore.filter(n=>n !== this.deck[this.active].name);
+      this._crossfadeTo(pool[(Math.random()*pool.length)|0]);
     }
-    /* Schedule a bar ahead. If the tab was backgrounded, the audio clock has
-       run on while the frame loop was parked, so the scheduler would owe dozens
-       of beats and fire them all at once the moment you came back. Any backlog
-       is dropped and the clock is resynced to now. */
-    const spb = 60/this.bpm;
-    if(this.nextTime === 0) this.nextTime = t + 0.2;
+
+    const track = TRACKS[this.deck[this.active].name] || TRACKS.open_country;
+    const spb = 60/track.bpm;
+    if(this.nextTime === 0) this.nextTime = t + 0.3;
     if(this.nextTime < t - 0.12){
-      const missed = Math.round((t - this.nextTime)/spb);
-      this.beat += Math.max(0, missed);
+      this.beat += Math.max(0, Math.round((t-this.nextTime)/spb));
       this.nextTime = t + 0.08;
     }
     let guard = 0;
     while(this.nextTime < t + spb*2 && guard++ < 8){
-      this._scheduleBeat(this.nextTime, this.beat);
+      // Both decks are scheduled while they are audible, so a cross-fade is a
+      // real overlap of two pieces rather than a cut.
+      for(const d of this.deck){
+        if(d.gain.gain.value < 0.004 && d.target === 0) continue;
+        const tr = TRACKS[d.name];
+        if(tr) this._bar(tr, d, this.nextTime, d.beat++);
+      }
       this.nextTime += spb;
       this.beat++;
     }
   }
 
-  _scheduleBeat(t, beat){
-    const spb = 60/this.bpm;
-    const bar = Math.floor(beat/4) % 4;
+  /* ---- One beat of one piece -------------------------------------------- */
+  _bar(tr, deck, t, beat){
+    const spb = 60/tr.bpm;
     const inBar = beat % 4;
-    const chord = this.PROG[bar];
+    const bar = Math.floor(beat/4) % tr.bars;
+    const phrase = Math.floor(beat/(4*tr.bars));
+    const chord = tr.prog[bar];
+    const out = deck.gain;
+    const key = tr.key;
 
-    /* Exploration: sparse plucked guitar and a low pad. */
-    if(this.targets.explore > 0.02){
-      const g = this.gains.explore;
-      if(inBar===0 || (inBar===2 && (beat%8<4))){
-        this.A.pluck(this.note(chord[0]-12), 2.4, g, 0.35, 0.34);
-        if(Math.random()<0.5) this.A.pluck(this.note(chord[2]), 1.8, g, 0.5, 0.18);
+    /* Pad: the bed. Slow attack, heavily filtered, never louder than a
+       whisper. Enters on the downbeat of each bar and holds. */
+    if(inBar === 0 && tr.pad > 0)
+      this._pad(t, spb*4.4, chord, out, tr.pad, key, tr.air);
+
+    /* Bass: root on one, fifth on three. Sine only. */
+    if(tr.bass > 0){
+      if(inBar === 0) this._bass(t, this.note(chord[0]-24, key), spb*1.8, out, tr.bass);
+      else if(inBar === 2) this._bass(t, this.note(chord[1]-24, key), spb*1.2, out, tr.bass*0.7);
+    }
+
+    /* Guitar: a soft, damped arpeggio rather than a strum on every beat. */
+    if(tr.pluck > 0){
+      const sw = (tr.swing || 0)*spb;
+      if(inBar === 0) this._pluck(this.note(chord[0]-12,key), 2.6, out, tr.pluck, t);
+      if(inBar === 1) this._pluck(this.note(chord[1],key), 2.0, out, tr.pluck*0.6, t+sw);
+      if(inBar === 2) this._pluck(this.note(chord[2],key), 2.2, out, tr.pluck*0.75, t);
+      if(inBar === 3 && (phrase%2===0))
+        this._pluck(this.note(chord[1]+12,key), 1.6, out, tr.pluck*0.45, t+sw);
+    }
+
+    /* Lead: only on some phrases, so the melody is an event. */
+    if(tr.melody && tr.leadEvery && phrase % tr.leadEvery === 0 && beat % (4*tr.bars) === 0)
+      this._melody(tr, out, t, key);
+
+    /* Tension: a slow heartbeat under everything. */
+    if(tr.pulse && inBar % 2 === 0)
+      this._heart(t, out, 0.10);
+
+    /* Negotiation: the ticking clock, but soft — a woodblock, not a click. */
+    if(tr.clock){
+      this._tick(t, out, 0.020);
+      this._tick(t + spb*0.5, out, 0.010);
+    }
+  }
+
+  /* ---- Voices ------------------------------------------------------------
+     All of these are deliberately dull sources through gentle filters. A
+     bright source in a game score is fatiguing within about two minutes. */
+  _pad(t, dur, chord, out, level, key, air){
+    const c = this.ctx;
+    const bus = c.createGain(); bus.gain.value = 1; bus.connect(out);
+    const lp = c.createBiquadFilter();
+    lp.type='lowpass'; lp.Q.value = 0.6;
+    lp.frequency.setValueAtTime(320, t);
+    lp.frequency.linearRampToValueAtTime(760, t+dur*0.45);
+    lp.frequency.linearRampToValueAtTime(300, t+dur);
+    lp.connect(bus);
+    for(let i=0;i<chord.length;i++){
+      const s = chord[i];
+      for(const [oct, amp] of [[-12, 1.0], [0, 0.55]]){
+        const o = c.createOscillator();
+        o.type = i===0 ? 'sine' : 'triangle';
+        o.frequency.value = this.note(s+oct, key);
+        o.detune.value = (Math.random()-0.5)*7;
+        const g = c.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(level*amp, t+dur*0.38);   // slow swell
+        g.gain.setValueAtTime(level*amp, t+dur*0.62);
+        g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+        o.connect(g).connect(lp);
+        o.start(t); o.stop(t+dur+0.1);
       }
-      if(inBar===3 && Math.random()<0.34)
-        this.A.pluck(this.note(chord[1]+12), 1.4, g, 0.7, 0.14);
-      // Low choral pad on the downbeat of each bar.
-      if(inBar===0) this._pad(t, spb*4, chord, g, 0.05);
     }
-
-    /* Tension: an upright bass pulse enters. */
-    if(this.targets.tension > 0.02){
-      const g=this.gains.tension;
-      this._bass(t, this.note(chord[0]-24), spb*0.9, g, 0.30);
-      if(inBar===2) this._bass(t+spb*0.5, this.note(chord[1]-24), spb*0.4, g, 0.18);
-    }
-
-    /* Combat: driving percussion. */
-    if(this.targets.combat > 0.02){
-      const g=this.gains.combat;
-      this._snare(t, g, inBar%2===1 ? 0.30 : 0.12);
-      this._bass(t, this.note(chord[0]-24), spb*0.5, g, 0.34);
-      if(inBar===3) this._snare(t+spb*0.5, g, 0.22);
-    }
-
-    /* Town: warmer and fuller — fiddle answers the guitar. */
-    if(this.targets.town > 0.02){
-      const g=this.gains.town;
-      if(inBar===0) this.A.bow(this.note(chord[2]), t, spb*1.8, g, 0.10);
-      if(inBar===2) this.A.harmonica(this.note(chord[1]+12), t, spb*1.2, g, 0.07);
-      this.A.pluck(this.note(chord[0]-12), 1.2, g, 0.5, 0.20);
-    }
-
-    /* Negotiation: a nervous ticking clock motif (§16). */
-    if(this.targets.negotiation > 0.02){
-      const g=this.gains.negotiation;
-      this._tick(t, g, 0.10);
-      this._tick(t+spb*0.5, g, 0.05);
-      if(inBar===0) this._pad(t, spb*4, [chord[0], chord[0]+1, chord[2]], g, 0.04);
+    // A breath of air over the top, filtered almost to nothing.
+    if(air > 0){
+      const n = c.createBufferSource();
+      n.buffer = this.A.noiseBuffer(dur+0.2, 'pink');
+      const bp = c.createBiquadFilter();
+      bp.type='bandpass'; bp.frequency.value = 900; bp.Q.value = 0.7;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(level*air*0.16, t+dur*0.4);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+      n.connect(bp).connect(g).connect(bus);
+      n.start(t); n.stop(t+dur);
     }
   }
 
-  _pad(t, dur, chord, out, level){
-    const c=this.ctx;
-    for(const s of chord){
-      const o=c.createOscillator(); o.type='triangle';
-      o.frequency.value=this.note(s-12);
-      o.detune.value=(Math.random()-0.5)*10;
-      const f=c.createBiquadFilter(); f.type='lowpass'; f.frequency.value=700;
-      const g=c.createGain(); g.gain.setValueAtTime(0.0001,t);
-      g.gain.exponentialRampToValueAtTime(level,t+dur*0.35);
-      g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-      o.connect(f).connect(g).connect(out); o.start(t); o.stop(t+dur+0.1);
-    }
+  _pluck(freq, dur, out, level, t){
+    const c = this.ctx;
+    const lp = c.createBiquadFilter();
+    lp.type='lowpass'; lp.frequency.value = Math.min(2600, freq*5.5); lp.Q.value=0.5;
+    lp.connect(out);
+    // Nylon-string damping and a low cutoff: warm, and it decays out of the way.
+    this.A.pluck(freq, dur, lp, 0.22, level, Math.max(t, this.A.now()));
   }
+
   _bass(t, freq, dur, out, level){
-    const c=this.ctx;
-    const o=c.createOscillator(); o.type='sine'; o.frequency.value=freq;
-    const o2=c.createOscillator(); o2.type='triangle'; o2.frequency.value=freq*2;
-    const g=c.createGain(); g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(level,t+0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-    const g2=c.createGain(); g2.gain.value=0.18;
-    o.connect(g); o2.connect(g2).connect(g); g.connect(out);
-    o.start(t); o2.start(t); o.stop(t+dur+0.05); o2.stop(t+dur+0.05);
-  }
-  _snare(t, out, level){
-    const c=this.ctx;
-    const n=c.createBufferSource(); n.buffer=this.A.noiseBuffer(0.24,'white');
-    const f=c.createBiquadFilter(); f.type='highpass'; f.frequency.value=1400;
-    const g=c.createGain(); g.gain.setValueAtTime(level,t);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+0.20);
-    n.connect(f).connect(g).connect(out); n.start(t); n.stop(t+0.25);
-  }
-  _tick(t, out, level){
-    const c=this.ctx;
-    const o=c.createOscillator(); o.type='square'; o.frequency.value=2400;
-    const g=c.createGain(); g.gain.setValueAtTime(level,t);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+0.035);
-    o.connect(g).connect(out); o.start(t); o.stop(t+0.05);
+    const c = this.ctx;
+    const o = c.createOscillator(); o.type='sine'; o.frequency.value = freq;
+    const lp = c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 380;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(level, t+0.06);      // no click
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.connect(lp).connect(g).connect(out);
+    o.start(t); o.stop(t+dur+0.05);
   }
 
-  /* Play the theme in full — the three moments that matter (§16). */
-  playTheme(instrument='harmonica', level=1){
-    if(!this.ctx) return 0;
-    const spb = 60/this.bpm;
-    let t = this.A.now()+0.15;
-    const g = this.ctx.createGain(); g.gain.value=level; g.connect(this.A.musicBus);
-    let bar = 0, beatCount = 0;
-    for(const [deg, beats] of this.THEME){
+  _melody(tr, out, t0, key){
+    const spb = 60/tr.bpm;
+    let t = t0;
+    for(const [deg, beats] of tr.melody){
       const dur = beats*spb;
       if(deg !== null){
-        const f = this.note(deg+12);
-        if(instrument==='harmonica') this.A.harmonica(f, t, dur*0.94, g, 0.18);
-        else if(instrument==='fiddle') this.A.bow(f, t, dur*0.94, g, 0.20);
-        else this.A.pluck(f, dur*1.2, g, 0.5, 0.32);
+        const f = this.note(deg, key);
+        if(tr.lead === 'harmonica') this._reed(f, t, dur*0.92, out, 0.075);
+        else if(tr.lead === 'fiddle') this.A.bow(f, t, dur*0.92, out, 0.070);
+        else this._pluck(f, dur*1.3, out, 0.22, t);
       }
-      // Chord bed under it.
-      if(beatCount % 4 === 0){
-        this._pad(t, spb*4, this.PROG[bar%4], g, 0.045);
-        bar++;
+      t += dur;
+    }
+  }
+
+  /* A softened harmonica: the same idea as the sfx reed but with the upper
+     partials rolled off so it sits in the mix instead of on top of it. */
+  _reed(freq, t, dur, out, level){
+    const c = this.ctx;
+    const lp = c.createBiquadFilter();
+    lp.type='lowpass'; lp.frequency.value = freq*3.6; lp.Q.value = 0.7;
+    const g = c.createGain(); g.gain.value = 0;
+    lp.connect(g).connect(out);
+    for(const [mult, amp] of [[1,1],[2,0.30],[3,0.10]]){
+      const o = c.createOscillator(); o.type='triangle';
+      o.frequency.value = freq*mult;
+      o.detune.value = (Math.random()-0.5)*9;
+      const og = c.createGain(); og.gain.value = amp*0.5;
+      o.connect(og).connect(lp);
+      o.start(t); o.stop(t+dur+0.06);
+    }
+    const vib = c.createOscillator(); vib.frequency.value = 4.6;
+    const vg = c.createGain();
+    vg.gain.setValueAtTime(0, t);
+    vg.gain.linearRampToValueAtTime(freq*0.008, t+dur*0.5);
+    vib.connect(vg); vib.start(t); vib.stop(t+dur+0.06);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(level, t+0.10);      // breathy attack
+    g.gain.setValueAtTime(level, t+dur*0.70);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  }
+
+  _heart(t, out, level){
+    const c = this.ctx;
+    const o = c.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(72, t);
+    o.frequency.exponentialRampToValueAtTime(44, t+0.30);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(level, t+0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.42);
+    o.connect(g).connect(out); o.start(t); o.stop(t+0.5);
+  }
+
+  _tick(t, out, level){
+    const c = this.ctx;
+    const o = c.createOscillator(); o.type='sine'; o.frequency.value = 1180;
+    const bp = c.createBiquadFilter(); bp.type='bandpass';
+    bp.frequency.value = 1180; bp.Q.value = 6;
+    const g = c.createGain();
+    g.gain.setValueAtTime(level, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.085);
+    o.connect(bp).connect(g).connect(out); o.start(t); o.stop(t+0.12);
+  }
+
+  /* The main theme, stated in full at the three moments that matter (§16). */
+  playTheme(instrument='harmonica', level=1){
+    if(!this.ctx) return 0;
+    const THEME = [[0,1],[3,1],[7,2],[5,1],[3,1],[2,2],
+                   [0,1],[3,1],[7,1],[10,1],[12,3],[null,1],
+                   [10,1],[8,1],[7,2],[5,1],[3,1],[5,2],
+                   [3,1],[2,1],[0,4],[null,2]];
+    const PROG = [[0,3,7],[-2,2,5],[3,7,10],[-5,-1,2]];
+    const bpm = 60, spb = 60/bpm, key = 0;
+    let t = this.A.now()+0.2, bar = 0, beats = 0;
+    const g = this.ctx.createGain(); g.gain.value = level*0.9;
+    g.connect(this.tone);
+    for(const [deg, b] of THEME){
+      const dur = b*spb;
+      if(deg !== null){
+        const f = this.note(deg+12, key);
+        if(instrument === 'harmonica') this._reed(f, t, dur*0.92, g, 0.085);
+        else if(instrument === 'fiddle') this.A.bow(f, t, dur*0.92, g, 0.085);
+        else this._pluck(f, dur*1.2, g, 0.26, t);
       }
-      t += dur; beatCount += beats;
+      if(beats % 4 === 0){ this._pad(t, spb*4.2, PROG[bar%4], g, 0.055, key, 0.7); bar++; }
+      t += dur; beats += b;
     }
     return t - this.A.now();
   }
@@ -6006,6 +6350,8 @@ class UI {
     this.hud = document.getElementById('hud');
     this.bars = document.getElementById('bars');
     this.veil = document.getElementById('veil');
+    this.objectiveEl = document.getElementById('objective');
+    this.titleEl = document.getElementById('titleCard');
     this.promptMap = new Map();
     this.subTimer = 0;
     this.showCompass = true;
@@ -6072,6 +6418,30 @@ class UI {
       c.globalAlpha=0.22; c.fillStyle='#cbbb96';
       c.fillRect(x-0.5, H*0.86, 1, 6);
     }
+    /* Objective bearing — the one the story is pointing you at. */
+    if(this.objectiveBearing !== null && this.objectiveBearing !== undefined){
+      const d = M.angDelta(yaw, this.objectiveBearing);
+      const x = W/2 + d*PPR;
+      if(x>-20 && x<W+20){
+        c.globalAlpha = 1;
+        c.fillStyle = '#FFD600';
+        c.beginPath();
+        c.moveTo(x, H*0.08); c.lineTo(x-6, H*0.36); c.lineTo(x+6, H*0.36);
+        c.closePath(); c.fill();
+      }
+    }
+    /* Waypoint bearing, if one is set. */
+    if(this.waypointBearing !== null && this.waypointBearing !== undefined){
+      const d = M.angDelta(yaw, this.waypointBearing);
+      const x = W/2 + d*PPR;
+      if(x>-20 && x<W+20){
+        c.globalAlpha = 0.95;
+        c.fillStyle = '#00A3A6';
+        c.beginPath();
+        c.moveTo(x, H*0.10); c.lineTo(x-5, H*0.32); c.lineTo(x+5, H*0.32);
+        c.closePath(); c.fill();
+      }
+    }
     c.globalAlpha=1;
     c.fillStyle='#FFD600';
     c.fillRect(W/2-1, 2, 2, 9);
@@ -6124,6 +6494,13 @@ class UI {
     this._toastT = setTimeout(()=>this.toastEl.classList.remove('on'), dur*1000);
   }
 
+  setObjective(text){
+    if(!this.objectiveEl) return;
+    this.objectiveEl.innerHTML = text ? `<b>&#9670;</b>${text}` : '';
+    this.objectiveEl.classList.toggle('on', !!text);
+  }
+  showTitle(on){ if(this.titleEl) this.titleEl.classList.toggle('on', !!on); }
+
   letterbox(on, pct=11){
     const h = on ? pct+'%' : '0';
     this.bars.querySelector('.t').style.height = h;
@@ -6156,8 +6533,17 @@ class Ledger {
     }
   }
   toggle(){ this.open ? this.close() : this.show(); }
-  show(){ this.open = true; this.el.classList.add('on'); this.render(); }
-  close(){ this.open = false; this.el.classList.remove('on'); }
+  show(){
+    this.open = true; this.el.classList.add('on');
+    // Hand the mouse back so the ledger can actually be used.
+    if(document.pointerLockElement) document.exitPointerLock();
+    this.render();
+  }
+  close(){
+    this.open = false; this.el.classList.remove('on');
+    const dom = this.game.renderer && this.game.renderer.domElement;
+    if(dom && dom.requestPointerLock) dom.requestPointerLock();
+  }
 
   render(){
     [...this.tabs.children].forEach(b=>
@@ -6169,22 +6555,40 @@ class Ledger {
       case 'Map': {
         html = `<h2>The Frontier</h2><div class="sub">Surveyed by the Grand Meridian
           Telegraph &amp; Pastoral Company</div>`;
+        html += `<canvas id="mapCanvas" width="640" height="640"
+                  style="width:100%;aspect-ratio:1;display:block;border-radius:3px;
+                  cursor:crosshair;margin:6px 0 10px"></canvas>`;
         html += row('Region', BIOME_NAMES[g.terrain.biomeAt(g.player.pos.x, g.player.pos.z)]);
-        html += row('Bearing', `${((-g.cam.yaw*180/Math.PI%360)+360).toFixed(0)}°`);
         html += row('Position', `${g.player.pos.x.toFixed(0)} E, ${(-g.player.pos.z).toFixed(0)} N`);
-        html += row('Elevation', `${g.player.pos.y.toFixed(1)} units`);
-        html += row('Regions discovered', `${g.discovered.size} of 5`);
-        html += `<div class="hint">The drawn map, fog of war and placeable waypoints
-          arrive with the towns in the next stage of the build.</div>`;
+        html += row('Surveyed', `${g.map.percent.toFixed(1)}% of the territory`);
+        html += row('Settlements found',
+          `${g.towns.list.filter(t=>g.discovered.has(t.name)).length} of ${g.towns.list.length}`);
+        if(g.map.waypoint){
+          const d = Math.hypot(g.map.waypoint.x-g.player.pos.x,
+                               g.map.waypoint.z-g.player.pos.z);
+          html += row('Waypoint', `${(d/1000).toFixed(2)} km — click it again to clear`);
+        } else {
+          html += `<div class="hint">Scroll to zoom, drag to pan, double-click to
+            reset. Click anywhere to set a waypoint — it shows on your compass in
+            teal, with the current objective in yellow.</div>`;
+        }
         break;
       }
-      case 'Missions':
-        html = `<h2>Contracts</h2><div class="sub">Sixteen, when they are written</div>`;
-        html += row('Act', `${g.player.act} — ${['','The Fall','The Climb','The Rival Exchanges','The Low Point','Redemption'][g.player.act]}`);
-        html += row('Current', g.objective || 'Learn the country. Find the Gulch.');
-        html += `<div class="hint">Story missions, the negotiation call system and the
-          mission engine are stage 10–12 of the build order.</div>`;
+      case 'Missions': {
+        const st = g.story;
+        html = `<h2>Contracts</h2><div class="sub">${st ? ACTS[st.act].card + ' — ' + ACTS[st.act].name : ''}</div>`;
+        html += row('Current', g.objective || 'Ride into Yes Gulch');
+        if(st){
+          html += row('Reputation', Math.round(g.player.reputation) + ' of 100');
+          html += row('Holdouts met', `${st.metCount||0} of 4`);
+          html += `<h2 style="margin-top:14px">Journal</h2>`;
+          const seen = st.log.slice(-8);
+          for(const e of seen) html += `<div class="row"><span>${e}</span><span></span></div>`;
+        }
+        html += `<div class="hint">The negotiation call system and the remaining
+          story missions build on this frame.</div>`;
         break;
+      }
       case 'Compendium':
         html = `<h2>Compendium</h2><div class="sub">Filling in as you find things</div>`;
         html += `<h2 style="margin-top:2px">Regions</h2>`;
@@ -6246,17 +6650,81 @@ class Ledger {
           the weather and every sound you hear, including the voices.</p>`;
         html += `<p><b>A work of parody.</b> Optus Rep Redemption is not affiliated
           with, endorsed by, sponsored by or connected to Singtel Optus Pty Limited
-          or any real telecommunications company. Jarrad Gaunt, Marguerite Conway,
-          Old Man Pudmenzky, Sheriff McRoberts, Cornelius Vane and every other
-          character, town and company named here are fictional inventions. Any
-          resemblance to real persons or businesses is coincidental and
-          affectionate.</p>`;
+          or any real telecommunications company. Jarrad Gaunt, Clerk Halloran,
+          Marguerite Conway, Old Man Pudmenzky, Sheriff McRoberts, the Widow
+          Dedman, Ambrose Rennick and every other character, town and company
+          named here are fictional inventions. They are not based on, and are
+          not intended to depict, any real person living or dead. Any
+          resemblance is coincidental.</p>`;
         html += `<div class="hint">Built with Three.js. No other external asset,
           library, image or sound file is used.</div>`;
         break;
     }
     this.page.innerHTML = html;
     if(this.current==='Settings') this._wireSettings();
+    if(this.current==='Map') this._wireMap();
+  }
+
+  _wireMap(){
+    const g = this.game;
+    const cv = document.getElementById('mapCanvas');
+    if(!cv) return;
+    const ctx = cv.getContext('2d');
+    let box = g.map.draw(ctx, cv.width, cv.height, g);
+    const redraw = ()=>{ box = g.map.draw(ctx, cv.width, cv.height, g); };
+    const toCanvas = (e)=>{
+      const r = cv.getBoundingClientRect();
+      return [ (e.clientX-r.left)/r.width*cv.width,
+               (e.clientY-r.top)/r.height*cv.height ];
+    };
+
+    /* Wheel zooms about the cursor, so you can push into a town rather than
+       zooming to the middle and hunting for it. */
+    cv.onwheel = (e)=>{
+      e.preventDefault();
+      const [cx,cy] = toCanvas(e);
+      const at = g.map.fromPx(cx, cy, box);
+      g.map.zoomAt(e.deltaY < 0 ? 1.22 : 1/1.22, at);
+      redraw();
+    };
+
+    /* Drag pans. A drag is not a click, so a waypoint is only set if the
+       pointer barely moved. */
+    let dragging = false, moved = 0, lastX = 0, lastY = 0;
+    cv.onpointerdown = (e)=>{
+      dragging = true; moved = 0;
+      [lastX,lastY] = toCanvas(e);
+      cv.setPointerCapture(e.pointerId);
+    };
+    cv.onpointermove = (e)=>{
+      if(!dragging) return;
+      const [cx,cy] = toCanvas(e);
+      const k = g.map.worldPerPx(box);
+      g.map.panBy((cx-lastX)*k, (cy-lastY)*k);
+      moved += Math.abs(cx-lastX) + Math.abs(cy-lastY);
+      lastX = cx; lastY = cy;
+      redraw();
+    };
+    cv.onpointerup = (e)=>{
+      dragging = false;
+      if(moved > 5) return;                  // that was a pan, not a pick
+      const [cx,cy] = toCanvas(e);
+      const p = g.map.fromPx(cx, cy, box);
+      if(!p) return;
+      const near = 120/g.map.view.zoom;
+      if(g.map.waypoint && g.map.waypoint.distanceTo(p) < near) g.map.waypoint = null;
+      else g.map.waypoint = p;
+      this.render();
+    };
+    cv.ondblclick = ()=>{ g.map.view.zoom = 1; g.map.view.cx = g.map.view.cz = 0;
+                          redraw(); };
+
+    // Keep it live while it is open: the arrow should move as the world does.
+    clearInterval(this._mapTimer);
+    this._mapTimer = setInterval(()=>{
+      if(!this.open || this.current!=='Map'){ clearInterval(this._mapTimer); return; }
+      if(!dragging) redraw();
+    }, 250);
   }
 
   _wireSettings(){
@@ -6496,6 +6964,18 @@ class Particles {
       (Math.random()-0.5)*0.4, (Math.random()-0.4)*0.25, (Math.random()-0.5)*0.4,
       5+Math.random()*4, 0.075, 0.85, 1.0, 0.35);
   }
+  /* Locomotive exhaust: dark and fast at the stack, pale and slow as it
+     lifts and cools. */
+  smoke(pos, speed){
+    const n = Math.round(M.lerp(2, 6, M.sat(speed/12))*this.density);
+    for(let i=0;i<n;i++){
+      const dark = 0.24 + Math.random()*0.30;
+      this.spawn(pos.x+(Math.random()-0.5)*0.5, pos.y, pos.z+(Math.random()-0.5)*0.5,
+        (Math.random()-0.5)*0.9, 2.6+Math.random()*1.8, (Math.random()-0.5)*0.9,
+        4.5+Math.random()*3.5, 0.55+Math.random()*0.55,
+        dark, dark*0.96, dark*0.94);
+    }
+  }
   breath(pos, dir){
     for(let i=0;i<3;i++)
       this.spawn(pos.x+dir.x*0.2, pos.y, pos.z+dir.z*0.2,
@@ -6540,8 +7020,33 @@ class Colliders {
     for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++) fn(this._key(i,j));
   }
 
-  /* hw/hh/hd are half-extents. y is the BOTTOM of the box. */
+  /* hw/hh/hd are half-extents. y is the BOTTOM of the box.
+
+     Long boxes — a station platform, a 170-metre boardwalk — are split into
+     cell-sized pieces along their own axes before they go in the grid. A
+     single box that spans twenty cells has to be registered by its
+     circumradius, which is both wasteful and leaky: the broadphase would miss
+     it in exactly the places you were standing on it. */
   addBox(owner, x, y, z, hw, hh, hd, yaw = 0, opts = {}){
+    const cellsX = Math.ceil((hw*2)/this.cell);
+    const cellsZ = Math.ceil((hd*2)/this.cell);
+    if(cellsX*cellsZ > 1 && cellsX*cellsZ <= 512){
+      const cy = Math.cos(yaw), sy = Math.sin(yaw);
+      const sw = hw/cellsX, sd = hd/cellsZ;
+      let first = null;
+      for(let i=0;i<cellsX;i++) for(let j=0;j<cellsZ;j++){
+        const lx = -hw + sw*(2*i+1), lz = -hd + sd*(2*j+1);
+        const wx = x + lx*cy + lz*sy;
+        const wz = z - lx*sy + lz*cy;
+        const piece = this._push(owner, wx, y, wz, sw, hh, sd, yaw, opts);
+        if(!first) first = piece;
+      }
+      return first;
+    }
+    return this._push(owner, x, y, z, hw, hh, hd, yaw, opts);
+  }
+
+  _push(owner, x, y, z, hw, hh, hd, yaw, opts){
     const b = { x, y, z, hw, hh, hd,
                 c: Math.cos(-yaw), s: Math.sin(-yaw),
                 top: y + hh*2, solid: opts.solid !== false,
@@ -6559,6 +7064,7 @@ class Colliders {
 
   /* Add every box a building needs from its own local part list. */
   addFromParts(owner, parts, mtx, yaw, minHeight = 0.9){
+    // minHeight is the line between "wall" and "floor" for this structure.
     const v = new THREE.Vector3();
     for(const part of parts){
       const g = part.geo;
@@ -6923,6 +7429,9 @@ class Game {
       ['tuning the wire',                ()=>this._audio()],
       ['raising the townsfolk',          ()=>this._folk()],
       ['building Yes Gulch',             ()=>this._homeTown()],
+      ['drawing the map',                ()=>this._map()],
+      ['getting up steam',               ()=>this._train()],
+      ['setting the scene',              ()=>this._story()],
       ['populating the near country',    ()=>this._firstChunks()],
     ];
     let done = 0;
@@ -6979,6 +7488,9 @@ class Game {
   _roads(){
     this.roads = new Roads(this.terrain);
     this.roads.build(this.towns.list);
+    // Towns on the line need to know where their platform goes.
+    this.towns.stationFor = (key)=>
+      (this.roads.stations || []).find(s=>s.town===key) || null;
     this.terrain.buildMoisture();
   }
 
@@ -7104,6 +7616,21 @@ class Game {
     this.discovered.add(home.name);
   }
 
+  _train(){
+    this.train = new Train(this.roads, this.lib, this.scene, this.audio);
+    this.train.smoke = (pos, speed)=> this.particles.smoke(pos, speed);
+  }
+
+  _story(){
+    this.story = new Story(this);
+  }
+
+  _map(){
+    this.map = new WorldMap(this.terrain, this.roads);
+    this.map.bake();
+    this.map.reveal(this.player.pos.x, this.player.pos.z, 220);
+  }
+
   async _firstChunks(){
     this.streamer.request(this.player.pos.x, this.player.pos.z, 3);
     // Build the opening cell set up front so the first frame is complete.
@@ -7147,14 +7674,18 @@ class Game {
     this.weather.audio = this.audio;
     /* The main theme, stated properly at the Act I title card (§16). */
     this.audio.music.setState('explore');
-    setTimeout(()=>{
-      this.audio.music.playTheme('harmonica', 0.9);
-      this.ui.toast('THE FALL', 'Act One');
-    }, 900);
-    setTimeout(()=>{
-      this.horse.say('idle', true);
-    }, 9000);
+    /* Ollie stands on his RIGHT, half a pace ahead, angled in toward him.
+       Offsetting her in world axes meant she could end up anywhere relative to
+       his facing — including directly behind the camera's shot on her, which
+       is how the opening ended up framed on the inside of her foreleg. */
+    const y0 = this.player.yaw;
+    const fx = Math.sin(y0), fz = Math.cos(y0);      // his forward
+    const rx = -Math.cos(y0), rz = Math.sin(y0);     // his right
+    this.horse.spawn(this.player.pos.x + rx*2.15 + fx*0.45,
+                     this.player.pos.z + rz*2.15 + fz*0.45,
+                     y0 + 0.42);
     this.loop();
+    setTimeout(()=>this.story.opening(), 500);
   }
 
   /* --- FIXED-STEP SIMULATION (§3.1) -------------------------------------- */
@@ -7164,17 +7695,41 @@ class Game {
     const biome = this.terrain.biomeAt(this.player.pos.x, this.player.pos.z);
     this.weather.update(dt, this.player.pos, biome);
     this.discovered.add(BIOME_NAMES[biome]);
+    if(this.map) this.map.reveal(this.player.pos.x, this.player.pos.z,
+                                 this.player.mounted ? 185 : 150);
 
     /* Settlements assemble and release around the player; their residents
        only think when he is close enough to notice them. */
     const town = this.towns.update(this.player.pos,
       (t,g)=>{ this.folk.populate(t,g);
-               this.ui.toast(t.name.toUpperCase(), t.blurb, 4.5);
                this.discovered.add(t.name); },
       (t)=> this.folk.release(t));
     this.folk.fixedUpdate(dt, this.tod.hour, this.player.pos);
+    if(town && town !== this._enteredTown){
+      this._enteredTown = town;
+      this.ui.toast(town.name.toUpperCase(), town.blurb, 4.5);
+      if(this.story) this.story.onEnterTown(town);
+    } else if(!town) this._enteredTown = null;
 
-    if(this.player.mounted){
+    /* Nothing takes input during a cutscene. The frame loop already hands the
+       camera to the director, but the SIMULATION was still reading the
+       keyboard, so you could walk out of your own scene. */
+    if(this.story && this.story.director.active){
+      const still = { fwd:0, right:0, sprint:false, walk:false,
+                      jump:false, brake:true };
+      this.player.vel.set(0,0,0);
+      this.player.turning = null;
+      this.horse.followTarget = null;
+      this.horse.fixedUpdate(dt, still, this.horse.yaw, this.worldState());
+      if(!this.player.mounted) this.player.fixedUpdate(dt, still, this.player.yaw);
+      if(this.audio.update) this.audio.update(dt);
+      return;
+    }
+
+    if(this.aboard){
+      // Pinned to the carriage; his own locomotion is switched off.
+      this.horse.fixedUpdate(dt, {fwd:0,right:0}, this.cam.yaw, this.worldState());
+    } else if(this.player.mounted){
       this.horse.fixedUpdate(dt, inp, this.cam.yaw, this.worldState());
       this.player.fixedUpdate(dt, inp, this.cam.yaw);
     } else {
@@ -7182,6 +7737,16 @@ class Game {
       this.player.fixedUpdate(dt, inp, this.cam.yaw);
     }
     if(this.audio.update) this.audio.update(dt);
+  }
+
+  _nearestStation(pos){
+    if(!this.roads || !this.roads.stations) return null;
+    let best=null, bd=Infinity;
+    for(const s of this.roads.stations){
+      const d = Math.hypot(s.pos.x-pos.x, s.pos.z-pos.z);
+      if(d < bd){ bd=d; best=s; }
+    }
+    return best ? { s:best, d:bd } : null;
   }
 
   worldState(){
@@ -7199,6 +7764,64 @@ class Game {
   /* --- PER-FRAME --------------------------------------------------------- */
   frame(dt){
     const inp = this.input, p = this.player, h = this.horse;
+    if(!(this.story && this.story.director.active)){
+      p.suspendIK = false; h.inScene = false;
+      if(p.anim.frozen) p.anim.unfreeze();
+      if(h.anim.frozen) h.anim.unfreeze();
+    }
+
+    /* A cutscene takes the camera and the controls; everything else in the
+       world carries on around it. */
+    if(this.story && this.story.director.active){
+      if(inp.once('Escape') || inp.once('Space')) this.story.director.skip();
+      // Swallow look input so the camera does not lurch when control returns.
+      inp.mouseDX = 0; inp.mouseDY = 0;
+      this.story.director.update(dt);
+      this.ui.updateSubs(dt);
+      /* Foot IK re-solves the legs every frame against the ground. It is what
+         you want while walking and exactly what you do not want while a camera
+         is a metre from the subject, so it is off for the duration. */
+      p.suspendIK = true; h.inScene = true;
+      p.anim.freeze('idle', 1.35);
+      h.anim.freeze('graze_idle', 2.10);
+      h.update(dt, null);
+      p.update(dt, null);
+      this.folk.updatePosesOnly(dt, p.eyePos.clone());
+
+      /* The world does not stop for a cutscene: terrain keeps streaming, the
+         sky keeps moving, and the grass is still lit and placed around the
+         camera. Skipping all of it was leaving the scene standing in a bald,
+         unlit patch of country. */
+      this.tod.followTarget(this.camera.position);
+      this.streamer.request(this.camera.position.x, this.camera.position.z,
+                            this.drawRadius);
+      this.streamer.pump();
+      this.grass.reposition(this.camera.position.x, this.camera.position.z,
+                            this.grassDensity);
+      this._sunLit = (this._sunLit || new THREE.Color());
+      this._ambLit = (this._ambLit || new THREE.Color());
+      this._sunLit.copy(this.tod.sun.color)
+          .multiplyScalar(M.clamp(this.tod.sun.intensity*0.30, 0, 1.5));
+      this._ambLit.copy(this.tod.hemi.color)
+          .multiplyScalar(this.tod.hemi.intensity*0.62);
+      this.grass.update(this.elapsed, this.weather.windDir, this.weather.windStr,
+        this.camera.position, this.tod.sunDir, this._sunLit, this._ambLit);
+      this.veg.update(this.elapsed, this.weather.windDir, this.weather.windStr);
+      this.sky.uniforms.uTime.value = this.elapsed;
+      const wu2 = this.waterMat.userData.uniforms;
+      wu2.uTime.value = this.elapsed;
+      wu2.uSun.value.copy(this.tod.sunDir);
+      this.water.position.x = this.camera.position.x;
+      this.water.position.z = this.camera.position.z;
+      this.towns.setNight(this.tod.nightAmt);
+      this._placeTownLights();
+      if(this.train) this.train.update(dt, this.camera.position, this.tod.nightAmt);
+      this.particles.update(dt, this.weather.windDir, this.weather.windStr);
+
+      this.composer.render(this.elapsed);
+      inp.endFrame();
+      return;
+    }
 
     /* Camera look. */
     if(inp.locked || Math.abs(inp.mouseDX)+Math.abs(inp.mouseDY) > 0)
@@ -7221,7 +7844,9 @@ class Game {
       p.anim.playOverride('whistle', UPPER_MASK, 1, 0.10, false);
       setTimeout(()=>p.anim.stopOverride('whistle'), 1000);
       this.audio.whistleSfx(p.pos);
-      if(h.whistleTo(p.pos)) this.ui.toast('','Ollie is coming', 1.8);
+      if(h.whistleTo(p.pos, ()=>this.player.pos))
+        this.ui.toast('', `Ollie is coming — ${Math.round(h.pos.distanceTo(p.pos))}m`, 2.2);
+      else this.ui.toast('', 'Too far. She cannot hear you.', 2.2);
     }
     if(inp.once('KeyR') && !p.mounted && mountDist<3.0){
       h.brush(); this.ui.toast('','Ollie: bond '+h.bond.toFixed(1), 1.6);
@@ -7330,7 +7955,14 @@ class Game {
       }
     }
 
+    /* The service runs whether or not anybody is watching it. */
+    if(this.train) this.train.update(dt, p.pos, this.tod.nightAmt);
+
     /* Townsfolk, lamplight and the town's own sound. */
+    this.folk.world = {
+      hour: this.tod.hour, weather: this.weather.target,
+      mounted: !!p.mounted, reputation: p.reputation,
+    };
     this.nearNpc = this.folk.update(dt, p.eyePos.clone(), p.pos, this.ui, this.audio);
     this.towns.setNight(this.tod.nightAmt);
     this._placeTownLights();
@@ -7342,13 +7974,64 @@ class Game {
         this.audio.setReverb(inTown ? 'store' : 'outdoor');
       }
     }
+    /* --- Riding the line ------------------------------------------------ */
+    const tr = this.train;
+    if(tr && tr.route){
+      const bp = tr.boardPoint(this._bp || (this._bp = new THREE.Vector3()));
+      const nearTrain = bp ? p.pos.distanceTo(bp) : 999;
+      if(this.aboard){
+        p.pos.copy(bp);
+        p.object.position.copy(p.pos);
+        p.object.rotation.set(0, tr.cars[2].mesh.rotation.y, 0);
+        p.anim.play(tr.stopped ? 'idle' : 'idle_shift', 0.4);
+        this.ui.setPrompt('board','E',
+          tr.stopped ? `Step down${tr.currentStation()?' at '+tr.currentStation():''}`
+                     : 'Hold on — moving', true);
+        if(inp.once('KeyE') && tr.stopped){
+          const ap = tr.alightPoint();
+          p.pos.set(ap.x, this.terrain.heightAt(ap.x, ap.z), ap.z);
+          this.colliders.resolve(p.pos, CFG.PLAYER_R, CFG.PLAYER_H);
+          p.object.position.copy(p.pos);
+          this.aboard = false;
+          this.ui.setPrompt('board','E','',false);
+          // Ollie travelled in the stock car; she is waiting on the platform.
+          h.spawn(ap.x - Math.sin(p.yaw)*4, ap.z - Math.cos(p.yaw)*4, p.yaw);
+          h.say('dismount', true);
+          this.ui.toast(tr.currentStation() || 'THE LINE', 'End of the line for now', 3);
+        }
+      } else {
+        const canBoard = nearTrain < 5.2 && tr.stopped && !p.mounted;
+        this.ui.setPrompt('board','E',
+          `Board the train${tr.nextStation()?' — '+tr.nextStation():''}`, canBoard);
+        if(canBoard && inp.once('KeyE')){
+          this.aboard = true;
+          if(p.mounted) h.dismount();
+          this.ui.toast('ABOARD', 'Step down when she stops. E to alight.', 4);
+        }
+        /* Standing on a platform with no train in sight: wait for one, rather
+           than stand there for four real minutes finding out when she is due. */
+        const plat = this._nearestStation(p.pos);
+        const canWait = plat && !canBoard && !p.mounted && plat.d < 24;
+        this.ui.setPrompt('wait','Y', `Wait for the train — ${plat?plat.s.name:''}`,
+                          !!canWait);
+        if(canWait && inp.once('KeyY')){
+          const waited = tr.fastForwardTo(plat.s.name, this.tod);
+          this.ui.toast('THE TRAIN IS IN',
+            `You waited ${Math.round(waited/60)} minutes`, 3.5);
+        }
+      }
+    }
+
     this.ui.setPrompt('talk','F',
       this.nearNpc ? `Speak to ${this.nearNpc.named ? this.nearNpc.name : 'them'}`
                    : '', !!this.nearNpc);
     if(this.nearNpc && inp.once('KeyF')){
       const n = this.nearNpc;
-      const pool = n.lines || n.barks || [];
-      if(pool.length) this.folk.onSpeak(n, pool[(n._li = ((n._li|0)+1)) % pool.length]);
+      // If this person owes the story a scene, play it. Otherwise, a remark.
+      if(!(this.story && this.story.converse(n))){
+        const line = this.folk.pickLine(n);
+        if(line) this.folk.onSpeak(n, line);
+      }
       n.spokenT = 6;
       p.anim.playOverride('tip_hat', UPPER_MASK, 1, 0.10, false);
       setTimeout(()=>p.anim.stopOverride('tip_hat'), 1350);
@@ -7356,7 +8039,19 @@ class Game {
 
     /* HUD. */
     this.ui.drawVitals(p, h);
-    this.ui.drawCompass(this.cam.yaw + Math.PI);
+    /* Compass bearings.
+
+       A yaw of 0 faces +Z, which is SOUTH in this world, and bearings run
+       clockwise from north. So bearing = PI - yaw, not yaw + PI: adding PI
+       gets north right by luck and then has east and west the wrong way round,
+       which is why the strip slid the wrong way when you turned. */
+    const bearing = (dx, dz)=> Math.PI - Math.atan2(dx, dz);
+    const om = this.story && this.story.markerPos();
+    this.ui.objectiveBearing = om ? bearing(om.x - p.pos.x, om.z - p.pos.z) : null;
+    this.ui.waypointBearing = this.map && this.map.waypoint
+      ? bearing(this.map.waypoint.x - p.pos.x, this.map.waypoint.z - p.pos.z)
+      : null;
+    this.ui.drawCompass(Math.PI - this.cam.yaw);
     this.ui.updateSubs(dt);
     document.getElementById('clock').textContent =
       `${this.tod.clockString()} · ${this.towns.current ? this.towns.current.name
@@ -7453,6 +8148,8 @@ class Game {
         `chunks   ${this.streamer.loaded.size} (+${this.streamer.queue.length} queued)\n`+
         `towns    ${this.towns.built.size} built   folk ${this.folk.all.length}\n`+
         `colliders ${this.colliders.count}   road ${this.terrain.roadAt(this.player.pos.x,this.player.pos.z).toFixed(2)}\n`+
+        `map      ${this.map ? this.map.percent.toFixed(1) : 0}% surveyed` +
+        (this.train && this.train.route ? `   train ${(this.train.speed*3.6).toFixed(0)} km/h` : '') + `\n`+
         `grass    ${this.grass.count}\n`+
         `particles ${this.particles.active}\n`+
         `pos      ${this.player.pos.x.toFixed(0)}, ${this.player.pos.y.toFixed(1)}, ${this.player.pos.z.toFixed(0)}\n`+
@@ -7477,22 +8174,22 @@ class Game {
 
 const TOWNS = [
   { key:'gulch',    name:'Yes Gulch',          biome:BIOME.GRASS,
-    near:[-150,-60],  size:22, character:'company',
+    near:[-330, 150],  size:22, character:'company',
     blurb:'A company town that forgot to ask what the company was for.' },
   { key:'conway',   name:'Conway Creek',       biome:BIOME.DELTA,
-    near:[260, 520],  size:18, character:'river',
+    near:[470, 720],  size:18, character:'river',
     blurb:'Built on a bend, flooded twice, rebuilt on the same bend.' },
   { key:'pudmenzky',name:'Pudmenzky Flats',    biome:BIOME.FLATS,
-    near:[-560, 180], size:15, character:'dust',
+    near:[-880,-540], size:15, character:'dust',
     blurb:'Salt, wind, and a man who will not sell.' },
   { key:'mcroberts',name:'McRoberts Crossing', biome:BIOME.GRASS,
-    near:[420, -180], size:20, character:'law',
+    near:[720,-230],  size:20, character:'law',
     blurb:'Where the road, the river and the law all meet and disagree.' },
   { key:'dedman',   name:'Dedman Gulch',       biome:BIOME.COPPER,
-    near:[620, 120],  size:17, character:'mine',
+    near:[110,-860],  size:17, character:'mine',
     blurb:'Copper wire went in. Very little came back out.' },
   { key:'signal',   name:'Signal Ridge Camp',  biome:BIOME.RIDGE,
-    near:[-260,-520], size:13, character:'camp',
+    near:[-680, 800], size:13, character:'camp',
     blurb:'Tents, a cookfire, and the highest bar of reception in the country.' },
 ];
 
@@ -7553,15 +8250,19 @@ function makeSignTexture(text, opts={}){
 
 /* ---- Geometry merge (no skinning; buildings do not bend) ---------------- */
 function mergeParts(parts){
-  const pos=[], nrm=[], uv=[], idx=[], groups=[];
+  const pos=[], nrm=[], uv=[], col=[], idx=[], groups=[];
   let vOff=0, iOff=0;
   for(const part of parts){
     const g = part.geo;
     const p=g.attributes.position, n=g.attributes.normal, u=g.attributes.uv;
+    // Per-part vertex colour: this is how one shared material paints forty
+    // buildings forty different colours without forty draw calls.
+    const c = part.color || WHITE_TINT;
     for(let i=0;i<p.count;i++){
       pos.push(p.getX(i),p.getY(i),p.getZ(i));
       nrm.push(n?n.getX(i):0, n?n.getY(i):1, n?n.getZ(i):0);
       uv.push(u?u.getX(i):0, u?u.getY(i):0);
+      col.push(c.r, c.g, c.b);
     }
     const cnt = g.index ? g.index.count : p.count;
     for(let i=0;i<cnt;i++) idx.push((g.index?g.index.getX(i):i)+vOff);
@@ -7572,6 +8273,7 @@ function mergeParts(parts){
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
   geo.setAttribute('normal',   new THREE.Float32BufferAttribute(nrm,3));
   geo.setAttribute('uv',       new THREE.Float32BufferAttribute(uv,2));
+  geo.setAttribute('color',    new THREE.Float32BufferAttribute(col,3));
   geo.setIndex(idx.length>65535 ? new THREE.Uint32BufferAttribute(idx,1)
                                 : new THREE.Uint16BufferAttribute(idx,1));
   // Merge adjacent groups that share a material — fewer draw calls.
@@ -7587,6 +8289,25 @@ function mergeParts(parts){
    Every archetype returns geometry in its own local frame, front facing +Z.
    ========================================================================== */
 const BM = { BOARD:0, TIMBER:1, ROOF:2, GLASS:3, STONE:4, METAL:5 };
+const WHITE_TINT = new THREE.Color(1,1,1);
+
+/* Frontier paint. Whitewash and lead-based colours were what you could
+   actually get out here, and most of it is peeling. */
+const PAINTS = [
+  { name:'whitewash', body:0xe9e2cf, trim:0xbfae8e },
+  { name:'unpainted', body:0xb5a68d, trim:0x8d7d64 },
+  { name:'barn red',  body:0x9c4a38, trim:0xd8cbaa },
+  { name:'ochre',     body:0xc39247, trim:0x6d5636 },
+  { name:'sage',      body:0x7d8a6d, trim:0xd9d1b6 },
+  { name:'slate',     body:0x66727a, trim:0xcfc9b4 },
+  { name:'buff',      body:0xd3bf94, trim:0x7c6a4c },
+  { name:'oxblood',   body:0x7a3a35, trim:0xc7b78f },
+  { name:'teal',      body:0x35706e, trim:0xe0d8bd },
+  { name:'bone',      body:0xd9d2bb, trim:0x9a8a6c },
+  { name:'umber',     body:0x7b6248, trim:0xcdbb95 },
+  { name:'pale blue', body:0x8fa3ab, trim:0xe4ddc6 },
+];
+const ROOF_TINTS = [0x6b6156, 0x584f47, 0x7a6d5c, 0x4c4640, 0x6f6455];
 
 function bldBox(x,y,z, w,h,d, group, parts, uvScale=0.5){
   const g = new THREE.BoxGeometry(w,h,d);
@@ -8003,6 +8724,58 @@ const BUILDINGS = {
     return { parts, signs, lamps, w:w+1.6, d:d+1.6, h:h+0.8 };
   },
 
+  /* ---- Railway station: platform, shelter, name board, water column ----- */
+  station(rnd, name){
+    const parts=[], signs=[], lamps=[];
+    const PL = 26, PW = 5.2, PH = 0.95;
+    // Platform, faced with timber and decked on top.
+    bldBox(0, PH/2, -PW/2 - 1.4, PL, PH, PW, BM.STONE, parts);
+    bldBox(0, PH+0.06, -PW/2 - 1.4, PL, 0.14, PW, BM.BOARD, parts);
+    for(let i=0;i<9;i++)
+      bldBox(-PL/2 + (i+0.5)*(PL/9), PH*0.5, -0.05, 0.9, PH, 0.16, BM.TIMBER, parts);
+    /* Ramps at both ends, the full depth of the platform. Without them the
+       platform is a metre-high wall — too tall to step onto, so you either walk
+       through it or bounce off it. The ends are where a real platform ramps,
+       and they are clear of the station building, unlike the back. */
+    for(const end of [-1, 1]){
+      for(let k=0;k<4;k++){       // four treads: 240mm each, well inside a stride
+        const h = PH*(k+1)/4;
+        bldBox(end*(PL/2 + 0.7 + (3-k)*1.45), h/2, -PW/2 - 1.4,
+               2.9, h, PW + 0.8, BM.BOARD, parts);
+      }
+    }
+
+    // Station building, back from the platform edge.
+    const bw = 9.5, bd = 5.0, bh = 3.7;
+    const bz = -PW - 1.4;
+    bldBox(0, PH+0.13+bh/2, bz, bw, bh, bd, BM.BOARD, parts);
+    bldPrism(0, PH+0.13+bh, bz, bw+0.4, 1.5, bd+0.4, BM.ROOF, parts);
+    // Deep canopy over the platform — the shape that says station.
+    bldBox(0, PH+0.13+bh-0.15, bz+bd/2+1.9, bw+1.2, 0.16, 3.8, BM.ROOF, parts);
+    for(const sx of [-bw/2+0.4, 0, bw/2-0.4])
+      bldPost(sx, bz+bd/2+3.5, PH+0.13, PH+0.13+bh-0.15, 0.085, BM.TIMBER, parts, sx*7);
+    bldBox(0, PH+1.28, bz+bd/2+0.08, 1.15, 2.25, 0.12, BM.TIMBER, parts);
+    for(const sx of [-bw/3.2, bw/3.2])
+      bldBox(sx, PH+1.85, bz+bd/2+0.07, 1.25, 1.35, 0.08, BM.GLASS, parts);
+    // Bench, and a clock over the door.
+    bldBox(-bw/4, PH+0.55, bz+bd/2+0.75, 2.0, 0.10, 0.5, BM.TIMBER, parts);
+    for(const sx of [-bw/4-0.85, -bw/4+0.85])
+      bldBox(sx, PH+0.32, bz+bd/2+0.75, 0.10, 0.45, 0.45, BM.TIMBER, parts);
+    bldBox(0, PH+3.05, bz+bd/2+0.10, 0.62, 0.62, 0.08, BM.GLASS, parts);
+
+    // Water column at the far end of the platform.
+    bldPost(PL/2-2.0, 1.2, PH, PH+4.2, 0.16, BM.METAL, parts, 3);
+    bldBox(PL/2-2.0, PH+4.6, 1.2, 1.6, 1.5, 1.6, BM.BOARD, parts);
+    bldBox(PL/2-3.1, PH+3.9, 1.2, 2.2, 0.20, 0.20, BM.METAL, parts);
+
+    signs.push({ text:name, x:0, y:PH+0.13+bh+0.55, z:bz+bd/2+0.20,
+                 w:6.4, h:0.85, accent:'#00A3A6', bg:'#14312f' });
+    signs.push({ text:name, x:-PL/2+3.6, y:PH+1.9, z:0.18, w:4.2, h:0.62 });
+    lamps.push({ x:-PL/2+4, y:PH+3.2, z:-1.2 });
+    lamps.push({ x: PL/2-5, y:PH+3.2, z:-1.2 });
+    return { parts, signs, lamps, w:PL+2, d:PW+bd+6, h:bh+3, platform:{PL,PW,PH} };
+  },
+
   /* ---- Aerial mast: the reason the camp exists at all ------------------- */
   mast(rnd){
     const parts=[], signs=[], lamps=[];
@@ -8125,7 +8898,11 @@ function makeProps(rnd, kind){
 const STORE_NAMES = ['DRY GOODS','ASSAY OFFICE','HARDWARE','GENERAL STORE',
   'BARBER','UNDERTAKER','TIN & WIRE','LAUNDRY','BOOTMAKER','POST & PARCEL',
   'GUNSMITH','APOTHECARY','SADDLERY','MILLINER','BUTCHER','TAILOR',
-  'PHOTOGRAPHER','LAND AGENT','FEED & SEED','COOPER'];
+  'PHOTOGRAPHER','LAND AGENT','FEED & SEED','COOPER','WHEELWRIGHT',
+  'BLACKSMITH','TOBACCONIST','SURVEYOR','WATCHMAKER','PRINT SHOP',
+  'BATH HOUSE','CHOP HOUSE','ICE & COLD STORE','SIGN PAINTER','GLAZIER',
+  'HARNESS MAKER','STATIONER','DENTIST','TELEGRAPH SUPPLY','GROCER',
+  'BAKERY','CANDLEMAKER','ROPEWALK','LIVERY OFFICE'];
 const SALOON_NAMES = ['THE BROKEN AERIAL','THE LAST BAR','THE DEAD ZONE',
   'THE FULL SIGNAL','THE PATIENT MULE','THE CUT LINE','THE RELAY'];
 
@@ -8287,13 +9064,14 @@ class Towns {
     const S=(t,extra={})=> new THREE.MeshStandardMaterial(Object.assign({
       map:t.map, roughnessMap:t.roughnessMap, normalMap:t.normalMap,
       roughness:1, metalness:0 }, extra));
-    const board  = S(lib.wood_weathered, {color:0xb9ac95});
-    const timber = S(lib.wood_dark,      {color:0x9b8b74});
-    const roof   = S(lib.wood_dark,      {color:0x6b6156});
-    const stone  = S(lib.rock_grey,      {color:0xa8a49c});
-    const metal  = S(lib.metal_iron,     {metalness:0.55, roughness:0.55});
+    const board  = S(lib.wood_weathered, {color:0xffffff, vertexColors:true});
+    const timber = S(lib.wood_dark,      {color:0xffffff, vertexColors:true});
+    const roof   = S(lib.wood_dark,      {color:0xffffff, vertexColors:true});
+    const stone  = S(lib.rock_grey,      {color:0xffffff, vertexColors:true});
+    const metal  = S(lib.metal_iron,     {color:0xffffff, vertexColors:true,
+                                          metalness:0.55, roughness:0.55});
     const glass = new THREE.MeshStandardMaterial({
-      color:0x14161a, roughness:0.18, metalness:0.10,
+      color:0x14161a, roughness:0.18, metalness:0.10, vertexColors:false,
       emissive:new THREE.Color(0xffb347), emissiveIntensity:0.0 });
     this.glass = glass;
     return [board,timber,roof,glass,stone,metal];
@@ -8304,7 +9082,7 @@ class Towns {
     const T = this.terrain;
     const taken = [];
     for(const def of TOWNS){
-      const site = this._pickSite(def.near[0], def.near[1], 300, taken);
+      const site = this._pickSite(def.near[0], def.near[1], 240, taken);
       taken.push(site);
       const radius = 34 + def.size*4.4;
       T.flattenDisc(site.x, site.z, radius, radius*0.85, site.y);
@@ -8323,8 +9101,8 @@ class Towns {
     let best=null, bestScore=-1e9;
     for(let i=0;i<520;i++){
       const a = (i*2.399963), r = searchR*Math.sqrt(i/520);
-      const x = M.clamp(cx + Math.cos(a)*r, -CFG.HALF+280, CFG.HALF-280);
-      const z = M.clamp(cz + Math.sin(a)*r, -CFG.HALF+280, CFG.HALF-280);
+      const x = M.clamp(cx + Math.cos(a)*r, -CFG.HALF+200, CFG.HALF-200);
+      const z = M.clamp(cz + Math.sin(a)*r, -CFG.HALF+200, CFG.HALF-200);
       const y = T.heightAt(x,z);
       if(y < CFG.SEA + 3.0 || y > CFG.SNOWLINE - 20) continue;
       let relief = 0;
@@ -8350,9 +9128,9 @@ class Towns {
         if(d<nd){ nd=d; near=o; } }
       const a = Math.atan2(cz-near.z, cx-near.x);
       const x = M.clamp(near.x + Math.cos(a)*CFG.TOWN_MIN_GAP*1.15,
-                        -CFG.HALF+280, CFG.HALF-280);
+                        -CFG.HALF+200, CFG.HALF-200);
       const z = M.clamp(near.z + Math.sin(a)*CFG.TOWN_MIN_GAP*1.15,
-                        -CFG.HALF+280, CFG.HALF-280);
+                        -CFG.HALF+200, CFG.HALF-200);
       best = { x, z, y:T.heightAt(x,z) };
     }
     return best || {x:cx, z:cz, y:this.terrain.heightAt(cx,cz)};
@@ -8381,6 +9159,19 @@ class Towns {
               : undefined;
     const b = gen(ctx.rnd, name);
 
+    /* Give the building a coat of paint. Roofs and stone keep their own
+       colour; only the boarding and trim take it, which is how a real street
+       looks — a row of different buildings, not a row of different colours. */
+    const paint = PAINTS[(ctx.rnd()*PAINTS.length)|0];
+    const fade = 0.82 + ctx.rnd()*0.30;
+    const body = new THREE.Color(paint.body).multiplyScalar(fade);
+    const trim = new THREE.Color(paint.trim).multiplyScalar(fade);
+    const roofC = new THREE.Color(ROOF_TINTS[(ctx.rnd()*ROOF_TINTS.length)|0]);
+    const stoneC = new THREE.Color(0xa8a49c).multiplyScalar(0.9 + ctx.rnd()*0.22);
+    const tintFor = (g)=> g===BM.BOARD ? body : g===BM.TIMBER ? trim
+                        : g===BM.ROOF ? roofC : g===BM.STONE ? stoneC
+                        : new THREE.Color(0xb0aca6);
+
     /* A building's front is its local +Z. To face the street it must look
        along -side in the town's v axis, which works out to these two angles. */
     const rot = explicitRot !== undefined ? town.angle + explicitRot
@@ -8394,7 +9185,7 @@ class Towns {
 
     for(const part of b.parts){
       const g = part.geo.clone(); g.applyMatrix4(mtx);
-      ctx.parts.push({geo:g, group:part.group});
+      ctx.parts.push({geo:g, group:part.group, color:tintFor(part.group)});
     }
     for(const s of b.signs)
       ctx.signs.push({ text:s.text, pos:new THREE.Vector3(s.x,s.y,s.z).applyMatrix4(mtx),
@@ -8417,11 +9208,19 @@ class Towns {
   /* Fill a run of street with buildings, front doors on the kerb. */
   _row(town, ctx, opts){
     const { u0, u1, side, streetW, mix, gap=[1.2,3.6], across=false } = opts;
-    let u = u0;
-    let i = 0;
+    /* Shuffle the mix, and never place the same archetype twice running: a
+       street of six identical false fronts is the tell that a town was
+       generated rather than built. */
+    const bag = mix.slice();
+    for(let k=bag.length-1;k>0;k--){
+      const j = (ctx.rnd()*(k+1))|0; [bag[k],bag[j]] = [bag[j],bag[k]];
+    }
+    let last = null, u = u0, i = 0;
     const kerb = side*(streetW/2);
     while(u < u1 && i < 60){
-      const kind = mix[i % mix.length];
+      let kind = bag[i % bag.length];
+      if(kind === last && bag.length > 1) kind = bag[(i+1) % bag.length];
+      last = kind;
       const w = across
         ? this._place(town, ctx, kind, side*(streetW/2 + 5.0), u, 0,
                       side>0 ? -Math.PI/2 : Math.PI/2)
@@ -8451,6 +9250,51 @@ class Towns {
                           yaw:town.angle });
     }
     ctx.streetLen = Math.max(ctx.streetLen||0, u - u0);
+  }
+
+  /* A station, squared up to the permanent way rather than to the street. */
+  _station(town, ctx){
+    const st = this.stationFor && this.stationFor(town.key);
+    if(!st) return;
+    const b = BUILDINGS.station(ctx.rnd, town.name.toUpperCase());
+    // Set back from the centreline so the platform edge meets the track.
+    const side = new THREE.Vector3(-st.dir.z, 0, st.dir.x);
+    const p = st.pos.clone().addScaledVector(side, 4.2);
+    p.y = this.terrain.heightAt(p.x, p.z);
+    const rot = st.angle + Math.PI/2;
+    const mtx = new THREE.Matrix4().compose(p,
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rot, 0)),
+      new THREE.Vector3(1,1,1));
+    const body = new THREE.Color(0xdcd3b8), trim = new THREE.Color(0x4a5f52);
+    const tintFor = (g)=> g===BM.BOARD ? body : g===BM.TIMBER ? trim
+                        : g===BM.ROOF ? new THREE.Color(0x5a5148)
+                        : g===BM.STONE ? new THREE.Color(0x9d9890)
+                        : new THREE.Color(0xb0aca6);
+    for(const part of b.parts){
+      const g = part.geo.clone(); g.applyMatrix4(mtx);
+      ctx.parts.push({geo:g, group:part.group, color:tintFor(part.group)});
+    }
+    for(const s of b.signs)
+      ctx.signs.push({ text:s.text,
+        pos:new THREE.Vector3(s.x,s.y,s.z).applyMatrix4(mtx),
+        rot, w:s.w, h:s.h, accent:s.accent, bg:s.bg });
+    for(const l of b.lamps)
+      ctx.lamps.push(new THREE.Vector3(l.x,l.y,l.z).applyMatrix4(mtx));
+    /* A platform is nearly a metre high, so the default wall threshold made
+       the whole thing solid and you could not get onto it. Raise the bar for
+       the station: anything under 1.4 m here is a surface, not an obstacle. */
+    ctx.colliderJobs.push({ parts:b.parts, mtx, rot });
+    for(let k=0;k<4;k++)
+      ctx.npcSpots.push({
+        pos: p.clone().addScaledVector(new THREE.Vector3(
+          Math.cos(rot), 0, -Math.sin(rot)), -8 + k*5.5),
+        facing: rot, kind:'station' });
+    // A short spur of road from the town out to the platform.
+    ctx.propInstances.push({kind:'cart', pos:p.clone().addScaledVector(side, 7),
+                            yaw:rot});
+    ctx.propInstances.push({kind:'crate', pos:p.clone().addScaledVector(side, 5.6),
+                            yaw:rot});
+    ctx.station = { pos:p, rot };
   }
 
   /* Outskirt features — the things that sit beyond the last building. */
@@ -8561,6 +9405,7 @@ class Towns {
       propInstances:[], walkways:[], streetLen:0,
     };
     (PLANS[town.character] || PLANS.company)(this, town, ctx);
+    this._station(town, ctx);
 
     const group = new THREE.Group();
     const shell = new THREE.Mesh(mergeParts(ctx.parts), this.mats);
@@ -8607,7 +9452,8 @@ class Towns {
 
     /* Collision. Walls block; boardwalks, porches and the jetty carry you. */
     for(const job of ctx.colliderJobs)
-      this.colliders.addFromParts(town.key, job.parts, job.mtx, job.rot);
+      this.colliders.addFromParts(town.key, job.parts, job.mtx, job.rot,
+                                  job.minHeight || 0.9);
     for(const wk of ctx.walkways)
       this.colliders.addBox(town.key, wk.x, wk.y, wk.z, wk.hw, wk.hh, wk.hd,
         wk.yaw, { solid:false, climb:true });
@@ -8621,6 +9467,7 @@ class Towns {
       end:   this._toWorld(town,  half, 0).setY(this.terrain.heightAt(town.x,town.z)),
     };
     group.userData.buildings = ctx.colliderJobs.length;
+    group.userData.station = ctx.station || null;
     return group;
   }
 
@@ -8688,11 +9535,12 @@ class Roads {
      Cost punishes grade hard and water absolutely. The heuristic is straight
      line distance, which is admissible because no step is ever cheaper than
      its own length. */
-  route(ax, az, bx, bz){
+  route(ax, az, bx, bz, avoid){
     // Two attempts: an ordinary wagon road first, then a rougher track that
     // will take grades no coach would enjoy. A straight line is the last
     // resort and it means the two towns genuinely cannot be joined.
-    return this._search(ax,az,bx,bz, CFG.ROAD_MAX_GRADE)
+    return this._search(ax,az,bx,bz, CFG.ROAD_MAX_GRADE, avoid)
+        || this._search(ax,az,bx,bz, CFG.ROAD_MAX_GRADE*1.75, avoid)
         || this._search(ax,az,bx,bz, CFG.ROAD_MAX_GRADE*1.75)
         || this._straight(ax,az,bx,bz);
   }
@@ -8706,7 +9554,7 @@ class Roads {
     return pts;
   }
 
-  _search(ax, az, bx, bz, maxGrade){
+  _search(ax, az, bx, bz, maxGrade, avoid){
     const G=this.G, NX=this.NX;
     const toI = (w)=> M.clamp(Math.round((w + CFG.HALF - G/2)/G), 1, NX-2);
     const si = toI(ax), sj = toI(az), gi = toI(bx), gj = toI(bz);
@@ -8780,6 +9628,15 @@ class Roads {
         if(closed[nk]) continue;
         const nh = H(ni,nj);
         if(nh < CFG.SEA + 1.2) continue;                 // no fords, no bridges yet
+        if(avoid){
+          const wx2 = ni*G-CFG.HALF+G/2, wz2 = nj*G-CFG.HALF+G/2;
+          let inside = false;
+          for(let z=0; z<avoid.length; z++){
+            const a2 = avoid[z];
+            if(Math.hypot(wx2-a2.x, wz2-a2.z) < a2.r){ inside = true; break; }
+          }
+          if(inside) continue;      // the line does not go through the main street
+        }
         const run = Math.hypot(di,dj)*G;
         const grade = Math.abs(nh-ch)/run;
         if(grade > maxGrade) continue;                   // a wagon simply cannot
@@ -8805,6 +9662,59 @@ class Roads {
      than the plan: a surveyed road climbs at a steady, gentle rate and cuts or
      fills to hold it. Sampling the terrain and calling that a road is what
      produced 60% grades — the road was simply following every bump. */
+  /* Railway alignment. Same idea as a road profile but the numbers are an
+     order of magnitude tighter: a locomotive working on adhesion alone gives
+     up somewhere around 1 in 25, so the formation is cut and filled far more
+     aggressively and the curves are eased much harder. */
+  _railAlign(pts){
+    let p = pts;
+    for(let s=0;s<5;s++){                    // five passes: railways ease slowly
+      const out=[p[0]];
+      for(let i=0;i<p.length-1;i++){
+        const a=p[i], b=p[i+1];
+        out.push(new THREE.Vector3(a.x*0.75+b.x*0.25, 0, a.z*0.75+b.z*0.25));
+        out.push(new THREE.Vector3(a.x*0.25+b.x*0.75, 0, a.z*0.25+b.z*0.75));
+      }
+      out.push(p[p.length-1]); p = out;
+    }
+    const STEP = 4;
+    const uni=[p[0].clone()]; let carry=0;
+    for(let i=0;i<p.length-1;i++){
+      const a=p[i], b=p[i+1];
+      const seg=Math.hypot(b.x-a.x,b.z-a.z);
+      if(seg<1e-4) continue;
+      let d=STEP-carry;
+      while(d<=seg){ const t=d/seg;
+        uni.push(new THREE.Vector3(M.lerp(a.x,b.x,t),0,M.lerp(a.z,b.z,t))); d+=STEP; }
+      carry=(carry+seg)%STEP;
+    }
+    uni.push(p[p.length-1].clone());
+    p = uni;
+    const n = p.length;
+    if(n<3){ for(const q of p) q.y=this.terrain.heightAt(q.x,q.z); return p; }
+
+    const ground = p.map(q=>this.terrain.heightAt(q.x,q.z));
+    let y = ground.slice();
+    const smoothPass=(arr,times)=>{
+      for(let s=0;s<times;s++){
+        const c=arr.slice();
+        for(let i=1;i<n-1;i++) arr[i]=(c[i-1]+c[i]*2+c[i+1])*0.25;
+      }
+    };
+    smoothPass(y, 120);                       // averaged over ~200m of formation
+    const rise = CFG.RAIL_MAX_GRADE*STEP;
+    for(let i=1;i<n;i++)    y[i]=M.clamp(y[i], y[i-1]-rise, y[i-1]+rise);
+    for(let i=n-2;i>=0;i--) y[i]=M.clamp(y[i], y[i+1]-rise, y[i+1]+rise);
+    // Deep cuttings and tall embankments are exactly what a railway does.
+    const MAXDEV = 11;
+    for(let i=0;i<n;i++) y[i]=M.clamp(y[i], ground[i]-MAXDEV, ground[i]+MAXDEV);
+    smoothPass(y, 20);
+    for(let i=1;i<n;i++)    y[i]=M.clamp(y[i], y[i-1]-rise, y[i-1]+rise);
+    for(let i=n-2;i>=0;i--) y[i]=M.clamp(y[i], y[i+1]-rise, y[i+1]+rise);
+    for(let i=0;i<n;i++) p[i].y=y[i];
+    return p;
+  }
+
   _smooth(pts){
     let p = pts;
     for(let s=0;s<3;s++){
@@ -8909,18 +9819,178 @@ class Roads {
       this.routes.push({ a:A.key, b:B.key, points:pts, length:len, rail:false });
     }
 
-    /* The line: whichever pair of towns is longest and flattest gets rail. */
-    let best=null, bestScore=-1;
-    for(const r of this.routes){
-      let grade=0;
-      for(let i=0;i<r.points.length-1;i++)
-        grade += Math.abs(r.points[i+1].y - r.points[i].y);
-      const score = r.length/(1 + grade*0.4);
-      if(score > bestScore){ bestScore=score; best=r; }
-    }
-    if(best) best.rail = true;
-    this.railRoute = best;
+    this.towns = towns;
+    this._buildRail(towns);
     return this.routes;
+  }
+
+  /* ---- The line --------------------------------------------------------
+     Chooses the flattest chain of towns it can string together, routes past
+     each one rather than through it, and hands back a station throat for every
+     town it serves. The old version simply ran the rail alongside a road,
+     which is how it ended up going straight through the main street. */
+  _buildRail(towns){
+    const scored = towns.map(t=>({ t, y:t.y }));
+    // Start from the lowest town and greedily hop to the nearest unvisited one
+    // whose height difference is something a locomotive would accept.
+    scored.sort((a,b)=>a.y-b.y);
+    const chain = [scored[0].t];
+    const left = new Set(towns.filter(t=>t!==chain[0]));
+    while(left.size && chain.length < 4){
+      const from = chain[chain.length-1];
+      let pick=null, bestCost=Infinity;
+      for(const t of left){
+        const d = Math.hypot(t.x-from.x, t.z-from.z);
+        const climb = Math.abs(t.y-from.y);
+        const cost = d + climb*26;            // climbing is what kills a railway
+        if(cost < bestCost && climb/Math.max(d,1) < CFG.RAIL_MAX_GRADE*3.2){
+          bestCost=cost; pick=t;
+        }
+      }
+      if(!pick) break;
+      chain.push(pick); left.delete(pick);
+    }
+    if(chain.length < 2){ this.railRoute = null; this.stations = []; return; }
+
+    this.railTowns = chain;
+    this.stations = [];
+    const avoid = towns.map(t=>({x:t.x, z:t.z, r:t.radius + 6}));
+
+    /* ONE anchor per town, offset to the side of it, shared by the leg coming
+       in and the leg going out. Using a separate "in" and "out" throat either
+       side of each town left a gap the width of the town at every join — which
+       is where the 108% gradients were coming from. */
+    const anchors = chain.map((t,i)=>{
+      /* Run of the line at this town. At the two ends of the chain there is
+         only one neighbour, so use the direction to it — taking prev and next
+         as the same town gave a zero vector and dumped the anchor straight
+         onto the town centre. */
+      let ax, az;
+      if(i > 0 && i < chain.length-1){
+        ax = chain[i+1].x - chain[i-1].x; az = chain[i+1].z - chain[i-1].z;
+      } else {
+        const other = chain[i+1] || chain[i-1];
+        ax = other.x - t.x; az = other.z - t.z;
+      }
+      const L = Math.hypot(ax,az) || 1;
+      // Perpendicular to the run of the line, on whichever side is flatter.
+      let bestP = null, bestScore = -Infinity;
+      for(const sgn of [1,-1]){
+        // Close in, so a passenger can step off the platform and walk
+        // straight into town rather than hiking a quarter mile of scrub.
+        const px = t.x + (-az/L)*sgn*(t.radius+10);
+        const pz = t.z + ( ax/L)*sgn*(t.radius+10);
+        let relief = 0;
+        for(let k=0;k<6;k++){
+          const a2=k/6*Math.PI*2;
+          relief += Math.abs(this.terrain.heightAt(px+Math.cos(a2)*26,
+                                                   pz+Math.sin(a2)*26)
+                           - this.terrain.heightAt(px,pz));
+        }
+        const score = -relief;
+        if(score > bestScore){ bestScore=score; bestP={x:px, z:pz}; }
+      }
+      return bestP;
+    });
+
+    const legs = [];
+    for(let i=0;i<chain.length-1;i++){
+      const raw = this.route(anchors[i].x, anchors[i].z,
+                             anchors[i+1].x, anchors[i+1].z, avoid);
+      legs.push(this._railAlign(raw));
+    }
+
+    /* Join the legs, forcing each seam to be a single shared point. */
+    const pts = legs[0].slice();
+    for(let i=1;i<legs.length;i++){
+      const tail = pts[pts.length-1], head = legs[i][0];
+      // Average the two ends so neither leg has to jump to meet the other.
+      const y = (tail.y + head.y)*0.5;
+      tail.set((tail.x+head.x)*0.5, y, (tail.z+head.z)*0.5);
+      pts.push(...legs[i].slice(1));
+    }
+    /* Keep the finished alignment out of the towns. Chaikin cuts corners, and
+       a cut corner near a settlement puts the track down the main street. Push
+       any point that strayed inside back out, ease, and repeat — four rounds is
+       enough for the curve to settle outside every town. */
+    const keepOut = towns.map(t=>({x:t.x, z:t.z, r:t.radius + 4}));
+    for(let round=0; round<4; round++){
+      for(const p of pts){
+        for(const z of keepOut){
+          const dx = p.x-z.x, dz = p.z-z.z;
+          const d = Math.hypot(dx,dz);
+          if(d < z.r && d > 1e-3){
+            p.x = z.x + dx/d*z.r;
+            p.z = z.z + dz/d*z.r;
+          }
+        }
+      }
+      for(let s=0;s<6;s++){
+        const cx = pts.map(q=>q.x), cz = pts.map(q=>q.z);
+        for(let i=1;i<pts.length-1;i++){
+          pts[i].x = (cx[i-1]+cx[i]*2+cx[i+1])*0.25;
+          pts[i].z = (cz[i-1]+cz[i]*2+cz[i+1])*0.25;
+        }
+      }
+    }
+    for(const p of pts) p.y = this.terrain.heightAt(p.x, p.z);
+
+    /* Ease the whole alignment across the joins, then re-impose the ruling
+       gradient over the finished line so no seam can exceed it. */
+    for(let s=0;s<150;s++){
+      const c = pts.map(q=>q.y);
+      for(let i=1;i<pts.length-1;i++) pts[i].y = (c[i-1]+c[i]*2+c[i+1])*0.25;
+    }
+    // A railway will sit in a cutting or on a bank, but not on stilts.
+    for(let i=0;i<pts.length;i++){
+      const g = this.terrain.heightAt(pts[i].x, pts[i].z);
+      pts[i].y = M.clamp(pts[i].y, g-12, g+12);
+    }
+    for(let s=0;s<24;s++){
+      const c = pts.map(q=>q.y);
+      for(let i=1;i<pts.length-1;i++) pts[i].y = (c[i-1]+c[i]*2+c[i+1])*0.25;
+    }
+    for(let pass=0; pass<3; pass++){
+      for(let i=1;i<pts.length;i++){
+        const run = Math.hypot(pts[i].x-pts[i-1].x, pts[i].z-pts[i-1].z);
+        const rise = CFG.RAIL_MAX_GRADE*Math.max(run, 0.001);
+        pts[i].y = M.clamp(pts[i].y, pts[i-1].y-rise, pts[i-1].y+rise);
+      }
+      for(let i=pts.length-2;i>=0;i--){
+        const run = Math.hypot(pts[i+1].x-pts[i].x, pts[i+1].z-pts[i].z);
+        const rise = CFG.RAIL_MAX_GRADE*Math.max(run, 0.001);
+        pts[i].y = M.clamp(pts[i].y, pts[i+1].y-rise, pts[i+1].y+rise);
+      }
+    }
+    this.terrain.gradeRail(pts, CFG.RAIL_W);
+
+    let len=0;
+    for(let i=0;i<pts.length-1;i++) len += pts[i].distanceTo(pts[i+1]);
+    this.railRoute = { a:chain[0].key, b:chain[chain.length-1].key,
+                       points:pts, length:len, rail:true };
+
+    /* Where is each town's platform? The point on the finished alignment
+       closest to that town. */
+    for(const t of chain){
+      let bestI=0, bestD=Infinity, acc=0, bestAcc=0;
+      for(let i=0;i<pts.length;i++){
+        if(i>0) acc += pts[i-1].distanceTo(pts[i]);
+        const d = Math.hypot(pts[i].x-t.x, pts[i].z-t.z);
+        if(d<bestD){ bestD=d; bestI=i; bestAcc=acc; }
+      }
+      const i0 = M.clamp(bestI,1,pts.length-2);
+      const dir = new THREE.Vector3().subVectors(pts[i0+1], pts[i0-1]).normalize();
+      const sp = pts[i0].clone();
+      /* Level the station yard to the height of the rail. A platform is a
+         single rigid slab; if the ground under it falls away by even 150mm the
+         bottom tread of its ramp becomes taller than a man can step. */
+      this.terrain.flattenDisc(sp.x, sp.z, 30, 20, sp.y);
+      (this.terrain.flatZones = this.terrain.flatZones || []).push(
+        { x:sp.x, z:sp.z, r:30, f:20 });
+      this.stations.push({ town:t.key, name:t.name,
+        pos: sp, dir, along: bestAcc,
+        angle: Math.atan2(dir.x, dir.z) });
+    }
   }
 
   /* Sample a point and a direction some distance along a route. */
@@ -9031,6 +10101,34 @@ class Roads {
     /* ---- Rail ----------------------------------------------------------- */
     if(this.railRoute){
       const r = this.railRoute;
+      /* Ballast: a raised trapezoid the whole way, so the line reads as sitting
+         ON the ground rather than being painted onto it. */
+      {
+        const P=[], I=[]; let vi=0;
+        const stepB = 6;
+        const N = Math.floor(r.length/stepB);
+        for(let i=0;i<=N;i++){
+          const s = this.sampleRoute(r, Math.min(i*stepB, r.length));
+          const side = new THREE.Vector3(-s.dir.z,0,s.dir.x);
+          const y0 = this.terrain.heightAt(s.pos.x, s.pos.z);
+          const yTop = s.pos.y + 0.30;
+          for(const [w,yy] of [[4.6, y0-0.4],[2.6, yTop],[-2.6, yTop],[-4.6, y0-0.4]])
+            P.push(s.pos.x+side.x*w, yy, s.pos.z+side.z*w);
+          if(i>0){
+            const o=(i-1)*4;
+            for(let k=0;k<3;k++) I.push(o+k, o+4+k, o+k+1, o+k+1, o+4+k, o+5+k);
+          }
+          vi+=4;
+        }
+        const bg = new THREE.BufferGeometry();
+        bg.setAttribute('position', new THREE.Float32BufferAttribute(P,3));
+        bg.setIndex(I); bg.computeVertexNormals();
+        const ballast = new THREE.Mesh(bg, new THREE.MeshStandardMaterial({
+          map:lib.g_scree.map, normalMap:lib.g_scree.normalMap,
+          color:0x9a9086, roughness:1 }));
+        ballast.receiveShadow = true; ballast.frustumCulled = false;
+        group.add(ballast);
+      }
       const sleeperGeo = new THREE.BoxGeometry(2.5, 0.16, 0.26);
       const sleeperMat = new THREE.MeshStandardMaterial({
         map:lib.wood_dark.map, normalMap:lib.wood_dark.normalMap,
@@ -9043,9 +10141,9 @@ class Roads {
       for(let i=0;i<count;i++){
         const s = this.sampleRoute(r, i*CFG.SLEEPER_SPACING);
         const side = new THREE.Vector3(-s.dir.z, 0, s.dir.x);
-        // The line runs beside the road, not down the middle of it.
-        const base = s.pos.clone().addScaledVector(side, -(CFG.ROAD_W*0.5 + 4.5));
-        base.y = this.terrain.heightAt(base.x, base.z) + 0.10;
+        // The line has its own graded formation; the sleepers sit on it.
+        const base = s.pos.clone();
+        base.y = s.pos.y + 0.34;
         const yaw = Math.atan2(s.dir.x, s.dir.z);
         mtx.compose(base, new THREE.Quaternion().setFromEuler(
           new THREE.Euler(0, yaw, 0)), new THREE.Vector3(1,1,1));
@@ -9165,59 +10263,228 @@ const NPC_PALETTES = [
   { coat:0x39434a, shirt:0xd8d2bd, hat:0x22262a, skin:0xe0bb99 },
   { coat:0x5a4a4a, shirt:0xc2b6a0, hat:0x30282a, skin:0xbb8f6a },
   { coat:0x2f3a34, shirt:0xcabfa4, hat:0x241f1c, skin:0xc9a07c },
+  { coat:0x7d3f34, shirt:0xe2d9bf, hat:0x2e241e, skin:0xd2a37e },
+  { coat:0x2c3d52, shirt:0xbfb6a2, hat:0x1d2530, skin:0xa87a56 },
+  { coat:0x6a6250, shirt:0xa89c84, hat:0x3d372c, skin:0xe6c6a4 },
+  { coat:0x453042, shirt:0xd6cbb2, hat:0x2a1f28, skin:0xc09070 },
+  { coat:0x8a6a3c, shirt:0xefe6cc, hat:0x40331f, skin:0xdcae86 },
+  { coat:0x33403c, shirt:0xb3ab94, hat:0x1f2726, skin:0x9c7050 },
+  { coat:0x5e5344, shirt:0xcfc0a0, hat:0x342c22, skin:0xefd0ac },
+];
+
+/* Clothing layers. A townsfolk body is a base plus whichever of these it
+   happens to be wearing, so a crowd reads as tradesmen, clerks, drovers and
+   shopkeepers rather than twelve of the same person. */
+const OUTFITS = [
+  { id:'coat',    skirt:false, apron:false, vest:true,  long:true,  hats:['derby','wide','stovepipe',null] },
+  { id:'shirt',   skirt:false, apron:false, vest:false, long:false, hats:['wide','flat',null] },
+  { id:'apron',   skirt:false, apron:true,  vest:true,  long:false, hats:[null,'flat'] },
+  { id:'dress',   skirt:true,  apron:false, vest:false, long:false, hats:['bonnet',null] },
+  { id:'workdress',skirt:true, apron:true,  vest:false, long:false, hats:['bonnet',null] },
+  { id:'drover',  skirt:false, apron:false, vest:true,  long:false, hats:['wide','wide'] },
+  { id:'clerk',   skirt:false, apron:false, vest:true,  long:true,  hats:['derby','stovepipe'] },
+  { id:'poncho',  skirt:false, apron:false, vest:false, long:false, hats:['wide',null], poncho:true },
 ];
 
 /* Named characters. Each is a fixed resident of one town, with their own look,
    voice profile and lines. */
 const NAMED = [
+  /* The company's own clerk in Yes Gulch. He is the first person the game
+     asks you to find, so he stands where the game says he stands. */
+  { id:'halloran', name:'CLERK HALLORAN', town:'gulch', voice:'mcroberts',
+    palette:6, hat:'derby', scale:1.0, post:'office',
+    lines:[ "Gaunt. We had the wire about you. Nobody here was pleased either.",
+            "Six towns, no line between them. That's the job as head office wrote it.",
+            "Conway at the creek. Pudmenzky on the flats. McRoberts at the crossing. The Widow Dedman at the gulch.",
+            "None of the four will sign. That's why it's you they sent and not somebody good.",
+            "Come back when you've talked to all of them. Not before." ] },
   { id:'conway', name:'MARGUERITE CONWAY', town:'conway', voice:'conway',
-    palette:2, hat:'bonnet', scale:0.96,
+    palette:2, hat:'bonnet', scale:0.96, post:'saloon',
     lines:[ "You're the one they sent. You're smaller than the letter suggested.",
             "The water takes the road twice a year. We have stopped arguing with it.",
             "If you are selling, sell to me last. I'll want to hear the others first." ] },
   { id:'pudmenzky', name:'OLD MAN PUDMENZKY', town:'pudmenzky', voice:'pudmenzky',
-    palette:1, hat:'wide', scale:1.04,
+    palette:1, hat:'wide', scale:1.04, post:'store',
     lines:[ "Forty years on this flat. Never needed a wire yet.",
             "You'll tell me it's progress. Everyone tells me it's progress.",
             "Sit down, then. If you're going to waste my afternoon, waste it sitting." ] },
   { id:'mcroberts', name:'SHERIFF McROBERTS', town:'mcroberts', voice:'mcroberts',
-    palette:3, hat:'wide', scale:1.06,
+    palette:3, hat:'wide', scale:1.06, post:'jail',
     lines:[ "Keep the horse off the boardwalk and we'll get along.",
             "I know what you do for a living. I haven't decided about it yet.",
             "Two men came through asking after you. I told them nothing useful." ] },
   { id:'dedman', name:'THE WIDOW DEDMAN', town:'dedman', voice:'conway',
-    palette:0, hat:'bonnet', scale:0.94,
+    palette:0, hat:'bonnet', scale:0.94, post:'office',
     lines:[ "My husband put that wire in the ground. It's still there. So is he.",
             "The company pays on the first. It has not been the first for some time.",
             "You have an honest face. That's usually the expensive kind." ] },
 ];
 
 /* Ambient barks. Short, in character, never plot-critical. */
+/* ==========================================================================
+   TOWNSFOLK DIALOGUE
+   Barks are pooled three ways: by the town's character, by what the speaker
+   does for a living, and by the state of the world. Every line is short, in
+   period, and tells you something — about the place, the company, or the
+   weather that is about to arrive.
+   ========================================================================== */
 const TOWN_BARKS = {
-  company:[ "Line's down past the ridge again.",
-            "They're paying in scrip this month. Scrip.",
-            "Morning. Mind the third board, it's gone." ],
-  river:  [ "River's up. It's always up.",
-            "You'll want the ferry, and the ferry wants coin.",
-            "Fish are running. Nobody's fishing." ],
-  dust:   [ "Wind took my washing to the next county.",
-            "Water's two bits. Don't look at me like that.",
-            "Nothing grows here but opinions." ],
-  law:    [ "Sheriff's in. Behave accordingly.",
-            "Court sits Thursday. Bring a hat.",
-            "Road's clear as far as the crossing." ],
-  mine:   [ "Copper's down. Everything's down.",
-            "Shaft four's still flooded.",
-            "You hear that? No. Exactly." ],
-  camp:   [ "Four bars up here. Four.",
-            "Coffee's on if you're stopping.",
-            "Colder than it looks. It always is." ],
+  company:[
+    "Line's down past the ridge again.",
+    "They're paying in scrip this month. Scrip.",
+    "Morning. Mind the third board, it's gone.",
+    "Company store put the price of flour up. Again.",
+    "My brother took the survey work. Haven't heard since.",
+    "There's a man from head office in town. Nobody's pleased.",
+    "They call it a town. I call it an account.",
+    "Poles went in straight. The rest of it didn't.",
+    "You'll want the office. Everyone wants the office.",
+    "Wire came through Tuesday. Nothing on it worth reading.",
+    "Half the street's owned by the company. The useful half.",
+    "New foreman. Same holes in the road.",
+  ],
+  river:[
+    "River's up. It's always up.",
+    "You'll want the ferry, and the ferry wants coin.",
+    "Fish are running. Nobody's fishing.",
+    "Water came through the shop floor in March. Took the ledgers.",
+    "Bridge is out. Has been since the thaw.",
+    "Boat's late. Boat's always late.",
+    "Damp gets into the wire. Damp gets into everything.",
+    "We rebuilt on the same bend. Ask me why.",
+    "Reeds are thick this year. Good sign or bad, depends who you ask.",
+    "Barge master owes me eleven shillings and a promise.",
+  ],
+  dust:[
+    "Wind took my washing to the next county.",
+    "Water's two bits. Don't look at me like that.",
+    "Nothing grows here but opinions.",
+    "Salt gets in the boots. Then it gets in the temper.",
+    "Old Pudmenzky won't sell. Forty years he won't sell.",
+    "Rained in '09. I remember where I was standing.",
+    "Pump's been turning since before I was born.",
+    "You'll want to be off the flat by dark. Trust me on that.",
+    "Dust storm last week took a fence and a dog.",
+    "Company came out here once. Turned round at the crossing.",
+  ],
+  law:[
+    "Sheriff's in. Behave accordingly.",
+    "Court sits Thursday. Bring a hat.",
+    "Road's clear as far as the crossing.",
+    "Two roads meet here and neither of them agrees.",
+    "We hanged a man in '11. Wrong man, as it happens.",
+    "Gaol's got one occupant and he's sleeping it off.",
+    "Circuit judge is due. Prices go up when he's due.",
+    "You carrying? Doesn't matter. Just asking.",
+    "Everything passes through here eventually. Including trouble.",
+    "Deputy quit. Third one this year.",
+  ],
+  mine:[
+    "Copper's down. Everything's down.",
+    "Shaft four's still flooded.",
+    "You hear that? No. Exactly.",
+    "Widow Dedman's still owed. Everyone knows it.",
+    "Headframe's turning. That's something.",
+    "Tailings are creeping toward the shacks. Nobody's stopping them.",
+    "Wire's made of what we pull out. Think on that.",
+    "Ore's thin. Men are thinner.",
+    "Company assay says one thing. My eyes say another.",
+    "Cage went down at six. Some of it came back up.",
+  ],
+  camp:[
+    "Four bars up here. Four.",
+    "Coffee's on if you're stopping.",
+    "Colder than it looks. It always is.",
+    "You can hear the whole territory from this ridge.",
+    "Masts hum in the wind. You get used to it.",
+    "Nobody lives here. We just don't leave.",
+    "Weather comes up that valley in about an hour.",
+    "Best signal in the country and nothing worth saying.",
+    "Bring wood if you're staying. That's the rule.",
+  ],
+};
+
+/* What the speaker does, inferred from the building they stand outside. */
+const TRADE_BARKS = {
+  store:[ "Fresh in on the wagon. What's left of it, anyway.",
+          "Credit's for people I've known ten years.",
+          "I can order it. Takes six weeks and a small miracle.",
+          "Prices are the company's, not mine.",
+          "Mind the step. Everybody says that after they trip." ],
+  saloon:[ "First one's the same price as the second one.",
+           "No trouble inside. Outside's your business.",
+           "Piano man left. Nobody's replaced him.",
+           "You look like a man who's been riding.",
+           "We've got whiskey and we've got whiskey." ],
+  office:[ "Wire's up. For now.",
+           "Sixpence a word and worth every one.",
+           "Head office wants a report. Head office always wants a report.",
+           "You're the rep, then. We'd heard.",
+           "Key's been tapping all morning. Nothing good." ],
+  church:[ "Doors are open. They generally are.",
+           "We'll say a word for the line and the men on it.",
+           "Sunday, if you're still here.",
+           "Bell's cracked. Rings anyway." ],
+  bank:[ "The vault is quite secure. I'd rather not discuss it further.",
+         "Interest is interest. I don't set it.",
+         "We hold paper for half this street.",
+         "Come back when you've something to deposit." ],
+  hotel:[ "Rooms upstairs. Hot water's a Tuesday thing.",
+          "Sign the book. Everyone signs the book.",
+          "Quiet house. We'd like to keep it that way." ],
+  jail:[ "Move along unless you're stopping.",
+         "One in, and he's not going anywhere." ],
+  courthouse:[ "Court's not sitting. Come Thursday.",
+               "Everything's a matter of record here." ],
+  stable:[ "I'll look after her. Feed's extra.",
+           "That's a good horse. Odd, but good.",
+           "Shoe's loose on the near fore. Thought you'd want to know." ],
+  warehouse:[ "Freight's stacked to the roof and nothing's moving.",
+              "You want it shipped, you want the depot." ],
+  station:[ "Down train's late. Up train's later.",
+            "Platform's that way. Mind the edge.",
+            "She'll be through at the hour, or thereabouts.",
+            "You can hear her before you see her.",
+            "Tickets inside. Cash only." ],
+  shack:[ "Nothing here worth your time.",
+          "Keep walking, friend. No offence." ],
+};
+
+/* State of the world. These fire only when the condition is true. */
+const CONDITION_BARKS = {
+  dawn:[ "You're up early. So's everyone, apparently.",
+         "Best hour of the day, this one.",
+         "Kettle's just on." ],
+  night:[ "Late to be about.",
+          "Lamps are lit. Mind how you go.",
+          "Nothing good happens out there after dark." ],
+  rain:[ "Get under something.",
+         "This'll be in for the day.",
+         "Roads'll be soup by evening." ],
+  storm:[ "That's coming straight for us.",
+          "Get off the street.",
+          "Count the seconds. Under five and you run." ],
+  snow:[ "Wire freezes, wire snaps.",
+         "Won't get a wagon through by morning.",
+         "Come in by the stove if you're stopping." ],
+  hot:[ "Too hot to argue.",
+        "Shade's on the other side by noon." ],
+  mounted:[ "That's a handsome animal.",
+            "Water trough's down the end.",
+            "Don't ride her on the boards." ],
+  reputationHigh:[ "You're the one who got the line through.",
+                   "They speak well of you here. Enjoy it.",
+                   "Whatever you're after, you'll get a hearing." ],
+  reputationLow:[ "I know your name. That's not a compliment.",
+                  "We've heard what you do.",
+                  "Say your piece and move on." ],
 };
 
 /* ---- Body variants -------------------------------------------------------
    Four bodies, built once and shared. Each NPC gets its own Skeleton so they
    animate independently, but the vertex data is common. */
 function buildTownsfolkVariant(lib, variant){
+  const OUT = OUTFITS[variant % OUTFITS.length];
   const def = boneDefFromWorld(JARRAD_BONES);
   const rig = makeSkeleton(def);
   rig.weightScale = { pelvis:1.5, spine1:1.2, head:1.6, jaw:0.5,
@@ -9226,16 +10493,16 @@ function buildTownsfolkVariant(lib, variant){
   const parts=[]; const push=(g,m)=>parts.push({geo:g, group:m});
   const MAT = { COAT:0, SHIRT:1, SKIN:2, BOOT:3, HAT:4 };
 
-  const stout = variant===1 ? 1.16 : (variant===3 ? 0.90 : 1.0);
-  const skirt = (variant===2);      // a long skirt instead of trousers
+  const stout = [1.0,1.14,0.92,1.06,0.96,1.18,0.90,1.04][variant % 8];
+  const skirt = OUT.skirt;
 
   /* Torso */
-  push(limbGeometry(V(0,0.96,0), V(0,1.32,0.01), 0.165*stout, 0.200*stout,
-       {radial:10, rings:3, squashX:1.26, squashZ:0.88, bulge:0.06}), MAT.SHIRT);
-  push(limbGeometry(V(0,1.30,0.01), V(0,1.54,0.005), 0.200*stout, 0.208*stout,
-       {radial:10, rings:2, squashX:1.36, squashZ:0.82}), MAT.SHIRT);
-  push(limbGeometry(V(0,1.52,0.005), V(0,0.98,0), 0.216*stout, 0.192*stout,
-       {radial:11, rings:4, squashX:1.34, squashZ:0.92}), MAT.COAT);
+  push(limbGeometry(V(0,0.96,0), V(0,1.32,0.01), 0.150*stout, 0.176*stout,
+       {radial:10, rings:3, squashX:1.04, squashZ:0.68, bulge:0.06}), MAT.SHIRT);
+  push(limbGeometry(V(0,1.30,0.01), V(0,1.54,0.005), 0.176*stout, 0.190*stout,
+       {radial:10, rings:2, squashX:1.10, squashZ:0.62}), MAT.SHIRT);
+  push(limbGeometry(V(0,1.52,0.005), V(0,0.98,0), 0.196*stout, 0.172*stout,
+       {radial:11, rings:4, squashX:1.04, squashZ:0.70}), MAT.COAT);
 
   /* Head */
   push(blobGeometry(V(0,1.695,-0.004), 0.094, 0.110, 0.104, 12), MAT.SKIN);
@@ -9254,6 +10521,23 @@ function buildTownsfolkVariant(lib, variant){
     push(blobGeometry(V(s*0.220,0.940,0.004), 0.033, 0.050, 0.024, 8), MAT.SKIN);
     push(blobGeometry(V(s*0.186,1.500,0.000), 0.080, 0.072, 0.082, 8), MAT.COAT);
   }
+
+  /* Waistcoat, apron, or a poncho over the top. */
+  if(OUT.vest)
+    push(limbGeometry(V(0,1.00,0), V(0,1.42,0.008), 0.152*stout, 0.184*stout,
+         {radial:10, rings:3, squashX:1.06, squashZ:0.64}), MAT.SHIRT);
+  if(OUT.long)
+    push(limbGeometry(V(0,1.48,0.004), V(0,0.72,-0.01), 0.188*stout, 0.204*stout,
+         {radial:12, rings:4, squashX:1.02, squashZ:0.70, tipRound:false}), MAT.COAT);
+  if(OUT.apron){
+    push(limbGeometry(V(0,1.22,0.090), V(0,0.58,0.078), 0.150, 0.180,
+         {radial:8, rings:3, squashZ:0.22, tipRound:false}), MAT.SHIRT);
+    push(limbGeometry(V(-0.11,1.44,0.05), V(0.11,1.44,0.05), 0.020, 0.020,
+         {radial:4, rings:1}), MAT.SHIRT);
+  }
+  if(OUT.poncho)
+    push(limbGeometry(V(0,1.52,0.004), V(0,1.02,0), 0.215*stout, 0.300*stout,
+         {radial:12, rings:3, squashX:1.05, squashZ:0.90, tipRound:false}), MAT.COAT);
 
   /* Legs, or a skirt */
   if(skirt){
@@ -9274,15 +10558,59 @@ function buildTownsfolkVariant(lib, variant){
            0.055, 0.040, {radial:7, rings:2, squashZ:0.9}), MAT.BOOT);
     }
   }
-  return { geo: skinParts(parts, rig, {power:3.0}), skirt };
+  return { geo: skinParts(parts, rig, {power:3.4}), skirt, outfit:OUT };
 }
 
 /* Hats are separate small meshes parented to the head bone, so one body can
    wear a stovepipe, a wide brim or a bonnet. */
+/* A small painted plaque that floats over the head of anyone who matters.
+   Sprites always face the camera, so it reads from any angle without any
+   per-frame billboarding work. */
+function makeNameMarker(name){
+  const cv = document.createElement('canvas');
+  cv.width = 512; cv.height = 128;
+  const c = cv.getContext('2d');
+  c.clearRect(0,0,512,128);
+  // Chevron.
+  c.fillStyle = '#FFD600';
+  c.strokeStyle = 'rgba(24,18,10,0.85)'; c.lineWidth = 5;
+  c.beginPath();
+  c.moveTo(256, 96); c.lineTo(214, 40); c.lineTo(298, 40);
+  c.closePath(); c.fill(); c.stroke();
+  // Name above it.
+  c.textAlign='center'; c.textBaseline='middle';
+  let size = 30;
+  do { c.font = `600 ${size}px "Bookman Old Style", Georgia, serif`; size -= 1; }
+  while(c.measureText(name).width > 470 && size > 12);
+  c.lineWidth = 6; c.strokeStyle = 'rgba(20,15,8,0.9)';
+  c.strokeText(name, 256, 18);
+  c.fillStyle = '#f6efd8';
+  c.fillText(name, 256, 18);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.needsUpdate = true;
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({
+    map:t, transparent:true, depthTest:true, depthWrite:false,
+    sizeAttenuation:true, fog:false }));
+  spr.scale.set(2.6, 0.65, 1);
+  spr.center.set(0.5, 0);
+  return spr;
+}
+
 function makeHat(kind){
   const parts=[];
   const V=(x,y,z)=>new THREE.Vector3(x,y,z);
-  if(kind==='bonnet'){
+  if(kind==='stovepipe'){
+    parts.push({geo:limbGeometry(V(0,0.070,-0.01), V(0,0.320,-0.014), 0.092,0.090,
+      {radial:14, rings:3}), group:0});
+    parts.push({geo:limbGeometry(V(0,0.066,-0.01), V(0,0.082,-0.01), 0.165,0.160,
+      {radial:14, rings:2, tipRound:false}), group:0});
+  } else if(kind==='flat'){
+    parts.push({geo:limbGeometry(V(0,0.072,-0.012), V(0,0.118,-0.014), 0.098,0.094,
+      {radial:12, rings:2, squashZ:1.05}), group:0});
+    parts.push({geo:limbGeometry(V(0,0.086,0.02), V(0,0.096,0.115), 0.100,0.070,
+      {radial:10, rings:2, squashZ:0.5, tipRound:false}), group:0});
+  } else if(kind==='bonnet'){
     parts.push({geo:blobGeometry(V(0,0.045,-0.02), 0.115,0.100,0.118, 12), group:0});
     parts.push({geo:limbGeometry(V(0,0.02,0.06), V(0,0.05,0.13), 0.135,0.105,
       {radial:12, rings:2, squashZ:0.55, tipRound:false}), group:0});
@@ -9326,6 +10654,7 @@ class NPC {
       S(lib.leather_boot,0xffffff),
       S(lib.cloth_coat,  P.hat),
     ];
+    this.outfit = variant.outfit;
     this.mesh = new THREE.SkinnedMesh(variant.geo, this.mats);
     this.mesh.castShadow = true; this.mesh.receiveShadow = true;
     this.mesh.frustumCulled = false;
@@ -9343,6 +10672,11 @@ class NPC {
 
     this.object = new THREE.Group();
     this.object.add(this.mesh);
+    if(this.named){
+      this.marker = makeNameMarker(name);
+      this.marker.position.set(0, 2.05, 0);
+      this.object.add(this.marker);
+    }
     this.object.scale.setScalar(scale || 1);
     scene.add(this.object);
 
@@ -9362,6 +10696,8 @@ class NPC {
     this.route = [];
     this.spokenT = 0;
     this.active = true;
+    this.trade = opts.trade || null;
+    this._said = new Set();
     this.object.position.copy(this.pos);
     this.object.rotation.y = this.yaw;
   }
@@ -9370,6 +10706,7 @@ class NPC {
 
   /* Simple daily rhythm: out and about by day, drifting home after dark. */
   fixedUpdate(dt, hour, playerPos){
+    if(this.inScene){ this.speed = 0; return; }
     const dayTime = hour > 6.5 && hour < 20.5;
 
     if(this.waitT > 0 && !this.target){
@@ -9431,6 +10768,11 @@ class NPC {
   }
 
   update(dt, lookTarget){
+    if(this.marker){
+      // A slow bob, so the eye catches it without it being a beacon.
+      this._mt = (this._mt||Math.random()*6) + dt;
+      this.marker.position.y = 2.05 + Math.sin(this._mt*1.6)*0.075;
+    }
     if(this.speed < 0.2){
       this.anim.play('idle', 0.4);
       this.anim.speed = 1;
@@ -9440,9 +10782,11 @@ class NPC {
       this.anim.speed = M.clamp(this.speed/gs, 0.6, 1.4);
     }
     this.anim.update(dt);
+    // Mouth follows the voice envelope, the same way Ollie's does.
+    if(this.mouthOpen) this.rig.byName.jaw.rotation.x += this.mouthOpen*0.34;
     if(lookTarget){
       this.object.updateMatrixWorld(true);
-      IK.look(this.rig.byName.head, lookTarget, 0.32, 0.75);
+      IK.look(this.rig.byName.head, lookTarget, 0.24, 0.55, PLAYER_HEAD_FWD);
     }
     this.rig.root.updateMatrixWorld(true);
   }
@@ -9459,7 +10803,7 @@ class Townsfolk {
     this.terrain = terrain; this.lib = lib; this.scene = scene;
     this.colliders = colliders;
     this.variants = [];
-    for(let i=0;i<4;i++) this.variants.push(buildTownsfolkVariant(lib, i));
+    for(let i=0;i<OUTFITS.length;i++) this.variants.push(buildTownsfolkVariant(lib, i));
     this.byTown = new Map();
     this.all = [];
     this.onSpeak = null;
@@ -9485,15 +10829,19 @@ class Townsfolk {
 
     for(let i=0;i<count;i++){
       const spot = spots[i % spots.length];
-      const hat = ['wide','derby','bonnet',null][Math.floor(rnd()*4)];
+      const vi = Math.floor(rnd()*this.variants.length);
+      const variant = this.variants[vi];
+      const hats = variant.outfit.hats;
+      const hat = hats[Math.floor(rnd()*hats.length)];
       const npc = new NPC({
         terrain:this.terrain, lib:this.lib, scene:this.scene,
         colliders:this.colliders,
-        variant:this.variants[Math.floor(rnd()*4)],
-        palette:Math.floor(rnd()*4),
-        hat, scale: M.range(rnd, 0.93, 1.07),
-        name: 'TOWNSFOLK', voice: rnd()<0.5 ? 'conway' : 'mcroberts',
+        variant, palette:Math.floor(rnd()*NPC_PALETTES.length),
+        hat, scale: variant.skirt ? M.range(rnd,0.90,1.00) : M.range(rnd,0.93,1.09),
+        name: variant.skirt ? 'TOWNSWOMAN' : 'TOWNSMAN',
+        voice: variant.skirt ? 'conway' : (rnd()<0.5 ? 'mcroberts' : 'pudmenzky'),
         home: spot.pos.clone(), facing: spot.facing,
+        trade: spot.kind,
       });
       npc.barks = TOWN_BARKS[town.character] || TOWN_BARKS.company;
       npc.setRoute(route);
@@ -9503,18 +10851,22 @@ class Townsfolk {
     /* The town's named resident, standing outside the biggest building. */
     const named = NAMED.find(n=>n.town === town.key);
     if(named && spots.length){
-      const spot = spots[0];
+      // Stand them outside the building they are associated with, so "speak to
+      // the telegraph office" points at somebody who is actually there.
+      const spot = spots.find(s=>s.kind === named.post) || spots[0];
       const npc = new NPC({
         terrain:this.terrain, lib:this.lib, scene:this.scene,
         colliders:this.colliders,
-        variant:this.variants[named.palette % 4],
+        variant:this.variants[named.palette % this.variants.length],
         palette:named.palette, hat:named.hat, scale:named.scale,
         name:named.name, voice:named.voice, lines:named.lines,
         home: spot.pos.clone().add(new THREE.Vector3(1.4,0,0)),
-        facing: spot.facing,
+        facing: spot.facing, trade: named.post || spot.kind,
       });
+      npc.id = named.id;
       npc.barks = named.lines;
       npc.setRoute([]);            // named residents keep their post
+      npc.important = true;
       list.push(npc);
     }
 
@@ -9534,16 +10886,70 @@ class Townsfolk {
     this.byTown.delete(town.key);
   }
 
+  /* Weighted draw across three pools, skipping anything this person has said
+     to you recently. Named characters always speak their own lines. */
+  pickLine(npc){
+    if(npc.lines && npc.lines.length){
+      npc._li = ((npc._li|0)+1) % npc.lines.length;
+      return npc.lines[npc._li];
+    }
+    const pool = [];
+    const w = this.world || {};
+    if(npc.trade && TRADE_BARKS[npc.trade]) pool.push(...TRADE_BARKS[npc.trade],
+                                                      ...TRADE_BARKS[npc.trade]);
+    if(npc.barks) pool.push(...npc.barks);
+    const cond = [];
+    if(w.hour !== undefined){
+      if(w.hour > 5 && w.hour < 8)  cond.push(...CONDITION_BARKS.dawn);
+      if(w.hour > 20 || w.hour < 5) cond.push(...CONDITION_BARKS.night);
+      if(w.hour > 11 && w.hour < 15 && w.weather === 'clear')
+        cond.push(...CONDITION_BARKS.hot);
+    }
+    if(w.weather === 'drizzle' || w.weather === 'downpour')
+      cond.push(...CONDITION_BARKS.rain);
+    if(w.weather === 'thunderstorm') cond.push(...CONDITION_BARKS.storm);
+    if(w.weather === 'snow' || w.weather === 'blizzard')
+      cond.push(...CONDITION_BARKS.snow);
+    if(w.mounted) cond.push(...CONDITION_BARKS.mounted);
+    if(w.reputation > 72) cond.push(...CONDITION_BARKS.reputationHigh);
+    if(w.reputation < 28) cond.push(...CONDITION_BARKS.reputationLow);
+    // Conditions get a third of the weight; they are seasoning, not the meal.
+    for(let i=0;i<Math.ceil(pool.length/3) && cond.length;i++)
+      pool.push(cond[i % cond.length]);
+    if(!pool.length) return null;
+    const fresh = pool.filter(l=>!npc._said.has(l));
+    const list = fresh.length ? fresh : (npc._said.clear(), pool);
+    const line = list[(Math.random()*list.length)|0];
+    npc._said.add(line);
+    return line;
+  }
+
   fixedUpdate(dt, hour, playerPos){
     for(const npc of this.all){
       const d = Math.hypot(npc.pos.x-playerPos.x, npc.pos.z-playerPos.z);
       npc.setActive(d < CFG.NPC_DRAW_R);
+      if(npc.marker){
+        npc.marker.visible = d < 95;
+        npc.marker.material.opacity = M.sat((95-d)/22) * M.sat((d-2.0)/2.0);
+      }
       if(d < CFG.NPC_SIM_R) npc.fixedUpdate(dt, hour, playerPos);
+    }
+  }
+
+  /* Cutscenes still need everyone posed, but nobody should start chatting
+     over the top of a scripted scene. */
+  updatePosesOnly(dt, playerEye){
+    for(const npc of this.all){
+      if(!npc.active) continue;
+      npc.anim.freeze('idle', 1.35);
+      npc.update(dt, null);
+      if(npc.marker) npc.marker.visible = false;
     }
   }
 
   update(dt, playerEye, playerPos, ui, audio){
     this._greetT -= dt;
+    for(const npc of this.all) if(npc.anim.frozen) npc.anim.unfreeze();
     let nearest = null, nd = 1e9;
     for(const npc of this.all){
       if(!npc.active) continue;
@@ -9551,17 +10957,1388 @@ class Townsfolk {
       npc.update(dt, d < 12 ? playerEye : null);
       if(d < nd){ nd = d; nearest = npc; }
     }
-    /* Somebody says something when you walk past. Not everybody, not often. */
-    if(nearest && nd < 6.5 && this._greetT <= 0 && nearest.spokenT <= 0){
-      this._greetT = 9 + Math.random()*12;
-      nearest.spokenT = 45;
-      const pool = nearest.barks || [];
-      if(pool.length && this.onSpeak){
-        const line = pool[(Math.random()*pool.length)|0];
-        this.onSpeak(nearest, line);
-      }
+    /* Somebody says something when you walk past. Not everybody, not often,
+       and what they say depends on who they are and what the day is doing. */
+    if(nearest && nd < 5.0 && this._greetT <= 0 && nearest.spokenT <= 0){
+      // A town is not a chorus. One unprompted remark every half-minute or so,
+      // and the same person will not start again for a good few minutes.
+      this._greetT = 26 + Math.random()*34;
+      nearest.spokenT = 210;
+      const line = this.pickLine(nearest);
+      if(line && this.onSpeak) this.onSpeak(nearest, line);
     }
     return nearest && nd < 3.2 ? nearest : null;
+  }
+}
+/* ==========================================================================
+   THE MAP
+   Drawn once at boot from the heightfield itself — every ridge, river, road
+   and coastline on it is the ground you will actually ride over, because it
+   is rendered from the same data the terrain mesh is built from.
+
+   What you have not seen stays under the paper. The explored mask fills in as
+   you travel, so the map is a record of where you have been rather than a
+   satellite photograph handed to you at the start (§17).
+   ========================================================================== */
+const MAP_PX = 512;          // resolution of the baked sheet
+const EXPLORE_N = 128;       // resolution of the fog-of-war mask
+
+class WorldMap {
+  constructor(terrain, roads){
+    this.terrain = terrain; this.roads = roads;
+    this.explored = new Uint8Array(EXPLORE_N*EXPLORE_N);
+    this.waypoint = null;
+    this.revealed = 0;
+    this.base = null;
+    /* View state: which patch of country the sheet is showing. */
+    this.view = { cx:0, cz:0, zoom:1 };
+    this.MAXZOOM = 8;
+  }
+
+  /* Keep the view inside the world however far it is zoomed. */
+  clampView(){
+    const v = this.view;
+    v.zoom = M.clamp(v.zoom, 1, this.MAXZOOM);
+    const span = CFG.WORLD / v.zoom;
+    const lim = Math.max(0, CFG.HALF - span/2);
+    v.cx = M.clamp(v.cx, -lim, lim);
+    v.cz = M.clamp(v.cz, -lim, lim);
+  }
+  zoomAt(factor, worldPoint){
+    const v = this.view;
+    const before = v.zoom;
+    v.zoom = M.clamp(v.zoom*factor, 1, this.MAXZOOM);
+    if(worldPoint && v.zoom !== before){
+      // Keep the point under the cursor pinned while the scale changes.
+      const k = 1 - before/v.zoom;
+      v.cx += (worldPoint.x - v.cx)*k;
+      v.cz += (worldPoint.z - v.cz)*k;
+    }
+    this.clampView();
+  }
+  panBy(dxWorld, dzWorld){
+    this.view.cx -= dxWorld; this.view.cz -= dzWorld;
+    this.clampView();
+  }
+  centreOn(p){ this.view.cx = p.x; this.view.cz = p.z; this.clampView(); }
+
+  /* ---- Bake the sheet --------------------------------------------------- */
+  bake(){
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = MAP_PX;
+    const c = cv.getContext('2d');
+    const img = c.createImageData(MAP_PX, MAP_PX);
+    const d = img.data;
+    const T = this.terrain;
+
+    /* Hill shading from a raking north-west sun, over a biome tint. Relief
+       shading is what turns a colour blob into something you can navigate. */
+    for(let j=0;j<MAP_PX;j++){
+      for(let i=0;i<MAP_PX;i++){
+        const wx = (i/(MAP_PX-1))*CFG.WORLD - CFG.HALF;
+        const wz = (j/(MAP_PX-1))*CFG.WORLD - CFG.HALF;
+        const h  = T.heightAt(wx,wz);
+        const k = (j*MAP_PX+i)*4;
+        let r,g,b;
+        if(h < CFG.SEA){
+          const deep = M.sat(-h/18);
+          r = M.lerp(120,46,deep); g = M.lerp(150,78,deep); b = M.lerp(158,100,deep);
+        } else {
+          const biome = T.biomeAt(wx,wz,h);
+          const pal = [[214,196,148],   // Flats
+                       [186,190,186],   // Ridge
+                       [176,188,142],   // Grasslands
+                       [196,164,132],   // Copperwire
+                       [156,180,150]][biome];
+          const alt = M.sat((h-CFG.SNOWLINE)/40);
+          r = M.lerp(pal[0], 244, alt);
+          g = M.lerp(pal[1], 246, alt);
+          b = M.lerp(pal[2], 250, alt);
+          // Relief.
+          const e = CFG.WORLD/MAP_PX;
+          const hx = T.heightAt(wx+e,wz), hz = T.heightAt(wx,wz+e);
+          const shade = M.clamp(1 + ((h-hx) + (h-hz))*0.055, 0.55, 1.42);
+          r*=shade; g*=shade; b*=shade;
+          // Rivers.
+          const rv = T.sample(T.river, wx, wz);
+          if(rv > 0.10){
+            const t = M.sat((rv-0.10)*2.2);
+            r = M.lerp(r, 104, t); g = M.lerp(g, 138, t); b = M.lerp(b, 152, t);
+          }
+        }
+        d[k]=r; d[k+1]=g; d[k+2]=b; d[k+3]=255;
+      }
+    }
+    c.putImageData(img, 0, 0);
+
+    /* Roads and the line, inked over the top. */
+    const toPx = (wx,wz)=> [ (wx+CFG.HALF)/CFG.WORLD*MAP_PX,
+                             (wz+CFG.HALF)/CFG.WORLD*MAP_PX ];
+    if(this.roads){
+      c.lineCap = 'round'; c.lineJoin = 'round';
+      for(const r of this.roads.routes){
+        c.strokeStyle = 'rgba(92,66,40,0.85)'; c.lineWidth = 2.4;
+        c.beginPath();
+        r.points.forEach((p,i)=>{ const [x,y]=toPx(p.x,p.z);
+          i? c.lineTo(x,y) : c.moveTo(x,y); });
+        c.stroke();
+      }
+      const rr = this.roads.railRoute;
+      if(rr){
+        c.strokeStyle = 'rgba(38,34,30,0.92)'; c.lineWidth = 2.6;
+        c.beginPath();
+        rr.points.forEach((p,i)=>{ const [x,y]=toPx(p.x,p.z);
+          i? c.lineTo(x,y) : c.moveTo(x,y); });
+        c.stroke();
+        // Sleeper ticks, so the line reads as rail and not another road.
+        c.lineWidth = 1.2;
+        for(let i=0;i<rr.points.length-1;i+=6){
+          const a=rr.points[i], b=rr.points[i+1];
+          const [ax,ay]=toPx(a.x,a.z), [bx,by]=toPx(b.x,b.z);
+          const dx=bx-ax, dy=by-ay, L=Math.hypot(dx,dy)||1;
+          const nx=-dy/L*2.6, ny=dx/L*2.6;
+          c.beginPath(); c.moveTo(ax+nx,ay+ny); c.lineTo(ax-nx,ay-ny); c.stroke();
+        }
+      }
+    }
+    this.base = cv;
+    return cv;
+  }
+
+  /* ---- Exploration ------------------------------------------------------ */
+  reveal(wx, wz, radius = 150){
+    const cell = CFG.WORLD/EXPLORE_N;
+    const ci = (wx+CFG.HALF)/cell, cj = (wz+CFG.HALF)/cell;
+    const r = radius/cell;
+    const i0=Math.max(0,Math.floor(ci-r)), i1=Math.min(EXPLORE_N-1,Math.ceil(ci+r));
+    const j0=Math.max(0,Math.floor(cj-r)), j1=Math.min(EXPLORE_N-1,Math.ceil(cj+r));
+    for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++){
+      if(Math.hypot(i-ci, j-cj) > r) continue;
+      const k=j*EXPLORE_N+i;
+      if(!this.explored[k]){ this.explored[k]=1; this.revealed++; }
+    }
+  }
+  get percent(){ return this.revealed/(EXPLORE_N*EXPLORE_N)*100; }
+
+  /* Blur the mask when drawing so the edge of knowledge is a soft frontier
+     rather than a staircase of squares. */
+  _fogCanvas(w,h){
+    if(!this._fog || this._fog.width!==EXPLORE_N){
+      this._fog = document.createElement('canvas');
+      this._fog.width = this._fog.height = EXPLORE_N;
+    }
+    const fc = this._fog.getContext('2d');
+    const img = fc.createImageData(EXPLORE_N, EXPLORE_N);
+    for(let i=0;i<this.explored.length;i++){
+      img.data[i*4+3] = this.explored[i] ? 0 : 255;
+    }
+    fc.putImageData(img,0,0);
+    return this._fog;
+  }
+
+  /* ---- Draw ------------------------------------------------------------- */
+  draw(ctx, W, H, game){
+    const S = Math.min(W,H);
+    const ox = (W-S)/2, oy = (H-S)/2;
+    ctx.clearRect(0,0,W,H);
+
+    // Parchment behind everything, so unexplored country is blank paper.
+    ctx.fillStyle = '#22201a';
+    ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = '#cbbf9d';
+    ctx.fillRect(ox,oy,S,S);
+
+    this.clampView();
+    const v = this.view;
+    /* The whole sheet is drawn scaled and offset, so zooming is just a wider
+       destination rectangle with the view centre held in the middle. */
+    const dS = S*v.zoom;
+    const dx = ox + S/2 - ((v.cx + CFG.HALF)/CFG.WORLD)*dS;
+    const dy = oy + S/2 - ((v.cz + CFG.HALF)/CFG.WORLD)*dS;
+
+    ctx.save();
+    ctx.beginPath(); ctx.rect(ox,oy,S,S); ctx.clip();
+    // Crisp at high zoom, smooth when showing the whole territory.
+    ctx.imageSmoothingEnabled = v.zoom < 3;
+    if(this.base) ctx.drawImage(this.base, dx, dy, dS, dS);
+
+    // Fog: paint the paper back over anything unvisited.
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.imageSmoothingEnabled = true;
+    const fog = this._fogCanvas();
+    ctx.save();
+    ctx.filter = 'blur(' + (2*Math.min(v.zoom,3)).toFixed(1) + 'px)';
+    ctx.globalAlpha = 0.97;
+    ctx.fillStyle = '#c6b995';
+    ctx.drawImage(fog, dx, dy, dS, dS);
+    ctx.restore();
+    ctx.filter = 'none';
+
+    const toPx = (wx,wz)=> [ dx + (wx+CFG.HALF)/CFG.WORLD*dS,
+                             dy + (wz+CFG.HALF)/CFG.WORLD*dS ];
+
+    /* Towns you have found. */
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for(const t of (game.towns ? game.towns.list : [])){
+      if(!game.discovered.has(t.name)) continue;
+      const [x,y] = toPx(t.x, t.z);
+      const served = game.roads && game.roads.stations &&
+                     game.roads.stations.some(s=>s.town===t.key);
+      ctx.fillStyle = '#2a2118';
+      ctx.beginPath(); ctx.arc(x,y,5.5,0,6.283); ctx.fill();
+      ctx.fillStyle = served ? '#FFD600' : '#e8dfc8';
+      ctx.beginPath(); ctx.arc(x,y,3.6,0,6.283); ctx.fill();
+      ctx.font = '600 12px "Bookman Old Style", Georgia, serif';
+      ctx.fillStyle = 'rgba(30,24,16,0.92)';
+      ctx.fillText(t.name, x+1, y-13);
+      ctx.fillStyle = '#f3ecd6';
+      ctx.fillText(t.name, x, y-14);
+    }
+
+    /* Where the story is pointing you. */
+    const om = game.story && game.story.markerPos();
+    if(om){
+      const [x,y] = toPx(om.x, om.z);
+      ctx.save();
+      ctx.translate(x,y);
+      ctx.fillStyle = '#FFD600';
+      ctx.strokeStyle = 'rgba(30,22,10,0.9)'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0,2); ctx.lineTo(-7,-12); ctx.lineTo(7,-12);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+
+    /* Waypoint. */
+    if(this.waypoint){
+      const [x,y] = toPx(this.waypoint.x, this.waypoint.z);
+      ctx.strokeStyle = '#00A3A6'; ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.arc(x,y,9,0,6.283); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x-13,y); ctx.lineTo(x+13,y);
+      ctx.moveTo(x,y-13); ctx.lineTo(x,y+13); ctx.stroke();
+    }
+
+    /* You, and which way you are pointed. */
+    const p = game.player.pos;
+    const [px,py] = toPx(p.x, p.z);
+    const yaw = game.player.yaw;
+    ctx.save();
+    // North is up on the sheet, and a yaw of 0 faces south, so the arrow is
+    // rotated by PI - yaw. Rotating by -yaw pointed it exactly backwards.
+    ctx.translate(px,py); ctx.rotate(Math.PI - yaw);
+    ctx.fillStyle = '#b0362c';
+    ctx.beginPath();
+    ctx.moveTo(0,-9); ctx.lineTo(6,7); ctx.lineTo(0,4); ctx.lineTo(-6,7);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(20,16,10,0.85)'; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.restore();
+    ctx.restore();
+
+    /* Border and scale bar. */
+    ctx.strokeStyle = 'rgba(40,32,20,0.8)'; ctx.lineWidth = 3;
+    ctx.strokeRect(ox+1.5, oy+1.5, S-3, S-3);
+    const km = dS/CFG.WORLD*1000;
+    ctx.strokeStyle = '#3a2f20'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(ox+16, oy+S-16); ctx.lineTo(ox+16+km, oy+S-16);
+    ctx.moveTo(ox+16, oy+S-20); ctx.lineTo(ox+16, oy+S-12);
+    ctx.moveTo(ox+16+km, oy+S-20); ctx.lineTo(ox+16+km, oy+S-12);
+    ctx.stroke();
+    ctx.textAlign='left';
+    ctx.font='11px "Bookman Old Style", Georgia, serif';
+    ctx.fillStyle='#3a2f20';
+    ctx.fillText('1 km', ox+20+km, oy+S-16);
+    ctx.textAlign='right';
+    ctx.fillText(v.zoom > 1.02 ? (v.zoom.toFixed(1)+'x  ·  drag to pan')
+                               : 'scroll to zoom  ·  drag to pan',
+                 ox+S-16, oy+S-16);
+    return { ox, oy, S, dx, dy, dS };
+  }
+
+  /* Turn a point on the sheet into a place in the world, and back. */
+  fromPx(cx, cy, box){
+    if(!box) return null;
+    if(cx < box.ox || cx > box.ox+box.S || cy < box.oy || cy > box.oy+box.S)
+      return null;
+    const u = (cx-box.dx)/box.dS, w = (cy-box.dy)/box.dS;
+    return new THREE.Vector3(u*CFG.WORLD - CFG.HALF, 0, w*CFG.WORLD - CFG.HALF);
+  }
+  /* World units per sheet pixel — used to turn a drag into a pan. */
+  worldPerPx(box){ return CFG.WORLD/box.dS; }
+}
+/* ==========================================================================
+   THE TRAIN
+   A real service, not a set dressing. She runs the length of the line, stops
+   at every platform, waits, whistles, and sets off again — and she is the same
+   distance away whether you are watching her or not, because the timetable is
+   simulated whether or not she is on screen (§13).
+   ========================================================================== */
+function buildLocomotive(lib){
+  const parts=[];
+  const P=(g,m)=>parts.push({geo:g, group:m});
+  const C = { IRON:0, BRASS:1, PAINT:2, WOOD:3, GLASS:4 };
+
+  /* Boiler, smokebox, chimney. */
+  const boiler = new THREE.CylinderGeometry(0.86, 0.86, 5.0, 16);
+  boiler.rotateX(Math.PI/2); boiler.translate(0, 1.90, 0.55);
+  P(boiler, C.PAINT);
+  for(const z of [-1.3, 0.5, 2.2]){
+    const band = new THREE.TorusGeometry(0.875, 0.045, 5, 16);
+    band.translate(0, 1.90, z); P(band, C.BRASS);
+  }
+  const smokebox = new THREE.CylinderGeometry(0.90, 0.90, 1.2, 16);
+  smokebox.rotateX(Math.PI/2); smokebox.translate(0, 1.90, 3.55);
+  P(smokebox, C.IRON);
+  const door = new THREE.CircleGeometry(0.78, 16);
+  door.translate(0, 1.90, 4.16); P(door, C.IRON);
+  // Diamond stack — the shape that says frontier locomotive at any distance.
+  const stackL = new THREE.CylinderGeometry(0.24, 0.30, 0.75, 10);
+  stackL.translate(0, 3.05, 3.30); P(stackL, C.IRON);
+  const stackU = new THREE.CylinderGeometry(0.62, 0.26, 1.15, 12);
+  stackU.translate(0, 4.00, 3.30); P(stackU, C.IRON);
+  const rim = new THREE.TorusGeometry(0.62, 0.055, 5, 14);
+  rim.rotateX(Math.PI/2); rim.translate(0, 4.56, 3.30); P(rim, C.BRASS);
+  // Steam dome and bell.
+  const dome = new THREE.SphereGeometry(0.42, 12, 8, 0, 6.283, 0, 1.9);
+  dome.translate(0, 2.62, 0.60); P(dome, C.BRASS);
+  const bell = new THREE.ConeGeometry(0.20, 0.30, 10);
+  bell.rotateX(Math.PI); bell.translate(0, 2.86, 2.30); P(bell, C.BRASS);
+  const headlamp = new THREE.BoxGeometry(0.55, 0.60, 0.50);
+  headlamp.translate(0, 3.05, 4.05); P(headlamp, C.IRON);
+  const lens = new THREE.CircleGeometry(0.20, 12);
+  lens.translate(0, 3.05, 4.31); P(lens, C.GLASS);
+
+  /* Frame, cab, cowcatcher. */
+  const frame = new THREE.BoxGeometry(2.0, 0.42, 8.6);
+  frame.translate(0, 1.10, 0.20); P(frame, C.IRON);
+  const cab = new THREE.BoxGeometry(2.35, 2.30, 2.60);
+  cab.translate(0, 2.45, -2.60); P(cab, C.WOOD);
+  const cabRoof = new THREE.BoxGeometry(2.65, 0.16, 3.00);
+  cabRoof.translate(0, 3.66, -2.60); P(cabRoof, C.IRON);
+  for(const sx of [-1.19, 1.19]){
+    const win = new THREE.BoxGeometry(0.06, 0.80, 0.85);
+    win.translate(sx, 2.95, -1.95); P(win, C.GLASS);
+  }
+  const catcher = new THREE.ConeGeometry(1.05, 1.40, 4, 1);
+  catcher.rotateZ(Math.PI/2); catcher.rotateY(Math.PI/4);
+  catcher.scale(1, 1, 0.55);
+  catcher.rotateX(-Math.PI/2); catcher.translate(0, 0.72, 4.70);
+  P(catcher, C.IRON);
+
+  /* Wheels: two small leading, three drivers, with rods. */
+  const wheelAt = (z, r, mat)=>{
+    for(const sx of [-0.98, 0.98]){
+      const w = new THREE.CylinderGeometry(r, r, 0.16, 14);
+      w.rotateZ(Math.PI/2); w.translate(sx, r, z); P(w, mat);
+      const hub = new THREE.CylinderGeometry(r*0.28, r*0.28, 0.22, 8);
+      hub.rotateZ(Math.PI/2); hub.translate(sx, r, z); P(hub, C.BRASS);
+      for(let k=0;k<6;k++){
+        const sp = new THREE.BoxGeometry(0.07, r*1.7, 0.07);
+        sp.rotateX(k/6*Math.PI); sp.rotateZ(Math.PI/2);
+        sp.translate(sx, r, z); P(sp, mat);
+      }
+    }
+  };
+  wheelAt(3.60, 0.44, C.IRON);
+  wheelAt(1.00, 0.86, C.PAINT);
+  wheelAt(-0.85, 0.86, C.PAINT);
+  wheelAt(-2.70, 0.86, C.PAINT);
+  for(const sx of [-1.12, 1.12]){
+    const rod = new THREE.BoxGeometry(0.10, 0.14, 4.0);
+    rod.translate(sx, 0.86, -0.85); P(rod, C.BRASS);
+    const cyl = new THREE.CylinderGeometry(0.34, 0.34, 1.3, 10);
+    cyl.rotateX(Math.PI/2); cyl.translate(sx*0.92, 1.28, 2.55); P(cyl, C.IRON);
+  }
+  return mergeParts(parts);
+}
+
+function buildCar(lib, kind){
+  const parts=[];
+  const P=(g,m)=>parts.push({geo:g, group:m});
+  const C = { IRON:0, BRASS:1, PAINT:2, WOOD:3, GLASS:4 };
+  const L = kind==='tender' ? 5.2 : 8.6;
+  const frame = new THREE.BoxGeometry(2.1, 0.40, L);
+  frame.translate(0, 1.06, 0); P(frame, C.IRON);
+  if(kind==='tender'){
+    const body = new THREE.BoxGeometry(2.25, 1.70, L-0.4);
+    body.translate(0, 2.10, 0); P(body, C.PAINT);
+    // Coal, heaped.
+    for(let i=0;i<9;i++){
+      const c = new THREE.DodecahedronGeometry(0.30 + Math.random()*0.22, 0);
+      c.translate((Math.random()-0.5)*1.5, 2.95 + Math.random()*0.2,
+                  (Math.random()-0.5)*(L-1.4));
+      P(c, C.IRON);
+    }
+  } else {
+    const body = new THREE.BoxGeometry(2.45, 2.60, L);
+    body.translate(0, 2.55, 0); P(body, kind==='freight' ? C.WOOD : C.PAINT);
+    const roof = new THREE.BoxGeometry(2.65, 0.20, L+0.3);
+    roof.translate(0, 3.92, 0); P(roof, C.IRON);
+    if(kind==='coach'){
+      for(let i=0;i<6;i++){
+        const z = -L/2 + (i+0.5)*(L/6);
+        for(const sx of [-1.24, 1.24]){
+          const w = new THREE.BoxGeometry(0.06, 0.95, 0.85);
+          w.translate(sx, 2.90, z); P(w, C.GLASS);
+        }
+      }
+      for(const sz of [-L/2-0.18, L/2+0.18]){
+        const plat = new THREE.BoxGeometry(2.2, 0.14, 0.9);
+        plat.translate(0, 1.30, sz); P(plat, C.WOOD);
+        for(const sx of [-1.0, 1.0]){
+          const rail = new THREE.BoxGeometry(0.07, 1.0, 0.07);
+          rail.translate(sx, 1.85, sz); P(rail, C.IRON);
+        }
+      }
+    } else {
+      for(const sz of [-1, 1]){
+        const dr = new THREE.BoxGeometry(2.5, 1.9, 0.10);
+        dr.translate(0, 2.35, sz*(L/2+0.01)); P(dr, C.IRON);
+      }
+    }
+  }
+  for(const z of [-L/2+1.2, L/2-1.2]){
+    for(const sx of [-1.0, 1.0]){
+      const w = new THREE.CylinderGeometry(0.48,0.48,0.16,12);
+      w.rotateZ(Math.PI/2); w.translate(sx, 0.48, z); P(w, C.IRON);
+    }
+  }
+  return mergeParts(parts);
+}
+
+class Train {
+  constructor(roads, lib, scene, audio){
+    this.roads = roads; this.audio = audio; this.scene = scene;
+    this.route = roads.railRoute;
+    this.stations = (roads.stations||[]).slice().sort((a,b)=>a.along-b.along);
+    if(!this.route) return;
+
+    const mats = [
+      new THREE.MeshStandardMaterial({ color:0x2c2b29, roughness:0.55, metalness:0.55 }),
+      new THREE.MeshStandardMaterial({ color:0xb08d3f, roughness:0.34, metalness:0.75 }),
+      new THREE.MeshStandardMaterial({ color:0x1d3b3c, roughness:0.48, metalness:0.22 }),
+      new THREE.MeshStandardMaterial({ map:lib.wood_dark.map,
+        normalMap:lib.wood_dark.normalMap, color:0x8a6a48, roughness:0.9 }),
+      new THREE.MeshStandardMaterial({ color:0x9fb6c4, roughness:0.12,
+        metalness:0.3, emissive:0x000000 }),
+    ];
+    this.mats = mats;
+    this.group = new THREE.Group();
+    this.cars = [];
+    const specs = [ {geo:buildLocomotive(lib), len:9.4, off:0},
+                    {geo:buildCar(lib,'tender'), len:5.6, off:8.2},
+                    {geo:buildCar(lib,'coach'),  len:9.0, off:14.6},
+                    {geo:buildCar(lib,'coach'),  len:9.0, off:24.4},
+                    {geo:buildCar(lib,'freight'),len:9.0, off:34.2} ];
+    for(const s of specs){
+      const m = new THREE.Mesh(s.geo, mats);
+      m.castShadow = true; m.receiveShadow = true;
+      this.group.add(m);
+      this.cars.push({ mesh:m, off:s.off });
+    }
+    scene.add(this.group);
+
+    this.dist = this.stations.length ? this.stations[0].along : 20;
+    this.dir = 1;
+    this.speed = 0;
+    this.dwell = 6;
+    this.nextStop = 1;
+    this.smokeT = 0;
+    this.chuffT = 0;
+    this.whistled = false;
+    this.headlamp = new THREE.PointLight(0xffd9a0, 0, 34, 2);
+    scene.add(this.headlamp);
+    this.rider = null;          // set while the player is aboard
+  }
+
+  /* Where a passenger stands: the end platform of the first coach. */
+  boardPoint(out){
+    const car = this.cars[2];
+    if(!car) return null;
+    const v = (out || new THREE.Vector3()).set(0, 1.44, -4.6);
+    return v.applyMatrix4(car.mesh.matrixWorld);
+  }
+  /* And where they step down to. */
+  alightPoint(out){
+    const car = this.cars[2];
+    if(!car) return null;
+    const v = (out || new THREE.Vector3()).set(-3.4, 0.2, -4.6);
+    return v.applyMatrix4(car.mesh.matrixWorld);
+  }
+  get stopped(){ return this.speed < 0.9; }
+
+  /* Wind the service forward until she is standing at a given platform. Used
+     by the "wait for the train" prompt, so nobody has to stand on a platform
+     for four real minutes to find out whether the timetable works. */
+  fastForwardTo(stationName, tod){
+    let simulated = 0;
+    for(let i=0;i<20000;i++){
+      this.update(0.25, new THREE.Vector3(0,0,1e6), 0);
+      simulated += 0.25;
+      if(this.atStation && this.currentStation() === stationName) break;
+    }
+    if(tod) tod.setHour(tod.hour + simulated/3600*24/(CFG.DAY_MINUTES/60*24));
+    return simulated;
+  }
+  get atStation(){ return this.dwell > 0; }
+  /* Name of the platform she is standing at, if any. */
+  currentStation(){
+    if(!this.atStation) return null;
+    const s = this.stations[this.nextStop];
+    return s ? s.name : null;
+  }
+  nextStation(){
+    const s = this.stations[this.nextStop];
+    return s ? s.name : null;
+  }
+
+  /* Sample the alignment; the wheels sit on the rail head, not the ballast. */
+  _at(d){
+    const s = this.roads.sampleRoute(this.route, M.clamp(d, 0, this.route.length));
+    return s;
+  }
+
+  update(dt, playerPos, nightAmt){
+    if(!this.route) return;
+
+    /* Timetable. Accelerate, run, brake into the platform, wait, go again. */
+    let target = CFG.TRAIN_SPEED;
+    const stop = this.stations[this.nextStop];
+    if(this.dwell > 0){
+      this.dwell -= dt; target = 0;
+      if(this.dwell <= 0){
+        this.whistled = false;
+        // Reverse at the end of the line.
+        if(this.nextStop >= this.stations.length-1 && this.dir > 0) this.dir = -1;
+        else if(this.nextStop <= 0 && this.dir < 0) this.dir = 1;
+        this.nextStop = M.clamp(this.nextStop + this.dir, 0, this.stations.length-1);
+      }
+    } else if(stop){
+      const remaining = Math.abs(stop.along - this.dist);
+      if(remaining < 90) target = M.lerp(1.2, CFG.TRAIN_SPEED, remaining/90);
+      if(remaining < 2.2){ this.dwell = CFG.TRAIN_DWELL + Math.random()*10; target = 0; }
+      // She whistles on the approach, every time.
+      if(remaining < 150 && !this.whistled){
+        this.whistled = true;
+        if(this.audio && this.audio.ready) this._whistle();
+      }
+    }
+    this.speed = M.damp(this.speed, target, target > this.speed ? 0.45 : 0.8, dt);
+    this.dist += this.speed*dt*this.dir;
+    this.dist = M.clamp(this.dist, 0, this.route.length);
+
+    /* Place every vehicle along the alignment, each trailing the one ahead. */
+    const up = new THREE.Vector3(0,1,0);
+    const q = new THREE.Quaternion();
+    for(const car of this.cars){
+      const d = this.dist - car.off*this.dir;
+      const a = this._at(d);
+      const b = this._at(d + 2.5*this.dir);
+      const dir = new THREE.Vector3().subVectors(b.pos, a.pos);
+      if(this.dir < 0) dir.negate();
+      if(dir.lengthSq() < 1e-6) dir.set(0,0,1);
+      dir.normalize();
+      car.mesh.position.set(a.pos.x, a.pos.y + 0.44, a.pos.z);
+      const yaw = Math.atan2(dir.x, dir.z);
+      const pitch = -Math.asin(M.clamp(dir.y, -1, 1));
+      car.mesh.rotation.order = 'YXZ';
+      car.mesh.rotation.set(pitch, yaw, 0);
+    }
+
+    /* Headlamp after dark. */
+    const head = this.cars[0].mesh;
+    this.headlamp.intensity = nightAmt*10;
+    this.headlamp.visible = nightAmt > 0.15;
+    this.headlamp.position.copy(head.position).add(
+      new THREE.Vector3(Math.sin(head.rotation.y)*4.2, 3.0,
+                        Math.cos(head.rotation.y)*4.2));
+    this.mats[4].emissive.setRGB(nightAmt*0.9, nightAmt*0.7, nightAmt*0.4);
+
+    /* Exhaust, and the beat of it. */
+    const near = head.position.distanceTo(playerPos);
+    this.smokeT -= dt;
+    if(this.smokeT <= 0 && this.smoke && near < 420){
+      this.smokeT = M.lerp(0.42, 0.10, M.sat(this.speed/CFG.TRAIN_SPEED));
+      const stackPos = head.position.clone().add(new THREE.Vector3(
+        Math.sin(head.rotation.y)*3.3, 4.6, Math.cos(head.rotation.y)*3.3));
+      this.smoke(stackPos, this.speed);
+    }
+    if(this.audio && this.audio.ready && near < 260 && this.speed > 0.4){
+      this.chuffT -= dt;
+      if(this.chuffT <= 0){
+        this.chuffT = M.lerp(0.60, 0.16, M.sat(this.speed/CFG.TRAIN_SPEED));
+        this._chuff(head.position, near);
+      }
+    }
+    this.pos = head.position;
+
+    /* The car matrices are written above; a passenger is pinned to one of
+       them, so he rides with every lurch and pitch the train has. */
+    for(const car of this.cars) car.mesh.updateMatrixWorld(true);
+  }
+
+  /* Four beats to the revolution: a hiss of steam through a tapering filter. */
+  _chuff(pos, dist){
+    const A = this.audio, c = A.ctx, t = A.now();
+    const out = A.out(pos, 0.30);
+    const n = c.createBufferSource();
+    n.buffer = A.noiseBuffer(0.5, 'brown');
+    const f = c.createBiquadFilter(); f.type='bandpass';
+    f.frequency.setValueAtTime(760, t);
+    f.frequency.exponentialRampToValueAtTime(180, t+0.28);
+    f.Q.value = 0.9;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.34, t+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.34);
+    n.connect(f).connect(g).connect(out);
+    n.start(t); n.stop(t+0.4);
+  }
+
+  /* Two chime notes, a fifth apart, with the wobble a real whistle has. */
+  _whistle(){
+    const A = this.audio, c = A.ctx, t = A.now();
+    const out = A.out(this.pos || new THREE.Vector3(), 0.45);
+    for(const [f0, lvl] of [[392, 0.16],[588, 0.12],[784, 0.05]]){
+      const o = c.createOscillator(); o.type='sawtooth'; o.frequency.value=f0;
+      const bp = c.createBiquadFilter(); bp.type='bandpass';
+      bp.frequency.value = f0*1.6; bp.Q.value = 3.5;
+      const lfo = c.createOscillator(); lfo.frequency.value = 5.6;
+      const lg = c.createGain(); lg.gain.value = f0*0.012;
+      lfo.connect(lg).connect(o.frequency);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(lvl, t+0.14);
+      g.gain.setValueAtTime(lvl, t+1.1);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+1.9);
+      o.connect(bp).connect(g).connect(out);
+      o.start(t); lfo.start(t); o.stop(t+2.0); lfo.stop(t+2.0);
+    }
+    const air = c.createBufferSource();
+    air.buffer = A.noiseBuffer(2.0, 'pink');
+    const af = c.createBiquadFilter(); af.type='highpass'; af.frequency.value=1800;
+    const ag = c.createGain();
+    ag.gain.setValueAtTime(0.0001, t);
+    ag.gain.exponentialRampToValueAtTime(0.03, t+0.14);
+    ag.gain.exponentialRampToValueAtTime(0.0001, t+1.9);
+    air.connect(af).connect(ag).connect(out);
+    air.start(t); air.stop(t+2.0);
+  }
+}
+/* ==========================================================================
+   CUTSCENE DIRECTOR
+   Camera on rails, letterboxed, with subtitles and synthesised voice. Shots
+   are authored as a start and end framing plus a list of lines with their own
+   timings, and the director eases between them.
+
+   It is skippable from the first frame. A cutscene you cannot skip is a
+   cutscene you resent the second time you see it (§9).
+   ========================================================================== */
+const FWD_HELP = new THREE.Vector3(0,0,1);
+const _push = new THREE.Vector3();
+
+class Director {
+  constructor(game){
+    this.game = game;
+    this.active = false;
+    this.shots = null;
+    this.shot = 0;
+    this.t = 0;
+    this.onDone = null;
+    this._pos = new THREE.Vector3();
+    this._look = new THREE.Vector3();
+    this._spoken = new Set();
+  }
+
+  /* shots: [{ dur, from:{pos,look}, to:{pos,look}, lines:[{t,who,text,voice,cls}],
+              fadeIn, fadeOut, hold }] */
+  /* Stage a conversation: turn both parties to face one another, hold them
+     there, and cut between them as they speak. */
+  converse(npc, lines, onDone){
+    const g = this.game;
+    const p = g.player;
+    // Square up to each other.
+    const dx = npc.pos.x - p.pos.x, dz = npc.pos.z - p.pos.z;
+    p.yaw = p.desiredYaw = Math.atan2(dx, dz);
+    p.object.rotation.y = p.yaw;
+    p.vel.set(0,0,0);
+    npc.yaw = Math.atan2(-dx, -dz);
+    npc.object.rotation.y = npc.yaw;
+    npc.target = null; npc.speed = 0; npc.waitT = 999;
+    npc.inScene = true;
+    g.horse.followTarget = null;
+    g.horse.speed = 0;
+    this.talking = npc;
+    return this.play(conversationShots(g, npc, lines), ()=>{
+      npc.inScene = false; npc.waitT = 3 + Math.random()*6;
+      npc.mouthOpen = 0;
+      this.talking = null;
+      if(onDone) onDone();
+    });
+  }
+
+  play(shots, onDone){
+    this.shots = shots;
+    this.shot = 0; this.t = 0;
+    this.active = true;
+    this.onDone = onDone;
+    this._spoken.clear();
+    this.game.ui.letterbox(true, 12);
+    this.game.ui.hud.classList.add('cine');
+    if(document.pointerLockElement) document.exitPointerLock();
+    return this;
+  }
+
+  skip(){
+    if(!this.active) return;
+    this.finish();
+  }
+
+  finish(){
+    this.active = false;
+    /* Hand the free camera back pointing roughly where the last shot was
+       looking, so control resumes without a lurch. */
+    const g = this.game;
+    if(g.cam && this._look){
+      const p = g.player.pos;
+      g.cam.yaw = Math.atan2(this._look.x - p.x, this._look.z - p.z);
+      g.cam.pitch = M.clamp(g.cam.pitch, -0.35, 0.15);
+      g.cam.smoothTarget.copy(g.player.eyePos);
+      g.cam.curDist = CFG.CAM.DIST;
+    }
+    this.game.ui.showTitle(false);
+    this.game.ui.letterbox(false);
+    this.game.ui.hud.classList.remove('cine');
+    this.game.ui.fade(0, 500);
+    this.game.ui.subs.classList.remove('on');
+    const dom = this.game.renderer.domElement;
+    if(dom.requestPointerLock) dom.requestPointerLock();
+    const cb = this.onDone; this.onDone = null;
+    if(cb) cb();
+  }
+
+  update(dt){
+    if(!this.active) return false;
+    const s = this.shots[this.shot];
+    if(!s){ this.finish(); return false; }
+    this.t += dt;
+
+    /* Ease each move so the camera arrives rather than stops. */
+    const k = M.smoother(M.sat(this.t / s.dur));
+    const from = typeof s.from === 'function' ? s.from() : s.from;
+    const to   = typeof s.to   === 'function' ? s.to()   : s.to;
+    // A framing may hand back either a vector or a function returning one.
+    const val = (v)=> (typeof v === 'function' ? v() : v);
+    this._pos.lerpVectors(val(from.pos), val(to.pos), k);
+    this._look.lerpVectors(val(from.look), val(to.look), k);
+
+    /* Never put the camera underground. Shot framings are offsets from an
+       actor, and on sloping country an offset that clears the ground on the
+       flat will be buried in a hillside — which renders as a black screen. */
+    const T = this.game.terrain;
+    const floor = T.heightAt(this._pos.x, this._pos.z) + 0.55;
+    if(!(this._pos.y > floor)) this._pos.y = floor;
+    if(this.game.colliders &&
+       this.game.colliders.blocked(this._pos.x, this._pos.z, 0.4)){
+      const deck = this.game.colliders.support(this._pos.x, this._pos.z,
+                                               this._pos.y + 4, 0.4);
+      if(deck > this._pos.y) this._pos.y = deck + 0.5;
+    }
+    if(!Number.isFinite(this._look.x)) this._look.copy(this._pos).add(FWD_HELP);
+    /* Never let the lens end up inside its own subject. */
+    const gap = this._pos.distanceTo(this._look);
+    if(gap < 0.85){
+      _push.copy(this._pos).sub(this._look);
+      if(_push.lengthSq() < 1e-6) _push.set(0,0,1);
+      this._pos.addScaledVector(_push.normalize(), 0.85 - gap);
+    }
+
+    const cam = this.game.camera;
+    cam.position.copy(this._pos);
+    cam.lookAt(this._look);
+    if(s.fov){
+      const f = M.lerp(s.fov[0], s.fov[1], k);
+      if(Math.abs(cam.fov - f) > 0.01){ cam.fov = f; cam.updateProjectionMatrix(); }
+    }
+    // A little handheld drift, so a locked-off shot still breathes.
+    const n = this.game.cam._noise;
+    cam.rotateX(n.n2(this.t*0.7, 0)*0.0016);
+    cam.rotateY(n.n2(0, this.t*0.8)*0.0016);
+
+    /* The title reveal is a beat like any other. */
+    if(s.title && this.t >= s.title.t && !this._spoken.has('title'+this.shot)){
+      this._spoken.add('title'+this.shot);
+      this.game.ui.showTitle(true);
+    }
+
+    /* Lines fire once, at their own moment inside the shot. */
+    for(let i=0;i<(s.lines||[]).length;i++){
+      const L = s.lines[i];
+      const id = this.shot+':'+i;
+      if(this.t >= L.t && !this._spoken.has(id)){
+        this._spoken.add(id);
+        this.game.ui.say(L.who, L.text, L.hold, L.cls || '');
+        if(this.game.audio.ready && L.voice){
+          const prof = VOICE[L.voice] || VOICE.jarrad_act1;
+          const src = L.at ? L.at() : null;
+          this.game.audio.speak(L.text, prof, src, L.mouth || null, null,
+                                L.follow || null);
+        }
+      }
+    }
+
+    if(this.t >= s.dur){
+      this.shot++; this.t = 0;
+      if(this.shot >= this.shots.length){ this.finish(); return false; }
+    }
+    return true;
+  }
+}
+
+
+/* ==========================================================================
+   CONVERSATIONS
+   Every meeting that moves the plot is played as a scene: over-the-shoulder,
+   letterboxed, both parties voiced. Written so each of the four tells you
+   something the others do not — what the company did here, and why the answer
+   is no (§9, §10).
+
+   who: 'them' = the character, 'me' = Jarrad.
+   ========================================================================== */
+const CONVERSATIONS = {
+
+  halloran_first: [
+    { who:'them', text:"Gaunt. The wire came through Tuesday. Nobody in this office was pleased about it." },
+    { who:'me',   text:"Nobody in this office was consulted. Neither was I." },
+    { who:'them', text:"Six towns. Not one foot of wire between any of them. That is the job as head office wrote it." },
+    { who:'me',   text:"Head office being Ambrose Rennick. Six weeks in the chair and already signing." },
+    { who:'them', text:"Head office being a man who has never seen this country and has costed it to the shilling." },
+    { who:'them', text:"The old board would have argued about it for a year. This one signed it on his second morning." },
+    { who:'me',   text:"Then he'll have costed the poles. What he won't have costed is the people." },
+    { who:'them', text:"No. And there are four of them who matter. Marguerite Conway at the creek. Old Pudmenzky on the flats." },
+    { who:'them', text:"Sheriff McRoberts at the crossing. And the Widow Dedman, up at the gulch." },
+    { who:'me',   text:"And all four have said no." },
+    { who:'them', text:"All four have said no to a letter. Nobody has ever bothered to ride out and ask them properly." },
+    { who:'me',   text:"That's what I'm for. Allegedly." },
+    { who:'them', text:"Then go and be it. Come back when you've heard all four out. Not before." },
+  ],
+
+  conway_first: [
+    { who:'them', text:"You're the one they sent. You're smaller than the letter suggested." },
+    { who:'me',   text:"The letter was written by a man who's never met me either." },
+    { who:'them', text:"I run the crossing, the ferry and most of the credit in this town. So I'll be direct." },
+    { who:'them', text:"Your company surveyed this bend in '09. Told us the poles would go in by spring." },
+    { who:'me',   text:"And they didn't." },
+    { who:'them', text:"They put in eleven. Then the river came up and took nine of them, and your surveyor with it." },
+    { who:'me',   text:"I didn't know about the surveyor." },
+    { who:'them', text:"No. His name was Alder. Nobody in your office remembers it, which is rather the point." },
+    { who:'me',   text:"Then let me learn the river before I ask you for anything." },
+    { who:'them', text:"...That's the first sensible thing anyone from Meridian has said to me in nine years." },
+    { who:'them', text:"Come back when you can tell me where the water goes. Then we'll talk about wire." },
+  ],
+
+  pudmenzky_first: [
+    { who:'them', text:"Forty years on this flat. Never needed a wire yet." },
+    { who:'me',   text:"You've never had one to need." },
+    { who:'them', text:"Don't be clever at me, son. I've had clever men out here before." },
+    { who:'me',   text:"How many?" },
+    { who:'them', text:"Three. First one promised water. Second promised rail. Third promised the wire." },
+    { who:'them', text:"I have the salt, no railhead, and a hole in the ground where a pump was meant to go." },
+    { who:'me',   text:"And you'd like a fourth man to promise you something." },
+    { who:'them', text:"I'd like a man to tell me what it COSTS. Nobody's ever done that." },
+    { who:'me',   text:"Eleven pounds a mile, and the maintenance falls on the company, not on you." },
+    { who:'them', text:"...Say that again, slower." },
+    { who:'me',   text:"I'll write it down. And I'll put my name on it, not the company's." },
+    { who:'them', text:"Hm. Sit down, then. If you're going to waste my afternoon, waste it sitting." },
+  ],
+
+  mcroberts_first: [
+    { who:'them', text:"Keep the horse off the boardwalk and we'll get along." },
+    { who:'me',   text:"I'm told you decide for this town." },
+    { who:'them', text:"I decide who leaves it. That's different, and it's enough." },
+    { who:'me',   text:"I want to bring the wire through the crossing." },
+    { who:'them', text:"I know what you want. Two men came through last month asking after you." },
+    { who:'me',   text:"...Describe them." },
+    { who:'them', text:"Company coats. No dust on them. Asked whether Meridian's man had come through yet, and what he'd been told." },
+    { who:'me',   text:"Rennick." },
+    { who:'them', text:"I told them nothing useful. I don't much like men who arrive clean." },
+    { who:'me',   text:"Then we may want the same thing for different reasons." },
+    { who:'them', text:"We may. Bring me a line I can hang a warrant on and I'll think about it." },
+  ],
+
+  dedman_first: [
+    { who:'them', text:"My husband put that wire in the ground. It's still there. So is he." },
+    { who:'me',   text:"I'm sorry." },
+    { who:'them', text:"Everyone is. The company was sorry in writing. Twice, on the same form." },
+    { who:'me',   text:"What happened at shaft four?" },
+    { who:'them', text:"They ran the line down it because it was cheaper than going round the ridge." },
+    { who:'them', text:"It flooded in March. Eleven men. Your company called it an act of God and closed the file." },
+    { who:'me',   text:"Who signed the routing order?" },
+    { who:'them', text:"...Nobody has ever asked me that." },
+    { who:'me',   text:"I'm asking." },
+    { who:'them', text:"A. Rennick. In his own hand, when he was nobody. I've kept it eleven years waiting for somebody to ask." },
+    { who:'me',   text:"Then keep it a little longer. I'll want it where it can do some good." },
+    { who:'them', text:"You have an honest face, Mr Gaunt. That's usually the expensive kind." },
+  ],
+
+  halloran_report: [
+    { who:'them', text:"All four. Well. That's more than the last man managed." },
+    { who:'me',   text:"They'll all sign. Not one of them will sign for the reason head office thinks." },
+    { who:'them', text:"Go on." },
+    { who:'me',   text:"Conway wants the river surveyed. Pudmenzky wants a number. McRoberts wants leverage." },
+    { who:'me',   text:"And the Widow Dedman has held a routing order with Rennick's signature on it for eleven years." },
+    { who:'them', text:"...Say that last part to nobody else in this building." },
+    { who:'me',   text:"I intend to say it to a great many people. Eventually." },
+    { who:'them', text:"Then you'd better get the line up first. A man with no wire has no voice." },
+    { who:'me',   text:"That's rather the business we're in." },
+    { who:'them', text:"Get the poles in the ground, Gaunt. Then we'll see whose name is on what." },
+  ],
+};
+
+/* How long this line will actually take to speak. Taken from the phonemiser
+   the voice synth uses, so a shot can never be shorter than its own dialogue —
+   which is what had the camera cutting to the listener while the speaker was
+   still halfway through a sentence. */
+function speechSeconds(text, voiceName){
+  const p = VOICE[voiceName] || VOICE.jarrad_act1;
+  const rate = p.rate || 1;
+  let t = 0;
+  for(const ph of phonemise(text)) t += ph.dur / rate;
+  return t + 0.12;
+}
+const LINE_GAP = 0.95;      // a beat between lines, so nobody talks over anybody
+const SHOT_PRE = 0.55;      // the camera settles before the first word
+const SHOT_TAIL = 0.85;     // and holds after the last
+
+/* Build a scene between the player and a character.
+
+   Two rules the old builder broke. First, a shot must never be shorter than
+   the line it carries plus a beat either side — a two-word reply was producing
+   a one-and-a-half second shot, which reads as the camera flinching. Second,
+   every camera stays on ONE side of the axis between the two speakers. The
+   old version put the over-the-shoulder cameras on opposite sides, so the pair
+   swapped places in frame on every cut.
+
+   And it is no longer just A, B, A, B: there is a vocabulary of framings and
+   the scene draws from it. */
+const MIN_SHOT = 3.6;       // nothing cuts faster than this
+const TWO_SHOT_UNDER = 1.7; // a very short line is played in a two-shot instead
+
+function conversationShots(game, npc, lines){
+  const P = game.player, V = (x,y,z)=>new THREE.Vector3(x,y,z);
+  const eyeMe   = ()=> V(P.pos.x, P.pos.y + 1.58, P.pos.z);
+  const eyeThem = ()=> V(npc.pos.x, npc.pos.y + 1.58*(npc.object.scale.y||1), npc.pos.z);
+  const midEye  = ()=>{ const a=eyeMe(), b=eyeThem();
+    return V((a.x+b.x)/2, (a.y+b.y)/2, (a.z+b.z)/2); };
+
+  /* One seed per scene, so a given conversation is always cut the same way. */
+  let seed = 0;
+  for(let i=0;i<npc.name.length;i++) seed = (seed*31 + npc.name.charCodeAt(i))>>>0;
+  seed = (seed + lines.length*7919)>>>0;
+  const rnd = ()=>{ seed = (seed*1664525 + 1013904223)>>>0; return seed/4294967296; };
+  const side = rnd() < 0.5 ? 1 : -1;      // chosen once; never crossed
+
+  /* A camera placement in the two speakers' own frame: `along` runs from
+     Jarrad toward the other party, `lat` is always positive so every camera
+     sits on the same side of the line. */
+  const cam = (on, along, lat, up)=>()=>{
+    const a = eyeMe(), b = eyeThem();
+    const dx = b.x-a.x, dz = b.z-a.z;
+    const L = Math.hypot(dx,dz) || 1;
+    const ax = dx/L, az = dz/L;
+    const px = -az*side, pz = ax*side;
+    const o = on === 'them' ? b : on === 'me' ? a : midEye();
+    return V(o.x + ax*along + px*lat, o.y + up, o.z + az*along + pz*lat);
+  };
+
+  /* The vocabulary. Each entry gives the anchor, how far along the axis, how
+     far to the side, and the height — mirrored depending on who is speaking. */
+  const FRAMINGS = {
+    ots:     { w:3, fov:[40,37], them:['me',   -1.05, 0.80, 0.24],
+                                 me:  ['them',  1.05, 0.80, 0.24] },
+    single:  { w:3, fov:[38,35], them:['them', -1.20, 1.05, 0.14],
+                                 me:  ['me',    1.20, 1.05, 0.14] },
+    profile: { w:1, fov:[42,39], them:['mid',   0.30, 2.10, 0.26],
+                                 me:  ['mid',  -0.30, 2.10, 0.26] },
+    low:     { w:1, fov:[40,36], them:['them', -1.35, 0.74,-0.44],
+                                 me:  ['me',    1.35, 0.74,-0.44] },
+    high:    { w:1, fov:[42,39], them:['them', -1.20, 0.68, 1.00],
+                                 me:  ['me',    1.20, 0.68, 1.00] },
+    wide:    { w:1, fov:[46,43], them:['mid',  -0.60, 3.30, 0.85],
+                                 me:  ['mid',   0.60, 3.30, 0.85] },
+    two:     { w:0, fov:[45,42], them:['mid',   0.00, 2.85, 0.58],
+                                 me:  ['mid',   0.00, 2.85, 0.58] },
+  };
+  const DECK = [];
+  for(const k of Object.keys(FRAMINGS))
+    for(let i=0;i<FRAMINGS[k].w;i++) DECK.push(k);
+
+  /* Four ways for a shot to move, so nothing is ever locked off. */
+  const MOVES = [
+    (a,l,u,s2)=>[a + 0.17*s2, l - 0.07, u - 0.02],   // push in
+    (a,l,u,s2)=>[a - 0.15*s2, l + 0.06, u + 0.03],   // ease back
+    (a,l,u,s2)=>[a + 0.05*s2, l + 0.24, u + 0.01],   // arc round
+    (a,l,u,s2)=>[a + 0.06*s2, l - 0.03, u + 0.11],   // rise
+  ];
+
+  const jarradVoice = game.player.act >= 4 ? 'jarrad_act5' : 'jarrad_act1';
+  const shots = [];
+  let lastKind = null, moveIdx = (rnd()*MOVES.length)|0;
+
+  /* Establish the pair before anybody speaks. */
+  shots.push({ dur: 2.9,
+    from: { pos: cam('mid', -0.5, 3.5, 0.95), look: midEye },
+    to:   { pos: cam('mid', -0.2, 3.0, 0.72), look: midEye },
+    fov: [48, 44], lines: [] });
+
+  let i = 0;
+  while(i < lines.length){
+    // Consecutive lines from one person share a shot, up to three.
+    let n = 1;
+    while(i+n < lines.length && lines[i+n].who === lines[i].who && n < 3) n++;
+    const group = lines.slice(i, i+n);
+    const onThem = group[0].who === 'them';
+    const who = onThem ? 'them' : 'me';
+
+    /* Lay the lines out with a real beat between them. */
+    const shotLines = [];
+    let t = SHOT_PRE, speech = 0;
+    for(const L of group){
+      const isThem = L.who === 'them';
+      const voice = isThem ? (npc.voice || 'conway') : jarradVoice;
+      const d = speechSeconds(L.text, voice);
+      shotLines.push({
+        t, hold: d + 0.55,
+        who: isThem ? npc.name : 'JARRAD GAUNT',
+        cls: isThem ? 'named' : '',
+        text: L.text, voice,
+        at: isThem ? eyeThem : eyeMe,
+        follow: isThem ? eyeThem : eyeMe,
+        mouth: isThem ? (o)=>{ npc.mouthOpen = o; } : null,
+      });
+      t += d + LINE_GAP; speech += d;
+    }
+    const dur = Math.max(MIN_SHOT, t - LINE_GAP + SHOT_TAIL);
+
+    /* Pick a framing. A very short turn is played wide, with both of them in
+       frame, so a one-word reply never earns a cut of its own. */
+    let kind;
+    if(speech < TWO_SHOT_UNDER) kind = 'two';
+    else {
+      let guard = 0;
+      do { kind = DECK[(rnd()*DECK.length)|0]; } while(kind === lastKind && guard++ < 8);
+    }
+    lastKind = kind;
+    const f = FRAMINGS[kind];
+    const [anchor, along, lat, up] = f[who];
+    const s2 = onThem ? -1 : 1;      // "toward the speaker" along the axis
+    const mv = MOVES[moveIdx++ % MOVES.length];
+    const [a2, l2, u2] = mv(along, lat, up, s2);
+    const lookAt = kind === 'two' || kind === 'wide' ? midEye
+                 : (onThem ? eyeThem : eyeMe);
+
+    shots.push({
+      dur, kind,
+      from: { pos: cam(anchor, along, lat, up), look: lookAt },
+      to:   { pos: cam(anchor, a2, l2, u2),     look: lookAt },
+      fov: f.fov,
+      lines: shotLines,
+    });
+    i += n;
+  }
+
+  /* Sit on the two of them for a moment before handing control back. */
+  shots.push({ dur: 2.2,
+    from: { pos: cam('mid', 0.1, 2.7, 0.62), look: midEye },
+    to:   { pos: cam('mid', -0.3, 3.3, 0.82), look: midEye },
+    fov: [44, 47], lines: [] });
+
+  return shots;
+}
+
+/* ==========================================================================
+   STORY
+   Five acts, sixteen missions (§9). What is wired here is the frame: the act
+   the player is in, the objective in front of them, and the beats that move
+   one to the next. The opening is authored in full.
+   ========================================================================== */
+const ACTS = [
+  null,
+  { n:1, name:'The Fall',            card:'ACT ONE' },
+  { n:2, name:'The Climb',           card:'ACT TWO' },
+  { n:3, name:'The Rival Exchanges', card:'ACT THREE' },
+  { n:4, name:'The Low Point',       card:'ACT FOUR' },
+  { n:5, name:'Redemption',          card:'ACT FIVE' },
+];
+
+class Story {
+  constructor(game){
+    this.game = game;
+    this.act = 1;
+    this.objective = null;
+    this.log = [];
+    this.flags = new Set();
+    this.director = new Director(game);
+  }
+
+  /* An objective is a line of text AND a place. Without the second half the
+     player is told to find a man in a town of forty buildings and left to it. */
+  setObjective(text, hint, marker){
+    this.objective = text;
+    this.game.objective = text;
+    this.marker = marker || null;
+    this.log.push(text);
+    this.game.ui.setObjective(text);
+    this.game.ui.toast(text.toUpperCase(), hint || '', 5);
+  }
+
+  /* Where the current objective is, resolved live so it can follow a person. */
+  markerPos(){
+    if(!this.marker) return null;
+    if(typeof this.marker === 'function') return this.marker();
+    return this.marker;
+  }
+  townByKey(k){ return this.game.towns.list.find(t=>t.key===k); }
+  namedNpc(id){ return this.game.folk.all.find(n=>n.id===id); }
+  complete(flag){
+    if(this.flags.has(flag)) return false;
+    this.flags.add(flag);
+    return true;
+  }
+
+  /* ---- The opening ------------------------------------------------------
+     Dawn on the road out of Yes Gulch. He has been sent here, and he is not
+     pretending otherwise. Ollie does most of the talking, which is the joke
+     and also the point: she is the only one still on his side. */
+  opening(){
+    const g = this.game;
+    const P = g.player.pos, H = g.horse;
+    const V = (x,y,z)=> new THREE.Vector3(x,y,z);
+    const at = (dx,dy,dz)=> V(P.x+dx, P.y+dy, P.z+dz);
+    const head = ()=> H.headPoint();
+    const face = ()=> V(P.x, P.y+1.55, P.z);
+
+    g.ui.fade(1, 0);
+    setTimeout(()=>g.ui.fade(0, 2600), 350);
+
+    /* Framings are given in the character's OWN frame — behind, beside,
+       above — not in world axes. World-axis offsets depend on which way he
+       happens to be facing when the game starts, so the same shot could be a
+       clean three-quarter view one run and the inside of a hill the next. */
+    const rel = (side, fwd, up)=>()=>{
+      const y = g.player.yaw, s2 = Math.sin(y), c2 = Math.cos(y);
+      return V(P.x + s2*fwd + c2*side, P.y + up, P.z + c2*fwd - s2*side);
+    };
+
+    /* Framings that know about BOTH of them. Placing a shot on Ollie using
+       only Jarrad's frame assumed she was standing in a particular spot; if
+       she was not, the lens ended up inside her. These work from the axis
+       between the two, exactly as the conversation scenes do, so the framing
+       holds wherever she happens to be. */
+    /* Jarrad and Ollie stand SIDE BY SIDE, so the axis between them runs
+       across their bodies and the perpendicular runs fore-and-aft. Fixing that
+       perpendicular to one sign put every camera behind them — which is why the
+       shots were looking at the back of a horse and sweeping across her flank.
+       The side is chosen so the lens is always in front of the pair. */
+    const pair = (on, along, lat, up)=>()=>{
+      const a = face(), b = head();
+      const dx = b.x-a.x, dz = b.z-a.z;
+      const L = Math.hypot(dx,dz) || 1;
+      const ax = dx/L, az = dz/L;
+      const fy = g.player.yaw;
+      const fwdX = Math.sin(fy), fwdZ = Math.cos(fy);
+      const sgn = (-az*fwdX + ax*fwdZ) >= 0 ? 1 : -1;
+      const px = -az*sgn, pz = ax*sgn;
+      const o = on === 'ollie' ? b
+              : on === 'jarrad' ? a
+              : V((a.x+b.x)/2, (a.y+b.y)/2, (a.z+b.z)/2);
+      return V(o.x + ax*along + px*lat, o.y + up, o.z + az*along + pz*lat);
+    };
+    const midEye = ()=>{ const a=face(), b=head();
+      return V((a.x+b.x)/2, (a.y+b.y)/2 - 0.05, (a.z+b.z)/2); };
+
+    /* A shot is a framing plus a list of turns. Its length comes from how long
+       the turns actually take to say, so the camera can never cut away from
+       somebody mid-sentence. */
+    const shot = (from, to, fov, turns, extra)=>{
+      const lines = [];
+      let t = 0.6;
+      for(const turn of (turns||[])){
+        const d = turn.voice ? speechSeconds(turn.text, turn.voice) : (turn.hold || 4.4);
+        lines.push(Object.assign({}, turn, { t, hold: d + 0.55 }));
+        t += d + 1.05;
+      }
+      const dur = (turns && turns.length) ? Math.max(MIN_SHOT, t + 0.5)
+                                         : ((extra && extra.dur) || 4);
+      return Object.assign({ dur, from, to, fov, lines }, extra || {});
+    };
+    const F = (pos, look)=>({ pos, look });
+    const OLLIE = { who:'OLLIE', cls:'ollie', voice:'ollie', at:head, follow:head,
+                    mouth:(o)=>{ g.horse.mouthOpen = o; } };
+    const JAR   = { who:'JARRAD GAUNT', voice:'jarrad_act1', at:face };
+
+    const shots = [
+      /* 1 — the country, before the man. */
+      shot(F(rel(-52,-62,44), ()=>V(P.x, P.y+8, P.z)),
+           F(rel(-30,-34,21), ()=>V(P.x, P.y+3, P.z)), [46,52],
+        [{ who:'', text:'The frontier. Eighteen days out from anywhere that has a name.',
+           hold:5.0 }]),
+
+      /* 2 — the two of them, before either says anything. */
+      shot(F(pair('mid', -0.4, 3.60, 1.05), midEye),
+           F(pair('mid', -0.1, 3.05, 0.82), midEye), [48,44], null, { dur: 3.2 }),
+
+      /* 3 — over his shoulder, onto her. */
+      shot(F(pair('jarrad', -1.05, 0.86, 0.26), head),
+           F(pair('jarrad', -0.88, 0.78, 0.24), head), [42,39],
+        [Object.assign({}, OLLIE,
+          { text:"So. That's it, then. They actually did it." })]),
+
+      /* 4 — reverse: over her shoulder, onto him. */
+      shot(F(pair('ollie', 1.05, 0.86, 0.24), face),
+           F(pair('ollie', 0.90, 0.80, 0.22), face), [40,37],
+        [Object.assign({}, JAR,
+          { text:"They did it in writing. That's the part that stings." })]),
+
+      /* 5 — a clean single, closer. The dismissal, in his own words. */
+      shot(F(pair('jarrad', 1.28, 1.02, 0.10), face),
+           F(pair('jarrad', 1.10, 0.94, 0.06), face), [38,34],
+        [Object.assign({}, JAR, { text:"Twelve years I sold for that company. Twelve." }),
+         Object.assign({}, JAR, { text:"Rennick signs one page and I'm a frontier man with a horse and a satchel." })]),
+
+      /* 6 — back over his shoulder, and the terms of the thing. */
+      shot(F(pair('jarrad', -1.10, 0.90, 0.28), head),
+           F(pair('jarrad', -0.92, 1.10, 0.24), head), [42,38],
+        [Object.assign({}, OLLIE,
+          { text:"Six towns. No wire between any of them. Get the line through and they take you back." })]),
+
+      /* 7 — him, in profile across the pair. */
+      shot(F(pair('mid', -0.30, 2.15, 0.30), face),
+           F(pair('mid', -0.20, 2.00, 0.34), face), [42,39],
+        [Object.assign({}, JAR, { text:"That's the arrangement." })]),
+
+      /* 8 — her, and the last word. */
+      shot(F(pair('ollie', -1.20, 1.00, 0.14), head),
+           F(pair('ollie', -1.02, 0.92, 0.18), head), [40,37],
+        [Object.assign({}, OLLIE,
+          { text:"Then we'd better start talking to people. You're good at that. Allegedly." })]),
+
+      /* 9 — pull back out to the country, and the title comes up over it. */
+      shot(F(rel(-5,-6,4.2), face), F(rel(-36,-44,30), ()=>V(P.x, P.y+6, P.z)),
+           [42,58], null, { dur: 11.5, title:{ t:2.6 } }),
+    ];
+
+    this.director.play(shots, ()=>{
+      g.ui.toast('THE FALL', 'Act One', 5.5);
+      if(g.audio.ready) g.audio.music.playTheme('harmonica', 0.85);
+      setTimeout(()=>{
+        const gulch = this.townByKey('gulch');
+        this.setObjective('Ride into Yes Gulch',
+          'Follow the road. Ollie knows the way.',
+          gulch ? new THREE.Vector3(gulch.x, gulch.y, gulch.z) : null);
+      }, 5200);
+    });
+  }
+
+  /* ---- Beats ------------------------------------------------------------ */
+  onEnterTown(town){
+    if(town.key === 'gulch' && this.complete('reach_gulch')){
+      this.setObjective('Speak to Clerk Halloran',
+        'Outside the telegraph office. He has a name over his head.',
+        ()=>{ const n = this.namedNpc('halloran');
+              return n ? n.pos : new THREE.Vector3(town.x, town.y, town.z); });
+    }
+  }
+
+  /* Which scene, if any, this person owes you right now. */
+  scriptFor(npc){
+    if(!npc || !npc.id) return null;
+    if(npc.id === 'halloran'){
+      if(!this.flags.has('talk_office') && this.flags.has('reach_gulch'))
+        return 'halloran_first';
+      if(this.flags.has('met_all') && !this.flags.has('reported'))
+        return 'halloran_report';
+      return null;
+    }
+    if(this.flags.has('talk_office') && !this.flags.has('met_'+npc.id))
+      return npc.id + '_first';
+    return null;
+  }
+
+  /* Returns true if a scene played, so the caller does not also fire a bark. */
+  converse(npc){
+    const key = this.scriptFor(npc);
+    if(!key || !CONVERSATIONS[key]) return false;
+    if(this.director.active) return true;
+    this.director.converse(npc, CONVERSATIONS[key],
+                           ()=>this._afterScene(npc, key));
+    return true;
+  }
+
+  _afterScene(npc, key){
+    const g = this.game;
+    if(key === 'halloran_first'){
+      this.complete('talk_office');
+      g.player.reputation = Math.min(100, g.player.reputation + 4);
+      this._nextHoldout();
+      return;
+    }
+    if(key === 'halloran_report'){
+      this.complete('reported');
+      this.advance(2);
+      this.setObjective('Get the line through',
+        'Poles in the ground. Then we see whose name is on what.', null);
+      return;
+    }
+    if(key.endsWith('_first')){
+      this.complete('met_'+npc.id);
+      this.met = this.met || [];
+      if(this.met.indexOf(npc.id) < 0) this.met.push(npc.id);
+      this.metCount = this.met.length;
+      g.player.reputation = Math.min(100, g.player.reputation + 6);
+      g.ui.toast(npc.name,
+        `${['nobody','One','Two','Three','All four'][this.metCount]} of the four heard out`, 4.5);
+      if(this.metCount >= 4 && this.complete('met_all')){
+        this.setObjective('Return to Clerk Halloran',
+          'Yes Gulch. Tell him what you found.',
+          ()=>{ const n = this.namedNpc('halloran');
+                const t = this.townByKey('gulch');
+                return n ? n.pos : new THREE.Vector3(t.x,t.y,t.z); });
+      } else this._nextHoldout();
+    }
+  }
+
+  onTalk(){ /* scripted scenes handle the plot; barks handle everything else */ }
+
+  /* Point at whichever of the four is closest and still unmet. */
+  _nextHoldout(){
+    const done = new Set(this.met || []);
+    const remaining = NAMED.filter(n=>n.id !== 'halloran' && !done.has(n.id));
+    if(!remaining.length) return;
+    const p = this.game.player.pos;
+    let best = remaining[0], bd = Infinity;
+    for(const n of remaining){
+      const t = this.townByKey(n.town);
+      if(!t) continue;
+      const d = Math.hypot(t.x-p.x, t.z-p.z);
+      if(d < bd){ bd = d; best = n; }
+    }
+    const t = this.townByKey(best.town);
+    const pretty = best.name.replace(/\b([A-Z])([A-Z']+)/g,
+      (m,a,b)=>a+b.toLowerCase());
+    this.setObjective(`Find ${pretty}`,
+      `${t ? t.name : ''} — ${Math.round(bd)} m`,
+      ()=>{ const n = this.namedNpc(best.id);
+            return n ? n.pos : (t ? new THREE.Vector3(t.x,t.y,t.z) : null); });
+  }
+  advance(act){
+    if(act <= this.act) return;
+    this.act = act;
+    this.game.player.setAct(act);
+    const A = ACTS[act];
+    this.game.ui.toast(A.name.toUpperCase(), A.card, 6);
+    if(this.game.audio.ready) this.game.audio.music.setKey();
   }
 }
 /* ==========================================================================
