@@ -91,6 +91,10 @@
   #vitals.idle{opacity:.16}
   #hud.cine #vitals,#hud.cine #compass,#hud.cine #clock,#hud.cine #prompts,
   #hud.cine #objective{opacity:0;transition:opacity .4s}
+  /* A call owns the screen. Not dimmed, not moved — gone. The last build left
+     a subtitle from the previous scene counting down underneath the meeting
+     window, and the Ledger prompt sitting in the corner of it. */
+  #hud.away{opacity:0;pointer-events:none;transition:opacity .22s}
 
   /* Persistent objective line, under the clock. */
   #objective{position:absolute;top:66px;left:50%;transform:translateX(-50%);
@@ -211,93 +215,142 @@
     background:#c9b68c;border:1px solid #8a7449;color:#2b2011;padding:5px 11px;
     cursor:pointer}
   #ledgerPage .hint{font-size:12px;color:#7d6844;font-style:italic;margin-top:16px}
+  #ledgerPage .srow{display:flex;align-items:center;gap:10px;padding:9px 0;
+    border-bottom:1px dotted rgba(60,44,22,.25)}
+  #ledgerPage .sinfo{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+  #ledgerPage .sinfo b{font-family:var(--slab);font-size:13px;letter-spacing:.16em}
+  #ledgerPage .sinfo span{font-size:12px;color:#6b5731;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  #ledgerPage .sinfo .dim{color:#9a8a6c;font-size:11px}
+  #ledgerPage .srow button{font-family:var(--slab);font-size:11px;letter-spacing:.12em;
+    background:#c9b68c;border:1px solid #8a7449;color:#2b2011;padding:6px 12px;
+    cursor:pointer}
+  #ledgerPage .srow button:disabled{opacity:.35;cursor:default}
+  #ledgerPage textarea{width:100%;background:rgba(255,255,255,.35);
+    border:1px solid #8a7449;color:#33260f;font-family:monospace;font-size:11px;
+    padding:8px;resize:vertical}
 
 
-  /* ---- THE CALL — legible, and nothing painted over the world -----------
-     The old housing drew an opaque backdrop across the whole screen, which is
-     exactly why the "feeds" were blank: there was a black div sitting on top
-     of the canvas. There is no backdrop now. The camera frames the person in
-     the world and this is a letterboxed overlay on top of that. */
-  #call{position:fixed;inset:0;z-index:80;display:none;pointer-events:none}
+
+  /* ---- THE CALL — a two-person meeting window ---------------------------
+     The tiles are HOLES. There is deliberately nothing painted inside them:
+     the scrim is a single SVG whose path is the whole screen minus two
+     rounded rectangles, and the live 3D shows through those. Put any opaque
+     background on .tile and the feeds go black again, which is precisely what
+     happened twice before. */
+  #call{position:fixed;inset:0;z-index:80;display:none;pointer-events:none;
+    font-family:var(--sans)}
   #call.on{display:block}
-  #call .bar{position:absolute;left:0;right:0;height:11vh;background:#000;
-    transition:height .4s ease}
-  #call .bar.top{top:0}
-  #call .bar.bot{bottom:0}
+  #call .scrim{position:absolute;left:0;top:0;width:100%;height:100%}
+  #call .scrim path{fill:#0b0d10}
 
-  #call .who{position:absolute;left:5vw;top:13.5vh;font-family:var(--slab);
-    font-size:22px;letter-spacing:.16em;color:var(--yes);
-    text-shadow:0 3px 14px rgba(0,0,0,.95)}
+  /* Top bar: who the meeting is with, how long it has been running, and how
+     the line is holding up. */
+  #call .topbar{position:absolute;left:5vw;right:5vw;top:calc(10.5vh - 42px);
+    height:34px;display:flex;align-items:center;justify-content:space-between;
+    font-family:var(--slab);font-size:11px;letter-spacing:.2em;color:#9fb0c0}
+  #call .topbar .tl{display:flex;align-items:center;gap:10px}
+  #call .topbar .dot{width:9px;height:9px;border-radius:50%;background:#e0483c;
+    box-shadow:0 0 10px rgba(224,72,60,.85);animation:rec 2s ease-in-out infinite}
+  @keyframes rec{50%{opacity:.35}}
+  #call .topbar .tr{display:flex;align-items:center;gap:18px}
+  #call .topbar .clock{color:#e6eef5;font-size:13px;letter-spacing:.12em}
+  #call .topbar .qual{color:#5fbf8a}
 
-  /* The one meter that matters, and it is enormous on purpose. */
-  #call .gw{position:absolute;left:5vw;top:19vh;width:min(46vw,520px)}
-  #call .gwlab{font-family:var(--slab);font-size:11px;letter-spacing:.26em;
-    color:#cbb68b;margin-bottom:6px;text-shadow:0 2px 8px #000}
-  #call .gwtrack{position:relative;height:16px;background:rgba(0,0,0,.62);
-    border:1px solid rgba(203,182,139,.55)}
+  /* The tiles themselves: a border, a radius, and nothing else. */
+  #call .tile{position:absolute;border-radius:10px;overflow:visible}
+  #call .tile .ring{position:absolute;inset:-3px;border-radius:13px;
+    border:2px solid transparent;transition:border-color .18s,box-shadow .18s}
+  #call .tile.talking .ring{border-color:#4cc2c4;
+    box-shadow:0 0 22px rgba(76,194,196,.5),inset 0 0 26px rgba(76,194,196,.14)}
+  #call .tile .pill{position:absolute;left:10px;bottom:10px;
+    display:flex;align-items:center;gap:8px;padding:5px 11px;border-radius:5px;
+    background:rgba(11,13,16,.78);font-family:var(--slab);font-size:11px;
+    letter-spacing:.16em;color:#e6eef5;max-width:calc(100% - 20px)}
+  #call .tile .pill span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #call .tile .mic{width:7px;height:11px;border-radius:4px;background:#5fbf8a;
+    flex:none}
+  #call .tile.talking .mic{background:#4cc2c4;box-shadow:0 0 8px #4cc2c4}
+
+  /* Goodwill, under the tiles and impossible to miss. */
+  #call .gw{position:absolute;left:5vw;top:calc(10.5vh + 46vh);width:min(42vw,480px)}
+  #call .gwlab{font-family:var(--slab);font-size:10px;letter-spacing:.26em;
+    color:#8ea0b0;margin-bottom:6px}
+  #call .gwtrack{position:relative;height:14px;border-radius:7px;
+    background:rgba(255,255,255,.07);overflow:hidden}
   #call .gwtrack u{position:absolute;left:0;top:0;bottom:0;display:block;
-    background:rgba(255,214,0,.22)}
+    background:rgba(255,214,0,.18)}
   #call .gwtrack i{position:absolute;left:0;top:0;bottom:0;display:block;
-    background:linear-gradient(90deg,#8c2f22,#c9a13a 45%,#FFD600 78%,#00A3A6);
-    box-shadow:0 0 18px rgba(255,214,0,.45)}
-  #call .gwnum{position:absolute;right:-52px;top:24px;font-family:var(--slab);
-    font-size:20px;color:#efe3c6;text-shadow:0 2px 8px #000}
-  #call .gwpop{position:absolute;right:-56px;top:16px;font-family:var(--slab);
-    font-size:30px;opacity:0;pointer-events:none}
-  #call .gwpop.up{color:#8ce7a0}
-  #call .gwpop.down{color:#ef6b52}
+    border-radius:7px;
+    background:linear-gradient(90deg,#a8402f,#c9a13a 45%,#FFD600 76%,#4cc2c4);
+    transition:width .1s linear}
+  #call .gwnum{position:absolute;right:-54px;top:20px;font-family:var(--slab);
+    font-size:19px;color:#e6eef5}
+  #call .gwpop{position:absolute;right:-58px;top:12px;font-family:var(--slab);
+    font-size:30px;opacity:0}
+  #call .gwpop.up{color:#6fe0a0} #call .gwpop.down{color:#ef6b52}
   #call .gwpop.go{animation:gwpop 1.05s cubic-bezier(.2,.8,.3,1) forwards}
   @keyframes gwpop{
     0%{opacity:0;transform:translateY(14px) scale(.8)}
     18%{opacity:1;transform:translateY(-4px) scale(1.25)}
     70%{opacity:1;transform:translateY(-22px) scale(1)}
     100%{opacity:0;transform:translateY(-40px) scale(.95)}}
-  #call.warm .gwtrack{border-color:rgba(0,163,166,.85)}
-  #call.cold .gwtrack{border-color:rgba(140,47,34,.85)}
+  #call.warm .gwtrack{box-shadow:0 0 0 1px rgba(76,194,196,.55)}
+  #call.cold .gwtrack{box-shadow:0 0 0 1px rgba(168,64,47,.6)}
 
-  #call .said{position:absolute;left:5vw;right:5vw;bottom:calc(11vh + 34vh);
-    font-size:19px;line-height:1.55;color:#f2e8cf;
-    text-shadow:0 3px 14px rgba(0,0,0,.95);max-width:min(84vw,1100px)}
-  #call .said b{display:block;font-family:var(--slab);font-size:11px;
-    letter-spacing:.24em;color:var(--yes);margin-bottom:7px}
-  #call .said i{color:#c0ab82}
+  /* What was just said — a caption strip, the way a meeting app shows one. */
+  #call .said{position:absolute;left:5vw;right:5vw;top:calc(10.5vh + 53vh);
+    font-size:18px;line-height:1.5;color:#eef4fa;max-width:min(86vw,1180px)}
+  #call .said b{display:block;font-family:var(--slab);font-size:10px;
+    letter-spacing:.24em;color:var(--yes);margin-bottom:6px}
+  #call .said i{color:#93a4b4}
   #call .said.flash{animation:saidin .3s ease}
   @keyframes saidin{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
 
-  #call .terms{position:absolute;left:5vw;bottom:calc(11vh + 30vh);
-    font-family:var(--slab);font-size:12px;letter-spacing:.2em;color:#cbb68b;
+  #call .terms{position:absolute;left:5vw;bottom:calc(4.2vh + 152px);
+    font-family:var(--slab);font-size:11px;letter-spacing:.2em;color:#8ea0b0;
     opacity:0;transition:opacity .3s}
   #call .terms.on{opacity:1}
 
-  #call .howto{position:absolute;right:5vw;bottom:calc(11vh + 0.6vh);
-    font-family:var(--slab);font-size:10px;letter-spacing:.24em;color:#8e7c58}
-  #call .opts{position:absolute;left:5vw;right:5vw;bottom:calc(11vh + 3.6vh);
-    display:grid;gap:9px;pointer-events:auto}
+  #call .opts{position:absolute;left:5vw;right:5vw;bottom:calc(4.2vh + 26px);
+    display:grid;gap:8px;pointer-events:auto}
   #call .copt{display:flex;gap:13px;align-items:flex-start;text-align:left;
-    cursor:pointer;padding:13px 16px;
-    background:linear-gradient(180deg,rgba(26,19,10,.93),rgba(14,10,5,.93));
-    border:1px solid rgba(203,182,139,.35);border-left:3px solid #c9a13a;
-    color:#ecdfbe;font-family:var(--sans);font-size:15px;line-height:1.45;
+    cursor:pointer;padding:12px 16px;border-radius:7px;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);
+    border-left:3px solid #c9a13a;color:#e6eef5;font-family:var(--sans);
+    font-size:15px;line-height:1.45;
     transition:background .13s,transform .13s,border-color .13s}
-  #call .copt:hover{background:linear-gradient(180deg,rgba(54,39,18,.96),rgba(28,20,9,.96));
-    transform:translateX(4px);border-left-color:var(--yes)}
-  #call .copt em{font-family:var(--slab);font-style:normal;font-size:12px;
-    letter-spacing:.12em;color:var(--yes);min-width:18px;padding-top:2px}
+  #call .copt:hover{background:rgba(255,255,255,.11);transform:translateX(4px);
+    border-left-color:var(--yes)}
+  #call .copt em{font-family:var(--slab);font-style:normal;font-size:11px;
+    letter-spacing:.12em;color:#0b0d10;background:#c9a13a;border-radius:4px;
+    min-width:20px;height:20px;line-height:20px;text-align:center;flex:none}
   #call .copt span{flex:1}
   #call .copt .need{font-family:var(--slab);font-size:10px;letter-spacing:.16em;
-    color:#8c6a4a;margin-top:5px}
+    color:#8c7a5a;margin-top:5px}
   #call .copt .need.have{color:var(--yes)}
-  #call .copt.proof{border-left-color:var(--yes);
-    background:linear-gradient(180deg,rgba(58,44,14,.95),rgba(26,19,8,.95))}
-  #call .copt.locked{opacity:.42;cursor:default;transform:none}
-  #call .copt.locked:hover{transform:none;background:linear-gradient(180deg,rgba(26,19,10,.93),rgba(14,10,5,.93))}
-  #call .copt.term em{font-size:14px;letter-spacing:.16em;min-width:auto}
-  #call .copt.term{border-left-width:5px}
-  #call .copt.term.do{border-left-color:#00A3A6}
+  #call .copt.proof{border-left-color:var(--yes);background:rgba(255,214,0,.10)}
+  #call .copt.locked{opacity:.38;cursor:default}
+  #call .copt.locked:hover{transform:none;background:rgba(255,255,255,.05)}
+  #call .copt.term em{font-size:13px;letter-spacing:.14em;min-width:auto;
+    padding:0 10px;background:none;color:var(--yes)}
+  #call .copt.term{border-left-width:4px}
+  #call .copt.term.do{border-left-color:#4cc2c4}
   #call .copt.term.pay{border-left-color:#FFD600}
-  #call .copt.term.fight{border-left-color:#8c2f22}
-  #call .copt.term i{font-style:italic;color:#a89574;font-size:13px}
+  #call .copt.term.fight{border-left-color:#c4443a}
+  #call .copt.term i{font-style:italic;color:#93a4b4;font-size:13px}
 
+  /* The meeting controls. Decorative — but a call without them does not read
+     as a call. */
+  #call .toolbar{position:absolute;left:50%;bottom:1.1vh;transform:translateX(-50%);
+    display:flex;gap:8px}
+  #call .tool{font-family:var(--slab);font-size:10px;letter-spacing:.18em;
+    padding:7px 15px;border-radius:6px;background:rgba(255,255,255,.06);
+    color:#93a4b4;border:1px solid rgba(255,255,255,.08)}
+  #call .tool.on{color:#e6eef5}
+  #call .tool.leave{background:#a8332a;color:#fff;border-color:#7d241d}
+  #call .howto{position:absolute;right:5vw;bottom:1.9vh;font-family:var(--slab);
+    font-size:10px;letter-spacing:.22em;color:#6d7d8b}
 
   /* ---- The mission card -------------------------------------------------
      The old build put one thin uppercase line under the clock and expected
@@ -560,7 +613,9 @@
     game is fictional.<br>Best with headphones. Click to capture the mouse — Esc releases it.
     <br><b>1&ndash;5</b> draw a tool (again to stow) &middot; <b>right mouse</b> aim &middot;
     <b>left mouse</b> fire &middot; <b>R</b> reload &middot; <b>V</b> Yes-Eye &middot;
-    <b>E</b> at a Signal &amp; Arms to buy</div>
+    <b>E</b> at a Signal &amp; Arms to buy<br>
+    <b>Q</b> takes the rope out &middot; hold <b>left mouse</b> to twirl, release to throw &middot;
+    <b>E</b> hauls &middot; <b>F</b> ties &middot; <b>Tab</b> for the ledger and saves</div>
 </div>
 
 <script type="importmap">
@@ -6477,6 +6532,84 @@ class Audio {
     g.gain.exponentialRampToValueAtTime(0.0001,t+0.24);
     o.connect(g); o.start(t); o.stop(t+0.28);
   }
+  /* ---- Rope (§7, §16) ---------------------------------------------------
+     A rope makes three sounds and they are all noise, shaped: the hiss of a
+     throw, the slap of a catch, and the crack of one parting under load. */
+  ropeWhip(pos){
+    if(!this.ready) return;
+    const c=this.ctx,t=this.now(); const o=this.out(pos,0.22);
+    const n=c.createBufferSource(); n.buffer=this.noiseBuffer(0.6,'white');
+    const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=1.0;
+    bp.frequency.setValueAtTime(900,t);
+    bp.frequency.exponentialRampToValueAtTime(3200,t+0.22);
+    const g=c.createGain();
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.11,t+0.07);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.34);
+    n.connect(bp).connect(g).connect(o); n.start(t); n.stop(t+0.38);
+  }
+  ropeCatch(pos){
+    if(!this.ready) return;
+    const c=this.ctx,t=this.now(); const o=this.out(pos,0.26);
+    const n=c.createBufferSource(); n.buffer=this.noiseBuffer(0.3,'pink');
+    const lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1400;
+    const g=c.createGain();
+    g.gain.setValueAtTime(0.16,t);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.20);
+    n.connect(lp).connect(g).connect(o); n.start(t); n.stop(t+0.24);
+  }
+  ropeSnap(pos){
+    if(!this.ready) return;
+    const c=this.ctx,t=this.now(); const o=this.out(pos,0.3);
+    const n=c.createBufferSource(); n.buffer=this.noiseBuffer(0.3,'white');
+    const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=2600;
+    bp.Q.value=3.2;
+    const g=c.createGain();
+    g.gain.setValueAtTime(0.22,t);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.12);
+    n.connect(bp).connect(g).connect(o); n.start(t); n.stop(t+0.16);
+  }
+
+  /* ---- Animal calls (§16) ----------------------------------------------
+     One synth, seven voices. Each species is a formant pair over a shaped
+     noise bed, which is close enough to a throat to read as one. */
+  animalCall(kind, pos){
+    if(!this.ready) return;
+    const P = {
+      deer:   { f:520, sweep:-0.35, dur:0.55, noise:0.16, buzz:0.20 },
+      bison:  { f: 90, sweep:-0.12, dur:1.30, noise:0.30, buzz:0.55 },
+      wolf:   { f:420, sweep: 0.55, dur:1.70, noise:0.06, buzz:0.10 },
+      coyote: { f:700, sweep: 0.80, dur:0.85, noise:0.10, buzz:0.18 },
+      gator:  { f: 70, sweep:-0.05, dur:1.10, noise:0.42, buzz:0.70 },
+      kangaroo:{f:300, sweep:-0.20, dur:0.35, noise:0.34, buzz:0.30 },
+      crow:   { f:820, sweep:-0.25, dur:0.30, noise:0.26, buzz:0.55 },
+      songbird:{f:2200,sweep: 0.40, dur:0.22, noise:0.04, buzz:0.05 },
+      eagle:  { f:1500,sweep:-0.45, dur:0.60, noise:0.14, buzz:0.24 },
+      hawk:   { f:1800,sweep:-0.55, dur:0.45, noise:0.12, buzz:0.20 },
+    }[kind] || { f:500, sweep:0, dur:0.5, noise:0.2, buzz:0.3 };
+    const c=this.ctx, t=this.now(); const o=this.out(pos, 0.30);
+    const osc=c.createOscillator(); osc.type = P.buzz > 0.4 ? 'sawtooth':'triangle';
+    osc.frequency.setValueAtTime(P.f, t);
+    osc.frequency.exponentialRampToValueAtTime(
+      Math.max(40, P.f*(1+P.sweep)), t+P.dur*0.8);
+    const og=c.createGain();
+    og.gain.setValueAtTime(0.0001,t);
+    og.gain.exponentialRampToValueAtTime(0.10,t+P.dur*0.14);
+    og.gain.exponentialRampToValueAtTime(0.0001,t+P.dur);
+    const bp=c.createBiquadFilter(); bp.type='bandpass';
+    bp.frequency.value=P.f*1.6; bp.Q.value=1.4;
+    osc.connect(bp).connect(og).connect(o); osc.start(t); osc.stop(t+P.dur+0.1);
+    if(P.noise > 0.01){
+      const n=c.createBufferSource(); n.buffer=this.noiseBuffer(1.4,'pink');
+      const nf=c.createBiquadFilter(); nf.type='bandpass';
+      nf.frequency.value=P.f*1.1; nf.Q.value=0.9;
+      const ng=c.createGain();
+      ng.gain.setValueAtTime(P.noise*0.12,t);
+      ng.gain.exponentialRampToValueAtTime(0.0001,t+P.dur);
+      n.connect(nf).connect(ng).connect(o); n.start(t); n.stop(t+P.dur+0.1);
+    }
+  }
+
   holster(pos, out_){
     if(!this.ready) return;
     const c=this.ctx,t=this.now(); const o=this.out(pos,0.2);
@@ -7446,6 +7579,15 @@ class UI {
   }
   showTitle(on){ if(this.titleEl) this.titleEl.classList.toggle('on', !!on); }
 
+  /* Take the whole HUD off screen, and kill any subtitle still running from
+     whatever happened before. */
+  hideHud(on){ this.hud.classList.toggle('away', !!on); }
+  clearSubs(){
+    this.subTimer = 0;
+    this.subs.classList.remove('on');
+    this.subWho.textContent = ''; this.subLine.textContent = '';
+  }
+
   letterbox(on, pct=11){
     const h = on ? pct+'%' : '0';
     this.bars.querySelector('.t').style.height = h;
@@ -7469,7 +7611,8 @@ class Ledger {
     this.page = document.getElementById('ledgerPage');
     this.open = false;
     this.current = 'Map';
-    this.pages = ['Map','Missions','Compendium','Stats','Settings','Credits'];
+    this.pages = ['Map','Missions','Evidence','Compendium','Saves','Stats',
+                  'Settings','Credits'];
     for(const p of this.pages){
       const b = document.createElement('button');
       b.textContent = p;
@@ -7534,6 +7677,60 @@ class Ledger {
           story missions build on this frame.</div>`;
         break;
       }
+      /* ---- Evidence (§10, §17) -----------------------------------------
+         The four proofs, and what each one is FOR — because "routing order,
+         shaft four" means nothing to anybody who has not read it. */
+      case 'Evidence': {
+        const st = g.story;
+        html = `<h2>Evidence</h2><div class="sub">What you can put on a table</div>`;
+        for(const [id, c] of Object.entries(EVIDENCE)){
+          const have = st && st.hasCard(id);
+          html += row(have ? c.name : '\u2014 SEALED \u2014',
+                      have ? c.note : 'Not in your satchel yet');
+        }
+        html += `<h2>Where you stand</h2>`;
+        const WHO = { caitlin:'Caitlin R', muzz:'The Muzz',
+                      paula:'Paula Sutherland', chloe:'Chloe Dunn',
+                      vane:'Cornelius Vane', ashby:'Mrs Ashby' };
+        for(const [k, name] of Object.entries(WHO)){
+          const o = st && st.outcomes[k];
+          html += row(name, !o ? 'Not yet spoken to'
+            : o === 'favour' ? 'Signed \u2014 you did what they asked'
+            : o === 'paid'   ? 'Signed \u2014 you paid for it'
+            : o === 'won'    ? 'Conceded'
+            : o === 'fight'  ? 'Settled with force'
+            : o === 'partial'? 'Heard you out'
+            : 'Would not be moved');
+        }
+        break;
+      }
+
+      /* ---- Saves (§19) -------------------------------------------------- */
+      case 'Saves': {
+        const slots = SaveSystem.slots();
+        html = `<h2>Saves</h2><div class="sub">Slot 0 writes itself at every `
+             + `mission boundary</div>`;
+        slots.forEach((d, i)=>{
+          const label = i === 0 ? 'AUTOSAVE' : 'SLOT ' + i;
+          const when = d ? new Date(d.stamp).toLocaleString() : '';
+          html += `<div class="srow"><div class="sinfo"><b>${label}</b>`
+               + `<span>${d ? d.title + ' \u00b7 ' + d.where : 'empty'}</span>`
+               + `<span class="dim">${when}</span></div>`
+               + (i ? `<button data-save="${i}">SAVE</button>` : '')
+               + `<button data-load="${i}" ${d?'':'disabled'}>LOAD</button>`
+               + (i ? `<button data-wipe="${i}" ${d?'':'disabled'}>ERASE</button>` : '')
+               + `</div>`;
+        });
+        html += `<h2>Move it between machines</h2>`;
+        html += `<textarea id="saveBlob" rows="3" placeholder="Paste a save here, `
+             + `then press IMPORT"></textarea>`;
+        html += `<div class="srow"><button id="saveExport">EXPORT TO BOX</button>`
+             + `<button id="saveImport">IMPORT</button></div>`;
+        html += `<div class="hint">The export is plain text. Copy it somewhere `
+             + `safe; paste it back to pick the run up again.</div>`;
+        break;
+      }
+
       case 'Compendium':
         html = `<h2>Compendium</h2><div class="sub">Filling in as you find things</div>`;
         html += `<h2 style="margin-top:2px">Regions</h2>`;
@@ -7608,6 +7805,41 @@ class Ledger {
     this.page.innerHTML = html;
     if(this.current==='Settings') this._wireSettings();
     if(this.current==='Map') this._wireMap();
+    if(this.current==='Saves') this._wireSaves();
+  }
+
+  /* ---- Saves (§19) ------------------------------------------------------ */
+  _wireSaves(){
+    const g = this.game;
+    const q = (sel)=>this.page.querySelectorAll(sel);
+    for(const b of q('[data-save]')) b.onclick = ()=>{
+      const i = +b.dataset.save;
+      const ok = SaveSystem.write(g, i);      // called ONCE, not once per branch
+      g.ui.toast(ok ? 'SAVED' : 'COULD NOT SAVE',
+                 ok ? 'Slot ' + i : 'Browser storage is unavailable', 3);
+      this.render();
+    };
+    for(const b of q('[data-load]')) b.onclick = ()=>{
+      const i = +b.dataset.load;
+      if(SaveSystem.read(g, i)) this.close();
+      else g.ui.toast('NOTHING THERE', 'That slot is empty.', 3);
+    };
+    for(const b of q('[data-wipe]')) b.onclick = ()=>{
+      SaveSystem.wipe(+b.dataset.wipe); this.render();
+    };
+    const box = this.page.querySelector('#saveBlob');
+    const ex = this.page.querySelector('#saveExport');
+    const im = this.page.querySelector('#saveImport');
+    if(ex) ex.onclick = ()=>{
+      box.value = SaveSystem.exportText(g);
+      box.select();
+      g.ui.toast('EXPORTED', 'Copy the text in the box.', 3.5);
+    };
+    if(im) im.onclick = ()=>{
+      if(!box.value.trim()) return;
+      if(SaveSystem.importText(g, box.value)) this.close();
+      else g.ui.toast('THAT IS NOT A SAVE', 'The text did not parse.', 3.5);
+    };
   }
 
   _wireMap(){
@@ -8657,6 +8889,45 @@ function buildCombatClips(anim){
     handL:[[0,0,0,0],[0.32,-0.30,0,0],[0.66,0.10,0,0],[1.45,0,0,0]],
     head:[[0,0.02,0,0],[0.40,0.16,-0.10,0],[1.45,0.02,0,0]],
   }, {loop:false});
+  /* ---- The rope (§7) ---------------------------------------------------
+     Four upper-body poses. The twirl is the one that matters: the arm has to
+     stay up and turning for as long as the player holds it, so it loops. */
+  A('lasso_ready', 3.0, {
+    clavR:[[0,0,-0.10,0],[3.0,0,-0.10,0]],
+    armR:[[0,-0.52,0.22,-0.30],[1.5,-0.56,0.22,-0.30],[3.0,-0.52,0.22,-0.30]],
+    forearmR:[[0,-0.78,0,0.24],[3.0,-0.78,0,0.24]],
+    handR:[[0,-0.14,0.16,0],[3.0,-0.14,0.16,0]],
+    armL:[[0,-0.20,0,0.16],[3.0,-0.20,0,0.16]],
+    forearmL:[[0,-0.44,0,0],[3.0,-0.44,0,0]],
+    spine3:[[0,0.02,0.06,0],[3.0,0.02,0.06,0]],
+  });
+  A('lasso_twirl', 0.72, {
+    clavR:[[0,0,-0.24,0],[0.72,0,-0.24,0]],
+    armR:[[0,-2.05,0.34,-0.20],[0.18,-2.10,0.10,-0.34],[0.36,-2.05,-0.16,-0.20],
+          [0.54,-2.00,0.10,-0.06],[0.72,-2.05,0.34,-0.20]],
+    forearmR:[[0,-0.30,0,0.30],[0.36,-0.24,0,0.10],[0.72,-0.30,0,0.30]],
+    handR:[[0,-0.20,0.30,0],[0.36,-0.20,-0.10,0],[0.72,-0.20,0.30,0]],
+    spine3:[[0,0.02,0.10,0],[0.36,0.02,-0.06,0],[0.72,0.02,0.10,0]],
+    armL:[[0,-0.26,0,0.20],[0.72,-0.26,0,0.20]],
+  });
+  A('lasso_throw', 0.50, {
+    armR:[[0,-2.05,0.30,-0.20],[0.10,-1.25,-0.10,0.10],[0.28,-0.80,-0.16,0.14],
+          [0.50,-0.60,0.18,-0.24]],
+    forearmR:[[0,-0.30,0,0.28],[0.12,-0.05,0,0.02],[0.50,-0.60,0,0.20]],
+    spine3:[[0,0.02,0.22,0],[0.14,0.04,-0.26,0],[0.50,0.02,0.04,0]],
+    spine2:[[0,0.02,0.16,0],[0.14,0.03,-0.18,0],[0.50,0.02,0.02,0]],
+  }, {loop:false});
+  /* Hauling: both hands on the rope, heels dug in, leaning back. */
+  A('lasso_pull', 1.6, {
+    spine3:[[0,-0.18,0.04,0],[0.8,-0.26,0.04,0],[1.6,-0.18,0.04,0]],
+    spine2:[[0,-0.12,0,0],[0.8,-0.18,0,0],[1.6,-0.12,0,0]],
+    armR:[[0,-1.00,0.24,-0.36],[0.8,-0.72,0.20,-0.30],[1.6,-1.00,0.24,-0.36]],
+    forearmR:[[0,-1.10,0,0.26],[0.8,-0.90,0,0.22],[1.6,-1.10,0,0.26]],
+    armL:[[0,-1.10,-0.30,0.34],[0.8,-0.82,-0.26,0.30],[1.6,-1.10,-0.30,0.34]],
+    forearmL:[[0,-1.16,0,-0.10],[0.8,-0.96,0,-0.08],[1.6,-1.16,0,-0.10]],
+    head:[[0,-0.10,0,0],[1.6,-0.10,0,0]],
+  });
+
   /* The Ledger, swung like the blunt instrument it is. */
   A('melee', 0.62, {
     spine2:[[0,0.02,0.30,0],[0.16,0.02,-0.34,0],[0.62,0.02,0.10,0]],
@@ -9296,55 +9567,37 @@ class GunShop {
 
 
 /* ==========================================================================
-   THE VIDEO CALL — NEGOTIATION (§10)
-   The signature mechanic, and the one that gets more polish than anything
-   else in the build.
+   THE CALL (§10) — A MEETING, WITH TWO PEOPLE IN IT
 
-   The whole screen becomes the call. Both panels are LIVE — two extra cameras
-   render the real models with their real lighting into two scissored
-   viewports, so the man you are arguing with is the man standing in front of
-   you, breathing, with the weather on his face. The brass-and-mahogany
-   housing, the scanlines and the interlace wobble are a DOM overlay on top.
+   Third attempt, and this time the two feeds are real and they are visible.
 
-   Composure is yours. Resolve is theirs. Take theirs to nothing and he
-   concedes; lose yours and the conversation stops being a conversation.
-   ========================================================================== */
-const CALL_CATS = {
-  empathise: { label:'EMPATHISE', tint:'#00A3A6' },
-  assert:    { label:'ASSERT',    tint:'#FFD600' },
-  evidence:  { label:'EVIDENCE',  tint:'#c8b48d' },
-  deflect:   { label:'DEFLECT',   tint:'#9a8a6c' },
-};
+   The history matters because both previous failures were in the same place —
+   the plumbing between the canvas and the DOM — and neither was in the
+   negotiation logic:
 
-/* ==========================================================================
-   THE CALL (§10) — REBUILT AND SIMPLIFIED
+     · v1.1 drew the housing as an opaque full-screen backdrop and then drew
+       the two "feeds" as opaque black boxes ON TOP of the canvas. The 3D was
+       rendering correctly underneath the whole time. It also multiplied the
+       viewport rectangles by the device pixel ratio, which three.js already
+       does internally, so on any hi-dpi screen the two viewports were pushed
+       clean off the canvas.
+     · v1.2 removed the feeds altogether and pointed the world camera at the
+       person instead. That worked, but it is not a video call, and it left
+       the HUD and a stale subtitle sitting on top of the shot.
 
-   What was wrong with the old one, precisely:
+   How it works now:
+     · two extra cameras render the real models into two scissored viewports
+       of the MAIN canvas — no render targets, no readback, no second renderer
+     · the scrim is ONE full-screen SVG with two rounded-rectangle holes cut
+       out of it by the even-odd fill rule, generated from exactly the same
+       rectangles the viewports use, so the holes and the picture can never
+       drift apart
+     · everything else — name pills, the speaking ring, the toolbar, the
+       goodwill bar, the replies — is ordinary DOM around those two holes
 
-   1. Both panels were blank. The housing painted a full-screen opaque
-      backdrop at z-index 80 and then drew the "feeds" as opaque black boxes
-      ON TOP of the canvas, so the live 3D underneath could never be seen. It
-      was never going to work, and no amount of fiddling with viewports was
-      going to fix a DOM element painted over the top of it.
-   2. Even if you could see it, you could not READ it. Four hidden category
-      weightings, a tell system, an interrupt window and a signal-degradation
-      mechanic, and nothing on screen told you what any of your choices had
-      just done.
-
-   So: no render-to-panel at all. The camera frames the person you are talking
-   to, in the world, using the same machinery the cutscenes already use and
-   which already works. Over the top of that sits ONE bar — GOODWILL — and
-   every choice moves it by a number you can see, with the number flying off
-   the bar as it moves.
-
-   And the outcome is three buttons, in plain English:
-       DO WHAT THEY ASK   — take on their favour, then they sign
-       PAY THEM           — settle it in Connections, right now
-       REFUSE             — it becomes a fight, and your reputation pays
-
-   Goodwill sets the price of the last two. Talk well and the favour is small
-   and the price is low. Talk badly and both are expensive. That is the entire
-   system, it is visible from the first second, and nothing about it is hidden.
+   The layout is a two-person meeting window: side-by-side tiles, a name pill
+   in the corner of each, a ring around whoever is talking, a duration clock
+   and a connection readout up top, and the replies along the bottom.
    ========================================================================== */
 class Negotiation {
   constructor(game){
@@ -9352,38 +9605,112 @@ class Negotiation {
     this.active = false;
     this._build();
     this._v = new THREE.Vector3();
-    this.key = new THREE.PointLight(0xffe2b8, 0, 7, 2);
-    this.key.visible = false;
-    game.scene.add(this.key);
+
+    /* Two cameras, made once. Allocating one inside a frame is how you get a
+       hitch on the cut. */
+    this.camThem = new THREE.PerspectiveCamera(31, 1, 0.05, 300);
+    this.camMe   = new THREE.PerspectiveCamera(31, 1, 0.05, 300);
+
+    /* A three-point rig per tile. The previous build lit each face with one
+       bare point light at intensity 9 and blew the whole side of the frame
+       out into a white blob. These are modest, they fall off fast, and they
+       only exist while a call is up. */
+    this.lights = {};
+    for(const who of ['them','me']){
+      const key  = new THREE.PointLight(0xffe9c8, 0, 3.2, 2.0);
+      const fill = new THREE.PointLight(0x9fc4dc, 0, 3.0, 2.0);
+      const rim  = new THREE.PointLight(0xfff3d8, 0, 2.6, 2.0);
+      for(const l of [key, fill, rim]){ l.visible = false; game.scene.add(l); }
+      this.lights[who] = { key, fill, rim };
+    }
   }
 
+  /* ---- The meeting window ---------------------------------------------- */
   _build(){
     const el = document.createElement('div');
     el.id = 'call';
     el.innerHTML = `
-      <div class="bar top"></div>
-      <div class="bar bot"></div>
-      <div class="who"></div>
+      <svg class="scrim" xmlns="http://www.w3.org/2000/svg"
+           preserveAspectRatio="none"><path fill-rule="evenodd"></path></svg>
+      <div class="topbar">
+        <div class="tl"><i class="dot"></i><span class="title"></span></div>
+        <div class="tr"><span class="qual"></span><span class="clock">00:00</span></div>
+      </div>
+      <div class="tile them"><div class="ring"></div>
+        <div class="pill"><i class="mic"></i><span></span></div></div>
+      <div class="tile me"><div class="ring"></div>
+        <div class="pill"><i class="mic"></i><span>JARRAD GAUNT</span></div></div>
       <div class="gw">
         <div class="gwlab">GOODWILL</div>
-        <div class="gwtrack"><i></i><u></u></div>
-        <div class="gwnum">0</div>
-        <div class="gwpop"></div>
+        <div class="gwtrack"><u></u><i></i></div>
+        <div class="gwnum">0</div><div class="gwpop"></div>
       </div>
       <div class="said"></div>
-      <div class="opts"></div>
       <div class="terms"></div>
+      <div class="opts"></div>
+      <div class="toolbar">
+        <span class="tool on">MIC</span><span class="tool on">CAMERA</span>
+        <span class="tool">SHARE</span><span class="tool leave">LEAVE</span>
+      </div>
       <div class="howto">CLICK A REPLY, OR PRESS ITS NUMBER</div>`;
     document.body.appendChild(el);
-    this.el = el;
-    this.whoEl  = el.querySelector('.who');
-    this.saidEl = el.querySelector('.said');
-    this.optsEl = el.querySelector('.opts');
-    this.termsEl= el.querySelector('.terms');
-    this.gwFill = el.querySelector('.gwtrack i');
-    this.gwGhost= el.querySelector('.gwtrack u');
-    this.gwNum  = el.querySelector('.gwnum');
-    this.gwPop  = el.querySelector('.gwpop');
+    this.el      = el;
+    this.scrim   = el.querySelector('.scrim path');
+    this.svg     = el.querySelector('.scrim');
+    this.tileThem= el.querySelector('.tile.them');
+    this.tileMe  = el.querySelector('.tile.me');
+    this.nameThem= el.querySelector('.tile.them .pill span');
+    this.titleEl = el.querySelector('.title');
+    this.qualEl  = el.querySelector('.qual');
+    this.clockEl = el.querySelector('.clock');
+    this.saidEl  = el.querySelector('.said');
+    this.optsEl  = el.querySelector('.opts');
+    this.termsEl = el.querySelector('.terms');
+    this.gwFill  = el.querySelector('.gwtrack i');
+    this.gwGhost = el.querySelector('.gwtrack u');
+    this.gwNum   = el.querySelector('.gwnum');
+    this.gwPop   = el.querySelector('.gwpop');
+  }
+
+  /* ---- Geometry: one source of truth for the holes AND the viewports ----
+     Everything downstream — the SVG cut-outs, the DOM tiles, the GL scissor
+     rectangles — is derived from this, in CSS pixels. */
+  layout(){
+    const W = innerWidth, H = innerHeight;
+    const stageW = Math.min(W*0.90, 1480);
+    const gap = Math.max(12, W*0.010);
+    const tileW = (stageW - gap)/2;
+    const tileH = Math.min(tileW*0.62, H*0.46);
+    const x0 = (W - stageW)/2;
+    const y  = H*0.105;
+    return {
+      W, H, r: Math.max(8, tileW*0.016),
+      them: { x:x0,             y, w:tileW, h:tileH },
+      me:   { x:x0+tileW+gap,   y, w:tileW, h:tileH },
+    };
+  }
+
+  _applyLayout(){
+    const L = this.layout();
+    this._L = L;
+    const put = (el, q)=>{ el.style.left=q.x+'px'; el.style.top=q.y+'px';
+                           el.style.width=q.w+'px'; el.style.height=q.h+'px'; };
+    put(this.tileThem, L.them); put(this.tileMe, L.me);
+    /* One path: the whole screen, then a rounded rect per tile. With
+       fill-rule="evenodd" the inner subpaths become holes. */
+    const rr = (q, r)=>
+      `M${q.x+r},${q.y}H${q.x+q.w-r}A${r},${r} 0 0 1 ${q.x+q.w},${q.y+r}`
+    + `V${q.y+q.h-r}A${r},${r} 0 0 1 ${q.x+q.w-r},${q.y+q.h}`
+    + `H${q.x+r}A${r},${r} 0 0 1 ${q.x},${q.y+q.h-r}`
+    + `V${q.y+r}A${r},${r} 0 0 1 ${q.x+r},${q.y}Z`;
+    this.svg.setAttribute('viewBox', `0 0 ${L.W} ${L.H}`);
+    this.svg.setAttribute('width', L.W); this.svg.setAttribute('height', L.H);
+    this.scrim.setAttribute('d',
+      `M0,0H${L.W}V${L.H}H0Z` + rr(L.them, L.r) + rr(L.me, L.r));
+    const asp = L.them.w/L.them.h;
+    for(const c of [this.camThem, this.camMe]){
+      if(Math.abs(c.aspect - asp) > 1e-3){ c.aspect = asp; c.updateProjectionMatrix(); }
+    }
   }
 
   /* ---- Open ------------------------------------------------------------- */
@@ -9396,8 +9723,11 @@ class Negotiation {
     this.gw = deck.goodwillStart;
     this.gwShown = this.gw;
     this.busy = false;
+    this.speaking = null;
+    this.elapsed = 0;
+    this.price = 0;
 
-    /* Square them up and freeze them, exactly as a cutscene does. */
+    /* Stand them off against each other and hold them there. */
     const dx = npc.pos.x - p.pos.x, dz = npc.pos.z - p.pos.z;
     p.yaw = p.desiredYaw = Math.atan2(dx, dz);
     p.object.rotation.y = p.yaw;
@@ -9407,16 +9737,23 @@ class Negotiation {
     npc.inScene = true; npc.target = null; npc.speed = 0; npc.waitT = 999;
     g.horse.inScene = true; g.horse.followTarget = null;
 
+    /* The world's own furniture gets out of the way completely — the HUD, the
+       compass, the prompts and, above all, any subtitle still counting down
+       from the scene before this one. */
     g.audio.beginScene();
     g.ui.sceneOnly = true;
+    g.ui.hideHud(true);
+    g.ui.clearSubs();
     if(document.pointerLockElement) document.exitPointerLock();
 
-    this.whoEl.textContent = deck.name;
+    this.nameThem.textContent = deck.name;
+    this.titleEl.textContent = 'GRAND MERIDIAN EXCHANGE \u00b7 CALL IN PROGRESS';
+    this._applyLayout();
     this.el.classList.add('on');
-    this.key.visible = true;
-    this._camT = 0;
-    this._setGoodwill(this.gw, 0);
+    for(const w of ['them','me'])
+      for(const k of ['key','fill','rim']) this.lights[w][k].visible = true;
 
+    this._setGoodwill(this.gw, 0);
     g.audio.callTone && g.audio.callTone();
     this._say(null, deck.intro);
     this.optsEl.innerHTML = '';
@@ -9439,10 +9776,9 @@ class Negotiation {
 
   _myTurn(node){
     this.busy = false;
+    this.speaking = null;
     this.optsEl.innerHTML = '';
     node.options.forEach((o, i)=>{
-      /* A line that needs a document you do not have is shown, greyed, with
-         the reason on it. Seeing the door you did not open is the point. */
       const locked = o.needCard && !this.game.story.hasCard(o.needCard);
       const b = document.createElement('button');
       b.className = 'copt' + (locked ? ' locked' : '')
@@ -9462,8 +9798,6 @@ class Negotiation {
     this.optsEl.innerHTML = '';
     this._say('JARRAD GAUNT', o.text);
     this._speak(o.text, this.game.player.act >= 4 ? 'jarrad_act5' : 'jarrad_act1', true);
-    /* Move the bar NOW, while his line is still being said, so cause and
-       effect land in the same moment. */
     this._setGoodwill(M.clamp(this.gw + o.gw, 0, this.deck.goodwillMax), o.gw);
     this.turn++;
     clearTimeout(this._t);
@@ -9481,36 +9815,29 @@ class Negotiation {
   /* ---- The three ways this ends ---------------------------------------- */
   _offerTerms(){
     const T = this.deck.terms;
-    const frac = this.gw/this.deck.goodwillMax;          // 0 hostile, 1 won over
+    const frac = this.gw/this.deck.goodwillMax;
+    this.speaking = null;
 
-    /* The boardroom. There is nothing to buy and nothing to be asked for —
-       either the proofs carried the room or they did not. */
-    if(T.final){
+    if(T && T.final){
       const won = frac > 0.5;
       this._resultLine(won ? T.accept : T.refuse);
       setTimeout(()=>this._close(won ? 'won' : 'fight'), 3400);
       return;
     }
-
     if(this.deck.scripted){
-      /* Act I. Mrs Ashby is not selling you anything and there is nothing to
-         buy. She says her piece and goes. */
       const good = frac > 0.55;
-      this._say(this.deck.name, good ? this.deck.close.good : this.deck.close.bad);
-      this._speak(good ? this.deck.close.good : this.deck.close.bad, this.deck.voice, false);
+      this._resultLine(good ? this.deck.close.good : this.deck.close.bad);
       setTimeout(()=>this._close(good ? 'partial' : 'refused'), 3200);
       return;
     }
 
-    /* Price scales with how the conversation went, and the player is told the
-       arithmetic rather than being made to guess at it. */
     const price = Math.max(40, Math.round(T.basePrice*(1.55 - frac*1.05)/10)*10);
     this.price = price;
     const canPay = this.game.player.connections >= price;
 
     this.optsEl.innerHTML = '';
     this.termsEl.classList.add('on');
-    this.termsEl.innerHTML = `<b>${this.deck.name} WILL SIGN IF —</b>`;
+    this.termsEl.innerHTML = `<b>${this.deck.name} WILL SIGN IF \u2014</b>`;
     this._say(null, frac > 0.6
       ? 'You have got them most of the way. Now settle it.'
       : frac > 0.3
@@ -9524,7 +9851,6 @@ class Negotiation {
       if(enabled) b.addEventListener('click', fn);
       this.optsEl.appendChild(b);
     };
-
     add('do', 'DO WHAT THEY ASK',
         T.favour + '<br><i>No cost. Costs you time.</i>',
         ()=>{ this._resultLine(T.accept); this._close('favour'); });
@@ -9544,14 +9870,14 @@ class Negotiation {
     this._speak(line, this.deck.voice, false);
   }
 
-  /* ---- Presentation ----------------------------------------------------- */
-  /* Click the nth option from the keyboard. */
+  /* Click the nth reply from the keyboard. */
   pick(i){
     if(!this.active) return;
     const b = this.optsEl.querySelectorAll('.copt:not(.locked)')[i];
     if(b) b.click();
   }
 
+  /* ---- Presentation ----------------------------------------------------- */
   _say(who, text){
     this.saidEl.innerHTML = who ? `<b>${who}</b>${text}` : `<i>${text}</i>`;
     this.saidEl.classList.remove('flash');
@@ -9560,6 +9886,12 @@ class Negotiation {
   }
   _speak(text, voice, isMe){
     const g = this.game;
+    /* The ring round the tile follows whoever has the floor. */
+    this.speaking = isMe ? 'me' : 'them';
+    const secs = (typeof speechSeconds === 'function')
+      ? speechSeconds(text, voice) : Math.min(5, 1 + text.length*0.035);
+    clearTimeout(this._speakT);
+    this._speakT = setTimeout(()=>{ this.speaking = null; }, secs*1000);
     if(!g.audio.ready) return;
     const npc = this.npc;
     g.audio.speak(text, VOICE[voice] || VOICE.conway,
@@ -9568,7 +9900,6 @@ class Negotiation {
       isMe ? null : ()=>{ npc.mouthOpen = 0; },
       null, 'scene');
   }
-  /* The bar, the number, and a big +N / -N thrown off it. Nothing subtle. */
   _setGoodwill(v, delta){
     this.gw = v;
     if(delta){
@@ -9582,40 +9913,56 @@ class Negotiation {
     this.el.classList.toggle('cold', v/this.deck.goodwillMax < 0.3);
   }
 
-  /* ---- Per-frame: the camera does the work the panels used to ----------- */
+  /* ---- Per-frame -------------------------------------------------------- */
   update(dt){
     if(!this.active) return;
     const g = this.game, npc = this.npc, p = g.player;
+    this.elapsed += dt;
     p.suspendIK = true;
     g.horse.inScene = true;
     p.anim.freeze('idle', 1.35);
     g.horse.anim.freeze('graze_idle', 2.10);
     npc.anim.freeze('idle', 1.10);
 
-    /* A slow push-in on their face, with Jarrad's shoulder in the near
-       corner. This is the shot the old build was trying to render into a
-       postage stamp; it costs nothing to just point the real camera at it. */
-    this._camT += dt;
-    const head = this._v.set(npc.pos.x, npc.pos.y + 1.58, npc.pos.z).clone();
-    const yaw = npc.yaw;
-    const push = M.sat(this._camT/16);
-    const dist = M.lerp(2.35, 1.72, push);
-    const side = Math.sin(yaw), fwdv = Math.cos(yaw);
-    const camPos = new THREE.Vector3(
-      head.x + side*dist - fwdv*0.72,
-      head.y + 0.16 - push*0.05,
-      head.z + fwdv*dist + side*0.72);
-    g.camera.position.lerp(camPos, M.sat(dt*3.4));
-    g.camera.lookAt(head.x, head.y - 0.04, head.z);
-    if(Math.abs(g.camera.fov - 38) > 0.05){
-      g.camera.fov = M.damp(g.camera.fov, 38, 4, dt);
-      g.camera.updateProjectionMatrix();
-    }
-    this.key.position.set(head.x + side*2.1 - fwdv*1.5, head.y + 1.1,
-                          head.z + fwdv*2.1 + side*1.5);
-    this.key.intensity = 7;
+    this._applyLayout();
 
-    /* The bar chases the value, so you watch it move rather than snap. */
+    /* Frame each face the way a webcam sits: dead ahead, a touch above eye
+       line, head and shoulders in frame. Slight offset so they are not
+       perfectly centred, which is what makes a real call look like a real
+       call rather than a passport photo. */
+    const rig = (cam, set, subject, yaw, height)=>{
+      const eye = this._v.set(subject.x, subject.y + height, subject.z).clone();
+      const fx = Math.sin(yaw), fz = Math.cos(yaw);
+      const side = 0.14;
+      cam.position.set(eye.x + fx*1.02 - fz*side,
+                       eye.y + 0.07,
+                       eye.z + fz*1.02 + fx*side);
+      cam.lookAt(eye.x - fx*0.1, eye.y - 0.05, eye.z - fz*0.1);
+      // Key: high and camera-left. Fill: low and opposite. Rim: behind.
+      set.key.position.set(eye.x + fx*1.15 - fz*0.95, eye.y + 0.62,
+                           eye.z + fz*1.15 + fx*0.95);
+      set.key.intensity = 3.1;
+      set.fill.position.set(eye.x + fx*0.95 + fz*0.95, eye.y - 0.05,
+                            eye.z + fz*0.95 - fx*0.95);
+      set.fill.intensity = 1.0;
+      set.rim.position.set(eye.x - fx*0.85, eye.y + 0.75, eye.z - fz*0.85);
+      set.rim.intensity = 1.6;
+    };
+    rig(this.camThem, this.lights.them, npc.pos, npc.yaw,
+        1.60*((npc.object.scale && npc.object.scale.y) || 1));
+    rig(this.camMe,   this.lights.me,   p.pos,   p.yaw,   1.62);
+
+    this.tileThem.classList.toggle('talking', this.speaking === 'them');
+    this.tileMe.classList.toggle('talking', this.speaking === 'me');
+
+    const t = Math.floor(this.elapsed);
+    const cl = String(Math.floor(t/60)).padStart(2,'0') + ':'
+             + String(t%60).padStart(2,'0');
+    if(this._cl !== cl){ this._cl = cl; this.clockEl.textContent = cl; }
+    const bars = 3 + (Math.sin(this.elapsed*0.4) > 0.7 ? -1 : 0);
+    const q = '\u2588'.repeat(bars) + '\u2591'.repeat(4-bars) + '  GOOD';
+    if(this._q !== q){ this._q = q; this.qualEl.textContent = q; }
+
     this.gwShown = M.damp(this.gwShown, this.gw, 7, dt);
     const f = M.sat(this.gwShown/this.deck.goodwillMax);
     this.gwFill.style.width = (f*100).toFixed(1)+'%';
@@ -9623,22 +9970,59 @@ class Negotiation {
     this.gwNum.textContent = Math.round(this.gwShown);
   }
 
+  /* ---- Render the two feeds --------------------------------------------
+     Straight to the canvas, in CSS pixels. three.js multiplies viewport and
+     scissor rectangles by the pixel ratio itself; doing it again by hand is
+     what pushed both feeds off the edge of the screen on a hi-dpi display
+     last time. GL's origin is bottom-left, so Y is flipped. */
+  render(){
+    if(!this.active) return false;
+    const r = this.game.renderer, L = this._L || this.layout();
+    const prevAuto = r.autoClear;
+    const prevClear = new THREE.Color(); r.getClearColor(prevClear);
+    const prevAlpha = r.getClearAlpha();
+
+    r.setRenderTarget(null);
+    r.setClearColor(0x0b0d10, 1);
+    r.setScissorTest(false);
+    r.clear(true, true, true);
+
+    r.autoClear = true;
+    r.setScissorTest(true);
+    for(const [q, cam] of [[L.them, this.camThem], [L.me, this.camMe]]){
+      const y = L.H - q.y - q.h;
+      r.setViewport(q.x, y, q.w, q.h);
+      r.setScissor (q.x, y, q.w, q.h);
+      r.render(this.game.scene, cam);
+    }
+    r.setScissorTest(false);
+    r.setViewport(0, 0, L.W, L.H);
+    r.setScissor (0, 0, L.W, L.H);
+    r.autoClear = prevAuto;
+    r.setClearColor(prevClear, prevAlpha);
+    return true;
+  }
+
   /* ---- Close ------------------------------------------------------------ */
   _close(outcome){
-    clearTimeout(this._t);
+    clearTimeout(this._t); clearTimeout(this._speakT);
     this.optsEl.innerHTML = '';
     this.termsEl.classList.remove('on');
+    this.speaking = null;
     setTimeout(()=>{
       this.active = false;
       this.el.classList.remove('on','warm','cold');
-      this.key.visible = false; this.key.intensity = 0;
+      for(const w of ['them','me'])
+        for(const k of ['key','fill','rim']){
+          this.lights[w][k].visible = false; this.lights[w][k].intensity = 0;
+        }
       const g = this.game;
       g.audio.stopVoices('scene'); g.audio.endScene();
       g.ui.sceneOnly = false;
+      g.ui.hideHud(false);
       this.npc.inScene = false; this.npc.mouthOpen = 0; this.npc.waitT = 3;
       g.player.suspendIK = false;
       g.player.anim.unfreeze(); g.horse.anim.unfreeze(); this.npc.anim.unfreeze();
-      g.camera.fov = g.cam.fov; g.camera.updateProjectionMatrix();
       const dom = g.renderer.domElement;
       if(dom.requestPointerLock) dom.requestPointerLock();
       const cb = this.onDone; this.onDone = null;
@@ -9646,6 +10030,7 @@ class Negotiation {
     }, outcome === 'fight' ? 1600 : 2900);
   }
 }
+
 
 
 /* ==========================================================================
@@ -9864,6 +10249,1468 @@ function buildWorkSite(kind, lib){
   return g;
 }
 
+
+/* ==========================================================================
+   THE LASSO (§7)
+   A rope, simulated, with a hole in it.
+
+   The temptation with a lasso is to make it a hitscan grab with a pretty
+   animation over the top. The brief says no, and it is right to: the whole
+   character of the thing comes from the loop being a REAL aperture in space.
+   It can sail past a man's shoulder. It can drop over a horse's head. It can
+   catch a back leg instead of a neck, which is a worse catch and behaves like
+   one. None of that is possible if the catch is a raycast.
+
+   So: twenty-four Verlet points, six constraint passes a step, gravity, air
+   drag and the same wind that moves the grass. The last eight points are
+   closed into a ring by an extra set of constraints, and that ring is the
+   loop. A catch happens when a target's neck crosses the PLANE of the ring
+   while inside its radius — which is a real aperture test, and which is why
+   the throw can miss in the way a throw ought to miss.
+
+   It is also the pacifist path (§7). A man you have roped and calmed resolves
+   the same way as a man you have talked round, and your reputation knows the
+   difference between the two and a fistfight.
+   ========================================================================== */
+const LASSO = {
+  N: 24,                 // rope points
+  RING: 8,               // how many of them form the loop
+  ITERS: 6,              // constraint passes per fixed step
+  /* A working lariat is about nine metres of rope with a loop a bit over a
+     metre across. Sixteen segments of line at 0.50 plus an eight-point ring
+     gives exactly that, and it matters: the old 0.19 made a 4.5 m rope that
+     could not reach a man standing five metres away, while the code happily
+     advertised a 13.5 m range. */
+  SEG: 0.50,
+  GRAV: -9.4,
+  DRAG: 0.988,
+  THROW_SPEED: 15.5,
+  MAX_RANGE: 9.6,
+  CATCH_PLANE: 0.42,     // how close to the ring's plane counts as through it
+};
+
+class Lasso {
+  constructor(game){
+    this.game = game;
+    this.state = 'stowed';   // stowed | ready | twirl | fly | caught | tied
+    this.charge = 0;
+    this.target = null;      // what is on the end of it
+    this.catchKind = null;   // 'neck' | 'leg'
+    this.struggle = 0;
+    this.slack = LASSO.SEG*(LASSO.N - LASSO.RING) + 0.6;   // rope still to haul in
+    this.dallied = false;    // rope turned round the saddle horn
+    this.stateT = 0;
+
+    /* ---- The rope --------------------------------------------------- */
+    this.pts = [];
+    for(let i=0;i<LASSO.N;i++)
+      this.pts.push({ p:new THREE.Vector3(), o:new THREE.Vector3(), w:1 });
+
+    /* Constraints are built once: the spine of the rope, then the ring that
+       closes the last few points into a loop, then two diameters across that
+       ring so it holds an aperture open instead of collapsing into a knot. */
+    this.cons = [];
+    for(let i=0;i<LASSO.N-1;i++)
+      this.cons.push({ a:i, b:i+1, d:LASSO.SEG, k:1 });
+    const r0 = LASSO.N - LASSO.RING;
+    this.cons.push({ a:r0, b:LASSO.N-1, d:LASSO.SEG, k:1 });   // close the ring
+    const circ = LASSO.RING*LASSO.SEG;
+    const dia = circ/Math.PI;
+    for(let i=0;i<LASSO.RING/2;i++)
+      this.cons.push({ a:r0+i, b:r0+i+LASSO.RING/2, d:dia, k:0.55 });
+
+    this._buildMesh();
+    this._v = new THREE.Vector3(); this._v2 = new THREE.Vector3();
+    this._n = new THREE.Vector3(); this._c = new THREE.Vector3();
+  }
+
+  /* ---- Geometry: one tube, rebuilt in place every frame ---------------- */
+  _buildMesh(){
+    const RAD = 6, N = LASSO.N;
+    const pos = new Float32Array(N*RAD*3);
+    const uv  = new Float32Array(N*RAD*2);
+    const idx = [];
+    for(let i=0;i<N;i++) for(let k=0;k<RAD;k++){
+      uv[(i*RAD+k)*2]   = k/RAD;
+      uv[(i*RAD+k)*2+1] = i*0.9;     // long V so the fibre twist reads
+    }
+    for(let i=0;i<N-1;i++) for(let k=0;k<RAD;k++){
+      const a=i*RAD+k, b=i*RAD+(k+1)%RAD, c=(i+1)*RAD+k, d=(i+1)*RAD+(k+1)%RAD;
+      idx.push(a,c,b, b,c,d);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+    g.setAttribute('uv', new THREE.BufferAttribute(uv,2));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    const t = this.game.lib.leather_tack;
+    const mat = new THREE.MeshStandardMaterial({
+      map:t.map, roughnessMap:t.roughnessMap, normalMap:t.normalMap,
+      color:0xcbb58a, roughness:0.92, metalness:0 });
+    this.mesh = new THREE.Mesh(g, mat);
+    this.mesh.castShadow = true;
+    this.mesh.frustumCulled = false;
+    this.mesh.visible = false;
+    this.game.scene.add(this.mesh);
+    this._geo = g; this._RAD = RAD;
+  }
+
+  _updateMesh(){
+    const p = this._geo.attributes.position.array, RAD = this._RAD;
+    const up = this._v.set(0,1,0), tan = this._v2, nrm = this._n, bi = this._c;
+    for(let i=0;i<LASSO.N;i++){
+      const a = this.pts[i].p;
+      const b = this.pts[Math.min(i+1, LASSO.N-1)].p;
+      const c = this.pts[Math.max(i-1, 0)].p;
+      tan.subVectors(b, c);
+      if(tan.lengthSq() < 1e-8) tan.set(0,0,1);
+      tan.normalize();
+      nrm.copy(up);
+      if(Math.abs(nrm.dot(tan)) > 0.94) nrm.set(1,0,0);
+      bi.crossVectors(tan, nrm).normalize();
+      nrm.crossVectors(bi, tan).normalize();
+      const rad = 0.022;
+      for(let k=0;k<RAD;k++){
+        const ang = (k/RAD)*Math.PI*2;
+        const cx = Math.cos(ang)*rad, cy = Math.sin(ang)*rad;
+        const o = (i*RAD+k)*3;
+        p[o]   = a.x + nrm.x*cx + bi.x*cy;
+        p[o+1] = a.y + nrm.y*cx + bi.y*cy;
+        p[o+2] = a.z + nrm.z*cx + bi.z*cy;
+      }
+    }
+    this._geo.attributes.position.needsUpdate = true;
+    this._geo.computeVertexNormals();
+  }
+
+  /* ---- The loop, as a plane and an aperture ---------------------------- */
+  ringCentre(out){
+    const r0 = LASSO.N - LASSO.RING;
+    out.set(0,0,0);
+    for(let i=r0;i<LASSO.N;i++) out.add(this.pts[i].p);
+    return out.multiplyScalar(1/LASSO.RING);
+  }
+  ringNormal(out){
+    /* Newell's method across the ring — robust even when the loop is folded,
+       which it often is halfway through a bad throw. */
+    const r0 = LASSO.N - LASSO.RING;
+    out.set(0,0,0);
+    for(let i=0;i<LASSO.RING;i++){
+      const a = this.pts[r0+i].p, b = this.pts[r0+(i+1)%LASSO.RING].p;
+      out.x += (a.y-b.y)*(a.z+b.z);
+      out.y += (a.z-b.z)*(a.x+b.x);
+      out.z += (a.x-b.x)*(a.y+b.y);
+    }
+    if(out.lengthSq() < 1e-9) out.set(0,1,0);
+    return out.normalize();
+  }
+  ringRadius(){
+    const r0 = LASSO.N - LASSO.RING;
+    const c = this.ringCentre(this._c);
+    let r = 0;
+    for(let i=r0;i<LASSO.N;i++) r += this.pts[i].p.distanceTo(c);
+    return r/LASSO.RING;
+  }
+
+  /* ---- Where the rope is held ----------------------------------------- */
+  anchor(out){
+    const p = this.game.player;
+    /* Dallied round the saddle horn when mounted — that is what lets a horse
+       do the pulling instead of a man's shoulders (§7). */
+    if(this.dallied && p.mounted && this.game.horse){
+      const h = this.game.horse;
+      if(h.hornPoint) return out.copy(h.hornPoint());
+      return out.set(h.pos.x, h.pos.y + 1.98, h.pos.z);
+    }
+    const hand = p.rig && p.rig.byName.handR;
+    if(hand){ hand.updateMatrixWorld(true);
+              return out.setFromMatrixPosition(hand.matrixWorld); }
+    return out.set(p.pos.x, p.pos.y + 1.3, p.pos.z);
+  }
+
+  /* ---- Draw / stow ----------------------------------------------------- */
+  ready(){
+    if(this.state !== 'stowed') return false;
+    /* A tool and a rope do not share a hand. */
+    if(this.game.arsenal && this.game.arsenal.equipped) this.game.arsenal.holster();
+    this.state = 'ready'; this.stateT = 0; this.charge = 0;
+    const a = this.anchor(this._v);
+    for(const q of this.pts){ q.p.copy(a); q.o.copy(a); q.w = 1; }
+    this.mesh.visible = true;
+    this.game.player.anim.playOverride('lasso_ready', UPPER_MASK, 1, 0.16, true);
+    this._pose = 'lasso_ready';
+    return true;
+  }
+  stow(){
+    if(this.state === 'stowed') return false;
+    this.release();
+    this.state = 'stowed';
+    this.mesh.visible = false;
+    if(this._pose){ this.game.player.anim.stopOverride(this._pose); this._pose = null; }
+    return true;
+  }
+  _pose_(name){
+    if(this._pose === name) return;
+    if(this._pose) this.game.player.anim.stopOverride(this._pose);
+    this.game.player.anim.playOverride(name, UPPER_MASK, 1, 0.14, true);
+    this._pose = name;
+  }
+
+  /* ---- Twirl and throw -------------------------------------------------- */
+  beginTwirl(){
+    if(this.state !== 'ready' && this.state !== 'twirl') return;
+    this.state = 'twirl'; this.stateT = 0;
+    this._pose_('lasso_twirl');
+  }
+  throwIt(){
+    if(this.state !== 'twirl') return;
+    const dir = this.game.arsenal ? this.game.arsenal.aimDir()
+              : this._v2.set(Math.sin(this.game.player.yaw),0.12,
+                             Math.cos(this.game.player.yaw)).normalize();
+    const speed = LASSO.THROW_SPEED*(0.55 + this.charge*0.45);
+    const r0 = LASSO.N - LASSO.RING;
+    for(let i=1;i<LASSO.N;i++){
+      /* Points nearer the loop get more of the throw, so the rope pays out
+         rather than leaving as a rigid stick. */
+      const f = i/(LASSO.N-1);
+      const v = this._v.copy(dir).multiplyScalar(speed*f*(i>=r0 ? 1.15 : 1));
+      /* The rope pays out level; the LOOP falls. That is what actually
+         happens — the honda and the coils either side of it are the heavy
+         part, so the loop drops out of the throw and settles over the head
+         while the line behind it is still straightening.
+
+         The old code launched everything on a +2.4 m/s mortar arc, which sent
+         the loop sailing a metre over every head on the frontier and brought
+         it down in the dirt beyond. */
+      v.y += (i >= r0 ? -0.95 : 0.45)*f;
+      this.pts[i].o.copy(this.pts[i].p).addScaledVector(v, -CFG.FIXED_DT);
+    }
+    this.state = 'fly'; this.stateT = 0;
+    this._prevRing = null;
+    this._pose_('lasso_throw');
+    this.game.audio.ropeWhip && this.game.audio.ropeWhip(this.game.player.pos);
+    this.game.player.stamina = Math.max(0, this.game.player.stamina - 6);
+  }
+
+  /* ---- Release, pull, tie ---------------------------------------------- */
+  release(){
+    if(this.target){
+      this.target.roped = false;
+      this.target.ropeHold = 0;
+      this.target = null; this.catchKind = null;
+    }
+    this.struggle = 0;
+    this.slack = LASSO.SEG*(LASSO.N - LASSO.RING) + 0.6;
+    this.dallied = false;
+    if(this.state === 'caught' || this.state === 'fly')
+      this.state = this.state === 'stowed' ? 'stowed' : 'ready';
+  }
+  canTie(){
+    return this.state === 'caught' && this.target && this.struggle < 0.34
+        && !this.game.player.mounted
+        && this.target.pos.distanceTo(this.game.player.pos) < 3.2;
+  }
+  tie(){
+    if(!this.canTie()) return false;
+    const t = this.target;
+    t.tied = true; t.roped = false;
+    if(t.onTied) t.onTied();
+    else if(t.takeHit){ t.hp = 0; t.takeHit(0, null, 0); t.stayDown = true; }
+    this.game.ui.beat('HOGTIED', t.name || 'He is not going anywhere',
+                      'Settled without a mark on him.');
+    /* Roping is the non-lethal path, and the world scores it that way. */
+    this.game.player.reputation = M.clamp(this.game.player.reputation + 3, 0, 100);
+    this.game.onRoped && this.game.onRoped(t, 'tied');
+    this.target = null; this.state = 'ready'; this.struggle = 0;
+    return true;
+  }
+
+  /* ---- Candidate targets ------------------------------------------------ */
+  _targets(){
+    const out = [];
+    const p = this.game.player.pos;
+    const add = (o, neck, leg, mass, name)=>{
+      if(!o || o.tied || o.down) return;
+      if(o.pos.distanceToSquared(p) > LASSO.MAX_RANGE*LASSO.MAX_RANGE*1.6) return;
+      out.push({ o, neck, leg, mass, name });
+    };
+    for(const n of (this.game.folk ? this.game.folk.all : [])){
+      if(!n.active) continue;
+      add(n, this._pt(n.pos, 1.52), this._pt(n.pos, 0.42),
+          n.hostile ? 1.35 : 1.0, n.name);
+    }
+    if(this.game.wildlife) for(const a of this.game.wildlife.live){
+      if(!a.spec.ropeable) continue;
+      add(a, this._pt(a.pos, a.spec.neckY), this._pt(a.pos, a.spec.legY),
+          a.spec.mass, a.spec.label);
+    }
+    return out;
+  }
+  _pt(pos, y){ return new THREE.Vector3(pos.x, pos.y + y, pos.z); }
+
+  /* ---- Fixed-step simulation ------------------------------------------- */
+  fixedUpdate(dt){
+    if(this.state === 'stowed') return;
+    this.stateT += dt;
+    const g = this.game, pl = g.player;
+    const anchor = this.anchor(this._v).clone();
+
+    if(this.state === 'twirl'){
+      this.charge = M.sat(this.charge + dt*1.15);
+      /* The loop is swung overhead on a widening circle. Driving the ring
+         kinematically and letting the constraints drag the rest of the rope
+         along is far more stable than trying to find a force that produces a
+         twirl, and it reads identically. */
+      const r0 = LASSO.N - LASSO.RING;
+      const spin = this.stateT*8.4;
+      const rad = 0.55 + this.charge*0.62;
+      const cy = anchor.y + 0.72;
+      const cx = anchor.x + Math.sin(pl.yaw)*0.18;
+      const cz = anchor.z + Math.cos(pl.yaw)*0.18;
+      for(let i=0;i<LASSO.RING;i++){
+        const a = spin + (i/LASSO.RING)*Math.PI*2;
+        const q = this.pts[r0+i];
+        q.o.copy(q.p);
+        q.p.set(cx + Math.cos(a)*rad, cy + Math.sin(a*2)*0.06,
+                cz + Math.sin(a)*rad);
+      }
+    }
+
+    /* Verlet integrate everything that is not pinned. */
+    const wind = g.weather ? g.weather.windStr*1.6 : 0;
+    const wx = g.weather ? g.weather.windDir.x*wind : 0;
+    const wz = g.weather ? g.weather.windDir.y*wind : 0;
+    const free0 = (this.state === 'twirl') ? 1 : 1;
+    for(let i=free0;i<LASSO.N;i++){
+      if(this.state === 'twirl' && i >= LASSO.N - LASSO.RING) continue;
+      const q = this.pts[i];
+      const vx = (q.p.x - q.o.x)*LASSO.DRAG + wx*dt*dt;
+      const vy = (q.p.y - q.o.y)*LASSO.DRAG + LASSO.GRAV*dt*dt;
+      const vz = (q.p.z - q.o.z)*LASSO.DRAG + wz*dt*dt;
+      q.o.copy(q.p);
+      q.p.set(q.p.x+vx, q.p.y+vy, q.p.z+vz);
+    }
+
+    /* Pin point zero to the hand (or the saddle horn), and the loop to
+       whatever it has caught. */
+    this.pts[0].p.copy(anchor); this.pts[0].w = 0;
+    let holdPt = null;
+    if(this.state === 'caught' && this.target){
+      const t = this.target;
+      const y = this.catchKind === 'leg'
+        ? (t.spec ? t.spec.legY : 0.42) : (t.spec ? t.spec.neckY : 1.52);
+      holdPt = this._v2.set(t.pos.x, t.pos.y + y, t.pos.z).clone();
+    }
+
+    for(let k=0;k<LASSO.ITERS;k++){
+      for(const c of this.cons){
+        const A = this.pts[c.a], B = this.pts[c.b];
+        const dx = B.p.x-A.p.x, dy = B.p.y-A.p.y, dz = B.p.z-A.p.z;
+        const L = Math.sqrt(dx*dx+dy*dy+dz*dz) || 1e-5;
+        const diff = (L - c.d)/L*0.5*c.k;
+        const wA = A.w, wB = B.w, wsum = wA+wB || 1;
+        const fA = (wA/wsum)*2, fB = (wB/wsum)*2;
+        A.p.x += dx*diff*fA; A.p.y += dy*diff*fA; A.p.z += dz*diff*fA;
+        B.p.x -= dx*diff*fB; B.p.y -= dy*diff*fB; B.p.z -= dz*diff*fB;
+      }
+      this.pts[0].p.copy(anchor);
+      if(holdPt){
+        const r0 = LASSO.N - LASSO.RING;
+        const c = this.ringCentre(this._c);
+        const ox = holdPt.x-c.x, oy = holdPt.y-c.y, oz = holdPt.z-c.z;
+        for(let i=r0;i<LASSO.N;i++){
+          this.pts[i].p.x += ox; this.pts[i].p.y += oy; this.pts[i].p.z += oz;
+        }
+      }
+      /* The ground is solid for rope too. */
+      for(let i=1;i<LASSO.N;i++){
+        const q = this.pts[i];
+        const h = g.terrain.heightAt(q.p.x, q.p.z) + 0.02;
+        if(q.p.y < h){ q.p.y = h; q.o.x = M.lerp(q.o.x, q.p.x, 0.5);
+                       q.o.z = M.lerp(q.o.z, q.p.z, 0.5); }
+      }
+    }
+
+    if(this.state === 'fly'){
+      this._tryCatch();
+      /* A throw that has run out of rope, or out of patience, falls down. */
+      const c = this.ringCentre(this._c);
+      if(this.stateT > 2.4 || c.distanceTo(anchor) > LASSO.MAX_RANGE){
+        this.state = 'ready'; this._pose_('lasso_ready');
+      }
+    }
+
+    if(this.state === 'caught') this._updateCaught(dt, anchor);
+  }
+
+  /* Did the loop pass over something?
+
+     The test is swept. A loop travelling at fifteen metres a second covers a
+     quarter of a metre between two fixed steps, so a strictly instantaneous
+     plane test will step straight over a neck and report a clean miss —
+     which is indistinguishable, from the outside, from a lasso that does not
+     work. The window therefore widens with how far the ring moved. */
+  _tryCatch(){
+    const c = this.ringCentre(this._c).clone();
+    const n = this.ringNormal(this._n).clone();
+    const r = this.ringRadius();
+    if(r < 0.22) return;                      // the loop has collapsed
+    const step = this._prevRing ? c.distanceTo(this._prevRing) : 0;
+    this._prevRing = (this._prevRing || new THREE.Vector3()).copy(c);
+    /* A loop is not a sheet of paper: it is an open noose with some depth to
+       it, so the window is at least a fraction of its own radius. */
+    const window = Math.max(LASSO.CATCH_PLANE, step*0.85, r*0.55);
+    for(const t of this._targets()){
+      for(const [kind, pt] of [['neck', t.neck], ['leg', t.leg]]){
+        const d = this._v2.subVectors(pt, c);
+        const along = Math.abs(d.dot(n));
+        if(along > window) continue;                  // not through the hole
+        const radial = Math.sqrt(Math.max(0, d.lengthSq() - along*along));
+        if(radial > r*0.94) continue;                 // passed beside it
+        return this._catch(t, kind);
+      }
+    }
+  }
+  _catch(t, kind){
+    this.state = 'caught'; this.stateT = 0;
+    this.target = t.o; this.catchKind = kind;
+    this.target.roped = true;
+    this.targetMass = t.mass;
+    /* A leg catch is a worse catch and behaves like one: they fight harder
+       and you cannot tie them until you have dragged them down. */
+    this.struggle = kind === 'leg' ? 0.95 : 0.72;
+    /* Hauling is hand over hand: the rope you have taken in does not go back
+       out. Without this a catch at four metres on a nine-metre rope never goes
+       taut and the drag never starts, which reads as a rope that caught the
+       man and then did nothing at all. */
+    this.slack = Math.min(LASSO.SEG*(LASSO.N-LASSO.RING) + 0.6,
+                          t.neck.distanceTo(this.pts[0].p) + 0.3);
+    this._pose_('lasso_pull');
+    this.game.audio.ropeCatch && this.game.audio.ropeCatch(t.neck);
+    this.game.ui.toast(kind === 'leg' ? 'CAUGHT A LEG' : 'CAUGHT',
+      t.name ? t.name : '', 2.6);
+    if(this.target.onRoped) this.target.onRoped(kind);
+  }
+
+  _updateCaught(dt, anchor){
+    const g = this.game, t = this.target;
+    if(!t || t.tied || t.down){ this.release(); return; }
+    const pull = !!(g.input.keys.KeyE) || (g.player.mounted && g.input.sprint);
+
+    /* Struggle: they fight, you answer. Ignore a roped man and he gets out of
+       it; a wild horse gets out of it a great deal faster. */
+    const mass = this.targetMass || 1;
+    this.struggle += (pull ? -0.62 : 0.22)*dt/Math.max(0.6, mass*0.75);
+    this.struggle = M.clamp(this.struggle, 0, 1.35);
+    if(this.struggle >= 1.3){
+      this.game.ui.toast('BROKE FREE', t.name || '', 2.6);
+      this.game.audio.ropeSnap && this.game.audio.ropeSnap(t.pos);
+      if(t.onBrokeFree) t.onBrokeFree();
+      this.release();
+      return;
+    }
+
+    /* Taut rope drags. The pull is mass-appropriate, so a bison is a very
+       different proposition from a clerk. */
+    const d = this._v2.subVectors(anchor, this._v.set(t.pos.x, t.pos.y+0.9, t.pos.z));
+    const dist = d.length();
+    const rope = LASSO.SEG*(LASSO.N - LASSO.RING) + 0.6;
+    if(pull) this.slack = Math.max(2.0, Math.min(this.slack, dist)
+                                        - 1.7*dt/Math.max(0.5, mass*0.6));
+    else this.slack = Math.min(rope, this.slack + 0.4*dt);
+    if(dist > this.slack){
+      d.normalize();
+      const strength = (pull ? 3.1 : 1.6)/Math.max(0.5, mass);
+      const step = Math.min(dist - this.slack, strength*dt*(g.player.mounted?2.4:1));
+      t.pos.x += d.x*step; t.pos.z += d.z*step;
+      if(t.colliders) t.colliders.resolve(t.pos, 0.4, 1.0);
+      t.pos.y = g.terrain.heightAt(t.pos.x, t.pos.z);
+      t.dragged = true;
+      if(pull) g.player.stamina = Math.max(0, g.player.stamina - dt*9);
+    }
+    /* Face them toward the rope while they are on the end of it. */
+    if(t.yaw !== undefined)
+      t.yaw = M.angDamp(t.yaw, Math.atan2(anchor.x-t.pos.x, anchor.z-t.pos.z), 3.0, dt);
+  }
+
+  /* ---- Per-frame -------------------------------------------------------- */
+  update(dt){
+    if(this.state === 'stowed'){ this.mesh.visible = false; return; }
+    this.mesh.visible = true;
+    this._updateMesh();
+  }
+}
+
+
+/* ==========================================================================
+   WILDLIFE (§15)
+   Fourteen species, each with its own rig, its own gait, and its own reasons
+   for doing what it does.
+
+   The brief singles out the birds: "this detail is worth more than any other
+   single piece of ambience." It is right, and it is right for a reason worth
+   writing down — a world where nothing reacts to you is a diorama. A crow
+   that lifts off a fence rail as you ride past is the cheapest possible proof
+   that the world noticed, and the eye reads it long before it reads a shadow
+   cascade.
+
+   So every animal here runs the same small behaviour tree — idle, graze,
+   alert, flee, aggress, sleep — scored against three things it can actually
+   perceive: how close you are, whether you are UPWIND of it, and how much
+   noise you have been making. Ride in quietly from downwind and a deer will
+   let you get close. Gallop at it from upwind and it is gone before you see it.
+   ========================================================================== */
+
+/* Proportions, temperament and habitat. Everything downstream — the skeleton,
+   the mesh, the gait timing, the flee distance — is derived from this table,
+   so a new species is a row rather than a new module. */
+const SPECIES = {
+  deer:    { label:'DEER', kind:'quad', hide:'hide_deer', mass:1.0, scale:1.0,
+             body:1.05, girth:0.24, leg:0.72, neck:0.44, head:0.15, tail:0.14,
+             hump:0, ears:0.14, antlers:0.5, spd:{walk:1.4, run:9.5},
+             group:[1,4], flee:26, alert:40, biome:['GRASS','RIDGE'],
+             ropeable:true, neckY:1.30, legY:0.35, night:false },
+  bison:   { label:'BISON', kind:'quad', hide:'hide_bison', mass:5.2, scale:1.55,
+             body:1.45, girth:0.46, leg:0.66, neck:0.30, head:0.24, tail:0.16,
+             hump:0.30, ears:0.07, antlers:0, spd:{walk:1.2, run:7.2},
+             group:[6,16], flee:16, alert:30, biome:['GRASS'], herdLeader:true,
+             ropeable:true, neckY:1.65, legY:0.40, night:false },
+  wolf:    { label:'WOLF', kind:'quad', hide:'hide_wolf', mass:1.1, scale:0.82,
+             body:0.96, girth:0.20, leg:0.52, neck:0.30, head:0.15, tail:0.34,
+             hump:0.04, ears:0.11, antlers:0, spd:{walk:1.7, run:10.5},
+             group:[3,6], flee:0, alert:38, biome:['RIDGE','GRASS','COPPER'],
+             predator:true, pack:true, ropeable:true, neckY:0.92, legY:0.28,
+             night:true },
+  coyote:  { label:'COYOTE', kind:'quad', hide:'hide_wolf', mass:0.7, scale:0.66,
+             body:0.88, girth:0.16, leg:0.50, neck:0.28, head:0.13, tail:0.30,
+             hump:0, ears:0.14, antlers:0, spd:{walk:1.8, run:11.0},
+             group:[1,2], flee:22, alert:34, biome:['FLATS','GRASS','COPPER'],
+             predator:true, ropeable:true, neckY:0.80, legY:0.24, night:true },
+  rabbit:  { label:'RABBIT', kind:'quad', hide:'hide_deer', mass:0.12, scale:0.26,
+             body:0.60, girth:0.22, leg:0.34, neck:0.12, head:0.17, tail:0.08,
+             hump:0.06, ears:0.42, antlers:0, spd:{walk:1.4, run:8.0},
+             group:[1,3], flee:14, alert:20, biome:['GRASS','FLATS'],
+             ropeable:false, neckY:0.30, legY:0.10, night:false },
+  kangaroo:{ label:'KANGAROO', kind:'quad', hide:'hide_deer', mass:0.9, scale:0.95,
+             body:0.80, girth:0.24, leg:0.78, neck:0.32, head:0.15, tail:0.95,
+             hump:0.12, ears:0.24, antlers:0, spd:{walk:1.5, run:12.0},
+             group:[4,9], flee:24, alert:36, biome:['FLATS'], hop:true,
+             ropeable:true, neckY:1.15, legY:0.32, night:false },
+  gator:   { label:'ALLIGATOR', kind:'quad', hide:'hide_wolf', mass:2.4, scale:1.0,
+             body:1.50, girth:0.26, leg:0.20, neck:0.24, head:0.24, tail:1.10,
+             hump:0, ears:0, antlers:0, spd:{walk:0.9, run:5.4},
+             group:[1,2], flee:0, alert:22, biome:['DELTA'], predator:true,
+             ropeable:true, neckY:0.42, legY:0.14, night:true },
+  snake:   { label:'SNAKE', kind:'quad', hide:'hide_wolf', mass:0.1, scale:0.5,
+             body:1.10, girth:0.07, leg:0.05, neck:0.16, head:0.07, tail:0.70,
+             hump:0, ears:0, antlers:0, spd:{walk:1.0, run:4.2},
+             group:[1,1], flee:9, alert:14, biome:['FLATS','DELTA','COPPER'],
+             ropeable:false, neckY:0.14, legY:0.06, night:false },
+  wildhorse:{ label:'WILD HORSE', kind:'quad', hide:'hide_bay', mass:3.4, scale:1.35,
+             body:1.25, girth:0.34, leg:0.90, neck:0.52, head:0.20, tail:0.42,
+             hump:0.05, ears:0.14, antlers:0, spd:{walk:1.6, run:12.5},
+             group:[3,7], flee:30, alert:48, biome:['GRASS','FLATS'],
+             ropeable:true, breakable:true, neckY:1.72, legY:0.45, night:false },
+  /* Birds are a different animal in every sense — no skeleton, no gait, just
+     a body, two wings and a flight model. */
+  eagle:   { label:'EAGLE', kind:'bird', span:2.1, body:0.55, col:0x4a3524,
+             soar:true, height:[38,62], group:[1,1], biome:['RIDGE','FLATS'] },
+  hawk:    { label:'HAWK', kind:'bird', span:1.2, body:0.34, col:0x6b5136,
+             soar:true, height:[24,44], group:[1,2], biome:['GRASS','FLATS'] },
+  crow:    { label:'CROW', kind:'bird', span:0.9, body:0.28, col:0x14161a,
+             flock:true, height:[6,22], group:[9,22], biome:['GRASS','COPPER','DELTA'],
+             perches:true },
+  songbird:{ label:'SONGBIRD', kind:'bird', span:0.34, body:0.12, col:0xb8823a,
+             flock:true, height:[3,11], group:[5,12], biome:['GRASS','DELTA','RIDGE'],
+             perches:true, flushes:true },
+  fish:    { label:'FISH', kind:'fish', body:0.34, col:0x5d7a6a, span:0.30,
+             height:[-1.6,-0.35], group:[4,10], biome:['DELTA','GRASS'],
+             flock:true, water:true },
+};
+
+/* ---- Skeleton -----------------------------------------------------------
+   One quadruped plan, stretched by the numbers above. Same bone naming as
+   Ollie so the same skinning discipline applies: every part binds to its own
+   chain and nothing else. */
+function animalBones(s){
+  const L = s.body, LEGY = s.leg, G = s.girth;
+  const B = [
+    ['pelvis',  null,      0, LEGY + G*0.9, -L*0.42],
+    ['spine1', 'pelvis',   0, LEGY + G*0.95 + s.hump*0.35, -L*0.10],
+    ['spine2', 'spine1',   0, LEGY + G*0.95 + s.hump, L*0.22],
+    ['withers','spine2',   0, LEGY + G*0.98 + s.hump*0.8, L*0.40],
+    ['neck1',  'withers',  0, LEGY + G*1.05 + s.neck*0.35, L*0.48 + s.neck*0.25],
+    ['neck2',  'neck1',    0, LEGY + G*1.05 + s.neck*0.80, L*0.48 + s.neck*0.62],
+    ['head',   'neck2',    0, LEGY + G*1.02 + s.neck*1.00, L*0.48 + s.neck*0.98],
+    ['jaw',    'head',     0, LEGY + G*0.96 + s.neck*1.00, L*0.48 + s.neck*1.10],
+    ['tail1',  'pelvis',   0, LEGY + G*0.95, -L*0.50],
+    ['tail2',  'tail1',    0, LEGY + G*0.78, -L*0.50 - s.tail*0.5],
+    ['tail3',  'tail2',    0, LEGY + G*0.60, -L*0.50 - s.tail*1.0],
+  ];
+  for(const sd of [1,-1]){
+    const S = sd > 0 ? 'L' : 'R', x = sd*G*0.68;
+    B.push(['sh'+S,   'withers', x, LEGY + G*0.55, L*0.30]);
+    B.push(['hum'+S,  'sh'+S,    x, LEGY*0.62,     L*0.32]);
+    B.push(['can'+S,  'hum'+S,   x, LEGY*0.28,     L*0.30]);
+    B.push(['hof'+S,  'can'+S,   x, 0.02,          L*0.32]);
+    B.push(['hip'+S,  'pelvis',  x, LEGY + G*0.50, -L*0.40]);
+    B.push(['tib'+S,  'hip'+S,   x, LEGY*0.60,     -L*0.46]);
+    B.push(['hcan'+S, 'tib'+S,   x, LEGY*0.26,     -L*0.38]);
+    B.push(['hhof'+S, 'hcan'+S,  x, 0.02,          -L*0.38]);
+  }
+  return B;
+}
+
+function animalMesh(s, lib){
+  const V = (x,y,z)=> new THREE.Vector3(x,y,z);
+  const rig = makeSkeleton(boneDefFromWorld(animalBones(s)));
+  rig.weightScale = { pelvis:1.5, spine1:1.3, spine2:1.3, withers:1.3, head:2.0 };
+  const parts = [];
+  const push = (g,m,bones,hard)=>parts.push({geo:g, group:m, bones, hard});
+  const L = s.body, G = s.girth, LEGY = s.leg, N = s.neck;
+  const HIDE = 0, DARK = 1, HORN = 2, EYE = 3;
+  const SPINE = ['pelvis','spine1','spine2','withers'];
+  const NECK  = ['withers','neck1','neck2','head'];
+  const TAIL  = ['pelvis','tail1','tail2','tail3'];
+
+  /* Barrel, in two solids so the flank tucks. */
+  push(limbGeometry(V(0, LEGY+G*0.95+s.hump, L*0.40), V(0, LEGY+G*0.95, -L*0.14),
+       G*1.0, G*1.05, {radial:12, rings:4, squashX:0.92, squashZ:1.0, bulge:0.10}),
+       HIDE, ['withers','spine2','spine1']);
+  push(limbGeometry(V(0, LEGY+G*0.95, -L*0.10), V(0, LEGY+G*0.92, -L*0.48),
+       G*1.05, G*0.80, {radial:12, rings:3, squashX:0.94}), HIDE,
+       ['spine1','pelvis']);
+  if(s.hump > 0.01)
+    push(blobGeometry(V(0, LEGY+G*1.05+s.hump*0.9, L*0.30), G*0.78, s.hump*1.25,
+         G*1.05, 12), HIDE, ['withers','spine2']);
+  push(blobGeometry(V(0, LEGY+G*0.92, -L*0.44), G*0.95, G*0.92, G*0.85, 12),
+       HIDE, ['pelvis']);
+
+  /* Neck and head. */
+  push(limbGeometry(V(0, LEGY+G*1.02, L*0.44), V(0, LEGY+G*1.02+N*0.95, L*0.44+N*0.95),
+       G*0.62, G*0.36, {radial:10, rings:4, squashX:0.85}), HIDE, NECK);
+  const hx = L*0.48 + N*1.0, hy = LEGY + G*1.02 + N*1.0;
+  push(blobGeometry(V(0, hy, hx), s.head*0.9, s.head*0.95, s.head*1.35, 12),
+       HIDE, ['head'], true);
+  push(blobGeometry(V(0, hy-s.head*0.35, hx+s.head*0.95), s.head*0.55, s.head*0.5,
+       s.head*0.7, 10), HIDE, ['head','jaw']);
+  for(const sd of [1,-1]){
+    push(blobGeometry(V(sd*s.head*0.62, hy+s.head*0.30, hx+s.head*0.25),
+         s.head*0.20, s.head*0.22, s.head*0.18, 8), EYE, ['head'], true);
+    if(s.ears > 0.01)
+      push(limbGeometry(V(sd*s.head*0.55, hy+s.head*0.55, hx-s.head*0.1),
+           V(sd*s.head*0.80, hy+s.head*0.55+s.ears, hx-s.head*0.35),
+           s.head*0.26, s.head*0.10, {radial:6, rings:2, squashZ:0.45}),
+           HIDE, ['head'], true);
+    if(s.antlers > 0.01){
+      const a0 = V(sd*s.head*0.45, hy+s.head*0.65, hx-s.head*0.2);
+      const a1 = V(sd*(s.head*0.45+s.antlers*0.30), hy+s.head*0.65+s.antlers*0.75,
+                   hx-s.head*0.4);
+      push(limbGeometry(a0, a1, s.head*0.14, s.head*0.07, {radial:5, rings:3}),
+           HORN, ['head'], true);
+      for(let t=0;t<3;t++){
+        const f = 0.35 + t*0.22;
+        const b0 = V(M.lerp(a0.x,a1.x,f), M.lerp(a0.y,a1.y,f), M.lerp(a0.z,a1.z,f));
+        push(limbGeometry(b0, V(b0.x + sd*s.antlers*0.16, b0.y + s.antlers*0.26,
+             b0.z + s.antlers*0.10), s.head*0.08, s.head*0.03, {radial:4, rings:2}),
+             HORN, ['head'], true);
+      }
+    }
+  }
+
+  /* Tail. */
+  push(limbGeometry(V(0, LEGY+G*0.92, -L*0.50),
+       V(0, LEGY+G*0.92-s.tail*0.55, -L*0.50-s.tail*0.85),
+       G*0.28, G*0.12, {radial:7, rings:4}), s.tail > 0.5 ? HIDE : DARK, TAIL);
+
+  /* Legs. */
+  for(const sd of [1,-1]){
+    const S = sd > 0 ? 'L' : 'R', x = sd*G*0.68;
+    push(limbGeometry(V(x, LEGY+G*0.5, L*0.30), V(x, LEGY*0.60, L*0.32),
+         G*0.42, G*0.26, {radial:7, rings:3, bulge:0.10}), HIDE, ['sh'+S,'hum'+S]);
+    push(limbGeometry(V(x, LEGY*0.60, L*0.32), V(x, LEGY*0.26, L*0.30),
+         G*0.24, G*0.14, {radial:6, rings:3}), HIDE, ['hum'+S,'can'+S]);
+    push(limbGeometry(V(x, LEGY*0.26, L*0.30), V(x, 0.015, L*0.32),
+         G*0.14, G*0.16, {radial:6, rings:2}), DARK, ['can'+S,'hof'+S]);
+    push(limbGeometry(V(x, LEGY+G*0.5, -L*0.40), V(x, LEGY*0.58, -L*0.46),
+         G*0.46, G*0.26, {radial:7, rings:3, bulge:0.14}), HIDE, ['hip'+S,'tib'+S]);
+    push(limbGeometry(V(x, LEGY*0.58, -L*0.46), V(x, LEGY*0.24, -L*0.38),
+         G*0.24, G*0.14, {radial:6, rings:3}), HIDE, ['tib'+S,'hcan'+S]);
+    push(limbGeometry(V(x, LEGY*0.24, -L*0.38), V(x, 0.015, -L*0.38),
+         G*0.14, G*0.16, {radial:6, rings:2}), DARK, ['hcan'+S,'hhof'+S]);
+  }
+
+  const t = lib[s.hide] || lib.hide_deer;
+  const S2 = (extra)=> new THREE.MeshStandardMaterial(Object.assign({
+    map:t.map, roughnessMap:t.roughnessMap, normalMap:t.normalMap,
+    roughness:1 }, extra||{}));
+  const mats = [
+    S2(), S2({ color:0x3a3129 }),
+    new THREE.MeshStandardMaterial({ color:0xbfae8c, roughness:0.72 }),
+    new THREE.MeshStandardMaterial({ color:0x14100c, roughness:0.30 }),
+  ];
+  const mesh = new THREE.SkinnedMesh(skinParts(parts, rig, {power:3.4}), mats);
+  mesh.castShadow = true; mesh.frustumCulled = false;
+  mesh.add(rig.root);
+  mesh.bind(new THREE.Skeleton(rig.bones));
+  mesh.scale.setScalar(s.scale);
+  return { mesh, rig };
+}
+
+/* ---- Gaits --------------------------------------------------------------
+   A small cousin of the horse's generator: swing at the shoulder and hip,
+   fold at the joints below, level the foot, and keep it planted through the
+   arc. Kangaroos get a hop instead, which is a different animal entirely and
+   is written as one. */
+function animalClips(anim, s){
+  const leg = (tracks, t, swingB, midB, lowB, hofB, off, dur, reach, lift, hop)=>{
+    const sw=[], md=[], lo=[], hf=[];
+    for(let i=0;i<t.length;i++){
+      const a = ((t[i]/dur) + off) % 1;
+      let swing, fold;
+      if(hop){
+        // Both legs together: coil, drive, tuck, reach.
+        swing = -reach*Math.cos(a*Math.PI*2);
+        fold  = lift*(0.5 - 0.5*Math.cos(a*Math.PI*2));
+      } else if(a < 0.6){
+        const u = a/0.6;
+        swing = M.lerp(-reach, reach, u);
+        fold  = (1 - Math.cos(swing))*1.25;
+      } else {
+        const u = (a-0.6)/0.4;
+        swing = M.lerp(reach, -reach, M.smoother(u));
+        fold  = lift*Math.sin(Math.pow(M.sat(u), 0.72)*Math.PI);
+      }
+      const mid = fold*0.85, low = -fold*0.40;
+      sw.push([t[i], swing, 0, 0]);
+      md.push([t[i], mid,   0, 0]);
+      lo.push([t[i], low,   0, 0]);
+      hf.push([t[i], -(swing+mid+low)*0.8, 0, 0]);
+    }
+    tracks[swingB]=sw; tracks[midB]=md; tracks[lowB]=lo; tracks[hofB]=hf;
+  };
+  const gait = (name, dur, reach, lift, bob, offs, hop)=>{
+    const steps = 14, t = [];
+    for(let i=0;i<=steps;i++) t.push(i/steps*dur);
+    const tr = {};
+    leg(tr, t, 'shL','humL','canL','hofL', offs[0], dur, reach, lift, hop);
+    leg(tr, t, 'shR','humR','canR','hofR', offs[1], dur, reach, lift, hop);
+    leg(tr, t, 'hipL','tibL','hcanL','hhofL', offs[2], dur, reach, lift, hop);
+    leg(tr, t, 'hipR','tibR','hcanR','hhofR', offs[3], dur, reach, lift, hop);
+    const root = t.map((tt,i)=>[tt, 0,
+      -bob + Math.cos((tt/dur)*Math.PI*(hop?2:4))*bob, 0]);
+    tr.pelvis = t.map(tt=>[tt, 0, 0, Math.sin((tt/dur)*Math.PI*2)*bob*1.6]);
+    tr.neck1  = t.map(tt=>[tt, Math.sin((tt/dur)*Math.PI*2)*0.10, 0, 0]);
+    tr.head   = t.map(tt=>[tt, -Math.sin((tt/dur)*Math.PI*2-1.1)*0.08, 0, 0]);
+    tr.tail1  = t.map(tt=>[tt, -0.2, Math.sin((tt/dur)*Math.PI*2)*0.12, 0]);
+    anim.add(new Clip(name, dur, tr, { root }));
+  };
+  const hop = !!s.hop;
+  gait('walk', 1.25, 0.24, 0.40, 0.030, hop?[0,0,0.5,0.5]:[0.00,0.50,0.25,0.75], hop);
+  gait('run',  hop?0.58:0.52, hop?0.60:0.52, hop?1.20:1.00, hop?0.16:0.10,
+       hop?[0,0,0.5,0.5]:[0.00,0.14,0.46,0.60], hop);
+  /* Head down in the grass, ears working. */
+  anim.add(new Clip('graze', 5.2, {
+    neck1:[[0,0.95,0,0],[2.6,1.00,0.05,0],[5.2,0.95,0,0]],
+    neck2:[[0,0.55,0,0],[5.2,0.55,0,0]],
+    head: [[0,0.35,0,0],[1.3,0.45,0.10,0],[2.6,0.35,-0.08,0],[5.2,0.35,0,0]],
+    jaw:  [[0,0,0,0],[0.3,0.16,0,0],[0.6,0,0,0],[0.9,0.16,0,0],[1.2,0,0,0],[5.2,0,0,0]],
+    tail1:[[0,-0.2,0.1,0],[2.6,-0.2,-0.1,0],[5.2,-0.2,0.1,0]],
+  }));
+  /* Head up, dead still, deciding. */
+  anim.add(new Clip('alert', 3.0, {
+    neck1:[[0,-0.28,0,0],[3.0,-0.28,0,0]],
+    neck2:[[0,-0.12,0,0],[3.0,-0.12,0,0]],
+    head: [[0,0.18,0.10,0],[1.5,0.18,-0.10,0],[3.0,0.18,0.10,0]],
+    tail1:[[0,-0.55,0,0],[3.0,-0.55,0,0]],
+  }));
+  anim.add(new Clip('idle', 4.4, {
+    neck1:[[0,0.22,0,0],[2.2,0.26,0.04,0],[4.4,0.22,0,0]],
+    head: [[0,0.05,0,0],[2.2,0.05,-0.05,0],[4.4,0.05,0,0]],
+    tail1:[[0,-0.2,0.06,0],[1.1,-0.2,-0.06,0],[2.2,-0.2,0.06,0],[4.4,-0.2,0.06,0]],
+  }));
+  anim.add(new Clip('sleep', 6.0, {
+    pelvis:[[0,0.4,0,0],[6.0,0.4,0,0]],
+    neck1:[[0,1.15,0,0],[6.0,1.15,0,0]],
+    neck2:[[0,0.7,0,0],[6.0,0.7,0,0]],
+    humL:[[0,1.5,0,0],[6.0,1.5,0,0]], humR:[[0,1.5,0,0],[6.0,1.5,0,0]],
+    tibL:[[0,-1.4,0,0],[6.0,-1.4,0,0]], tibR:[[0,-1.4,0,0],[6.0,-1.4,0,0]],
+  }));
+}
+
+/* ---- A bird -------------------------------------------------------------
+   No skeleton. A body, two wings and a tail on a Group, and a flight model
+   that either flaps or rides a thermal. */
+function birdMesh(s){
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color:s.col, roughness:0.78,
+                                               flatShading:true });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(s.body*0.5, 8, 6), mat);
+  body.scale.set(0.72, 0.62, 1.5);
+  g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(s.body*0.28, 7, 5), mat);
+  head.position.set(0, s.body*0.12, s.body*0.62);
+  g.add(head);
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(s.body*0.10, s.body*0.26, 5),
+    new THREE.MeshStandardMaterial({ color:0xc49a3c, roughness:0.6 }));
+  beak.rotation.x = Math.PI/2;
+  beak.position.set(0, s.body*0.10, s.body*0.84);
+  g.add(beak);
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(s.span*0.20, 0.012, s.body*0.75), mat);
+  tail.position.set(0, 0, -s.body*0.70);
+  g.add(tail);
+  const wings = [];
+  for(const sd of [1,-1]){
+    const w = new THREE.Group();
+    const pl = new THREE.Mesh(new THREE.BoxGeometry(s.span*0.48, 0.012, s.body*0.66), mat);
+    pl.position.x = sd*s.span*0.24;
+    /* A taper toward the tip, so it is a wing and not a plank. */
+    const pos = pl.geometry.attributes.position;
+    for(let i=0;i<pos.count;i++){
+      const t = M.sat((pos.getX(i)*sd + s.span*0.24)/(s.span*0.48));
+      pos.setZ(i, pos.getZ(i)*M.lerp(1, 0.42, t));
+    }
+    pos.needsUpdate = true;
+    w.add(pl);
+    g.add(w); wings.push(w);
+  }
+  g.userData.wings = wings;
+  g.castShadow = true;
+  return g;
+}
+
+/* A fish: a flattened body and a tail that wags. Seen through teal-black
+   water at three metres, this is exactly as much fish as is required. */
+function fishMesh(s){
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color:s.col, roughness:0.36,
+                                               metalness:0.16, flatShading:true });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(s.body*0.5, 7, 5), mat);
+  body.scale.set(0.42, 0.85, 1.9);
+  g.add(body);
+  const tail = new THREE.Group();
+  const fin = new THREE.Mesh(new THREE.ConeGeometry(s.body*0.34, s.body*0.55, 4), mat);
+  fin.rotation.x = -Math.PI/2;
+  fin.scale.set(0.28, 1, 1);
+  fin.position.z = -s.body*0.30;
+  tail.add(fin);
+  tail.position.z = -s.body*0.48;
+  g.add(tail);
+  g.userData.wings = [tail, tail];
+  return g;
+}
+
+/* ==========================================================================
+   WILDLIFE MANAGER
+   Spawns around the player by biome, on a budget, and takes it all away
+   again when you ride off. Nothing here is persistent — a deer you never saw
+   does not need to exist.
+   ========================================================================== */
+class Wildlife {
+  constructor(game){
+    this.game = game;
+    this.live = [];
+    this.birds = [];
+    this.protos = {};          // one built mesh+clips per species, cloned after
+    this.cap = 26;
+    this.birdCap = 46;
+    this._t = 0;
+    this._spawnT = 0;
+    this._noise = 0;           // how much racket the player has been making
+    this._v = new THREE.Vector3();
+    this._s1 = new THREE.Vector3();
+    this._s2 = new THREE.Vector3();
+  }
+
+  _proto(key){
+    if(this.protos[key]) return this.protos[key];
+    const s = SPECIES[key];
+    const built = animalMesh(s, this.game.lib);
+    this.protos[key] = built;
+    return built;
+  }
+
+  /* A fresh animal. Skinned meshes cannot be shared, so each one gets its own
+     build — which is why the cap is 26 and not 260. */
+  _spawn(key, x, z, leader){
+    const s = SPECIES[key];
+    if(s.kind === 'bird') return this._spawnBird(key, x, z);
+    const { mesh, rig } = animalMesh(s, this.game.lib);
+    const anim = new Animator(rig);
+    animalClips(anim, s);
+    anim.play('idle', 0);
+    const obj = new THREE.Group();
+    obj.add(mesh);
+    this.game.scene.add(obj);
+    const y = this.game.terrain.heightAt(x, z);
+    const a = {
+      key, spec:s, mesh, rig, anim, object:obj,
+      pos:new THREE.Vector3(x, y, z), yaw:Math.random()*Math.PI*2,
+      state:'idle', stateT:Math.random()*3, speed:0, target:null,
+      leader: leader || null, hp: 40*s.mass, roped:false, tied:false, down:false,
+      colliders:this.game.colliders, terrain:this.game.terrain,
+      name:s.label, _blink:0,
+    };
+    /* Everything the lasso and the tools need to treat an animal as a target
+       is the same shape an NPC exposes, so neither has to special-case it. */
+    a.takeHit = (dmg, dir)=>{
+      a.hp -= dmg;
+      a.state = s.predator ? 'aggress' : 'flee';
+      a.stateT = 0;
+      if(a.hp <= 0){ a.down = true; a.state = 'down'; a.stateT = 0; return true; }
+      return false;
+    };
+    a.onRoped = ()=>{ a.state = 'roped'; a.stateT = 0; };
+    a.onBrokeFree = ()=>{ a.state = 'flee'; a.stateT = 0; };
+    a.onTied = ()=>{ a.tied = true; a.state = 'down';
+                     if(s.breakable) this.game.onWildHorseBroken &&
+                                     this.game.onWildHorseBroken(a); };
+    this.live.push(a);
+    return a;
+  }
+
+  _spawnBird(key, x, z){
+    const s = SPECIES[key];
+    const g = s.water ? fishMesh(s) : birdMesh(s);
+    this.game.scene.add(g);
+    const h = M.range(Math.random, s.height[0], s.height[1]);
+    const base = s.water ? CFG.SEA : this.game.terrain.heightAt(x,z);
+    const b = {
+      key, spec:s, object:g,
+      pos:new THREE.Vector3(x, base + h, z),
+      vel:new THREE.Vector3((Math.random()-0.5)*4, 0, (Math.random()-0.5)*4),
+      flap:Math.random()*6, perched:false, perchT:0, scare:0,
+    };
+    this.birds.push(b);
+    return b;
+  }
+
+  /* ---- Noise. Gunfire and a gallop both carry. ------------------------- */
+  bang(){ this._noise = 1; this.scatter(70); }
+  scatter(r){
+    const p = this.game.player.pos;
+    for(const b of this.birds){
+      if(b.pos.distanceTo(p) > r) continue;
+      b.perched = false; b.scare = 2.4;
+      b.vel.y = 5 + Math.random()*4;
+      const a = Math.atan2(b.pos.z-p.z, b.pos.x-p.x) + (Math.random()-0.5)*0.8;
+      b.vel.x = Math.cos(a)*9; b.vel.z = Math.sin(a)*9;
+    }
+    for(const a of this.live){
+      if(a.down || a.tied) continue;
+      if(a.pos.distanceTo(p) > r) continue;
+      if(a.spec.predator && Math.random() < 0.4) continue;
+      a.state = 'flee'; a.stateT = 0;
+    }
+  }
+
+  /* ---- Which species belong here? -------------------------------------- */
+  /* The terrain answers in the BIOME enum; the species table is written in
+     words, because a table of magic numbers is a table nobody edits. */
+  _biomeAt(x, z){
+    const t = this.game.terrain;
+    if(!t.biomeAt) return 'GRASS';
+    const y = t.heightAt(x, z);
+    const names = ['FLATS','RIDGE','GRASS','COPPER','DELTA'];
+    return names[t.biomeAt(x, z, y)] || 'GRASS';
+  }
+
+  fixedUpdate(dt, playerPos){
+    this._t += dt;
+    this._noise = Math.max(0, this._noise - dt*0.5);
+    const g = this.game, pl = g.player;
+    /* Galloping is loud. Walking is not. */
+    if(pl.mounted && g.horse && g.horse.speed > 7) this._noise = Math.max(this._noise, 0.5);
+
+    this._spawnT -= dt;
+    if(this._spawnT <= 0){ this._spawnT = 1.2; this._populate(playerPos); }
+
+    const hour = g.tod ? g.tod.hour : 12;
+    const night = (hour < 5.5 || hour > 19.5);
+    for(let i=this.live.length-1;i>=0;i--){
+      const a = this.live[i];
+      const d = a.pos.distanceTo(playerPos);
+      if(d > 180 && !a.roped){ this._despawn(i); continue; }
+      this._brain(a, dt, playerPos, night);
+      this._move(a, dt);
+    }
+    for(let i=this.birds.length-1;i>=0;i--){
+      const b = this.birds[i];
+      if(b.pos.distanceTo(playerPos) > 210){ this._despawnBird(i); continue; }
+      this._bird(b, dt, playerPos);
+    }
+  }
+
+  _despawn(i){
+    const a = this.live[i];
+    this.game.scene.remove(a.object);
+    a.mesh.geometry.dispose();
+    this.live.splice(i,1);
+  }
+  _despawnBird(i){
+    this.game.scene.remove(this.birds[i].object);
+    this.birds.splice(i,1);
+  }
+
+  _populate(p){
+    const biome = this._biomeAt(p.x, p.z);
+    const hour = this.game.tod ? this.game.tod.hour : 12;
+    const night = (hour < 5.5 || hour > 19.5);
+    if(this.live.length < this.cap){
+      const opts = Object.keys(SPECIES).filter(k=>{
+        const s = SPECIES[k];
+        if(s.kind !== 'quad') return false;
+        if(!s.biome.includes(biome)) return false;
+        if(s.night === true && !night) return Math.random() < 0.2;
+        if(s.night === false && night) return Math.random() < 0.25;
+        return true;
+      });
+      if(opts.length){
+        const key = opts[(Math.random()*opts.length)|0];
+        const s = SPECIES[key];
+        const ang = Math.random()*Math.PI*2;
+        const r = 70 + Math.random()*70;
+        const x = p.x + Math.cos(ang)*r, z = p.z + Math.sin(ang)*r;
+        const n = Math.min((s.group[0] + Math.random()*(s.group[1]-s.group[0]))|0,
+                           this.cap - this.live.length);
+        /* Herds spawn together with a leader the rest read off. */
+        let lead = null;
+        for(let i=0;i<Math.max(1,n);i++){
+          const a = this._spawn(key, x + (Math.random()-0.5)*12,
+                                     z + (Math.random()-0.5)*12, lead);
+          if(i === 0 && (s.herdLeader || s.pack || s.group[1] > 3)) lead = a;
+        }
+      }
+    }
+    /* Fish shoal in the shallows, and are found the same way birds are —
+       they are a flock that happens to live under the surface. */
+    if(this.birds.length < this.birdCap){
+      const wet = this.game.terrain.heightAt(p.x, p.z) < CFG.SEA + 2.5;
+      const opts = Object.keys(SPECIES).filter(k=>{
+        const sp = SPECIES[k];
+        if(!sp.biome.includes(biome)) return false;
+        if(sp.kind === 'fish') return wet;
+        return sp.kind === 'bird';
+      });
+      if(opts.length){
+        const key = opts[(Math.random()*opts.length)|0];
+        const s = SPECIES[key];
+        const ang = Math.random()*Math.PI*2, r = 40 + Math.random()*90;
+        const n = Math.min((s.group[0] + Math.random()*(s.group[1]-s.group[0]))|0,
+                           this.birdCap - this.birds.length);
+        for(let i=0;i<Math.max(1,n);i++)
+          this._spawnBird(key, p.x + Math.cos(ang)*r + (Math.random()-0.5)*16,
+                               p.z + Math.sin(ang)*r + (Math.random()-0.5)*16);
+      }
+    }
+  }
+
+  /* ---- The behaviour tree ----------------------------------------------
+     Scored, not scripted. An animal decides using only what it could actually
+     know: distance, whether you are upwind, and how loud you have been. */
+  _brain(a, dt, pp, night){
+    a.stateT += dt;
+    if(a.down || a.tied){ a.speed = 0; return; }
+    if(a.roped){ a.state = 'roped'; a.speed = 0; return; }
+    const s = a.spec;
+    const d = a.pos.distanceTo(pp);
+
+    /* Scent: if the player is upwind of the animal, it knows sooner. */
+    const w = this.game.weather;
+    let upwind = 0;
+    if(w){
+      const toA = this._v.set(a.pos.x-pp.x, 0, a.pos.z-pp.z);
+      if(toA.lengthSq() > 0.01){
+        toA.normalize();
+        upwind = M.sat(toA.x*w.windDir.x + toA.z*w.windDir.y);
+      }
+    }
+    const noticed = s.alert*(0.55 + upwind*0.55 + this._noise*0.75);
+    const fleeAt  = s.flee *(0.75 + upwind*0.40 + this._noise*0.85);
+
+    switch(a.state){
+      case 'sleep':
+        if(!night || d < noticed*0.6){ a.state='alert'; a.stateT=0; }
+        a.speed = 0; break;
+
+      case 'idle': case 'graze':
+        a.speed = 0;
+        if(d < noticed){ a.state='alert'; a.stateT=0; break; }
+        if(night && !s.predator && a.stateT > 14){ a.state='sleep'; a.stateT=0; break; }
+        if(a.stateT > 6 + Math.random()*8){
+          a.state = Math.random() < 0.55 ? 'graze' : 'wander';
+          a.stateT = 0;
+          const ang = Math.random()*Math.PI*2, r = 6 + Math.random()*16;
+          a.target = new THREE.Vector3(a.pos.x + Math.cos(ang)*r, 0,
+                                       a.pos.z + Math.sin(ang)*r);
+        }
+        break;
+
+      case 'wander':
+        a.speed = s.spd.walk;
+        if(d < noticed){ a.state='alert'; a.stateT=0; break; }
+        if(!a.target || a.pos.distanceTo(a.target) < 2 || a.stateT > 12){
+          a.state='graze'; a.stateT=0; a.speed=0;
+        }
+        break;
+
+      case 'alert':
+        a.speed = 0;
+        /* A predator that has been noticed by its dinner does not run. */
+        if(s.predator && !s.flee && d < s.alert*0.6){ a.state='aggress'; a.stateT=0; break; }
+        if(d < fleeAt){ a.state='flee'; a.stateT=0; break; }
+        if(a.stateT > 3.2 && d > noticed*1.25){ a.state='graze'; a.stateT=0; }
+        break;
+
+      case 'flee': {
+        a.speed = s.spd.run;
+        /* Herd animals run with the leader rather than in fourteen directions. */
+        const away = (a.leader && !a.leader.down)
+          ? this._v.set(a.leader.pos.x-a.pos.x, 0, a.leader.pos.z-a.pos.z)
+          : this._v.set(a.pos.x-pp.x, 0, a.pos.z-pp.z);
+        if(away.lengthSq() < 0.01) away.set(1,0,0);
+        away.normalize();
+        a.target = new THREE.Vector3(a.pos.x + away.x*30, 0, a.pos.z + away.z*30);
+        if(a.stateT > 6 && d > fleeAt*2.2){ a.state='alert'; a.stateT=0; }
+        break;
+      }
+
+      case 'aggress': {
+        a.speed = s.spd.run*0.86;
+        a.target = pp.clone();
+        if(d < 1.9){
+          a._bite = (a._bite||0) - dt;
+          if(a._bite <= 0){
+            a._bite = 1.5;
+            this.game.player.health = Math.max(0, this.game.player.health - 9*s.mass);
+            this.game.cam.addShake(0.45);
+            this.game.audio.animalCall && this.game.audio.animalCall(a.key, a.pos);
+          }
+        }
+        if(d > s.alert*1.4 || a.stateT > 18){ a.state='alert'; a.stateT=0; }
+        break;
+      }
+
+      case 'roped':
+        a.speed = 0;
+        if(!a.roped){ a.state='flee'; a.stateT=0; }
+        break;
+
+      case 'down': a.speed = 0; break;
+    }
+
+    /* Clip selection follows the state, not the other way round. */
+    const clip = a.state === 'sleep' ? 'sleep'
+               : a.state === 'down'  ? 'sleep'
+               : a.state === 'alert' || a.state === 'roped' ? 'alert'
+               : a.speed > s.spd.walk*2 ? 'run'
+               : a.speed > 0.1 ? 'walk'
+               : a.state === 'graze' ? 'graze' : 'idle';
+    if(a._clip !== clip){ a._clip = clip; a.anim.play(clip, 0.28); }
+  }
+
+  _move(a, dt){
+    if(a.speed > 0.05 && a.target){
+      const dx = a.target.x - a.pos.x, dz = a.target.z - a.pos.z;
+      const L = Math.hypot(dx, dz);
+      if(L > 0.1){
+        a.yaw = M.angDamp(a.yaw, Math.atan2(dx, dz), 4.2, dt);
+        const step = a.speed*dt;
+        a.pos.x += Math.sin(a.yaw)*step;
+        a.pos.z += Math.cos(a.yaw)*step;
+        a.pos.x = M.clamp(a.pos.x, -CFG.HALF+8, CFG.HALF-8);
+        a.pos.z = M.clamp(a.pos.z, -CFG.HALF+8, CFG.HALF-8);
+        this.game.colliders.resolve(a.pos, 0.5*a.spec.scale, 1.2);
+        if(a.spec.mass > 0.6 && a.speed > 3)
+          this.game.particles.hoofDust &&
+          this.game.particles.hoofDust(a.pos, a.speed, 'dirt');
+      }
+    }
+    a.pos.y = this.game.terrain.heightAt(a.pos.x, a.pos.z);
+    a.object.position.copy(a.pos);
+    a.object.rotation.y = a.yaw;
+  }
+
+  /* ---- Birds: soar, flock, perch, scatter ------------------------------ */
+  _bird(b, dt, pp){
+    const s = b.spec;
+    b.flap += dt*(b.perched ? 0 : 14);
+    if(b.scare > 0) b.scare -= dt;
+
+    if(b.perched){
+      b.perchT -= dt;
+      if(b.perchT <= 0 || b.pos.distanceTo(pp) < 9){
+        b.perched = false; b.vel.set((Math.random()-0.5)*6, 5, (Math.random()-0.5)*6);
+      }
+    } else if(s.soar){
+      /* Thermals: a slow circle that climbs in the warm part of the day and
+         sinks after dark. Real soaring physics is a lot of maths for a bird
+         you see at three hundred metres; a rising spiral is the same silhouette. */
+      const hour = this.game.tod ? this.game.tod.hour : 12;
+      const lift = Math.cos((hour-13)/24*Math.PI*2)*0.6 + 0.5;
+      const ang = this._t*0.22 + (b.pos.x + b.pos.z)*0.01;
+      b.vel.x = Math.cos(ang)*7.5; b.vel.z = Math.sin(ang)*7.5;
+      const want = this.game.terrain.heightAt(b.pos.x, b.pos.z)
+                 + M.lerp(s.height[0], s.height[1], 0.5 + Math.sin(ang*0.6)*0.4);
+      b.vel.y = M.clamp((want - b.pos.y)*0.5, -3, 3)*lift;
+    } else if(s.water){
+      /* A shoal. Same boids, but the ceiling is the surface and the floor is
+         the riverbed, and there is no flapping — the tail does the work. */
+      const sep = this._s1.set(0,0,0), tmp = this._s2;
+      let ax=0, az=0, cx=0, cz=0, n=0;
+      for(const o of this.birds){
+        if(o === b || o.key !== b.key) continue;
+        const d = b.pos.distanceTo(o.pos);
+        if(d > 5) continue;
+        n++;
+        if(d < 0.9 && d > 1e-3)
+          sep.add(tmp.subVectors(b.pos, o.pos).multiplyScalar(1/(d*d)));
+        ax += o.vel.x; az += o.vel.z; cx += o.pos.x; cz += o.pos.z;
+      }
+      if(n){
+        b.vel.x += (ax/n - b.vel.x)*1.4*dt + ((cx/n)-b.pos.x)*0.6*dt + sep.x*3*dt;
+        b.vel.z += (az/n - b.vel.z)*1.4*dt + ((cz/n)-b.pos.z)*0.6*dt + sep.z*3*dt;
+      }
+      const bed = this.game.terrain.heightAt(b.pos.x, b.pos.z);
+      const want = M.clamp(CFG.SEA - 0.55, bed + 0.25, CFG.SEA - 0.20);
+      b.vel.y = (want - b.pos.y)*1.6;
+      const d = b.pos.distanceTo(pp);
+      if(d < 5){ b.vel.x += (b.pos.x-pp.x)/d*9*dt; b.vel.z += (b.pos.z-pp.z)/d*9*dt; }
+      const sp2 = Math.hypot(b.vel.x, b.vel.z);
+      if(sp2 > 3.4){ b.vel.x *= 3.4/sp2; b.vel.z *= 3.4/sp2; }
+      if(sp2 < 0.7){ b.vel.x += (Math.random()-0.5)*2*dt; b.vel.z += (Math.random()-0.5)*2*dt; }
+      /* Tail wiggle instead of wings. */
+      const w0 = b.object.userData.wings;
+      w0[0].rotation.y = Math.sin(b.flap*0.6)*0.5;
+      b.pos.addScaledVector(b.vel, dt);
+      b.object.position.copy(b.pos);
+      if(sp2 > 0.02) b.object.rotation.y = Math.atan2(b.vel.x, b.vel.z);
+      return;
+    } else {
+      /* Boids: separation, alignment, cohesion, over the flock's own species. */
+      const sep = this._s1.set(0,0,0), tmp = this._s2;
+      let ax=0, ay=0, az=0, cx=0, cy=0, cz=0, n=0;
+      for(const o of this.birds){
+        if(o === b || o.key !== b.key || o.perched) continue;
+        const d = b.pos.distanceTo(o.pos);
+        if(d > 11) continue;
+        n++;
+        if(d < 2.6 && d > 1e-3)
+          sep.add(tmp.subVectors(b.pos, o.pos).multiplyScalar(1/(d*d)));
+        ax += o.vel.x; ay += o.vel.y; az += o.vel.z;
+        cx += o.pos.x; cy += o.pos.y; cz += o.pos.z;
+      }
+      if(n){
+        b.vel.x += (ax/n - b.vel.x)*0.9*dt + ((cx/n)-b.pos.x)*0.30*dt + sep.x*4*dt;
+        b.vel.y += (ay/n - b.vel.y)*0.9*dt + ((cy/n)-b.pos.y)*0.30*dt + sep.y*4*dt;
+        b.vel.z += (az/n - b.vel.z)*0.9*dt + ((cz/n)-b.pos.z)*0.30*dt + sep.z*4*dt;
+      }
+      const ground = this.game.terrain.heightAt(b.pos.x, b.pos.z);
+      const want = ground + M.lerp(s.height[0], s.height[1], 0.5);
+      b.vel.y += (want - b.pos.y)*0.55*dt;
+      /* Keep away from whoever is making all that noise. */
+      const d = b.pos.distanceTo(pp);
+      if(d < 16){
+        b.vel.x += (b.pos.x-pp.x)/d*12*dt;
+        b.vel.z += (b.pos.z-pp.z)/d*12*dt;
+      }
+      /* Come down and sit on something once the fright has passed. */
+      if(s.perches && b.scare <= 0 && Math.random() < dt*0.06 && d > 22){
+        b.perched = true; b.perchT = 5 + Math.random()*14;
+        b.pos.y = ground + 0.1 + Math.random()*2.4;
+        b.vel.set(0,0,0);
+      }
+      const sp = b.vel.length();
+      if(sp > 16) b.vel.multiplyScalar(16/sp);
+      if(sp < 3 && sp > 0.01) b.vel.multiplyScalar(3/sp);
+    }
+
+    b.pos.addScaledVector(b.vel, dt);
+    b.object.position.copy(b.pos);
+    if(b.vel.lengthSq() > 0.01)
+      b.object.rotation.y = Math.atan2(b.vel.x, b.vel.z);
+    b.object.rotation.x = M.clamp(-b.vel.y*0.05, -0.5, 0.5);
+    const w = b.object.userData.wings;
+    const beat = b.perched ? 0
+      : (s.soar ? Math.sin(b.flap*0.22)*0.16 : Math.sin(b.flap)*0.85);
+    w[0].rotation.z = -beat; w[1].rotation.z = beat;
+  }
+
+  update(dt){ /* visuals are driven from fixedUpdate; animators tick here */
+    for(const a of this.live) a.anim.update(dt);
+    /* Something calls every so often. Wolves at night, crows over the mine,
+       a bull bison when you get too close to the herd. */
+    this._callT = (this._callT || 6) - dt;
+    if(this._callT > 0) return;
+    this._callT = 7 + Math.random()*16;
+    const pool = this.live.filter(a=>!a.down && !a.tied);
+    if(!pool.length) return;
+    const a = pool[(Math.random()*pool.length)|0];
+    const d = a.pos.distanceTo(this.game.player.pos);
+    if(d > 90) return;
+    this.game.audio.animalCall && this.game.audio.animalCall(a.key, a.pos);
+  }
+}
+
+
+/* ==========================================================================
+   SAVE (§19)
+   Five manual slots, an autosave at every mission boundary, and a JSON blob
+   you can carry to another machine.
+
+   The rule this module lives by: save DECISIONS, not derived state. The world
+   is deterministic from its seed, so there is no reason to serialise a single
+   tree — but which way you settled with Caitlin, and whether you have the
+   audit, cannot be recomputed from anything. A save file that stores the
+   former and forgets the latter is a save file that quietly loses the game.
+   ========================================================================== */
+const SAVE_VERSION = 3;
+const SAVE_KEY = 'orr.save.';
+
+const SaveSystem = {
+  /* ---- Capture ---------------------------------------------------------- */
+  capture(g){
+    const p = g.player, st = g.story;
+    return {
+      v: SAVE_VERSION,
+      stamp: Date.now(),
+      title: st ? `Act ${st.act} \u00b7 ${st.mission ? st.mission.title : 'The frontier'}`
+                : 'The frontier',
+      where: g.towns.current ? g.towns.current.name : 'Out on the road',
+      player: {
+        x:p.pos.x, y:p.pos.y, z:p.pos.z, yaw:p.yaw,
+        health:p.health, stamina:p.stamina,
+        composure:p.composure, composureMax:p.composureMax,
+        reputation:p.reputation, connections:p.connections,
+        ammo:Object.assign({}, p.ammo), act:p.act, wanted:p.wanted,
+      },
+      arms: g.arsenal ? {
+        owned:Object.assign({}, g.arsenal.owned),
+        loaded:Object.assign({}, g.arsenal.loaded),
+        yesEye:g.arsenal.yesEyeMeter,
+      } : null,
+      horse: g.horse ? { bond:g.horse.bond, dirt:g.horse.dirt || 0,
+                         x:g.horse.pos.x, z:g.horse.pos.z } : null,
+      story: st ? {
+        act:st.act, mi:st.mi, si:0,
+        cards:Array.from(st.cards),
+        flags:Array.from(st.flags),
+        outcomes:Object.assign({}, st.outcomes),
+        allies:Array.from(st.allies),
+        ending:st.ending || null,
+      } : null,
+      world: {
+        hour: g.tod ? g.tod.hour : 8,
+        day:  g.tod ? (g.tod.day || 0) : 0,
+        weather: g.weather ? g.weather.state : 'clear',
+        discovered: Array.from(g.discovered || []),
+      },
+    };
+  },
+
+  /* ---- Restore ----------------------------------------------------------
+     A restored game re-enters the CURRENT MISSION from its first step rather
+     than trying to resume mid-step. Half a mission is not a state worth
+     serialising — nobody wants to reload into the third pole of three with
+     the beacons in the wrong place. */
+  apply(g, d){
+    if(!d || !d.v) return false;
+    d = this.migrate(d);
+    const p = g.player;
+    p.pos.set(d.player.x, d.player.y, d.player.z);
+    p.yaw = p.desiredYaw = d.player.yaw;
+    p.vel.set(0,0,0);
+    p.health = d.player.health; p.stamina = d.player.stamina;
+    p.composure = d.player.composure;
+    p.composureMax = d.player.composureMax || 100;
+    p.reputation = d.player.reputation;
+    p.connections = d.player.connections;
+    p.ammo = Object.assign({ charge:0, shell:0, cell:0 }, d.player.ammo);
+    p.wanted = d.player.wanted || 0;
+    if(p.setAct) p.setAct(d.player.act || 1);
+
+    if(g.arsenal && d.arms){
+      Object.assign(g.arsenal.owned, d.arms.owned);
+      Object.assign(g.arsenal.loaded, d.arms.loaded);
+      g.arsenal.yesEyeMeter = d.arms.yesEye;
+      g.arsenal.holster(); g.arsenal._stowAll();
+    }
+    if(g.horse && d.horse){
+      g.horse.bond = d.horse.bond;
+      g.horse.pos.set(d.horse.x, g.terrain.heightAt(d.horse.x, d.horse.z), d.horse.z);
+    }
+    if(g.tod){ g.tod.hour = d.world.hour; if('day' in d.world) g.tod.day = d.world.day; }
+    if(g.weather && d.world.weather) g.weather.target = d.world.weather;
+    g.discovered = new Set(d.world.discovered || []);
+
+    if(g.story && d.story){
+      const st = g.story;
+      st.act = d.story.act;
+      st.cards = new Set(d.story.cards);
+      st.flags = new Set(d.story.flags);
+      st.outcomes = Object.assign({}, d.story.outcomes);
+      st.allies = new Set(d.story.allies);
+      st.ending = d.story.ending;
+      st._clearSites && st._clearSites();
+      st._clearHostiles && st._clearHostiles();
+      st.beginMission(d.story.mi);
+    }
+    g.ui.beat('LOADED', d.title || '', d.where || '');
+    return true;
+  },
+
+  /* Old saves are migrated, never rejected — losing somebody's run because a
+     field moved is not an acceptable way to ship a change. */
+  migrate(d){
+    if(d.v < 2){
+      d.player.connections = d.player.connections || 45;
+      d.player.ammo = d.player.ammo || { charge:42, shell:8, cell:1 };
+      d.v = 2;
+    }
+    if(d.v < 3){
+      d.story = d.story || { act:1, mi:0, cards:[], flags:[], outcomes:{}, allies:[] };
+      d.world = d.world || { hour:8, weather:'clear', discovered:[] };
+      d.v = 3;
+    }
+    return d;
+  },
+
+  /* ---- Slots ------------------------------------------------------------ */
+  slots(){
+    const out = [];
+    for(let i=0;i<6;i++){          // 0 is the autosave
+      let d = null;
+      try { const raw = localStorage.getItem(SAVE_KEY+i);
+            if(raw) d = JSON.parse(raw); } catch(e){}
+      out.push(d);
+    }
+    return out;
+  },
+  write(g, i){
+    try {
+      localStorage.setItem(SAVE_KEY+i, JSON.stringify(this.capture(g)));
+      return true;
+    } catch(e){ return false; }
+  },
+  read(g, i){
+    try {
+      const raw = localStorage.getItem(SAVE_KEY+i);
+      if(!raw) return false;
+      return this.apply(g, JSON.parse(raw));
+    } catch(e){ return false; }
+  },
+  wipe(i){ try { localStorage.removeItem(SAVE_KEY+i); } catch(e){} },
+
+  /* ---- Carry it between machines --------------------------------------- */
+  exportText(g){ return btoa(unescape(encodeURIComponent(
+    JSON.stringify(this.capture(g))))); },
+  importText(g, txt){
+    try { return this.apply(g, JSON.parse(decodeURIComponent(escape(atob(
+      txt.trim())))));
+    } catch(e){ return false; }
+  },
+};
+
 /* ==========================================================================
    GAME
    ========================================================================== */
@@ -9901,6 +11748,8 @@ class Game {
       ['articulating a horse',           ()=>this._horse()],
       ['tuning the wire',                ()=>this._audio()],
       ['issuing the tools',              ()=>this._arms()],
+      ['coiling the rope',               ()=>this._lasso()],
+      ['letting the country out',        ()=>this._wildlife()],
       ['raising the townsfolk',          ()=>this._folk()],
       ['building Yes Gulch',             ()=>this._homeTown()],
       ['drawing the map',                ()=>this._map()],
@@ -10090,6 +11939,25 @@ class Game {
     };
   }
 
+  _lasso(){
+    this.lasso = new Lasso(this);
+    /* Roping somebody instead of shooting them is worth something, and the
+       mission engine wants to know about it. */
+    this.onRoped = (t, how)=>{
+      if(this.story && this.story.onRoped) this.story.onRoped(t, how);
+    };
+  }
+  _wildlife(){
+    this.wildlife = new Wildlife(this);
+    /* Gunfire empties the sky. It is the single loudest signal the world has
+       that something has happened. */
+    const prevBang = this.onGunfire;
+    this.onGunfire = (pos, def)=>{
+      prevBang && prevBang(pos, def);
+      this.wildlife.bang();
+    };
+  }
+
   _folk(){
     this.folk = new Townsfolk(this.terrain, this.lib, this.scene, this.colliders);
     this.folk.onSpeak = (npc, line)=>{
@@ -10208,6 +12076,8 @@ class Game {
                this.discovered.add(t.name); },
       (t)=> this.folk.release(t));
     this.folk.fixedUpdate(dt, this.tod.hour, this.player.pos);
+    if(this.wildlife) this.wildlife.fixedUpdate(dt, this.player.pos);
+    if(this.lasso) this.lasso.fixedUpdate(dt);
     if(town && town !== this._enteredTown){
       this._enteredTown = town;
       this.ui.toast(town.name.toUpperCase(), town.blurb, 4.5);
@@ -10304,6 +12174,76 @@ class Game {
     }
   }
 
+  /* The rope. Q takes it out and puts it away, hold the left mouse to twirl,
+     let go to throw, E hauls, F ties. Everything is a hold, because a rope is
+     not a trigger. */
+  _rope_input(dt, inp, p){
+    const L = this.lasso;
+    const busy = (this.story && (this.story.director.active || this.story.call.active
+                  || this.story.lude.active)) || this.ledger.open
+              || (this.shop && this.shop.open);
+    if(busy) return;
+
+    if(inp.once('KeyQ')){
+      if(L.state === 'stowed'){
+        if(L.ready()) this.ui.toast('ROPE OUT',
+          'Hold the left mouse to twirl. Let go to throw.', 4);
+      } else L.stow();
+    }
+    if(L.state === 'stowed') return;
+
+    if(inp.fire && (L.state === 'ready' || L.state === 'twirl')) L.beginTwirl();
+    if(!inp.fire && L.state === 'twirl') L.throwIt();
+
+    if(L.state === 'caught'){
+      const t = L.target;
+      const wild = t && t.spec && t.spec.breakable;
+      this.ui.setPrompt('rope','E', 'Haul on the rope', true);
+      if(L.canTie())
+        this.ui.setPrompt('ropeTie','F', wild ? 'Break her to the saddle' : 'Tie them',
+                          true);
+      else this.ui.setPrompt('ropeTie','F','',false);
+      if(inp.once('KeyF') && L.canTie()){
+        if(wild) this._breakHorse(t);
+        else L.tie();
+      }
+      /* Dally to the horn: from the saddle, the horse does the pulling. */
+      if(p.mounted && !L.dallied){ L.dallied = true;
+        this.ui.toast('DALLIED', 'The rope is round the horn now.', 3); }
+    } else {
+      this.ui.setPrompt('rope','E','',false);
+      this.ui.setPrompt('ropeTie','F','',false);
+    }
+  }
+
+  /* A wild horse is not tied, it is BROKEN — six to ten bucks of counter-
+     leaning (§7), which is the same timing ring the duel uses because it is
+     the same thing: hold your nerve and commit on the beat. */
+  _breakHorse(a){
+    const L = this.lasso;
+    this.story.lude.timing({
+      title:'BREAKING HER', rounds: 6 + ((Math.random()*4)|0),
+      speed:2.05, zone:0.25, shrink:0.88,
+      question:'Lean WITH the buck. Away from it and you are in the dirt.',
+      label:'LEAN',
+    }, (won)=>{
+      if(won){
+        a.tied = true; a.state = 'down'; a.broken = true;
+        this.ui.beat('BROKEN TO THE SADDLE', a.spec.label,
+                     'She will stand for a rider now.');
+        this.player.reputation = M.clamp(this.player.reputation + 5, 0, 100);
+        this.player.connections += 90;
+        this.onRoped && this.onRoped(a, 'broken');
+      } else {
+        this.ui.beat('SHE THREW YOU', 'Twice', 'Try her again when your nerve is back.',
+                     true);
+        this.player.health = Math.max(5, this.player.health - 14);
+        a.onBrokeFree && a.onBrokeFree();
+      }
+      L.release();
+    });
+  }
+
   _nearestStation(pos){
     if(!this.roads || !this.roads.stations) return null;
     let best=null, bd=Infinity;
@@ -10350,12 +12290,12 @@ class Game {
       this.story.update(dt);
       this.folk.updatePosesOnly(dt, p.eyePos.clone());
       h.update(dt, null); p.update(dt, null);
-      this.tod.followTarget(this.camera.position);
+      this.tod.followTarget(this.story.call.camThem.position);
       this._placeTownLights();
-      /* The world renders normally through the full post chain. The call is a
-         letterboxed overlay on top of it, not a picture-in-picture — which is
-         what stopped the panels being blank. */
-      this.composer.render(this.elapsed);
+      /* Two scissored passes of the real scene, straight to the canvas, with
+         the post chain bypassed. The scrim is an SVG with two holes in it, so
+         what shows through those holes is exactly what was just drawn there. */
+      this.story.call.render();
       inp.endFrame();
       return;
     }
@@ -10644,6 +12584,9 @@ class Game {
        halfway, because a man who can flick a repeater in and out of his coat
        forty times a second is a man in a different sort of game. */
     this._arms_input(dt, inp, p);
+
+    if(this.wildlife) this.wildlife.update(dt);
+    if(this.lasso){ this.lasso.update(dt); this._rope_input(dt, inp, p); }
 
     /* The mission engine: what the current step wants, and whether it has it. */
     if(this.story) this.story.update(dt);
@@ -14678,26 +16621,41 @@ class Director {
    Five people you negotiate with, and each one wants ONE thing you can
    understand in a sentence. */
 const STORY_NAMED = [
-  { id:'marchetti', name:'IDA MARCHETTI', town:'pudmenzky',
-    voice:'marchetti', palette:5, hat:'wide', scale:1.06, post:'saloon',
+  /* THE FOUR EXCHANGES (§12). Each wants exactly one thing, and each one
+     breaks a different way: Caitlin will not move on money but will move for
+     her crew; the Muzz cannot be argued at with paper, only with sincerity;
+     Paula wants a number she can check and nothing else; Chloe is the hardest
+     in the game and reads you while you talk. */
+  { id:'caitlin', name:'CAITLIN R', town:'pudmenzky',
+    voice:'caitlin', palette:5, hat:'wide', scale:1.06, post:'saloon',
     lines:[ "I've got your company's tower steel in my yard and eleven people eating off it.",
-            "Give my crew a reason and I'll give you your steel back.",
-            "Talk straight with me and this takes five minutes." ] },
-  { id:'tull', name:'REVEREND AMOS TULL', town:'conway',
-    voice:'tull', palette:9, hat:'stovepipe', scale:1.02, post:'church',
-    lines:[ "My parish lost four people who could not send for a doctor in time.",
-            "Prove the wire saves lives and I will stand behind it on Sunday.",
-            "I am not against you. I am against being lied to again." ] },
-  { id:'blackwood', name:'FOREMAN CYRUS BLACKWOOD', town:'dedman',
-    voice:'blackwood', palette:7, hat:'derby', scale:1.10, post:'office',
-    lines:[ "Four hundred men on this hill. I answer to every one of them.",
-            "Show me it saves money and I'll sign today.",
-            "I don't want speeches. I want a number I can check." ] },
-  { id:'kestrel', name:'VIVIENNE KESTREL', town:'signal',
-    voice:'kestrel', palette:2, hat:'bonnet', scale:0.98, post:'store',
-    lines:[ "I own the highest exchange in the country and I own it outright.",
-            "Convince me you are not just Meridian wearing a nicer coat.",
-            "I like you. That is not the same as agreeing with you." ] },
+            "Don't come at me with a price. Come at me with what happens to my crew.",
+            "Everyone out here has tried to buy me. Nobody's tried to back me." ] },
+  { id:'muzz', name:'THE MUZZ', town:'conway',
+    voice:'muzz', palette:9, hat:'stovepipe', scale:1.02, post:'church',
+    lines:[ "Forty people stand in that water every Sunday because I ask them to.",
+            "Don't bring me paper. Paper is what your company sent the last twice.",
+            "Mean it, or don't say it. I can hear the difference from here." ] },
+  { id:'paula', name:'PAULA SUTHERLAND', town:'dedman',
+    voice:'paula', palette:7, hat:'derby', scale:1.10, post:'office',
+    lines:[ "Four hundred people on this hill. I answer to every one of them.",
+            "Show me a number I can check and I'll sign it today.",
+            "I don't do speeches. I do columns." ] },
+  { id:'chloe', name:'CHLOE DUNN', town:'signal',
+    voice:'chloe', palette:2, hat:'bonnet', scale:0.98, post:'store',
+    lines:[ "I own the highest exchange in the country, and I own it outright.",
+            "You've rehearsed this. I can hear the seams from the doorway.",
+            "I like you. That is not remotely the same as agreeing with you." ] },
+  /* Act I's first call was pointed at Halloran because there was nobody else
+     in the room, so the feed showed the clerk with her name under it. She is
+     a real resident of Yes Gulch now — she rode in at dawn and she is standing
+     outside the exchange waiting for somebody from the company. */
+  { id:'ashby', name:'MRS ASHBY', town:'gulch',
+    voice:'ashby', palette:3, hat:'bonnet', scale:0.97, post:'church',
+    lines:[ "I've come nine miles. I'll wait a while longer.",
+            "My husband works the far paddock. That's the whole of my business here.",
+            "Is there anyone here who actually decides anything?" ] },
+
   { id:'vane', name:'CORNELIUS VANE', town:'mcroberts',
     voice:'vane', palette:6, hat:'stovepipe', scale:1.04, post:'courthouse',
     lines:[ "I am the Chairman of Grand Meridian. I decide what this country is worth.",
@@ -14707,10 +16665,10 @@ const STORY_NAMED = [
 
 /* ---- Voices (§16) ------------------------------------------------------- */
 const STORY_VOICES = {
-  marchetti: { pitch:158, formant:1.02, rate:0.94, breath:0.08, rasp:0.34, vibrato:0.008 },
-  tull:      { pitch: 88, formant:0.92, rate:0.74, breath:0.22, rasp:0.18, vibrato:0.020 },
-  blackwood: { pitch: 78, formant:0.88, rate:0.90, breath:0.06, rasp:0.42, vibrato:0.004 },
-  kestrel:   { pitch:186, formant:1.12, rate:0.86, breath:0.10, rasp:0.00, vibrato:0.018 },
+  caitlin: { pitch:162, formant:1.03, rate:0.96, breath:0.07, rasp:0.30, vibrato:0.008 },
+  muzz:    { pitch: 96, formant:0.93, rate:0.72, breath:0.24, rasp:0.20, vibrato:0.022 },
+  paula:   { pitch:148, formant:0.99, rate:0.92, breath:0.05, rasp:0.22, vibrato:0.005 },
+  chloe:   { pitch:190, formant:1.13, rate:0.84, breath:0.09, rasp:0.00, vibrato:0.018 },
   vane:      { pitch:112, formant:1.01, rate:0.78, breath:0.03, rasp:0.00, vibrato:0.002 },
   ashby:     { pitch:172, formant:1.08, rate:1.06, breath:0.20, rasp:0.06, vibrato:0.012 },
 };
@@ -14745,6 +16703,18 @@ const CONVERSATIONS = {
     { who:'them', text:"Do it well and I'll tell you the rest. There is a rest." },
   ],
 
+  /* She came nine miles to be heard, and you heard her. Act I is still a loss
+     — you cannot give her a line that does not exist yet — but losing well
+     and losing badly are not the same thing, and the game should say so. */
+  ashby_after_good: [
+    { who:'them', text:"You listened. That is more than the last three did." },
+    { who:'me',   text:"I still cannot give you a line. There isn't one to give." },
+    { who:'them', text:"I know. You did not pretend otherwise, and I noticed." },
+    { who:'me',   text:"Nine miles home in the dark. I'm sorry it was for nothing." },
+    { who:'them', text:"It was not for nothing. Somebody finally wrote down where the paddock is." },
+    { who:'them', text:"Build the thing, Mr Gaunt. Then come and find me." },
+  ],
+
   ashby_after: [
     { who:'them', text:"You didn't listen to me. You talked at me for ten minutes." },
     { who:'me',   text:"I had an answer ready before you finished the question." },
@@ -14754,12 +16724,24 @@ const CONVERSATIONS = {
     { who:'them', text:"Come back when you've something better than a schedule of charges." },
   ],
 
+  halloran_after_ashby_good: [
+    { who:'them', text:"She left smiling. I have not seen that in this office in two years." },
+    { who:'me',   text:"I couldn't sell her anything. There's no line to sell." },
+    { who:'them', text:"No. But she'll come back, and that is worth more today." },
+    { who:'them', text:"So here's the rest of it. Four people out there could put the whole frontier on the wire tomorrow." },
+    { who:'them', text:"Caitlin R on the Flats. The Muzz in the Delta. Paula Sutherland at the mine. Chloe Dunn on the Ridge." },
+    { who:'me',   text:"And all four have said no to the company." },
+    { who:'them', text:"They said no to LETTERS. Nobody's ever ridden out and asked them properly." },
+    { who:'me',   text:"Then that's what I do. But first the Gulch gets its own line back." },
+    { who:'them', text:"Raise the three poles on the north road. That's a day's work and it's yours." },
+  ],
+
   halloran_after_ashby: [
     { who:'them', text:"She walked out. I watched her go." },
     { who:'me',   text:"I lost that one badly." },
     { who:'them', text:"You did. Now here's the rest of it, and you won't like it." },
     { who:'them', text:"Four people out there could put the whole frontier on the wire tomorrow." },
-    { who:'them', text:"Marchetti on the Flats. Tull in the Delta. Blackwood at the mine. Kestrel on the Ridge." },
+    { who:'them', text:"Caitlin R on the Flats. The Muzz in the Delta. Paula Sutherland at the mine. Chloe Dunn on the Ridge." },
     { who:'me',   text:"And all four have said no to the company." },
     { who:'them', text:"They said no to LETTERS. Nobody's ever ridden out and asked them properly." },
     { who:'me',   text:"Then that's what I do. But first the Gulch gets its own line back." },
@@ -14772,11 +16754,11 @@ const CONVERSATIONS = {
     { who:'me',   text:"Three poles and an afternoon. That's all it took." },
     { who:'them', text:"Which raises the obvious question, doesn't it." },
     { who:'me',   text:"If it's this easy, why has it been broken for two years." },
-    { who:'them', text:"Ask Marchetti. She's been pulling company towers down for salvage." },
+    { who:'them', text:"Ask Caitlin R out on the Flats. She's been pulling company towers down for salvage." },
     { who:'them', text:"Ride out to Pudmenzky Flats and talk to her. Talk, Gaunt. Not sell." },
   ],
 
-  marchetti_after: [
+  caitlin_after: [
     { who:'them', text:"Right. The steel goes back up, and my crew puts it up, at your rates." },
     { who:'me',   text:"Agreed. Now tell me why you started pulling towers down." },
     { who:'them', text:"Because they were already down. Every one of them. I only carted them off." },
@@ -14786,11 +16768,50 @@ const CONVERSATIONS = {
     { who:'them', text:"Then go and look at Conway Creek. Nine poles in the water since 1909." },
   ],
 
+  /* Talked round, or shot at. Two different women afterwards. */
+  caitlin_after_fight: [
+    { who:'them', text:"Well. You got your steel. I hope it was worth what it cost you." },
+    { who:'me',   text:"It wasn't. I'd take it back if I could." },
+    { who:'them', text:"You can't. My crew watched. They'll remember which one you were." },
+    { who:'me',   text:"I still need to know why those towers were down." },
+    { who:'them', text:"...Cut. All of them, clean at the base, same side. I'm telling you because it's true, not because I like you." },
+    { who:'them', text:"Go look at Conway Creek. Nine poles in the water since 1909." },
+  ],
+
+  muzz_after: [
+    { who:'them', text:"I will say it on Sunday. That the wire is a tool, and tools are not sins." },
+    { who:'me',   text:"Thank you." },
+    { who:'them', text:"Do not thank me. Put the line in before somebody else dies waiting." },
+  ],
+  muzz_after_fight: [
+    { who:'them', text:"You raised your hand in front of my congregation." },
+    { who:'me',   text:"I know what I did." },
+    { who:'them', text:"You will have your right of way. I will not speak for you, and I will not speak against you." },
+    { who:'them', text:"That is the most I have for a man who did that here." },
+  ],
+
+  audit_taken_fight: [
+    { who:'them', text:"Take the book. Take it and get off my hill." },
+    { who:'me',   text:"Page eleven. Haulage, real cost — four hundred and twelve a year." },
+    { who:'them', text:"And head office published nine hundred. I know. I have known for years." },
+    { who:'me',   text:"They doubled it to make the frontier look worthless." },
+    { who:'them', text:"Yes. And you came up here and settled it with your fists anyway." },
+    { who:'them', text:"The numbers are yours. My men are not." },
+  ],
+
+  chloe_after_fight: [
+    { who:'them', text:"You drew on me. In my own parlour. Take the wretched document." },
+    { who:'me',   text:"1908. Starve the frontier, devalue it, buy it back." },
+    { who:'them', text:"In his own hand. Eleven years of it." },
+    { who:'me',   text:"Then I take it to the board at McRoberts Crossing." },
+    { who:'them', text:"Take it. And do not come back up my mountain." },
+  ],
+
   conway_creek: [
     { who:'them', text:"I'm Marguerite Conway. I run the ferry, the credit, and most of the arguments." },
     { who:'me',   text:"I want to look at the nine poles in the water." },
     { who:'them', text:"Everyone says the river took them. I've never believed it." },
-    { who:'me',   text:"Neither has Ida Marchetti. Let me look and I'll tell you." },
+    { who:'me',   text:"Neither has Caitlin R. Let me look and I'll tell you." },
     { who:'them', text:"Look all you like. Three of them are still in the shallows." },
   ],
 
@@ -14804,7 +16825,7 @@ const CONVERSATIONS = {
   ],
 
   /* --- ACT III --------------------------------------------------------- */
-  tull_intro: [
+  muzz_intro: [
     { who:'them', text:"You're the wire man. My congregation would rather you left." },
     { who:'me',   text:"You've buried four people who couldn't send for a doctor." },
     { who:'them', text:"...Yes. How do you know that?" },
@@ -14813,8 +16834,8 @@ const CONVERSATIONS = {
     { who:'them', text:"Meridian promised this parish a line twice and never came." },
   ],
 
-  blackwood_intro: [
-    { who:'them', text:"Blackwood. Four hundred men on this hill and I answer to all of them." },
+  paula_intro: [
+    { who:'them', text:"Paula Sutherland. Four hundred people on this hill and I answer to all of them." },
     { who:'me',   text:"I want to run the line to the mine." },
     { who:'them', text:"Then show me it saves money. Head office says it costs money." },
     { who:'me',   text:"Head office publishes figures that don't match your own audit." },
@@ -14834,12 +16855,12 @@ const CONVERSATIONS = {
   train_after: [
     { who:'them', text:"You've got the audit and half of Meridian's men know it." },
     { who:'me',   text:"There's one more thing I don't have. The reason." },
-    { who:'them', text:"Vivienne Kestrel on Signal Ridge has been fighting Meridian for a decade." },
+    { who:'them', text:"Chloe Dunn on Signal Ridge has been fighting Meridian for a decade." },
     { who:'them', text:"If anybody has the paper that explains WHY, it's her." },
     { who:'me',   text:"Then I go up the mountain." },
   ],
 
-  kestrel_after: [
+  chloe_after: [
     { who:'them', text:"You want to know why. Here is why." },
     { who:'them', text:"Vane wrote it down in 1908. Starve the frontier. Devalue it. Buy it back." },
     { who:'me',   text:"He's been cutting his own company's lines for eleven years." },
@@ -14867,8 +16888,8 @@ const CONVERSATIONS = {
     { who:'me',   text:"They took the papers. All four. I've got nothing left." },
     { who:'them', text:"You've got everyone you were decent to. That's not nothing." },
     { who:'me',   text:"It won't stand up in front of a board." },
-    { who:'them', text:"Marchetti kept a copy of the cut-line report. So did I." },
-    { who:'them', text:"Blackwood copied his audit twice. Kestrel never gives away an original." },
+    { who:'them', text:"Caitlin kept a copy of the cut-line report. So did I." },
+    { who:'them', text:"Paula copied her audit twice. Chloe never gives away an original." },
     { who:'me',   text:"...They all made copies." },
     { who:'them', text:"Because you asked them properly, and people protect what they believe in." },
     { who:'them', text:"Come down off that ridge. McRoberts Crossing. We'll be waiting." },
@@ -14912,7 +16933,7 @@ const DECKS = {
 
   ashby: {
     id:'ashby', name:'MRS ASHBY', voice:'ashby', scripted:true,
-    intro:"She has ridden nine miles to see somebody from the company. You have four minutes and a price list.",
+    intro:"She has ridden nine miles to see somebody from the company, and she is looking at you.",
     goodwillStart: 40, goodwillMax: 100,
     terms:{ favour:null, price:0, fight:false },
     nodes:[
@@ -14941,13 +16962,15 @@ const DECKS = {
     },
   },
 
-  marchetti: {
-    id:'marchetti', name:'IDA MARCHETTI', voice:'marchetti',
+  caitlin: {
+    id:'caitlin', name:'CAITLIN R', voice:'caitlin',
     intro:"Behind her is four years of company tower steel and eleven people who eat because of it.",
     goodwillStart: 30, goodwillMax: 100,
     terms:{
-      favourId:'marchetti_crew', favour:'Guarantee her eleven-strong crew the company line-work rate.',
-      basePrice: 240, fightRep: 12,
+      favourId:'caitlin_crew', favour:'Guarantee her eleven-strong crew the company line-work rate.',
+      /* Deliberately the dearest of the four to buy off and the cheapest to
+         win properly: she is unmovable on price and cracks on her crew. */
+      basePrice: 360, fightRep: 12,
       accept:"Then the steel goes back up, and my crew puts it up. Shake on it.",
       paid:"Cash on the table. I like a man who does not pretend money is vulgar.",
       refuse:"Then we do this the loud way. Boys!",
@@ -14964,11 +16987,11 @@ const DECKS = {
         ] },
       { them:"Eleven people eat off that steel. You want me to hand them a speech instead.",
         options:[
-          { text:"Eleven. You know the number without counting. That is not a business, that is a family.", gw:+18,
+          { text:"Eleven. You know the number without counting. That is not a business, that is a family.", gw:+24,
             reply:"...No. It is not a business." },
           { text:"They would earn double on a company line crew.", gw:+10,
             reply:"Double. Say that number out loud again." },
-          { text:"There are always eleven people, Miss Marchetti.", gw:-22,
+          { text:"There are always eleven people, Caitlin.", gw:-22,
             reply:"There are ELEVEN PEOPLE. Say it like it costs you something." },
         ] },
       { them:"And when Meridian decides the Flats are not worth a crew, what then?",
@@ -14983,12 +17006,12 @@ const DECKS = {
     ],
   },
 
-  tull: {
-    id:'tull', name:'REVEREND AMOS TULL', voice:'tull',
+  muzz: {
+    id:'muzz', name:'THE MUZZ', voice:'muzz',
     intro:"Forty people standing in the shallows, and a man who has buried four of them.",
     goodwillStart: 25, goodwillMax: 100,
     terms:{
-      favourId:'tull_doctor', favour:"Ride to McRoberts Crossing and bring the doctor to his parish.",
+      favourId:'muzz_doctor', favour:"Ride to McRoberts Crossing and bring the doctor back to the Delta.",
       basePrice: 180, fightRep: 20,
       accept:"Then bring the doctor, and I will stand behind your wire on Sunday.",
       paid:"Money for the parish roof. It is not what I asked for, but it is honest.",
@@ -15006,16 +17029,16 @@ const DECKS = {
         ] },
       { them:"Four of my parish died waiting for help that could not be sent for.",
         options:[
-          { text:"Tell me about them. Not the number — them.", gw:+20,
+          { text:"Tell me about them. Not the number — them.", gw:+24,
             reply:"...The Kerrigan girl was eleven. I sat with her mother two days." },
           { text:"A wire would have saved every one of them.", gw:-10,
             reply:"Do not use my dead as an argument." },
-          { text:"The mortality figures for wired parishes are a third lower.", gw:-18,
-            reply:"Numbers. Always numbers with you people." },
+          { text:"The mortality figures for wired parishes are a third lower.", gw:-24,
+            reply:"Numbers. Always numbers with you people. Paper never sat with anybody." },
         ] },
       { them:"What is it you actually want from me, Mr Gaunt?",
         options:[
-          { text:"Your permission. It is yours to give and I will not take it without.", gw:+16,
+          { text:"Your permission. It is yours to give and I will not take it without.", gw:+20,
             reply:"...Permission. Nobody has asked me for that in twenty years." },
           { text:"A right of way across the church land, in writing.", gw:-4,
             reply:"Straight to the paperwork. Of course." },
@@ -15025,12 +17048,12 @@ const DECKS = {
     ],
   },
 
-  blackwood: {
-    id:'blackwood', name:'FOREMAN CYRUS BLACKWOOD', voice:'blackwood',
+  paula: {
+    id:'paula', name:'PAULA SUTHERLAND', voice:'paula',
     intro:"The headframe turning behind him, four hundred men under it, and a ledger open on the desk.",
     goodwillStart: 35, goodwillMax: 100,
     terms:{
-      favourId:'blackwood_shaft', favour:"Go down and shore the flooded number four shaft before the shift.",
+      favourId:'paula_shaft', favour:"Go down and shore the flooded number four shaft before the shift.",
       basePrice: 300, fightRep: 16,
       accept:"Shore number four and the line goes in the same week. My word on it.",
       paid:"Bought and paid for. I would rather have had the shaft.",
@@ -15039,10 +17062,10 @@ const DECKS = {
     nodes:[
       { them:"Head office says a line to this mine costs nine hundred a year. Argue with that.",
         options:[
-          { text:"Head office doubled the figure. Your own audit says four hundred and twelve.", gw:+22,
+          { text:"Head office doubled the figure. Your own audit says four hundred and twelve.", gw:+26,
             reply:"...How do you know what my audit says?" },
-          { text:"Nine hundred is worth it for the safety alone.", gw:-12,
-            reply:"Safety is not a line in my accounts. Cost is." },
+          { text:"Nine hundred is worth it for the safety alone.", gw:-16,
+            reply:"Safety is not a line in my accounts. Cost is. Give me the column." },
           { text:"Then let us not talk about cost at all.", gw:-20,
             reply:"Cost is the only thing I talk about." },
         ] },
@@ -15050,7 +17073,7 @@ const DECKS = {
         options:[
           { text:"It was not. Somebody chose to route the line down that shaft to save money.", gw:+20,
             reply:"...I told four hundred men it was an engineering decision." },
-          { text:"That was eleven years ago, Mr Blackwood.", gw:-22,
+          { text:"That was eleven years ago, Paula.", gw:-22,
             reply:"It was Tuesday, as far as this hill is concerned." },
           { text:"I have met the widow. I know their names.", gw:+12,
             reply:"Then you know more than head office ever did." },
@@ -15067,13 +17090,14 @@ const DECKS = {
     ],
   },
 
-  kestrel: {
-    id:'kestrel', name:'VIVIENNE KESTREL', voice:'kestrel',
-    intro:"Snow on the glass, a fire behind her, and the whole mountain wired into this one room.",
-    goodwillStart: 20, goodwillMax: 100,
+  chloe: {
+    id:'chloe', name:'CHLOE DUNN', voice:'chloe',
+    intro:'Snow on the glass, a fire behind her, and the whole mountain wired into this one room. '
+        + 'She has been reading you since you came through the door.',
+    goodwillStart: 14, goodwillMax: 100,
     terms:{
-      favourId:'kestrel_relay', favour:"Climb to the summit relay in the storm and bring her mast back online.",
-      basePrice: 420, fightRep: 24,
+      favourId:'chloe_relay', favour:"Climb to the summit relay in the storm and bring her masts back online.",
+      basePrice: 460, fightRep: 24,
       accept:"Fix my summit relay and I will give you what Vane wrote in 1908.",
       paid:"Bought. How very Meridian of you. The document is on the desk.",
       refuse:"You came into my house and drew on me. Extraordinary.",
@@ -15664,11 +17688,18 @@ const MISSIONS = [
     brief:"A woman has ridden nine miles to talk to the company. You are the company.",
     steps:[
       { t:'talk', who:'halloran',
-        text:'Take the call from Mrs Ashby',
-        hint:'Halloran is holding the line for you in the office.' },
-      { t:'negotiate', who:'halloran', deck:'ashby' },
-      { t:'scene', with:'halloran', key:'ashby_after' },
-      { t:'scene', with:'halloran', key:'halloran_after_ashby' },
+        text:'Ask Halloran who is waiting',
+        hint:'The telegraph office. She has been outside since dawn.' },
+      { t:'talk', who:'ashby',
+        text:'Go and speak to Mrs Ashby',
+        hint:'She is by the chapel, still holding her horse.' },
+      /* `who` decides whose face is in the tile. Pointing it at the clerk is
+         how the last build ended up captioning Halloran as Mrs Ashby. */
+      { t:'negotiate', who:'ashby', deck:'ashby' },
+      { t:'scene', with:'halloran', on:'ashby',
+        good:'ashby_after_good', bad:'ashby_after' },
+      { t:'scene', with:'halloran', on:'ashby',
+        good:'halloran_after_ashby_good', bad:'halloran_after_ashby' },
       { t:'act', to:2 },
     ] },
 
@@ -15682,6 +17713,9 @@ const MISSIONS = [
         label:'Raise the pole', secs:2.2 },
       { t:'beat', kicker:'THE GULCH IS ON THE WIRE', title:'First time in two years',
         sub:'Lamps in four windows that were dark last night' },
+      { t:'talk', who:'halloran',
+        text:'Report back to Clerk Halloran',
+        hint:'Back down the north road to the telegraph office in Yes Gulch.' },
       { t:'scene', with:'halloran', key:'gulch_lit' },
       { t:'award', rep:6, connections:120 },
     ] },
@@ -15699,14 +17733,16 @@ const MISSIONS = [
       { t:'award', rep:6, connections:90 },
     ] },
 
-  { id:'m6', act:2, n:6, verb:'CONVINCE', title:'Ida Marchetti',
-    brief:"Marchetti has the company's tower steel. Talk her into putting it back up.",
+  { id:'m6', act:2, n:6, verb:'CONVINCE', title:'Caitlin R',
+    brief:"Caitlin R has the company's tower steel in her salvage yard, and eleven "
+         +"people eating off it. Talk her into putting it back up.",
     steps:[
-      { t:'talk', who:'marchetti',
-        text:'Find Ida Marchetti on the Flats',
+      { t:'talk', who:'caitlin',
+        text:'Find Caitlin R on the Flats',
         hint:'She is at the salvage yard. Walk up and press F.' },
-      { t:'negotiate', who:'marchetti', deck:'marchetti' },
-      { t:'scene', with:'marchetti', key:'marchetti_after' },
+      { t:'negotiate', who:'caitlin', deck:'caitlin' },
+      { t:'scene', with:'caitlin', on:'caitlin',
+        good:'caitlin_after', bad:'caitlin_after_fight' },
       { t:'award', rep:8, connections:0 },
       { t:'act', to:3 },
     ] },
@@ -15734,37 +17770,45 @@ const MISSIONS = [
             correct:true, card:'cutline' },
           { label:'ROT', sub:'Untreated pine standing in a wet bend for a decade.' },
         ] },
+      { t:'talk', who:'conway',
+        text:'Take what you found back to Marguerite Conway',
+        hint:'She is at the crossing. She has waited nine years to hear this.' },
       { t:'scene', with:'conway', key:'conway_cutline' },
       { t:'award', rep:8, connections:130 },
     ] },
 
-  { id:'m8', act:3, n:8, verb:'PERSUADE', title:'The Reverend Tull',
-    brief:"Tull tells forty people every Sunday that the wire is a lie. He is not wrong yet.",
+  { id:'m8', act:3, n:8, verb:'PERSUADE', title:'The Muzz',
+    brief:"The Muzz tells forty people every Sunday that the wire is a lie. "
+         +"Paper will not shift him. Only meaning it will.",
     steps:[
       { t:'goto', town:'conway', r:56,
         text:'Ride to the Delta congregation',
         hint:'Follow the singing to the water.' },
-      { t:'talk', who:'tull',
-        text:'Speak to Reverend Amos Tull',
+      { t:'talk', who:'muzz',
+        text:'Speak to The Muzz',
         hint:'He is at the church. Press F.' },
-      { t:'scene', with:'tull', key:'tull_intro' },
-      { t:'negotiate', who:'tull', deck:'tull' },
+      { t:'scene', with:'muzz', key:'muzz_intro' },
+      { t:'negotiate', who:'muzz', deck:'muzz' },
+      { t:'scene', with:'muzz', on:'muzz',
+        good:'muzz_after', bad:'muzz_after_fight' },
       { t:'award', rep:9, connections:0 },
     ] },
 
   { id:'m9', act:3, n:9, verb:'PROVE', title:'The Copperwire Audit',
-    brief:"Blackwood's own figures will show head office has been lying about the frontier.",
+    brief:"Paula Sutherland runs the mine and the numbers. Her own figures will show head "
+         +"office has been lying about what this frontier is worth.",
     steps:[
       { t:'goto', town:'dedman', r:56,
         text:'Ride to the Copperwire mine',
         hint:'East, under the headframe.' },
-      { t:'talk', who:'blackwood',
-        text:'Speak to Foreman Blackwood',
+      { t:'talk', who:'paula',
+        text:'Speak to Paula Sutherland',
         hint:'The mine office beside the headframe.' },
-      { t:'scene', with:'blackwood', key:'blackwood_intro' },
-      { t:'negotiate', who:'blackwood', deck:'blackwood' },
+      { t:'scene', with:'paula', key:'paula_intro' },
+      { t:'negotiate', who:'paula', deck:'paula' },
       { t:'give', card:'audit' },
-      { t:'scene', with:'blackwood', key:'audit_taken' },
+      { t:'scene', with:'paula', on:'paula',
+        good:'audit_taken', bad:'audit_taken_fight' },
       /* And with it, the order that put eleven men down a flooding shaft —
          it was in the same drawer, and it is the proof the finale turns on. */
       { t:'give', card:'shaft' },
@@ -15777,22 +17821,24 @@ const MISSIONS = [
       { t:'hostiles', n:3,
         text:'Fight off the company men',
         hint:'Draw a tool with keys 1 to 5. Right mouse aims, left mouse fires.' },
-      { t:'scene', with:'blackwood', key:'train_after' },
+      { t:'remote', with:'paula', key:'train_after' },
       { t:'award', rep:6, connections:120 },
     ] },
 
-  { id:'m11', act:3, n:11, verb:'CLIMB', title:'Vivienne Kestrel',
-    brief:"Kestrel has fought Meridian for ten years. She will know WHY Vane did it.",
+  { id:'m11', act:3, n:11, verb:'CLIMB', title:'Chloe Dunn',
+    brief:"Chloe Dunn has fought Meridian for ten years and reads people for sport. "
+         +"She is the hardest conversation in the game, and she knows WHY Vane did it.",
     steps:[
       { t:'goto', town:'signal', r:56,
         text:'Climb to Signal Ridge',
         hint:'North, above the snowline. Take the road, not the face.' },
-      { t:'talk', who:'kestrel',
-        text:'Present yourself to Vivienne Kestrel',
+      { t:'talk', who:'chloe',
+        text:'Present yourself to Chloe Dunn',
         hint:'The exchange at the top of the street.' },
-      { t:'negotiate', who:'kestrel', deck:'kestrel' },
+      { t:'negotiate', who:'chloe', deck:'chloe' },
       { t:'give', card:'memo' },
-      { t:'scene', with:'kestrel', key:'kestrel_after' },
+      { t:'scene', with:'chloe', on:'chloe',
+        good:'chloe_after', bad:'chloe_after_fight' },
       { t:'award', rep:10, connections:0 },
       { t:'act', to:4 },
     ] },
@@ -15880,13 +17926,13 @@ const MISSIONS = [
    short, physical and signposted, because a favour you cannot find is just a
    mission that appears to be broken. */
 const FAVOURS = {
-  marchetti_crew: [
+  caitlin_crew: [
     { t:'work', kind:'pole', count:2, radius:95, spread:55,
-      text:"Sign Marchetti's crew onto the company books",
+      text:"Sign Caitlin's crew onto the company books",
       hint:'Two sign-on posts out on the salt. Hold E at each.',
       label:'Sign the crew on', secs:2.0 },
   ],
-  tull_doctor: [
+  muzz_doctor: [
     { t:'goto', town:'mcroberts', r:50,
       text:'Fetch the doctor from McRoberts Crossing',
       hint:'Ride there. Then ride him back to the Delta.' },
@@ -15894,13 +17940,13 @@ const FAVOURS = {
       text:'Bring the doctor to the Delta parish',
       hint:'Back the way you came, and do not dawdle.' },
   ],
-  blackwood_shaft: [
+  paula_shaft: [
     { t:'work', kind:'camp', count:3, radius:60, spread:32,
       text:'Shore the number four shaft before the shift',
       hint:'Three props to set. Hold E at each one.',
       label:'Set the prop', secs:2.4 },
   ],
-  kestrel_relay: [
+  chloe_relay: [
     { t:'work', kind:'pole', count:2, radius:70, spread:40,
       text:'Bring the summit relay back online',
       hint:'Two masts above the exchange, in the weather. Hold E at each.',
@@ -15980,6 +18026,9 @@ class Story {
     const m = this.mission;
     this.step = null;
     this.setObjective(null);
+    /* Autosave on the boundary, which is the only place a reload lands
+       somewhere sensible (§19). */
+    if(typeof SaveSystem !== 'undefined') SaveSystem.write(this.game, 0);
     this.game.ui.beat('MISSION COMPLETE', `${m.n}. ${m.title}`, '');
     if(this.mi + 1 < MISSIONS.length) setTimeout(()=>this.beginMission(this.mi+1), 3600);
     else setTimeout(()=>this._credits(), 3600);
@@ -16076,7 +18125,7 @@ class Story {
         return;
 
       case 'scene': {
-        const lines = CONVERSATIONS[s.key];
+        const lines = CONVERSATIONS[this._sceneKey(s)];
         if(!lines) return this.nextStep();
         const npc = s.with ? this.namedNpc(s.with) : null;
         if(!npc) return this._remote(s, lines);
@@ -16085,7 +18134,7 @@ class Story {
         return;
       }
       case 'remote': {
-        const lines = CONVERSATIONS[s.key];
+        const lines = CONVERSATIONS[this._sceneKey(s)];
         if(!lines) return this.nextStep();
         return this._remote(s, lines);
       }
@@ -16150,6 +18199,17 @@ class Story {
         return;
     }
     return this.nextStep();
+  }
+
+  /* Which version of a scene to play. A step may give a flat `key`, or it may
+     name the negotiation it follows with `on:` and supply `good:` and `bad:`
+     variants. Agreeing, paying and winning the board all count as good; a
+     refusal, or a conversation you lost outright, counts as bad. */
+  _sceneKey(s){
+    if(!s.on) return s.key;
+    const o = this.outcomes[s.on];
+    const good = (o === 'favour' || o === 'paid' || o === 'won' || o === 'partial');
+    return (good ? s.good : s.bad) || s.key;
   }
 
   /* ---- What happens after a call --------------------------------------- */
@@ -16311,6 +18371,18 @@ class Story {
       setTimeout(step, (d + 1.05)*1000);
     };
     step();
+  }
+
+  /* A roped and calmed opponent resolves the same as a won negotiation (§7),
+     so a hostile taken with the rope counts toward clearing the fight. */
+  onRoped(t, how){
+    if(!t) return;
+    if(this.hostiles.includes(t)){
+      t.down = true; t.stayDown = true;
+      this.game.ui.toast('TIED', 'One down, and nobody hurt.', 2.6);
+      this.game.player.reputation =
+        M.clamp(this.game.player.reputation + 2, 0, 100);
+    }
   }
 
   /* ---- Per-frame -------------------------------------------------------- */
