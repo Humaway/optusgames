@@ -175,10 +175,41 @@ main{padding:12px;max-width:1400px;margin:0 auto}
 }
 .panel > h2:first-child,.panel > h3:first-child{margin-top:0}
 .grid{display:grid;gap:14px}
-@media (min-width:900px){
-  .grid-mtd{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-  .grid-eod{grid-template-columns:minmax(0,420px) minmax(0,1fr)}
+.grid-2,.grid-3{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:820px){
+  .grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid-3{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+@media (min-width:1240px){
+  .grid-3{grid-template-columns:1.08fr 1fr 1fr}
+}
+.panelhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
+.panelhead h3,.panelhead h2{margin:0}
+.panelhead .note{font-size:.78rem;color:var(--muted);font-weight:600}
+
+/* KPI strip — the numbers you want from across the counter */
+.kpis{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:14px}
+@media (min-width:700px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:1100px){.kpis{grid-template-columns:repeat(6,minmax(0,1fr))}}
+.kpi{
+  background:var(--card);border:1px solid var(--line);border-left:4px solid var(--midgreen);
+  border-radius:var(--r);padding:10px 12px;box-shadow:var(--shadow);min-width:0;
+}
+.kpi.accent{border-left-color:var(--plum)}
+.kpi .k-label{display:block;font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.kpi .k-value{
+  display:block;font-family:var(--serif);font-weight:700;font-size:1.7rem;line-height:1.15;
+  font-variant-numeric:tabular-nums;overflow-wrap:anywhere;
+}
+.kpi .k-sub{display:block;font-size:.75rem;color:var(--muted);font-weight:600}
+
+/* charts */
+svg.chart{width:100%;height:auto;display:block;color:var(--text)}
+svg.chart text{font-family:var(--sans);fill:currentColor}
+.chartnote{font-size:.75rem;color:var(--muted);margin:6px 0 0;font-weight:600}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:6px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
 .banner{
   padding:10px 14px;font-weight:700;text-align:center;font-size:.9rem;
   background:var(--warn);color:#fff;
@@ -239,11 +270,15 @@ table.data th[aria-sort="ascending"]::after{content:" \25B2"}
 table.data th[aria-sort="descending"]::after{content:" \25BC"}
 table.data td.num,table.data th.num{text-align:right;font-variant-numeric:tabular-nums}
 table.data tbody tr:hover{background:rgba(78,139,58,.07)}
+@media screen and (min-width:768px){
+  table.data thead th{position:sticky;top:0;background:var(--card);z-index:2;box-shadow:inset 0 -1px 0 var(--line-strong)}
+  .tablescroll{max-height:460px;overflow:auto;border:1px solid var(--line);border-radius:var(--r)}
+}
 .voidrow td{opacity:.5;text-decoration:line-through}
 
 /* Wide tables become stacked cards on phones. The board itself stays a grid —
    it is only three columns and is meant to be read as the sheet. */
-@media (max-width:767px){
+@media screen and (max-width:767px){
   table.data,table.data tbody,table.data tr,table.data td{display:block;width:100%}
   table.data thead{display:none}
   table.data tr{
@@ -301,22 +336,67 @@ code{font-family:var(--mono);font-size:.85em;background:rgba(0,0,0,.06);padding:
 .formula{font-family:var(--mono);font-size:.8rem;white-space:pre-wrap;background:rgba(0,0,0,.05);padding:10px;border-radius:8px;max-height:240px;overflow:auto}
 [data-theme="dark"] .formula{background:rgba(255,255,255,.06)}
 
-/* ---------- print: A4 month report ---------- */
+/* ---------- print: A4 landscape report ---------- */
 #printArea{display:none}
 @media print{
-  @page{size:A4 portrait;margin:12mm}
-  body{background:#fff;color:#000}
-  #topbar,#toastHost,#modalHost,main,.no-print{display:none !important}
-  #printArea{display:block}
-  #printArea .pbreak{break-before:page;page-break-before:always}
-  #printArea h1{font-family:var(--serif);font-size:16pt;margin-bottom:2mm}
-  #printArea .printgrid{display:grid;grid-template-columns:1fr 1fr;gap:6mm;align-items:start}
-  table.board,table.awards,table.metrics{background:#fff}
-  table.board th,table.board td,table.awards td,table.metrics td{
+  @page{size:A4 landscape;margin:9mm}
+  html,body{background:#fff;color:#000}
+  #topbar,#toastHost,#modalHost,main,.no-print,#offlineBanner{display:none !important}
+  #printArea{display:block;font-size:9pt}
+
+  .p-head{
+    display:flex;align-items:flex-end;justify-content:space-between;
+    border-bottom:2px solid #143a1e;padding-bottom:2mm;margin-bottom:4mm;
+  }
+  .p-head h1{font-family:var(--serif);font-size:15pt;margin:0}
+  .p-head .p-meta{font-size:8.5pt;text-align:right;line-height:1.35}
+  .p-page{break-after:page;page-break-after:always}
+  .p-page:last-child{break-after:auto;page-break-after:auto}
+  .p-grid3{display:grid;grid-template-columns:1.06fr 1fr 1fr;gap:5mm;align-items:start}
+  .p-grid2{display:grid;grid-template-columns:1fr 1fr;gap:5mm;align-items:start}
+  .p-block{break-inside:avoid;page-break-inside:avoid;margin-bottom:4mm}
+  .p-block h2{font-family:var(--serif);font-size:10.5pt;margin:0 0 1.5mm}
+
+  /* KPI strip prints as a single row of boxes */
+  .kpis{grid-template-columns:repeat(6,1fr) !important;gap:2mm;margin-bottom:4mm}
+  .kpi{
+    box-shadow:none;border:1px solid #c3ccc3;border-left:3px solid #4e8b3a;
+    padding:1.5mm 2mm;break-inside:avoid;
+  }
+  .kpi .k-label{font-size:6pt}
+  .kpi .k-value{font-size:13pt}
+  .kpi .k-sub{font-size:6.5pt}
+
+  /* boards keep their block colour on paper */
+  table.board,table.awards,table.metrics,table.pointsbox{background:#fff;width:100%}
+  table.board th,table.board td,
+  table.awards th,table.awards td,
+  table.metrics th,table.metrics td,
+  table.pointsbox td,
+  .kpi,svg.chart,svg.chart *{
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
   }
-  table.data{font-size:9pt}
-  table.data tr{break-inside:avoid}
+  table.board th,table.board td{padding:1.1mm 2mm;font-size:9pt}
+  table.metrics th,table.metrics td,table.awards th,table.awards td{padding:1.1mm 2mm;font-size:8.5pt}
+  .b-title{font-size:10pt;padding:1.8mm 2mm}
+  .b-vol,.b-val{font-size:9.5pt}
+  .pointsbox{width:48mm}
+  .pointsbox .pb-value{font-size:15pt}
+
+  svg.chart{color:#000;break-inside:avoid}
+  .chartnote{font-size:7.5pt;color:#444}
+  .legend{font-size:7.5pt;color:#444}
+
+  /* the by-person table: repeat the header, never split a row */
+  .tablescroll{max-height:none;overflow:visible;border:0}
+  table.data{font-size:8pt;width:100%;border-collapse:collapse}
+  table.data thead{display:table-header-group}
+  table.data thead th{position:static;background:#143a1e;color:#fff;box-shadow:none;padding:1.2mm 2mm}
+  table.data td{padding:1.1mm 2mm;border-bottom:.3pt solid #999}
+  table.data tr{break-inside:avoid;page-break-inside:avoid}
+  table.data tbody tr:nth-child(even){background:#f0f4ef}
+  .emptystate{border:.5pt dashed #999;padding:3mm;font-size:8pt}
+  .p-foot{margin-top:3mm;font-size:7.5pt;color:#555;border-top:.5pt solid #999;padding-top:1.5mm}
 }
 </style>
 </head>
@@ -413,25 +493,39 @@ code{font-family:var(--mono);font-size:.85em;background:rgba(0,0,0,.06);padding:
     <p id="mtdLockNote" class="small hidden" style="margin:10px 0 0"></p>
   </div>
 
-  <div class="grid grid-mtd">
-    <div>
-      <div class="panel">
-        <div class="boardwrap"><div id="mtdBoard"></div></div>
-        <p id="mtdAssert" class="small hidden" style="color:var(--bad);margin:10px 0 0;font-weight:700"></p>
-      </div>
-      <div class="panel">
-        <div id="mtdMetrics"></div>
-      </div>
+  <div id="mtdKpis"></div>
+
+  <div class="grid-3">
+    <div class="panel">
+      <div class="boardwrap"><div id="mtdBoard"></div></div>
+      <p id="mtdAssert" class="small hidden" style="color:var(--bad);margin:10px 0 0;font-weight:700"></p>
     </div>
-    <div>
-      <div class="panel">
-        <div id="mtdAwards"></div>
-      </div>
-      <div class="panel">
-        <h3>By person</h3>
-        <div id="mtdBreakdown"></div>
-      </div>
+    <div class="panel"><div id="mtdMetrics"></div></div>
+    <div class="panel"><div id="mtdAwards"></div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panelhead"><h3>Points by day</h3><span class="note" id="mtdPointsNote"></span></div>
+      <div id="mtdChartPoints"></div>
     </div>
+    <div class="panel">
+      <div class="panelhead"><h3>Running total</h3><span class="note" id="mtdCumNote"></span></div>
+      <div id="mtdChartCum"></div>
+    </div>
+    <div class="panel">
+      <div class="panelhead"><h3>Points by person</h3><span class="note">Month to date</span></div>
+      <div id="mtdChartPeople"></div>
+    </div>
+    <div class="panel">
+      <div class="panelhead"><h3>Volume by category</h3><span class="note">Services written</span></div>
+      <div id="mtdChartMix"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panelhead"><h3>By person</h3><span class="note">Tap any column to sort</span></div>
+    <div id="mtdBreakdown"></div>
   </div>
 </section>
 
@@ -451,22 +545,31 @@ code{font-family:var(--mono);font-size:.85em;background:rgba(0,0,0,.06);padding:
     <p id="eodPostedNote" class="small hidden" style="margin:10px 0 0"></p>
   </div>
 
-  <div class="grid grid-eod">
+  <div id="eodKpis"></div>
+
+  <div class="grid-3">
     <div class="panel">
       <div class="boardwrap"><div id="eodBoard"></div></div>
       <p id="eodAssert" class="small hidden" style="color:var(--bad);margin:10px 0 0;font-weight:700"></p>
     </div>
-    <div>
-      <div class="panel">
-        <div id="eodPoints"></div>
-      </div>
-      <div class="panel">
-        <div id="eodMetrics"></div>
-      </div>
-      <div class="panel">
-        <h3>Today by person</h3>
-        <div id="eodBreakdown"></div>
-      </div>
+    <div class="panel">
+      <div id="eodPoints" style="margin-bottom:14px"></div>
+      <div id="eodMetrics"></div>
+    </div>
+    <div class="panel">
+      <div class="panelhead"><h3>Points by person</h3><span class="note">This day</span></div>
+      <div id="eodChartPeople"></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panelhead"><h3>Services by hour</h3><span class="note">When the day happened</span></div>
+      <div id="eodChartHour"></div>
+    </div>
+    <div class="panel">
+      <div class="panelhead"><h3>By person</h3></div>
+      <div id="eodBreakdown"></div>
     </div>
   </div>
 </section>
@@ -485,30 +588,35 @@ code{font-family:var(--mono);font-size:.85em;background:rgba(0,0,0,.06);padding:
     </div>
   </div>
 
-  <div class="grid grid-mtd">
-    <div>
-      <div class="panel">
-        <div class="boardwrap"><div id="meBoard"></div></div>
-      </div>
-      <div class="panel">
-        <h3>Where you sit</h3>
-        <div id="meStats"></div>
-      </div>
+  <div id="meKpis"></div>
+
+  <div class="grid-3">
+    <div class="panel">
+      <div class="boardwrap"><div id="meBoard"></div></div>
     </div>
-    <div>
-      <div class="panel">
-        <h3>Daily points this month</h3>
-        <div id="meChart"></div>
-      </div>
-      <div class="panel">
-        <h3>Award standings</h3>
-        <div id="meAwardStandings"></div>
-      </div>
+    <div class="panel">
+      <div class="panelhead"><h3>Where you sit</h3></div>
+      <div id="meStats"></div>
+    </div>
+    <div class="panel">
+      <div class="panelhead"><h3>Award standings</h3><span class="note">This month</span></div>
+      <div id="meAwardStandings"></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panelhead"><h3>Your points by day</h3><span class="note" id="meChartNote"></span></div>
+      <div id="meChart"></div>
+    </div>
+    <div class="panel">
+      <div class="panelhead"><h3>Your volume by category</h3></div>
+      <div id="meChartMix"></div>
     </div>
   </div>
 
   <div class="panel">
-    <h3>Your sales</h3>
+    <div class="panelhead"><h3>Your sales</h3><span class="note">Newest first</span></div>
     <div id="meHistory"></div>
   </div>
 </section>
@@ -738,7 +846,8 @@ const TUNE = {
      METRIC_DEFS further down — add one there and it appears in the picker.  */
   metrics: [
     "handset_attach", "unp_attach", "avg_plan_ga", "mbb_attach",
-    "services_per_day", "fixed_per_day", "total_points", "pct_target"
+    "services_per_day", "points_per_day", "fixed_per_day", "business_share",
+    "total_points", "total_value", "projected_points", "pct_target"
   ],
 
   /* ---- monthly store targets (config/targets overrides) ---- */
@@ -1784,8 +1893,127 @@ const METRIC_DEFS = {
   points_per_service: {
     label:"Points per service",
     fn:(r) => r.count ? round1(r.points / r.count) : "—"
+  },
+  points_per_day: {
+    label:"Points per day",
+    fn:(r, c) => c.days ? int(Math.round(r.points / c.days)) : "—"
+  },
+  value_per_day: {
+    label:"Value per day",
+    fn:(r, c) => c.days ? money(r.totalValue / c.days) : "—"
+  },
+  ga_per_day: {
+    label:"New connects per day",
+    fn:(r, c) => c.days ? round1(r.total_ga.v / c.days) : "—"
+  },
+  mbb_per_day: {
+    label:"MBB per day",
+    fn:(r, c) => c.days ? round1(r.mbb.v / c.days) : "—"
+  },
+  business_share: {
+    label:"Business share of GA",
+    fn:(r) => pct(r.business.v, r.total_ga.v)
+  },
+  avg_recon_value: {
+    label:"Average plan value (recons)",
+    fn:(r) => r.recons.v ? money(r.recons.$ / r.recons.v) : "—"
+  },
+  avg_fixed_value: {
+    label:"Average fixed plan",
+    fn:(r) => {
+      const v = r.fixed_new.v + r.fixed_recon.v;
+      return v ? money((r.fixed_new.$ + r.fixed_recon.$) / v) : "—";
+    }
+  },
+  unp_per_handset: {
+    label:"U&P per handset",
+    fn:(r) => pct(r.unp.v, r.handsets.v)
+  },
+  outright_units: {
+    label:"Outright units",
+    fn:(r) => int(r.outright.v)
+  },
+  outright_value: {
+    label:"Outright value",
+    fn:(r) => money(r.outright.$)
+  },
+  active_sellers: {
+    label:"People who sold",
+    fn:(r, c) => int(distinctSellers(c.sales))
+  },
+  avg_points_per_seller: {
+    label:"Points per person",
+    fn:(r, c) => {
+      const n = distinctSellers(c.sales);
+      return n ? int(Math.round(r.points / n)) : "—";
+    }
+  },
+  best_day: {
+    label:"Best day",
+    fn:(r, c) => {
+      if (c.scope !== "month") return "—";
+      const b = bestDay(c.sales);
+      return b ? dmy(b.date).slice(0, -5) + " · " + int(b.points) : "—";
+    }
+  },
+  projected_points: {
+    label:"Projected month points",
+    fn:(r, c) => {
+      if (c.scope !== "month" || !c.days || !c.month) return "—";
+      return int(Math.round((r.points / c.days) * daysInMonth(c.month)));
+    }
+  },
+  projected_value: {
+    label:"Projected month value",
+    fn:(r, c) => {
+      if (c.scope !== "month" || !c.days || !c.month) return "—";
+      return money((r.totalValue / c.days) * daysInMonth(c.month));
+    }
   }
 };
+
+/* How many different people wrote something in this set. */
+function distinctSellers(sales){
+  const seen = {};
+  (sales || []).forEach(s => { if (!s.voided) seen[s.uid] = 1; });
+  return Object.keys(seen).length;
+}
+
+/* The day with the most points in this set. */
+function bestDay(sales){
+  const by = {};
+  (sales || []).forEach(s => {
+    if (s.voided) return;
+    by[s.businessDate] = num(by[s.businessDate]) + num(s.points);
+  });
+  const days = Object.keys(by);
+  if (!days.length) return null;
+  days.sort((a, b) => by[b] - by[a]);
+  return { date:days[0], points:round1(by[days[0]]) };
+}
+
+/* Services logged per hour of the trading day, for the EOD chart. Entries
+   still queued offline have no server timestamp yet and are skipped. */
+function hourLabel(h){
+  const ampm = h < 12 ? "am" : "pm";
+  const hh = (h % 12) === 0 ? 12 : h % 12;
+  return hh + ampm;
+}
+function hourlyCounts(sales){
+  const counts = {};
+  let lo = 9, hi = 17, any = false;
+  (sales || []).forEach(s => {
+    if (s.voided || !s.createdAt || !s.createdAt.toDate) return;
+    const h = zoneParts(s.createdAt.toDate()).h;
+    counts[h] = num(counts[h]) + 1;
+    lo = Math.min(lo, h); hi = Math.max(hi, h);
+    any = true;
+  });
+  if (!any) return [];
+  const out = [];
+  for (let h = lo; h <= hi; h++) out.push({ label:hourLabel(h), value:num(counts[h]) });
+  return out;
+}
 
 function activeMetricKeys(){
   const saved = state.metricsCfg && Array.isArray(state.metricsCfg.list) ? state.metricsCfg.list : null;
@@ -1910,6 +2138,231 @@ function awardsHTML(results, animate){
   return h;
 }
 
+/* ############################################################################
+   CHARTS — plain inline SVG, no chart library. Every chart takes
+   [{label, value}] and returns a string, so they print exactly as they render.
+   ############################################################################ */
+
+const CHART_COLORS = {
+  primary:"#4e8b3a",    // board mid-green
+  deep:"#143a1e",       // section bar green
+  plum:"#5b2150",
+  light:"#8fc06a",
+  soft:"#b9c2b8"
+};
+
+function niceMax(v){
+  if (!(v > 0)) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / mag;
+  const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+  return step * mag;
+}
+function svgWrap(w, h, inner, title){
+  return '<svg class="chart" viewBox="0 0 ' + w + " " + h + '" role="img" aria-label="' +
+         esc(title || "Chart") + '" xmlns="http://www.w3.org/2000/svg">' + inner + "</svg>";
+}
+function chartEmpty(msg){
+  return '<div class="emptystate">' + esc(msg || "Nothing to chart yet.") + "</div>";
+}
+
+/* Vertical bars — days of the month, hours of the day. */
+function chartBars(data, opts){
+  opts = opts || {};
+  const fmt = opts.fmt || int;
+  const vals = (data || []).map(d => num(d.value));
+  if (!vals.length || !vals.some(v => v > 0)) return chartEmpty(opts.empty);
+
+  const w = 720, h = opts.height || 230;
+  const padL = 46, padR = 12, padT = 16, padB = 30;
+  const max = niceMax(Math.max.apply(null, vals));
+  const n = data.length;
+  const bw = (w - padL - padR) / n;
+  let grid = "", bars = "", labels = "", values = "";
+
+  [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+    const y = padT + (h - padT - padB) * (1 - f);
+    grid += '<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (w - padR) +
+            '" y2="' + y.toFixed(1) + '" stroke="currentColor" stroke-width="1" opacity="' +
+            (f === 0 ? ".38" : ".13") + '"/>' +
+            '<text x="' + (padL - 7) + '" y="' + (y + 3.5).toFixed(1) +
+            '" font-size="10" text-anchor="end" opacity=".65">' + esc(fmt(max * f)) + "</text>";
+  });
+
+  data.forEach((d, i) => {
+    const v = num(d.value);
+    const bh = (h - padT - padB) * (v / max);
+    const x = padL + i * bw;
+    const y = h - padB - bh;
+    bars += '<rect x="' + (x + bw * 0.16).toFixed(1) + '" y="' + y.toFixed(1) +
+            '" width="' + Math.max(1.5, bw * 0.68).toFixed(1) + '" height="' + Math.max(0, bh).toFixed(1) +
+            '" fill="' + (d.color || opts.color || CHART_COLORS.primary) + '" rx="2">' +
+            "<title>" + esc(d.label + ": " + fmt(v)) + "</title></rect>";
+    if (!opts.labelEvery || i % opts.labelEvery === 0 || i === n - 1) {
+      labels += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (h - 10) +
+                '" font-size="10" text-anchor="middle" opacity=".7">' + esc(d.label) + "</text>";
+    }
+    if (opts.valueLabels && v > 0) {
+      values += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (y - 5).toFixed(1) +
+                '" font-size="10" font-weight="700" text-anchor="middle">' + esc(fmt(v)) + "</text>";
+    }
+  });
+
+  let avg = "";
+  if (opts.showAverage) {
+    const mean = vals.reduce((a, b) => a + b, 0) / (opts.averageOver || n);
+    const y = padT + (h - padT - padB) * (1 - mean / max);
+    avg = '<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (w - padR) + '" y2="' + y.toFixed(1) +
+          '" stroke="' + CHART_COLORS.plum + '" stroke-width="2" stroke-dasharray="7 5"/>' +
+          '<text x="' + (w - padR) + '" y="' + (y - 5).toFixed(1) + '" font-size="10" font-weight="700" ' +
+          'text-anchor="end" fill="' + CHART_COLORS.plum + '">avg ' + esc(fmt(mean)) + "</text>";
+  }
+  return svgWrap(w, h, grid + bars + avg + values + labels, opts.title);
+}
+
+/* Horizontal bars — leaderboards and category mixes, where the label matters
+   more than the axis. */
+function chartHBars(data, opts){
+  opts = opts || {};
+  const fmt = opts.fmt || int;
+  const vals = (data || []).map(d => num(d.value));
+  if (!vals.length || !vals.some(v => v > 0)) return chartEmpty(opts.empty);
+
+  const w = 720, rowH = 30, padT = 8, padB = 6;
+  const labelW = opts.labelWidth || 150, valW = 76;
+  const h = padT + padB + data.length * rowH;
+  const max = Math.max.apply(null, vals) || 1;
+  let out = "";
+
+  data.forEach((d, i) => {
+    const y = padT + i * rowH;
+    const bw = Math.max(2, (w - labelW - valW) * (num(d.value) / max));
+    out += '<text x="' + (labelW - 10) + '" y="' + (y + rowH / 2 + 4) +
+           '" font-size="12" font-weight="700" text-anchor="end">' + esc(d.label) + "</text>" +
+           '<rect x="' + labelW + '" y="' + (y + 5) + '" width="' + bw.toFixed(1) +
+           '" height="' + (rowH - 12) + '" fill="' + (d.color || opts.color || CHART_COLORS.primary) + '" rx="3">' +
+           "<title>" + esc(d.label + ": " + fmt(d.value)) + "</title></rect>" +
+           '<text x="' + (labelW + bw + 9).toFixed(1) + '" y="' + (y + rowH / 2 + 4) +
+           '" font-size="12" font-weight="700" opacity=".8">' + esc(fmt(d.value)) + "</text>";
+  });
+  return svgWrap(w, h, out, opts.title);
+}
+
+/* Lines — a running total against the pace a target implies. */
+function chartLine(series, xLabels, opts){
+  opts = opts || {};
+  const fmt = opts.fmt || int;
+  const all = [];
+  series.forEach(s => s.values.forEach(v => all.push(num(v))));
+  if (!all.length || !all.some(v => v > 0)) return chartEmpty(opts.empty);
+
+  const w = 720, h = opts.height || 230;
+  const padL = 50, padR = 14, padT = 14, padB = 30;
+  const max = niceMax(Math.max.apply(null, all));
+  const n = xLabels.length;
+  const xAt = i => padL + (w - padL - padR) * (n <= 1 ? 0 : i / (n - 1));
+  const yAt = v => padT + (h - padT - padB) * (1 - num(v) / max);
+
+  let grid = "", lines = "", labels = "";
+  [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+    const y = padT + (h - padT - padB) * (1 - f);
+    grid += '<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + (w - padR) + '" y2="' + y.toFixed(1) +
+            '" stroke="currentColor" stroke-width="1" opacity="' + (f === 0 ? ".38" : ".13") + '"/>' +
+            '<text x="' + (padL - 7) + '" y="' + (y + 3.5).toFixed(1) +
+            '" font-size="10" text-anchor="end" opacity=".65">' + esc(fmt(max * f)) + "</text>";
+  });
+  series.forEach(s => {
+    const pts = s.values.map((v, i) => xAt(i).toFixed(1) + "," + yAt(v).toFixed(1)).join(" ");
+    lines += '<polyline points="' + pts + '" fill="none" stroke="' + s.color +
+             '" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"' +
+             (s.dashed ? ' stroke-dasharray="7 5"' : "") + "/>";
+  });
+  xLabels.forEach((lab, i) => {
+    if (opts.labelEvery && i % opts.labelEvery !== 0 && i !== n - 1) return;
+    labels += '<text x="' + xAt(i).toFixed(1) + '" y="' + (h - 10) +
+              '" font-size="10" text-anchor="middle" opacity=".7">' + esc(lab) + "</text>";
+  });
+  return svgWrap(w, h, grid + lines + labels, opts.title);
+}
+
+function legendHTML(items){
+  return '<div class="legend">' + items.map(i =>
+    '<span><i style="background:' + i.color + '"></i>' + esc(i.label) + "</span>").join("") + "</div>";
+}
+
+/* ---- chart data builders ---- */
+function categoryMixData(r){
+  return [
+    { label:"New connects", value:r.total_ga.v },
+    { label:"Recons",       value:r.recons.v },
+    { label:"Handsets",     value:r.handsets.v, color:CHART_COLORS.light },
+    { label:"U&P",          value:r.unp.v,      color:CHART_COLORS.light },
+    { label:"MBB",          value:r.mbb.v },
+    { label:"Prepaid",      value:r.prepaid.v },
+    { label:"Fixed",        value:r.fixed_new.v + r.fixed_recon.v },
+    { label:"Outright",     value:r.outright.v, color:CHART_COLORS.soft }
+  ];
+}
+function peoplePointsData(sales, users, limit){
+  return perUserRollups(sales, users)
+    .filter(p => p.r.points > 0)
+    .sort((a, b) => b.r.points - a.r.points)
+    .slice(0, limit || 10)
+    .map(p => ({ label:p.name, value:p.r.points }));
+}
+function cumulativeSeries(sales, month, targetPoints){
+  const daily = dailyPoints(sales, month);
+  const today = todayBD();
+  const upTo = monthOf(today) === month ? num(today.slice(8)) : daily.length;
+  let run = 0;
+  const actual = [], labels = [];
+  daily.forEach((d, i) => {
+    labels.push(String(d.day));
+    if (i < upTo) { run += d.pts; actual.push(run); }
+    else actual.push(null);
+  });
+  // Drop the trailing nulls so the line stops at today rather than at zero.
+  const trimmed = actual.filter(v => v !== null);
+  const out = [{ name:"Actual", color:CHART_COLORS.primary, values:trimmed }];
+  if (targetPoints > 0) {
+    out.push({
+      name:"Target pace", color:CHART_COLORS.plum, dashed:true,
+      values:trimmed.map((_, i) => targetPoints * ((i + 1) / daily.length))
+    });
+  }
+  return { series:out, labels:labels.slice(0, trimmed.length) };
+}
+
+/* ---- KPI strip ---- */
+function kpisHTML(items){
+  return '<div class="kpis">' + items.map(i =>
+    '<div class="kpi' + (i.accent ? " accent" : "") + '">' +
+      '<span class="k-label">' + esc(i.label) + "</span>" +
+      '<span class="k-value">' + esc(i.value) + "</span>" +
+      '<span class="k-sub">' + esc(i.sub || "") + "</span>" +
+    "</div>").join("") + "</div>";
+}
+
+function boardKpis(r, ctx){
+  const contacts = r.total_ga.v + r.recons.v;
+  const target = num(ctx.targets && ctx.targets.points);
+  return [
+    { label:"Points", value:int(r.points), accent:true,
+      sub:target ? Math.round((r.points / target) * 100) + "% of " + int(target)
+                 : (ctx.days ? round1(r.points / ctx.days) + " per day" : "") },
+    { label:"Services", value:int(r.count),
+      sub:ctx.days ? round1(r.count / ctx.days) + " per day" : "" },
+    { label:"Value written", value:money(r.totalValue),
+      sub:r.count ? money(r.totalValue / r.count) + " each" : "" },
+    { label:"Total GA", value:int(r.total_ga.v),
+      sub:r.total_ga.v ? money(r.total_ga.$ / r.total_ga.v) + " average plan" : "no connects yet" },
+    { label:"Recons", value:int(r.recons.v),
+      sub:r.recons.v ? money(r.recons.$ / r.recons.v) + " average plan" : "none yet" },
+    { label:"Handset attach", value:pct(r.handsets.v, contacts),
+      sub:int(r.handsets.v) + " of " + int(contacts) + " contracts" }
+  ];
+}
+
 /* ---- per-person breakdown ---- */
 const BREAKDOWN_COLS = [
   { key:"name",      label:"Person",   get:p => p.name,            type:"text" },
@@ -1935,7 +2388,7 @@ function breakdownHTML(people, sortState){
     return (num(av) - num(bv)) * sortState.dir;
   });
 
-  let h = '<div style="overflow-x:auto"><table class="data"><thead><tr>';
+  let h = '<div class="tablescroll" style="overflow-x:auto"><table class="data"><thead><tr>';
   BREAKDOWN_COLS.forEach(c => {
     const isSort = c.key === sortState.col;
     h += '<th data-sort="' + c.key + '"' + (c.type === "text" ? "" : ' class="num"') +
@@ -1995,11 +2448,35 @@ function renderMTD(){
   if (assert) $("#mtdAssert").textContent = assert;
 
   const targets = targetsConfig();
-  $("#mtdMetrics").innerHTML = metricsHTML(
-    rToday, rMonth,
-    { days:1, targets:targets, scope:"today" },
-    { days:elapsedDays(m), targets:targets, scope:"month" }
-  );
+  const days = elapsedDays(m);
+  const ctxToday = { days:1, targets:targets, scope:"today", sales:todaySales, month:m };
+  const ctxMonth = { days:days, targets:targets, scope:"month", sales:monthSales, month:m };
+  $("#mtdMetrics").innerHTML = metricsHTML(rToday, rMonth, ctxToday, ctxMonth);
+  $("#mtdKpis").innerHTML = kpisHTML(boardKpis(rMonth, ctxMonth));
+
+  // charts
+  const daily = dailyPoints(monthSales, m);
+  $("#mtdChartPoints").innerHTML = chartBars(
+    daily.map(d => ({ label:String(d.day), value:round1(d.pts) })),
+    { labelEvery:3, showAverage:true, averageOver:days, empty:"No points logged this month yet.",
+      title:"Points by day" });
+  $("#mtdPointsNote").textContent = daily.filter(d => d.pts > 0).length + " trading days with sales";
+
+  const cum = cumulativeSeries(monthSales, m, num(targets.points));
+  $("#mtdChartCum").innerHTML =
+    (num(targets.points) ? legendHTML([
+      { label:"Actual", color:CHART_COLORS.primary },
+      { label:"Target pace", color:CHART_COLORS.plum }
+    ]) : "") +
+    chartLine(cum.series, cum.labels, { labelEvery:3, empty:"Nothing to plot yet.", title:"Running total" });
+  $("#mtdCumNote").textContent = num(targets.points)
+    ? int(Math.max(0, targets.points - rMonth.points)) + " points to target"
+    : "Set a points target in Admin to see pace";
+
+  $("#mtdChartPeople").innerHTML = chartHBars(peoplePointsData(monthSales, state.users, 10),
+    { empty:"No points on the board yet.", title:"Points by person" });
+  $("#mtdChartMix").innerHTML = chartHBars(categoryMixData(rMonth),
+    { labelWidth:130, empty:"No services logged yet.", title:"Volume by category" });
 
   const awards = awardResults(monthSales, state.users);
   $("#mtdAwards").innerHTML = awardsHTML(awards, m === thisMonth());
@@ -2056,6 +2533,7 @@ function renderEOD(){
   const r = rollup(daySales);
   const monthR = rollup(salesFor(m));
 
+
   $("#eodBoard").innerHTML = boardHTML(r, storeShort() + " EOD", dmy(d));
   $("#eodPoints").innerHTML = pointsBoxHTML(r.points, "Total Points");
 
@@ -2064,11 +2542,17 @@ function renderEOD(){
   if (assert) $("#eodAssert").textContent = assert;
 
   const targets = targetsConfig();
-  $("#eodMetrics").innerHTML = metricsHTML(
-    r, monthR,
-    { days:1, targets:targets, scope:"today" },
-    { days:elapsedDays(m), targets:targets, scope:"month" }
-  );
+  const monthSales = salesFor(m);
+  const ctxDay = { days:1, targets:targets, scope:"today", sales:daySales, month:m };
+  const ctxMonth = { days:elapsedDays(m), targets:targets, scope:"month", sales:monthSales, month:m };
+  $("#eodMetrics").innerHTML = metricsHTML(r, monthR, ctxDay, ctxMonth);
+  $("#eodKpis").innerHTML = kpisHTML(boardKpis(r, ctxDay));
+
+  $("#eodChartPeople").innerHTML = chartHBars(peoplePointsData(daySales, state.users, 10),
+    { empty:"Nothing logged for this day yet.", title:"Points by person" });
+  const hours = hourlyCounts(daySales);
+  $("#eodChartHour").innerHTML = chartBars(hours,
+    { valueLabels:true, height:200, empty:"Nothing logged for this day yet.", title:"Services by hour" });
 
   const people = perUserRollups(daySales, state.users).filter(p => p.r.count > 0);
   $("#eodBreakdown").innerHTML = people.length
@@ -2097,7 +2581,9 @@ function renderEodTools(d, posted){
     h += '<button id="btnPostEod" class="btn-sm btn-go"' + (posted ? " disabled" : "") + ">" +
          (posted ? "Posted" : "Post EOD") + "</button>";
   }
+  h += '<button id="btnPrintDay" class="btn-sm">Print day</button>';
   host.innerHTML = h;
+  $("#btnPrintDay").onclick = () => printDay(d);
   $("#btnCopyEod").onclick = async () => {
     const ok = await copyText(eodSummaryText(d));
     toast(ok ? "Summary copied — paste it into the group chat" : "Couldn't copy. Long-press to select instead.", ok ? "" : "bad");
@@ -2223,9 +2709,22 @@ function renderMe(){
                  int(Math.max(0, ahead.r.points - (mine ? mine.r.points : 0)) + 1) + " pts</dd>" : "") +
       "</dl></div>";
 
-  // trend
+  // KPI strip for the chosen scope
+  const scopeDays = meSalesAndLabel().scopeDays;
+  $("#meKpis").innerHTML = kpisHTML(boardKpis(r, {
+    days:scopeDays, targets:{}, scope:state.meScope, sales:sales, month:m
+  }));
+
+  // charts
   const mySalesMonth = monthSales.filter(s => s.uid === state.user.uid);
-  $("#meChart").innerHTML = trendSVG(dailyPoints(mySalesMonth, m));
+  const daily = dailyPoints(mySalesMonth, m);
+  $("#meChart").innerHTML = chartBars(
+    daily.map(d => ({ label:String(d.day), value:round1(d.pts) })),
+    { labelEvery:3, showAverage:true, averageOver:elapsedDays(m),
+      empty:"No points logged this month yet.", title:"Your points by day" });
+  $("#meChartNote").textContent = monthLabel(m);
+  $("#meChartMix").innerHTML = chartHBars(categoryMixData(r),
+    { labelWidth:130, empty:"Nothing logged for this period.", title:"Your volume by category" });
 
   // award standings
   const awards = awardResults(monthSales, state.users);
@@ -2259,33 +2758,6 @@ function renderMe(){
 function ordinal(n){
   const s = ["th", "st", "nd", "rd"], v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
-
-function trendSVG(days){
-  const w = 640, h = 160, padL = 30, padB = 20, padT = 10;
-  const max = Math.max(10, ...days.map(d => d.pts));
-  const bw = (w - padL - 6) / days.length;
-  let bars = "", labels = "";
-  days.forEach((d, i) => {
-    const bh = max ? (h - padB - padT) * (d.pts / max) : 0;
-    const x = padL + i * bw;
-    const y = h - padB - bh;
-    bars += '<rect x="' + (x + 1).toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + Math.max(2, bw - 2).toFixed(1) +
-            '" height="' + Math.max(0, bh).toFixed(1) + '" fill="#4e8b3a" rx="1"></rect>';
-    if (d.day % 5 === 0 || d.day === 1) {
-      labels += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (h - 6) + '" font-size="9" text-anchor="middle" fill="currentColor" opacity=".6">' + d.day + "</text>";
-    }
-  });
-  const grid = [0, 0.5, 1].map(f => {
-    const y = padT + (h - padB - padT) * (1 - f);
-    return '<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + w + '" y2="' + y.toFixed(1) +
-           '" stroke="currentColor" opacity=".15"></line>' +
-           '<text x="2" y="' + (y + 3).toFixed(1) + '" font-size="9" fill="currentColor" opacity=".6">' + Math.round(max * f) + "</text>";
-  }).join("");
-  const total = days.reduce((a, d) => a + d.pts, 0);
-  if (!total) return '<div class="emptystate">No points logged this month yet.</div>';
-  return '<svg class="trend" viewBox="0 0 ' + w + " " + h + '" preserveAspectRatio="none" role="img" aria-label="Daily points this month">' +
-         grid + bars + labels + "</svg>";
 }
 
 /* ---- sale history rows with edit / void ---- */
@@ -3363,28 +3835,111 @@ async function unlockMonth(m){
   catch (e) { toast(friendlyAuthError(e), "bad"); }
 }
 
+function printHead(title, meta){
+  return '<div class="p-head"><div><h1>' + esc(title) + "</h1></div>" +
+         '<div class="p-meta">' + meta + "</div></div>";
+}
+
 function printMonth(m){
   const live = salesFor(m);
   const r = rollup(live);
   const people = perUserRollups(live, state.users);
   const targets = targetsConfig();
   const today = todayBD();
+  const days = elapsedDays(m);
   const todayR = rollup(live.filter(s => s.businessDate === today));
+  const ctxToday = { days:1, targets:targets, scope:"today", sales:live.filter(s => s.businessDate === today), month:m };
+  const ctxMonth = { days:days, targets:targets, scope:"month", sales:live, month:m };
+
+  const meta = esc(storeName()) + "<br>Dealer " + esc(storeId_()) +
+               "<br>Printed " + esc(dmy(today)) + " by " + esc(state.profile.displayName);
+
+  const daily = dailyPoints(live, m);
+  const cum = cumulativeSeries(live, m, num(targets.points));
 
   $("#printArea").innerHTML =
-    "<h1>" + esc(storeName()) + " — " + esc(monthLabel(m)) + "</h1>" +
-    '<p class="small">Dealer ' + esc(storeId_()) + " · printed " + esc(dmy(todayBD())) + "</p>" +
-    '<div class="printgrid">' +
-      "<div>" + boardHTML(r, storeShort() + " (Month to Date)", dmy(today)) + "</div>" +
-      "<div>" + awardsHTML(awardResults(live, state.users), false) +
-        '<div style="margin-top:6mm">' + metricsHTML(todayR, r,
-          { days:1, targets:targets, scope:"today" },
-          { days:elapsedDays(m), targets:targets, scope:"month" }) + "</div>" +
-        '<div style="margin-top:6mm">' + pointsBoxHTML(r.points, "Total Points") + "</div>" +
+    // ---- page 1: the board, the metrics, the awards ----
+    '<div class="p-page">' +
+      printHead(storeShort() + " — " + monthLabel(m) + " month to date", meta) +
+      kpisHTML(boardKpis(r, ctxMonth)) +
+      '<div class="p-grid3">' +
+        '<div class="p-block">' + boardHTML(r, storeShort() + " (Month to Date)", dmy(today)) + "</div>" +
+        '<div class="p-block">' + metricsHTML(todayR, r, ctxToday, ctxMonth) + "</div>" +
+        '<div class="p-block">' + awardsHTML(awardResults(live, state.users), false) +
+          '<div style="margin-top:5mm">' + pointsBoxHTML(r.points, "Total Points") + "</div>" +
+        "</div>" +
       "</div>" +
     "</div>" +
-    '<div class="pbreak"><h1>By person — ' + esc(monthLabel(m)) + "</h1>" +
-      breakdownHTML(people, { col:"points", dir:-1 }) + "</div>";
+
+    // ---- page 2: the charts ----
+    '<div class="p-page">' +
+      printHead(storeShort() + " — " + monthLabel(m) + " trends", meta) +
+      '<div class="p-grid2">' +
+        '<div class="p-block"><h2>Points by day</h2>' +
+          chartBars(daily.map(d => ({ label:String(d.day), value:round1(d.pts) })),
+            { labelEvery:3, showAverage:true, averageOver:days, height:250 }) +
+          '<p class="chartnote">Dashed line is the daily average across ' + days + " days.</p></div>" +
+        '<div class="p-block"><h2>Running total</h2>' +
+          (num(targets.points) ? legendHTML([
+            { label:"Actual", color:CHART_COLORS.primary },
+            { label:"Target pace", color:CHART_COLORS.plum }
+          ]) : "") +
+          chartLine(cum.series, cum.labels, { labelEvery:3, height:250 }) +
+          '<p class="chartnote">' + (num(targets.points)
+            ? int(r.points) + " of " + int(targets.points) + " points."
+            : "No points target set.") + "</p></div>" +
+        '<div class="p-block"><h2>Points by person</h2>' +
+          chartHBars(peoplePointsData(live, state.users, 12)) + "</div>" +
+        '<div class="p-block"><h2>Volume by category</h2>' +
+          chartHBars(categoryMixData(r), { labelWidth:130 }) + "</div>" +
+      "</div>" +
+    "</div>" +
+
+    // ---- page 3: every person ----
+    '<div class="p-page">' +
+      printHead(storeShort() + " — " + monthLabel(m) + " by person", meta) +
+      breakdownHTML(people, { col:"points", dir:-1 }) +
+      '<p class="p-foot">Voided sales are excluded from every figure above. ' +
+        int(r.count) + " services, " + money(r.totalValue) + " written, " + int(r.points) + " points.</p>" +
+    "</div>";
+
+  window.print();
+}
+
+/* The single-day version, for pinning up after close. */
+function printDay(d){
+  const sales = salesForDay(d);
+  const r = rollup(sales);
+  const m = monthOf(d);
+  const targets = targetsConfig();
+  const monthSales = salesFor(m);
+  const ctxDay = { days:1, targets:targets, scope:"today", sales:sales, month:m };
+  const ctxMonth = { days:elapsedDays(m), targets:targets, scope:"month", sales:monthSales, month:m };
+  const people = perUserRollups(sales, state.users).filter(p => p.r.count > 0);
+  const posted = state.eodPosts[d];
+
+  const meta = esc(storeName()) + "<br>Dealer " + esc(storeId_()) +
+               "<br>Printed " + esc(dmy(todayBD())) + " by " + esc(state.profile.displayName) +
+               (posted ? "<br>Posted by " + esc(posted.postedBy || "?") : "");
+
+  $("#printArea").innerHTML =
+    '<div class="p-page">' +
+      printHead(storeShort() + " EOD — " + dmy(d), meta) +
+      kpisHTML(boardKpis(r, ctxDay)) +
+      '<div class="p-grid3">' +
+        '<div class="p-block">' + boardHTML(r, storeShort() + " EOD", dmy(d)) + "</div>" +
+        '<div class="p-block">' + pointsBoxHTML(r.points, "Total Points") +
+          '<div style="margin-top:5mm">' + metricsHTML(r, rollup(monthSales), ctxDay, ctxMonth) + "</div></div>" +
+        '<div class="p-block"><h2>Points by person</h2>' +
+          chartHBars(peoplePointsData(sales, state.users, 12)) +
+          '<div style="margin-top:5mm"><h2>Services by hour</h2>' +
+          chartBars(hourlyCounts(sales), { valueLabels:true, height:200 }) + "</div></div>" +
+      "</div>" +
+      (people.length
+        ? '<div class="p-block"><h2>By person</h2>' + breakdownHTML(people, { col:"points", dir:-1 }) + "</div>"
+        : "") +
+    "</div>";
+
   window.print();
 }
 
