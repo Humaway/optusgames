@@ -1772,6 +1772,45 @@ async function findWords(report){
   return said;
 }
 
+/* ------------------------------------------------------------
+   Anything you teach it can carry live values. The words stay yours;
+   what goes in the gaps is measured off the brain that turn.
+   ------------------------------------------------------------ */
+const SLOT_HELP = ['{looking}','{mood}','{feeling}','{times}','{turn}','{state}','{cells}','{spikes}','{linked}','{reminds}'];
+let assocNow = null, newWordsNow = 0;
+
+function lookingAt(){
+  if(!SEEING) return 'nothing, my eyes are shut';
+  if(SEEING.name!=='scene') return SEEING.label;
+  const a = attendedSlot();
+  return a ? a.label : 'the gap between things';
+}
+function moodWord(ro){
+  const a=ro.arousal, v=ro.valence;
+  return a>0.62&&v<-0.02 ? 'panicking' : a>0.62&&v>0.02 ? 'rushing at it'
+       : a>0.62 ? 'worked up' : a<0.14 ? 'barely awake'
+       : v<-0.03 ? 'wary' : v>0.03 ? 'interested' : 'flat';
+}
+function fillSlots(text, ro, seen, st){
+  if(!text || !text.includes('{')) return text;
+  const t = ro.turning || 0;
+  const map = {
+    looking: lookingAt(),
+    mood:    moodWord(ro),
+    feeling: ro.valence>0.12 ? 'something I have been taught to like'
+           : ro.valence<-0.12? 'something I have been taught to hate'
+           : 'nothing I have an opinion about',
+    times:   seen && seen.match ? String(seen.match.n) : '1',
+    turn:    Math.abs(t)>0.02 ? (t>0?'right':'left') : 'nowhere',
+    state:   st ? (st.fresh ? 'somewhere new' : stateName(st.state)) : 'nowhere',
+    cells:   String(Math.round(ro.kcFrac*B.byRole.KC.length)),
+    spikes:  ro.total.toLocaleString(),
+    linked:  (assocNow && assocNow.words.length) ? assocNow.words.slice(0,3).map(w=>w.w).join(', ') : 'nothing',
+    reminds: (assocNow && assocNow.reminded.length) ? assocNow.reminded[0].text : 'nothing I have met before',
+  };
+  return text.replace(/\{(\w+)\}/g, (m,k)=> map[k]!==undefined ? map[k] : m);
+}
+
 let busy=false;        // the input is locked
 let measuring=false;   // the brain is being stepped by hand — the main loop must keep off
 
@@ -2221,9 +2260,27 @@ function openingWords(){
     : `<p>No voice, so it answers with what you have taught it and what it did. Smell is what it learns from; sight only changes what it does.</p>`);
 }
 let lastT=performance.now(), spikeAccum=0;
+/* Reference each one directly: an arrow function assigned to a const is not
+   a property of window, so looking them up by name gives a false alarm. If a
+   name does not exist at all this throws, and the name is in the message. */
+function selfCheck(){
+  try{
+    const refs = { fillSlots, lookingAt, moodWord, stateName, ordinal, readState, associate,
+      sentenceCode, learnWord, speakFrom, brainReport, findWords, describe, didLine, teach,
+      outputVector, centredOutput, calibrateGaze, attendedSlot, drawWorldStrip, openEyes,
+      paintVocab, parseCSV };
+    const bad = Object.keys(refs).filter(k=>typeof refs[k]!=='function');
+    return bad.length ? 'missing: '+bad.join(', ') : null;
+  }catch(err){
+    return 'broken reference — '+err.message;
+  }
+}
+
 async function boot(){
   const msg=document.getElementById('loadmsg');
   try{
+    const broken = selfCheck();
+    if(broken) throw new Error('this build is broken — '+broken);
     msg.textContent='decompressing 669,033 synapses…';
     await unpack();
     msg.textContent='wiring it up…';
