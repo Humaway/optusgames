@@ -186,6 +186,9 @@ table.mem button:hover{color:var(--warn)}
 button.copy{background:none;border:1px solid var(--rule-hi);color:var(--ink-2);border-radius:8px;
   padding:.4rem .8rem;cursor:pointer;font-size:12.5px;margin-top:.5rem}
 code{font:400 12px "IBM Plex Mono",monospace;color:var(--mbon)}
+.slots{font:400 11.5px/1.75 "IBM Plex Mono",monospace;color:var(--ink-3);
+  background:#060A14;border:1px solid var(--rule);border-radius:8px;padding:.6rem .7rem;margin-top:.2rem}
+.slots span{color:var(--ink-2)} .slots em{font-style:normal;color:var(--mbon)}
 .turn.fly p.thinking{opacity:.45}
 .turn.fly p.spoke{font-family:"IBM Plex Serif",Georgia,serif;font-size:18px;line-height:1.45;color:var(--mbon)}
 .wrap{max-height:300px;overflow:auto}
@@ -266,6 +269,12 @@ code{font:400 12px "IBM Plex Mono",monospace;color:var(--mbon)}
     <input id="tc-cue" maxlength="80" placeholder="are you hungry" spellcheck="false"></label>
   <label class="fld">it replies
     <input id="tc-say" maxlength="140" placeholder="Starving. Put something sweet down." spellcheck="false"></label>
+  <p class="slots">The reply can carry live values, filled in from the brain each time:<br>
+    <code>{looking}</code> what it is watching · <code>{mood}</code> how it is ·
+    <code>{feeling}</code> what it makes of the smell · <code>{times}</code> times smelled ·
+    <code>{turn}</code> which way it turned · <code>{state}</code> its state ·
+    <code>{cells}</code> Kenyon cells · <code>{spikes}</code> spikes<br>
+    <span>e.g. <em>Not now. I am watching {looking}.</em></span></p>
   <p id="tc-note" style="color:var(--ink-3);font-size:12.5px;margin-top:.7rem">The words are yours. Which one comes out is its own doing.</p>
   <div class="acts">
     <button onclick="document.getElementById('dlg-teach').close()">Close</button>
@@ -277,7 +286,7 @@ code{font:400 12px "IBM Plex Mono",monospace;color:var(--mbon)}
 <dialog id="dlg-states"><div class="sheet">
   <h2>Name its states</h2>
   <p>These are patterns of output the fly fell into by itself. Nothing here was designed — a pattern unlike any before became a new one, and familiar ones have been averaging together ever since. Measured, its output supports about five it can hold apart, so the list stops at eight.</p>
-  <p>Give one a sentence and it will say that whenever it lands there.</p>
+  <p>Give one a sentence and it will say that whenever it lands there. The same live values work here — <code>{looking}</code>, <code>{mood}</code>, <code>{times}</code> and the rest.</p>
   <div class="wrap"><table class="mem"><thead><tr><th>state</th><th>times</th><th>says</th></tr></thead><tbody id="st-body"></tbody></table></div>
   <div class="acts"><button onclick="document.getElementById('dlg-states').close()">Close</button></div>
 </div></dialog>
@@ -1523,6 +1532,42 @@ async function findWords(report){
   return said;
 }
 
+/* ------------------------------------------------------------
+   Anything you teach it can carry live values. The words stay yours;
+   what goes in the gaps is measured off the brain that turn.
+   ------------------------------------------------------------ */
+const SLOT_HELP = ['{looking}','{mood}','{feeling}','{times}','{turn}','{state}','{cells}','{spikes}'];
+
+function lookingAt(){
+  if(!SEEING) return 'nothing, my eyes are shut';
+  if(SEEING.name!=='scene') return SEEING.label;
+  const a=attendedSlot();
+  return a ? a.label : 'the gap between things';
+}
+function moodWord(ro){
+  const a=ro.arousal, v=ro.valence;
+  return a>0.62&&v<-0.02 ? 'panicking' : a>0.62&&v>0.02 ? 'rushing at it'
+       : a>0.62 ? 'worked up' : a<0.14 ? 'barely awake'
+       : v<-0.03 ? 'wary' : v>0.03 ? 'interested' : 'flat';
+}
+function fillSlots(text, ro, seen, st){
+  if(!text.includes('{')) return text;
+  const t=ro.turning||0;
+  const map={
+    looking: lookingAt(),
+    mood:    moodWord(ro),
+    feeling: ro.valence>0.12 ? 'something I have been taught to like'
+           : ro.valence<-0.12? 'something I have been taught to hate'
+           : 'nothing I have an opinion about',
+    times:   seen.match ? String(seen.match.n) : '1',
+    turn:    Math.abs(t)>0.02 ? (t>0?'right':'left') : 'nowhere',
+    state:   st ? (st.fresh ? 'somewhere new' : stateName(st.state)) : 'nowhere',
+    cells:   String(Math.round(ro.kcFrac*B.byRole.KC.length)),
+    spikes:  ro.total.toLocaleString(),
+  };
+  return text.replace(/\{(\w+)\}/g, (m,k)=> map[k]!==undefined ? map[k] : m);
+}
+
 let busy=false;
 async function speak(text){
   if(busy || !text.trim()) return;
@@ -1568,9 +1613,9 @@ async function speak(text){
       descending <u>${ro.topDN.join(', ')}</u></div></div>`;
   let body;
   if(heard.sure){
-    body = `<p class="spoke">${esc(heard.v.say)}</p>`;
+    body = `<p class="spoke">${esc(fillSlots(heard.v.say, ro, seen, st))}</p>`;
   } else if(st && st.state.name){
-    body = `<p class="spoke">${esc(st.state.name)}</p>`;
+    body = `<p class="spoke">${esc(fillSlots(st.state.name, ro, seen, st))}</p>`;
   } else {
     body = `<p class="say">${esc(describe(ro, stim, seen, wrote))}</p>`;
   }
