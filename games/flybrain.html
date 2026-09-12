@@ -88,6 +88,12 @@ button,input,textarea{font:inherit;color:inherit}
 #loading p{font:400 13px/1.6 "IBM Plex Mono",monospace;color:var(--ink-3)}
 #loading .big{font-family:"IBM Plex Serif",serif;font-size:19px;color:var(--ink)}
 #loading.gone{opacity:0;pointer-events:none}
+#loadbar{width:min(330px,60vw);height:3px;background:var(--rule);border-radius:2px;overflow:hidden;margin:.2rem auto 0}
+#loadbar i{display:block;height:100%;width:0;background:var(--mbon);border-radius:2px;transition:width .3s}
+#loadsub{font:400 11.5px/1.6 "IBM Plex Mono",monospace;color:#3D4A63;max-width:min(420px,74vw);margin:0 auto}
+#loadskip{margin-top:.9rem;background:none;border:1px solid var(--rule-hi);color:var(--ink-3);
+  border-radius:99px;padding:.42rem .9rem;cursor:pointer;font:400 12px "IBM Plex Mono",monospace}
+#loadskip:hover{color:var(--ink);border-color:var(--ink-3)}
 
 /* ── console ───────────────────────────────────── */
 #console{
@@ -224,8 +230,11 @@ code{font:400 12px "IBM Plex Mono",monospace;color:var(--mbon)}
     <div id="stage">
       <canvas id="gl"></canvas>
       <div id="loading">
-        <p class="big">Unpacking the connectome</p>
-        <p id="loadmsg">reading 17,363 neurons…</p>
+        <p class="big" id="loadbig">Unpacking the connectome</p>
+        <p id="loadmsg">reading 54,029 neurons…</p>
+        <div id="loadbar" hidden><i></i></div>
+        <p id="loadsub" hidden></p>
+        <button id="loadskip" hidden>Go in without a voice</button>
       </div>
       <div id="legend"></div>
       <div id="eyes">
@@ -324,7 +333,7 @@ are you hungry,Always. Put something sweet down and stand back."></textarea>
     <label class="fld">Model
       <select id="vc-model">
         <option value="Qwen2.5-0.5B-Instruct-q4f16_1-MLC">Qwen2.5 0.5B — smallest, about 400 MB</option>
-        <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC" selected>Llama 3.2 1B — about 800 MB, better writing</option>
+        <option value="Llama-3.2-1B-Instruct-q4f16_1-MLC" selected>Llama 3.2 1B — about 800 MB, loaded by default</option>
         <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Qwen2.5 1.5B — about 1.1 GB</option>
         <option value="Llama-3.2-3B-Instruct-q4f16_1-MLC">Llama 3.2 3B — about 2.2 GB, slow to load</option>
         <option value="__custom">Something else — type the id below</option>
@@ -478,7 +487,7 @@ const FIREBASE_CONFIG = null;
    };
    ------------------------------------------------------------ */
 const VOICE = {
-  local:    null,        // e.g. "Llama-3.2-1B-Instruct-q4f16_1-MLC" — runs in the visitor's browser, free
+  local:    "Llama-3.2-1B-Instruct-q4f16_1-MLC",   // runs in the visitor's browser, free. null to turn off
   endpoint: null,        // or a server holding a key
   model:    "claude-sonnet-4-6"
 };
@@ -1626,8 +1635,9 @@ const VOICE_STATE = { on:false, endpoint:null, history:[], engine:null, model:nu
 const VOICE_BRIEF_SMALL = `You speak for a fruit fly's brain. It has no language and cannot read; words
 reach it as a smell. You are given what its brain did. Say in ONE short sentence, first person, what it
 is like right now. Never answer questions or state facts — it does not know what was asked. Match the
-mood exactly. Only ever mention smells, light, your body, and things you were reminded of. Under 25
-words, plain, no quote marks.`;
+mood exactly. Only ever mention smells, light, your body, and things you were reminded of. If nothing was
+recalled, say it is new and nothing came back — never invent a memory. Under 25 words, plain, no
+quote marks.`;
 
 function brainReport(ro, stim, seen, heard, wrote, st, assoc){
   const a=ro.arousal, v=ro.valence, t=ro.turning||0;
@@ -1688,8 +1698,11 @@ Hard rules:
   knows how the smell landed and what it dragged up.
 - The state decides the mood and you have no freedom over it. Wary means wary. Barely reacting means
   dull and uninterested.
-- Only ever refer to smells, light, its own body, and things it has actually been through. If
-  reminded_of is empty it has nothing to draw on and should sound blank.
+- Only ever refer to smells, light, its own body, and things it has actually been through.
+- An empty reminded_of does not mean say nothing. It means this smell matches nothing it has ever had,
+  and a brain built to recognise things finding no match is unsettling, not dull. Say that it is new,
+  that nothing came back, that it does not know what to do with it. Never invent a memory to fill
+  the gap — if nothing was retrieved, nothing was retrieved.
 - No metaphors about being a fly, no whimsy, no charm. Plain and physical.
 - One or two sentences, under 30 words. No quote marks, no asterisks.`;
 
@@ -2153,6 +2166,44 @@ document.getElementById('fb-save').onclick=async()=>{
 /* ============================================================
    BOOT
    ============================================================ */
+/* Hold the page until it has something to speak with. It can always be
+   escaped — no WebGPU, a dead connection or a slow download must not
+   lock anyone out, they just fall through to the taught phrases. */
+function gateOnVoice(modelId){
+  const big=document.getElementById('loadbig'), msg=document.getElementById('loadmsg'),
+        bar=document.getElementById('loadbar'), fill=bar.querySelector('i'),
+        sub=document.getElementById('loadsub'), skip=document.getElementById('loadskip');
+  if(!navigator.gpu){
+    msg.textContent='this browser cannot run a model — going in with its taught phrases';
+    return new Promise(r=>setTimeout(r,1400));
+  }
+  big.textContent='Giving it something to speak with';
+  msg.textContent='fetching the model';
+  bar.hidden=false; sub.hidden=false; skip.hidden=false;
+  sub.textContent='about 800 MB, once. After this it is cached and the page opens straight away.';
+  return new Promise(resolve=>{
+    let done=false;
+    const finish=note=>{ if(done) return; done=true; if(note) msg.textContent=note; resolve(); };
+    skip.onclick=()=>finish('going in without it');
+    loadLocalVoice(modelId, (text,frac)=>{
+      if(done) return;
+      if(text) msg.textContent=text.length>70?text.slice(0,70)+'…':text;
+      fill.style.width=Math.max(2,Math.round((frac||0)*100))+'%';
+    }).then(()=>{ fill.style.width='100%'; finish(); })
+      .catch(err=>{
+        sub.textContent=err.message.slice(0,150);
+        finish('no voice — going in with its taught phrases');
+        return new Promise(r=>setTimeout(r,900));
+      });
+  });
+}
+
+function openingWords(){
+  turn('sys',`<p>54,029 neurons are running, both eyes included. Type and it arrives as a smell. The strip under the brain is everything it can see: five things side by side, one of them deliberately nothing. The two boxes are where each eye is pointed, and nothing moves them except the difference between its left and right descending neurons.</p>`);
+  turn('sys', VOICE_STATE.engine
+    ? `<p>It has a model loaded in this tab. Every reply is written from what its brain actually did — the numbers behind each one are under <b>why</b>. Drag the speed slider down to watch single neurons fire.</p>`
+    : `<p>No voice, so it answers with what you have taught it and what it did. Smell is what it learns from; sight only changes what it does.</p>`);
+}
 let lastT=performance.now(), spikeAccum=0;
 async function boot(){
   const msg=document.getElementById('loadmsg');
@@ -2175,12 +2226,10 @@ async function boot(){
     await new Promise(r=>setTimeout(r,16));
     for(let n=0;n<1200;n++) tick(null);
     calibrateGaze(1500);
+    openEyes(); drawWorldStrip();
     strip.width = strip.clientWidth*Math.min(devicePixelRatio,2);
     strip.height= strip.clientHeight*Math.min(devicePixelRatio,2);
-    openEyes(); drawWorldStrip();
-    document.getElementById('loading').classList.add('gone');
-    turn('sys',`<p>54,029 neurons are running, both eyes included. Type and it arrives as a smell. The strip under the brain is everything it can see: five things laid out side by side, one of them deliberately nothing. The two boxes are where each eye is pointed, and nothing moves them except the difference between its left and right descending neurons — so whatever it settles on, it picked. The greyed-out neurons are the rest of the connectome, drawn but not simulated.</p>`);
-    turn('sys',`<p>Smell is what it learns from; sight only changes what it does. Use <b>Teach it to talk</b> to give it words — one lesson binds a phrase to the cells that fire for it, and after that it answers on its own. Drag the speed slider down to watch single neurons fire.</p>`);
+    loop();                                  // the brain runs behind the curtain
 
     let cfg = FIREBASE_CONFIG;
     if(!cfg){ try{ cfg = JSON.parse(localStorage.getItem('flybrain.fb')||'null'); }catch(e){} }
@@ -2188,14 +2237,13 @@ async function boot(){
              catch(e){ setSync('shared brain unreachable'); } }
     else setSync('this browser only');
     VOICE_STATE.endpoint = VOICE.endpoint || localStorage.getItem('flybrain.voice') || null;
+
+    // the model, before anyone is let in
     const wanted = VOICE.local || localStorage.getItem('flybrain.localmodel');
-    if(wanted && navigator.gpu){
-      const note = turn('sys', `<p>fetching a language model for it to speak with — this is a one-off download</p>`);
-      loadLocalVoice(wanted, (t,f)=>{ note.innerHTML = `<p>${esc(t||'loading')} ${f?Math.round(f*100)+'%':''}</p>`; })
-        .then(()=>{ note.innerHTML = `<p>it has a voice now</p>`; })
-        .catch(e=>{ note.className='turn sys bad'; note.innerHTML = `<p>no voice: ${esc(e.message.slice(0,120))}</p>`; });
-    }
-    loop();
+    if(wanted) await gateOnVoice(wanted);
+
+    document.getElementById('loading').classList.add('gone');
+    openingWords();
   }catch(err){
     document.getElementById('loading').innerHTML=
       `<p class="big">The brain did not load</p><p>${esc(err.message)}</p>`;
