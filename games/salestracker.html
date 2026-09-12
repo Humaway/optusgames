@@ -1063,68 +1063,86 @@ async function doSignUp(){
     cred = await auth.createUserWithEmailAndPassword(email, pass);
     const uid = cred.user.uid;
 
-    // Is the code right? Compared against a SHA-256 hash held in config/access.
-    // This runs after the account exists because the rules only let a
-    // signed-in caller read that doc.
-    let wantsMod = false;
-    if (code) {
-      const snap = await db.collection("config").doc("access").get();
-      const stored = snap.exists ? snap.data().moderatorHash : null;
-      if (stored) wantsMod = (await sha256Hex(code)) === stored;
-      if (!wantsMod) authMsg("That access code didn't match — creating a standard account.", true);
+    // The access code is never read back by the browser. We send a SHA-256 of
+    // whatever was typed and the Firestore rules compare it to the stored
+    // hash, so a wrong code is rejected by the server, not by this script.
+    const proof = code ? await sha256Hex(code) : null;
+
+    try {
+      await claimProfile(uid, name, email, proof);
+    } catch (e) {
+      if (e && e.message === "NAME_TAKEN") throw e;
+      if (proof && isPermissionDenied(e)) {
+        // Code didn't match. Fall back to a standard account.
+        authMsg("That access code didn't match — creating a standard account instead.", true);
+        await claimProfile(uid, name, email, null);
+      } else {
+        throw e;
+      }
     }
 
-    const slug = slugName(name);
-
-    // One transaction claims the display name, decides the bootstrap, and
-    // writes the profile — so two people signing up at once can't collide.
-    await db.runTransaction(async tx => {
-      const nameRef  = db.collection("displayNames").doc(slug);
-      const storeRef = db.collection("config").doc("store");
-      const userRef  = db.collection("users").doc(uid);
-
-      const nameSnap  = await tx.get(nameRef);
-      if (nameSnap.exists) throw new Error("NAME_TAKEN");
-      const storeSnap = await tx.get(storeRef);
-      const first = !storeSnap.exists || storeSnap.data().bootstrapped !== true;
-
-      const role = (first || wantsMod) ? "moderator" : "pending";
-
-      tx.set(nameRef, { uid:uid, displayName:name });
-      if (first) {
-        tx.set(storeRef, Object.assign({}, TUNE.store, {
-          bootstrapped:true,
-          timezone:TUNE.timezone,
-          rolloverHour:TUNE.rolloverHour,
-          editWindowHours:TUNE.editWindowHours
-        }), { merge:true });
-      }
-      tx.set(userRef, {
-        uid:uid,
-        displayName:name,
-        displayNameLower:slug,
-        email:email,
-        role:role,
-        approved:(role === "moderator"),
-        suspended:false,
-        storeId:(storeSnap.exists && storeSnap.data().dealerCode) || TUNE.store.dealerCode,
-        createdAt:firebase.firestore.FieldValue.serverTimestamp()
-      });
-    });
-
-    authMsg("");
     toast("Account created");
   } catch (e) {
     if (e && e.message === "NAME_TAKEN") {
       authMsg("That display name is already taken in this store. Pick another.", true);
-      if (cred && cred.user) { try { await cred.user.delete(); } catch (x) {} }
     } else {
       authMsg(friendlyAuthError(e), true);
-      if (cred && cred.user) { try { await cred.user.delete(); } catch (x) {} }
     }
+    // Don't strand a half-made account: remove the auth user so the email is
+    // free to try again.
+    if (cred && cred.user) { try { await cred.user.delete(); } catch (x) {} }
   } finally {
     btn.disabled = false;
   }
+}
+
+function isPermissionDenied(e){
+  return !!e && (e.code === "permission-denied" ||
+                 /permission|insufficient|PERMISSION_DENIED/i.test(String(e.message || "")));
+}
+
+/* Claims the display name and writes the profile in one transaction, so two
+   people signing up at the same moment can't take the same handle. */
+async function claimProfile(uid, name, email, proof){
+  const slug = slugName(name);
+  return db.runTransaction(async tx => {
+    const nameRef  = db.collection("displayNames").doc(slug);
+    const storeRef = db.collection("config").doc("store");
+    const userRef  = db.collection("users").doc(uid);
+
+    const nameSnap = await tx.get(nameRef);
+    if (nameSnap.exists) throw new Error("NAME_TAKEN");
+
+    const storeSnap = await tx.get(storeRef);
+    const first = !storeSnap.exists || storeSnap.data().bootstrapped !== true;
+    const role = (first || proof) ? "moderator" : "pending";
+
+    const profile = {
+      uid:uid,
+      displayName:name,
+      displayNameLower:slug,
+      email:email,
+      role:role,
+      approved:(role === "moderator"),
+      suspended:false,
+      storeId:(storeSnap.exists && storeSnap.data().dealerCode) || TUNE.store.dealerCode,
+      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+    };
+    // Only sent when a code was typed; the rules check it before allowing the
+    // moderator role through.
+    if (proof) profile.accessProof = proof;
+
+    tx.set(nameRef, { uid:uid, displayName:name });
+    if (first) {
+      tx.set(storeRef, Object.assign({}, TUNE.store, {
+        bootstrapped:true,
+        timezone:TUNE.timezone,
+        rolloverHour:TUNE.rolloverHour,
+        editWindowHours:TUNE.editWindowHours
+      }), { merge:true });
+    }
+    tx.set(userRef, profile);
+  });
 }
 
 async function doSignIn(){
@@ -1153,7 +1171,10 @@ function friendlyAuthError(e){
   if (c === "auth/weak-password") return "Choose a longer password.";
   if (c === "auth/network-request-failed") return "No connection to Firebase. Check the store wifi and try again.";
   if (c === "auth/too-many-requests") return "Too many attempts. Wait a minute and try again.";
-  if (c === "permission-denied") return "Firestore rules blocked that. Check the rules block at the bottom of this file.";
+  if (c === "permission-denied" || isPermissionDenied(e)) {
+    return "Firestore blocked that. Publish the rules from the comment block at the bottom of this file " +
+           "(Firebase console > Firestore Database > Rules > Publish), then try again.";
+  }
   return (e && e.message) || "Something went wrong.";
 }
 
@@ -3538,8 +3559,8 @@ if (document.readyState !== "loading") boot();
        - a person can only write sale docs carrying their own uid
        - role / approved / suspended are writable by managers only, never by
          the account itself
-       - a pending account can read its own user doc and the access hash, and
-         nothing else
+       - a pending account can read its own user doc and the store name, and
+         nothing else; the access-code hash is readable by nobody
        - a locked month (archives/{YYYY-MM}) is read-only for everyone
        - a posted EOD is immutable apart from appended discrepancy flags
        - sales are never hard-deleted; voiding is an update
@@ -3568,7 +3589,17 @@ service cloud.firestore {
     }
     // True only until the very first account claims the store.
     function bootstrapNeeded(){
-      return !exists(/databases/$(database)/documents/config/store);
+      return !exists(/databases/$(database)/documents/config/store)
+        || get(/databases/$(database)/documents/config/store).data.bootstrapped != true;
+    }
+
+    // A sign-up may take the manager role if it carries a SHA-256 of the
+    // access code that matches the stored hash. The hash is compared here, on
+    // the server, so the browser never needs to read it.
+    function hasAccessCode(){
+      return exists(/databases/$(database)/documents/config/access)
+        && request.resource.data.accessProof ==
+           get(/databases/$(database)/documents/config/access).data.moderatorHash;
     }
 
     // ---------------------------------------------------------------- users
@@ -3576,15 +3607,16 @@ service cloud.firestore {
       allow read: if signedIn() && (request.auth.uid == uid || isStaff());
 
       // Sign-up writes your own doc, and only as 'pending' — unless the store
-      // is brand new, in which case the first account becomes the manager so
-      // nobody is locked out on day one.
+      // is brand new (first account becomes the manager so nobody is locked
+      // out on day one) or the sign-up carries the right access code.
       allow create: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.uid == uid
         && request.resource.data.suspended == false
         && (
              (request.resource.data.role == 'pending' && request.resource.data.approved == false)
-             || (bootstrapNeeded() && request.resource.data.role == 'moderator')
+             || (request.resource.data.role == 'moderator'
+                 && (bootstrapNeeded() || hasAccessCode()))
            );
 
       // Managers can change anything. You can change your own display name but
@@ -3652,16 +3684,23 @@ service cloud.firestore {
     }
 
     // --------------------------------------------------------------- config
-    // The access hash has to be readable by a freshly created (still pending)
-    // account, because that is when the code is checked.
+    // The access hash is never readable by the browser — hasAccessCode()
+    // above compares it server-side during sign-up.
     match /config/access {
-      allow read: if signedIn();
+      allow read: if isMod();
       allow write: if isMod();
+    }
+    // config/store holds the shop name, dealer code and rollover hour, all of
+    // which are on screen anyway. Sign-up has to read it to work out whether
+    // this is the first account, so any signed-in caller can read it.
+    match /config/store {
+      allow read: if signedIn();
+      // Writable once by the first account, to bootstrap the store.
+      allow write: if isMod() || bootstrapNeeded();
     }
     match /config/{docId} {
       allow read: if isStaff();
-      // config/store is writable once by the first account, to bootstrap the store.
-      allow write: if isMod() || (docId == 'store' && bootstrapNeeded());
+      allow write: if isMod();
     }
 
     // Anything not matched above is denied.
