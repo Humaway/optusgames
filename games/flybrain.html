@@ -1290,6 +1290,7 @@ const stateName = st => st.name || ('state '+st.id);
    are the fly's; the words are yours. */
 async function teach(cue, reply, onStep, reps){
   const tally=new Map(); const REPS=reps||3;
+  const wasMeasuring = measuring; measuring = true;
   for(let i=0;i<REPS;i++){
     smell(cue);
     const rec=makeRecorder();
@@ -1310,6 +1311,7 @@ async function teach(cue, reply, onStep, reps){
   }
   const sig=[...tally.entries()].sort((a,b)=>b[1]-a[1]).slice(0,80).map(x=>x[0]).sort((a,b)=>a-b);
   const key='v'+hash32(cue.toLowerCase().trim());
+  measuring = wasMeasuring;
   MEM.vocab.set(key,{cue:cue.trim(), say:reply.trim(), sig, n:REPS});
   pushVocab(key);
   return {key, sig};
@@ -1343,6 +1345,7 @@ function speakFrom(sig){
    ------------------------------------------------------------ */
 async function learnWord(w){
   if(MEM.lex.has(w)) return MEM.lex.get(w);
+  const wasMeasuring = measuring; measuring = true;
   smell(w);
   const rec = makeRecorder();
   let ran=0;
@@ -1358,6 +1361,7 @@ async function learnWord(w){
     for(let n=0;n<30;n++) tick(pushArc);
     g+=30; if(g<LEX_GAP) requestAnimationFrame(step); else done();
   })();});
+  measuring = wasMeasuring;
   return sig;
 }
 
@@ -1768,10 +1772,13 @@ async function findWords(report){
   return said;
 }
 
-let busy=false;
+let busy=false;        // the input is locked
+let measuring=false;   // the brain is being stepped by hand — the main loop must keep off
+
 async function speak(text){
   if(busy || !text.trim()) return;
-  busy=true; ui.send.disabled=true;
+  busy=true; measuring=true; ui.send.disabled=true;
+  try{
   turn('you', `<p>${esc(text)}</p>`);
   ui.say.value=''; ui.say.style.height='auto';
   const stim0 = { words: (text.toLowerCase().match(/[a-z0-9']+/g)||[]).slice(0,24) };
@@ -1799,6 +1806,7 @@ async function speak(text){
     })();
   });
 
+  measuring=false;      // hand it back to the main loop; the rest is arithmetic
   const sig  = signature(rec.counts);
   const seen = recall(sig);
   const ro   = readout(rec.counts, sig);
@@ -1849,7 +1857,10 @@ async function speak(text){
     const p = el.querySelector('.say');
     p.classList.add('thinking');
     try{
-      const said = await findWords(report);
+      const said = await Promise.race([
+        findWords(report),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('took too long')), 45000))
+      ]);
       p.classList.remove('thinking');
       p.className = 'spoke';
       p.textContent = said;
@@ -1869,7 +1880,12 @@ async function speak(text){
   saveLocal();
   pushToShared(changed, stim.words, text, key, odour, stim.taste);
 
-  busy=false; ui.send.disabled=false; ui.say.focus();
+  }catch(err){
+    turn('sys bad', `<p>Something went wrong mid-thought: ${esc(err.message)}</p>`);
+    console.error(err);
+  }finally{
+    measuring=false; busy=false; ui.send.disabled=false; ui.say.focus();
+  }
 }
 
 ui.send.onclick=()=>speak(ui.say.value);
@@ -2251,7 +2267,7 @@ async function boot(){
 }
 function loop(){
   requestAnimationFrame(loop);
-  if(!busy){
+  if(!measuring){
     tickBudget += SPEED*PACE;
     let n=0;
     while(tickBudget>=1 && n<40){ if(SEEING) look(SEEING.frame); tick(pushArc); spikeAccum+=S.nSpike; tickBudget--; n++; }
