@@ -108,7 +108,14 @@ textarea{min-height:72px}
 label{display:block;font-size:.85rem;font-weight:600;color:var(--muted);margin:0 0 4px}
 fieldset{border:0;margin:0;padding:0}
 .field{margin-bottom:12px}
-.inline-check{display:flex;align-items:center;gap:10px;min-height:var(--tap);font-weight:600}
+.inline-check{
+  display:flex;align-items:center;gap:10px;min-height:var(--tap);font-weight:600;
+  border:1px solid transparent;border-radius:var(--r);padding:0 10px;margin-bottom:8px;
+  transition:background-color .12s ease,border-color .12s ease;
+}
+.inline-check.is-on{background:var(--mint);border-color:var(--midgreen);color:#000}
+[data-theme="dark"] .inline-check.is-on{background:rgba(78,139,58,.22);border-color:var(--midgreen);color:var(--text)}
+@media (prefers-reduced-motion:reduce){.inline-check{transition:none}}
 .inline-check input[type=checkbox]{width:24px;height:24px;min-height:24px;flex:0 0 auto}
 
 /* segmented buttons — big tap targets for the entry screen */
@@ -118,11 +125,25 @@ fieldset{border:0;margin:0;padding:0}
   background:var(--card);border:1px solid var(--line-strong);
   font-weight:600;
 }
+.seg button,.chips button{
+  transition:background-color .12s ease,color .12s ease,box-shadow .12s ease,border-color .12s ease;
+}
+@media (prefers-reduced-motion:reduce){.seg button,.chips button{transition:none}}
+/* Selected state. Colour alone isn't enough on a bright shop floor, so the
+   selected control also gains a ring and, for prices, a tick. */
 .seg button[aria-pressed="true"]{
   background:var(--forest);border-color:var(--forest);color:#fff;
+  box-shadow:0 0 0 3px rgba(20,58,30,.25);
 }
 .chips{display:flex;flex-wrap:wrap;gap:6px}
-.chips button{min-width:74px}
+.chips button{min-width:82px;font-variant-numeric:tabular-nums}
+.chips button[aria-pressed="true"]{
+  background:var(--midgreen);border-color:var(--midgreen);color:#fff;
+  box-shadow:0 0 0 3px rgba(78,139,58,.30);
+}
+.chips button[aria-pressed="true"]::after{content:"\2713";margin-left:7px;font-weight:700}
+[data-theme="dark"] .seg button[aria-pressed="true"]{box-shadow:0 0 0 3px rgba(120,200,120,.22)}
+[data-theme="dark"] .chips button[aria-pressed="true"]{box-shadow:0 0 0 3px rgba(120,200,120,.22)}
 
 /* ---------- layout ---------- */
 #topbar{
@@ -239,6 +260,7 @@ table.data tbody tr:hover{background:rgba(78,139,58,.07)}
 /* ---------- entry screen ---------- */
 .basketrow{border:1px solid var(--line);border-radius:var(--r);padding:12px;background:var(--card);margin-bottom:12px}
 .basketrow.is-invalid{border-color:var(--bad);box-shadow:0 0 0 2px rgba(163,32,32,.12)}
+.customprice{margin-top:8px;border-color:var(--midgreen);box-shadow:0 0 0 3px rgba(78,139,58,.15)}
 .basketrow header{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
 .basketrow .rowno{font-family:var(--serif);font-weight:700;font-size:1.05rem}
 .totalsbar{
@@ -305,7 +327,7 @@ code{font-family:var(--mono);font-size:.85em;background:rgba(0,0,0,.06);padding:
   <div class="barrow">
     <div class="brand">
       <span id="brandName">Yes Optus Redcliffe</span>
-      <span id="brandSub">Dealer W0405 &middot; Chloe Dunn</span>
+      <span id="brandSub">Dealer W0405 &middot; Luke McRoberts</span>
     </div>
     <div class="row" style="gap:6px">
       <div id="whoami" class="hidden"></div>
@@ -616,7 +638,7 @@ const TUNE = {
     name:       "Yes Optus Redcliffe",  // full name, shown in the top bar
     shortName:  "Reddy",                // the name printed on the boards
     dealerCode: "W0405",
-    manager:    "Chloe Dunn"
+    manager:    "Luke McRoberts"
   },
 
   /* ---- time ---- */
@@ -631,7 +653,14 @@ const TUNE = {
   editWindowHours: 24,
 
   /* ---- sale entry ---- */
-  planChips:      [59, 60, 70, 79, 90],  // preset plan prices, plus "Other"
+  /* Preset plan prices per service. Each list gets a "Custom" chip after it
+     for anything off-list. Edit a list and the chips change everywhere —
+     entry screen, the edit dialog, and what counts as a custom price. */
+  planChips: {
+    mobile: [59, 60, 70, 79, 90],
+    mbb:    [10, 15, 35],
+    fixed:  [59, 69, 79, 83, 97, 99]
+  },
   autoUnpPrices:  [79],                  // these prices auto-tick Upgrade & Protect
   deviceTerms:    [12, 24, 36],          // months
   maxBasket:      10,                    // "How many services?" ceiling
@@ -699,8 +728,9 @@ const TUNE = {
     { key:"handset_hustler", label:"Handset Hustler",   metric: r => r.handsets.v,                  fmt:"int"   },
     { key:"the_monster",     label:"The Monster (MBB)", metric: r => r.mbb.v,                       fmt:"int"   },
     { key:"prepaid_prodigy", label:"Prepaid Prodigy",   metric: r => r.prepaid.v,                   fmt:"int"   },
-    { key:"fibre_phantom",   label:"Fibre Phantom",     metric: r => r.fixed_new.v + r.fixed_recon.v, fmt:"int" },
-    { key:"cheeky_chowner",  label:"Cheeky Chowner",    metric: r => r.totalValue,                  fmt:"int"   }
+    { key:"fibre_phantom",   label:"Fibre Phantom",     metric: r => r.fixed_new.v + r.fixed_recon.v, fmt:"int" }
+    // Removed from the board. Put this line back to bring it out of retirement:
+    // { key:"cheeky_chowner", label:"Cheeky Chowner", metric: r => r.totalValue, fmt:"int" }
   ],
 
   /* Which metrics show in the Metrics panel by default. A manager can add or
@@ -2369,7 +2399,7 @@ function saleToRow(s){
     category:s.category,
     saleType:s.saleType,
     planPrice:num(s.planPrice),
-    otherPrice:!TUNE.planChips.includes(num(s.planPrice)) && num(s.planPrice) > 0,
+    otherPrice:!planChipsFor(s.category).includes(num(s.planPrice)) && num(s.planPrice) > 0,
     deviceAttached:!!(s.device && s.device.attached),
     term:(s.device && s.device.term) || 24,
     model:(s.device && s.device.model) || "",
@@ -2387,10 +2417,16 @@ function saleToRow(s){
    14.  SALE ENTRY
    ############################################################################ */
 
+/* The preset prices for a service, or an empty list where prices don't apply. */
+function planChipsFor(category){
+  const c = TUNE.planChips[category];
+  return Array.isArray(c) ? c : [];
+}
+
 function blankRow(copyFrom){
   if (copyFrom) return JSON.parse(JSON.stringify(copyFrom));
   return {
-    category:"mobile", saleType:"new", planPrice:TUNE.planChips[0], otherPrice:false,
+    category:"mobile", saleType:"new", planPrice:planChipsFor("mobile")[0], otherPrice:false,
     deviceAttached:false, term:24, model:"", unp:false,
     prepaidDevice:false, recharge:0,
     description:"", value:0, qty:1, notes:""
@@ -2440,23 +2476,23 @@ function rowEditorHTML(r, idPrefix){
          segHTML("type", cat.types, r.saleType, "type") + "</div>";
   }
 
-  if (r.category === "mobile" || r.category === "mbb" || r.category === "fixed") {
-    const chips = TUNE.planChips.map(p => [p, "$" + p]).concat([["other", "Other"]]);
+  if (planChipsFor(r.category).length) {
+    const chips = planChipsFor(r.category).map(p => [p, "$" + p]).concat([["other", "Custom"]]);
     const cur = r.otherPrice ? "other" : num(r.planPrice);
     h += '<div class="field"><label>Plan price / month</label>' +
          '<div class="chips">' + chips.map(c =>
            '<button type="button" data-price="' + esc(c[0]) + '" aria-pressed="' +
            (String(c[0]) === String(cur)) + '">' + esc(c[1]) + "</button>").join("") + "</div>";
     if (r.otherPrice) {
-      h += '<input type="number" inputmode="decimal" min="0" step="1" data-field="planPrice" value="' +
-           (num(r.planPrice) || "") + '" placeholder="Plan price" style="margin-top:8px">';
+      h += '<input class="customprice" type="number" inputmode="decimal" min="0" step="1" data-field="planPrice" value="' +
+           (num(r.planPrice) || "") + '" placeholder="Plan price" autofocus>';
     }
     h += "</div>";
   }
 
   if (r.category === "mobile" || r.category === "mbb") {
-    h += '<label class="inline-check"><input type="checkbox" data-check="deviceAttached"' +
-         (r.deviceAttached ? " checked" : "") + "> " +
+    h += '<label class="inline-check' + (r.deviceAttached ? " is-on" : "") + '">' +
+         '<input type="checkbox" data-check="deviceAttached"' + (r.deviceAttached ? " checked" : "") + "> " +
          (r.category === "mbb" ? "MBB device attached" : "Handset attached") + "</label>";
     if (r.deviceAttached) {
       h += '<div class="field"><label>Term</label>' +
@@ -2464,13 +2500,15 @@ function rowEditorHTML(r, idPrefix){
            '<input data-field="model" value="' + esc(r.model) + '" placeholder="Model (optional)" style="margin-top:8px">' +
            "</div>";
     }
-    h += '<label class="inline-check"><input type="checkbox" data-check="unp"' +
-         (r.unp ? " checked" : "") + "> Upgrade &amp; Protect</label>";
+    h += '<label class="inline-check' + (r.unp ? " is-on" : "") + '">' +
+         '<input type="checkbox" data-check="unp"' + (r.unp ? " checked" : "") +
+         "> Upgrade &amp; Protect</label>";
   }
 
   if (r.category === "prepaid") {
-    h += '<label class="inline-check"><input type="checkbox" data-check="prepaidDevice"' +
-         (r.prepaidDevice ? " checked" : "") + "> Prepaid device attached</label>";
+    h += '<label class="inline-check' + (r.prepaidDevice ? " is-on" : "") + '">' +
+         '<input type="checkbox" data-check="prepaidDevice"' + (r.prepaidDevice ? " checked" : "") +
+         "> Prepaid device attached</label>";
     h += '<div class="field"><label>Recharge amount</label>' +
          '<input type="number" inputmode="decimal" min="0" step="1" data-field="recharge" value="' +
          (num(r.recharge) || "") + '" placeholder="e.g. 150"></div>';
@@ -2498,6 +2536,12 @@ function wireRowEditor(scope, r, rerender, soft){
     r.category = b.getAttribute("data-cat");
     const cat = SALE_CATEGORIES.find(c => c.key === r.category);
     r.saleType = cat.types.length ? (cat.types.find(t => t[0] === r.saleType) ? r.saleType : cat.types[0][0]) : null;
+    // Each service has its own plan prices, so a price carried over from the
+    // last category is usually wrong. Keep it only if it's on the new list.
+    const chips = planChipsFor(r.category);
+    if (chips.length && !r.otherPrice && !chips.includes(num(r.planPrice))) {
+      r.planPrice = chips[0];
+    }
     rerender();
   });
   $$("[data-type]", scope).forEach(b => b.onclick = () => { r.saleType = b.getAttribute("data-type"); rerender(); });
