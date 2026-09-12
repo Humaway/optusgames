@@ -14,6 +14,12 @@
   Pty Limited or any real telecommunications company. All characters are
   fictional. See the credits.
   ============================================================================
+  V1.7 — model and graphics pass: every character rebuilt with a third
+  tier of detail (eyes, fingers, buttons, buckles, tack), vertex-colour
+  dirt and occlusion on every rig, buildings dressed with corner boards,
+  window frames, sills, mullions, ridge caps and chimneys, sun shafts in
+  the post chain, and the Q/whistle key clash fixed (whistle is G).
+
   BUILD STAGE 1-4 of the build order in the brief (§21):
     1. Renderer, post chain, LUT grading, sky, time of day
     2. Terrain, biomes, materials, water
@@ -615,7 +621,10 @@
     <b>left mouse</b> fire &middot; <b>R</b> reload &middot; <b>V</b> Yes-Eye &middot;
     <b>E</b> at a Signal &amp; Arms to buy<br>
     <b>Q</b> takes the rope out &middot; hold <b>left mouse</b> to twirl, release to throw &middot;
-    <b>E</b> hauls &middot; <b>F</b> ties &middot; <b>Tab</b> for the ledger and saves</div>
+    <b>E</b> hauls &middot; <b>F</b> ties<br>
+    <b>G</b> whistles Ollie &middot; <b>E</b> mounts &middot; <b>R</b> brushes her &middot;
+    <b>X</b> rears &middot; <b>C</b> crouch &middot; <b>H</b> tips the hat &middot;
+    <b>Tab</b> for the ledger and saves</div>
 </div>
 
 <script type="importmap">
@@ -739,15 +748,15 @@ const CFG = {
 /* Quality tiers driven by the adaptive manager (§20). Index 0 is best. */
 const QUALITY = [
   { name:'Cinematic', pr:2.00, shadow:2048, ssao:true,  ssaoScale:0.5, bloom:true,
-    grass:1.00, drawR:5, cascades:3, particles:1.00 },
+    grass:1.00, drawR:5, cascades:3, particles:1.00, shafts:true },
   { name:'High',      pr:1.50, shadow:2048, ssao:true,  ssaoScale:0.5, bloom:true,
-    grass:0.80, drawR:5, cascades:3, particles:0.85 },
+    grass:0.80, drawR:5, cascades:3, particles:0.85, shafts:true },
   { name:'Balanced',  pr:1.25, shadow:1024, ssao:true,  ssaoScale:0.35,bloom:true,
-    grass:0.58, drawR:4, cascades:2, particles:0.65 },
+    grass:0.58, drawR:4, cascades:2, particles:0.65, shafts:true },
   { name:'Performance',pr:1.00,shadow:1024, ssao:false, ssaoScale:0.35,bloom:true,
-    grass:0.38, drawR:4, cascades:2, particles:0.45 },
+    grass:0.38, drawR:4, cascades:2, particles:0.45, shafts:false },
   { name:'Potato',    pr:1.00, shadow:512,  ssao:false, ssaoScale:0.35,bloom:false,
-    grass:0.20, drawR:3, cascades:1, particles:0.25 },
+    grass:0.20, drawR:3, cascades:1, particles:0.25, shafts:false },
 ];
 
 /* ==========================================================================
@@ -1475,8 +1484,12 @@ class Composer {
     this.qScene = new THREE.Scene(); this.qScene.add(this.quad);
     this.qCam = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
 
-    this.opts = { ssao:true, ssaoScale:0.5, bloom:true, dof:false,
+    this.opts = { ssao:true, ssaoScale:0.5, bloom:true, dof:false, shafts:true,
                   grain:1.0, ca:1.0, vignette:1.0, yesEye:0.0 };
+    /* Sun-shaft state, fed per frame by the game (setSun). */
+    this.sunUV = new THREE.Vector2(0.5,0.5);
+    this.shaftAmt = 0;
+    this.shaftCol = new THREE.Color(1,0.9,0.7);
 
     this._makeTargets(Math.max(1,w|0), Math.max(1,h|0));
     this._makeMaterials();
@@ -1525,7 +1538,31 @@ class Composer {
     }
     this.rtWork  = plain(w,h);
     this.rtWork2 = plain(w,h);
+    disposeAll(this.rtShaft);
+    this.rtShaft = [plain(Math.max(1,w>>2), Math.max(1,h>>2)),
+                    plain(Math.max(1,w>>2), Math.max(1,h>>2))];
     this.size = {w,h};
+  }
+
+  /* --- Sun shafts: where the sun is on screen, and how much it gets ------
+     Called by the game every frame before render(). elev is sun elevation
+     (unit y), cloud the weather's cover 0..1, fogK the current fog density. */
+  setSun(sunDir, camera, elev, cloud, fogK){
+    const p = new THREE.Vector3().copy(sunDir).multiplyScalar(1000).add(camera.position);
+    p.project(camera);
+    let amt = 0;
+    if(p.z < 1.0 && elev > -0.02){
+      this.sunUV.set(p.x*0.5+0.5, p.y*0.5+0.5);
+      const off = Math.hypot(p.x, p.y);           // 0 centre, ~1.4 corner
+      amt = M.sat(elev*4.0 + 0.1)                 // fades out below the horizon
+          * M.sat(1.9 - off*1.0)                  // fades as the sun leaves the frame
+          * (1 - M.sat((cloud-0.25)/0.55)*0.92)   // clouds shut it down
+          * M.sat(1.4 - (fogK||0)*180);           // thick fog swallows it
+      /* Low sun through a clear sky is the money shot; noon barely shows. */
+      amt *= M.lerp(1.0, 0.45, M.sat((elev-0.25)/0.5));
+    }
+    this.shaftAmt = amt;
+    this.shaftCol.setRGB(1.0, M.lerp(0.62,0.92,M.sat(elev*3)), M.lerp(0.30,0.78,M.sat(elev*2.5)));
   }
 
   setSize(w,h){
@@ -1698,12 +1735,14 @@ class Composer {
         uGrain:{value:1.0}, uVig:{value:1.0}, uCA:{value:1.0},
         uTime:{value:0}, uAO:{value:1.0}, uYesEye:{value:0.0},
         uRes:{value:new THREE.Vector2()},
+        tShaft:{value:null}, uShaft:{value:0.0}, uShaftCol:{value:new THREE.Color()},
       },
       vertexShader: VS,
       fragmentShader:`
         varying vec2 vUv;
-        uniform sampler2D tSrc,tAO,tBloom;
-        uniform float uExposure,uBloom,uGrain,uVig,uCA,uTime,uAO,uYesEye;
+        uniform sampler2D tSrc,tAO,tBloom,tShaft;
+        uniform float uExposure,uBloom,uGrain,uVig,uCA,uTime,uAO,uYesEye,uShaft;
+        uniform vec3 uShaftCol;
         uniform vec2 uRes;
         ${GLSL_ACES}
         ${GLSL_LUT}
@@ -1727,6 +1766,8 @@ class Composer {
           col *= ao;
           col *= uExposure;
           col += texture2D(tBloom, uv).rgb * uBloom;
+          // Sun shafts, in linear light, before the tone curve so they roll off.
+          if(uShaft > 0.001) col += uShaftCol * (texture2D(tShaft, uv).r * uShaft);
 
           col = aces(col);
           col = toSRGB(col);
@@ -1782,6 +1823,44 @@ class Composer {
                                 +texture2D(tSrc,vUv+dir*0.5).rgb);
           float lB = lum(b);
           gl_FragColor = vec4((lB<lMin||lB>lMax)?a:b, 1.0);
+        }`,
+      depthTest:false, depthWrite:false });
+
+    /* Sun shafts (§15 "volumetric light shafts"): a depth-masked occlusion
+       image — sky is light, anything in front of it is dark — radially
+       blurred toward the sun's screen position, twice, at quarter res, and
+       added back in linear light. It is the cheapest thing in the chain and
+       the one that most says "morning". */
+    this.mShaftMask = new THREE.ShaderMaterial({
+      uniforms:{ tDepth:{value:null}, uSun:{value:new THREE.Vector2(0.5,0.5)} },
+      vertexShader: VS,
+      fragmentShader:`
+        varying vec2 vUv;
+        uniform sampler2D tDepth; uniform vec2 uSun;
+        void main(){
+          float z = texture2D(tDepth, vUv).x;
+          float sky = smoothstep(0.99993, 0.999995, z);   // cleared depth = sky; 2 km+ terrain fades in
+          float d = distance(vUv, uSun);
+          float halo = smoothstep(0.85, 0.0, d);
+          gl_FragColor = vec4(vec3(sky*halo), 1.0);
+        }`,
+      depthTest:false, depthWrite:false });
+    this.mShaftBlur = new THREE.ShaderMaterial({
+      uniforms:{ tSrc:{value:null}, uSun:{value:new THREE.Vector2(0.5,0.5)},
+                 uDensity:{value:0.55}, uDecay:{value:0.955} },
+      vertexShader: VS,
+      fragmentShader:`
+        varying vec2 vUv;
+        uniform sampler2D tSrc; uniform vec2 uSun; uniform float uDensity, uDecay;
+        void main(){
+          vec2 uv = vUv;
+          vec2 step = (uSun - uv) * uDensity / 20.0;
+          float w = 1.0, sum = 0.0, wsum = 0.0;
+          for(int i=0;i<20;i++){
+            sum += texture2D(tSrc, uv).r * w; wsum += w;
+            uv += step; w *= uDecay;
+          }
+          gl_FragColor = vec4(vec3(sum/wsum), 1.0);
         }`,
       depthTest:false, depthWrite:false });
   }
@@ -1893,6 +1972,20 @@ class Composer {
       bloomTex = this.rtBloom[0][0].texture;
     }
 
+    /* 3b. Sun shafts at quarter res: mask, then two radial-blur passes. */
+    let shaftOn = false;
+    if(o.shafts && this.shaftAmt > 0.01){
+      const [A,B] = this.rtShaft;
+      const mu = this.mShaftMask.uniforms;
+      mu.tDepth.value = this.rtScene.depthTexture; mu.uSun.value.copy(this.sunUV);
+      this._blit(this.mShaftMask, A);
+      const su = this.mShaftBlur.uniforms;
+      su.uSun.value.copy(this.sunUV);
+      su.tSrc.value = A.texture; this._blit(this.mShaftBlur, B);
+      su.tSrc.value = B.texture; this._blit(this.mShaftBlur, A);
+      shaftOn = true;
+    }
+
     /* 4. Optional DOF before grading (it operates on linear light). */
     let srcTex = this.rtScene.texture;
     if(o.dof){
@@ -1912,6 +2005,9 @@ class Composer {
     cu.uBloom.value = o.bloom ? 0.42 : 0.0;
     cu.uGrain.value = o.grain; cu.uVig.value = o.vignette; cu.uCA.value = o.ca;
     cu.uYesEye.value = o.yesEye;
+    cu.tShaft.value = shaftOn ? this.rtShaft[0].texture : this.rtAO.texture;
+    cu.uShaft.value = shaftOn ? this.shaftAmt*0.42*(1-o.yesEye*0.7) : 0.0;
+    cu.uShaftCol.value.copy(this.shaftCol);
     cu.uTime.value = time;
     cu.uRes.value.set(w,h);
     this._blit(this.mComposite, this.rtWork2);
@@ -3650,8 +3746,17 @@ function makeSkeleton(def){
    A tapered, slightly bent tube between two points with an optional
    cross-section squash. Everything on every character is built from this
    plus spheres, so silhouettes stay coherent. */
+/* Silhouette density. Every limb solid in the game is authored in terms of
+   an 8-to-14-sided tube; the multiplier lifts that to a 12-to-21-sided one so
+   a thigh reads as round rather than as a chamfered post, and adds a ring so
+   the muscle-belly bulge has a vertex to live on. It is one knob for the
+   whole cast (§2 three-tier silhouette rule). Rigid hard-bound parts pay for
+   it in vertices only; the skinning solve is a boot-time cost. */
+const LIMB_DETAIL = { radial:1.5, ringsAdd:1, blob:1.4 };
 function limbGeometry(a, b, r0, r1, opts={}){
-  const { radial=8, rings=5, squashX=1, squashZ=1, bulge=0, tipRound=true } = opts;
+  let { radial=8, rings=5, squashX=1, squashZ=1, bulge=0, tipRound=true } = opts;
+  radial = Math.max(4, Math.round(radial*LIMB_DETAIL.radial));
+  rings  = rings + LIMB_DETAIL.ringsAdd;
   const dir = new THREE.Vector3().subVectors(b,a);
   const len = dir.length();
   dir.normalize();
@@ -3705,6 +3810,7 @@ function limbGeometry(a, b, r0, r1, opts={}){
 }
 
 function blobGeometry(center, rx, ry, rz, seg=12, squish=null){
+  seg = Math.max(6, Math.round(seg*LIMB_DETAIL.blob));
   const g = new THREE.SphereGeometry(1, seg, Math.max(6,seg>>1));
   g.scale(rx,ry,rz);
   if(squish) g.applyMatrix4(squish);
@@ -3818,6 +3924,16 @@ function crownGeometry(cx, cy, cz, r, h, opts={}){
   return g;
 }
 
+/* A closed ring, for the small hard fittings a character carries: stirrup
+   irons, bit rings, buckles, a spur rowel. `axis` is the ring's normal. */
+function ringGeometry(center, R, r, axis='y', radial=14, tube=6){
+  const g = new THREE.TorusGeometry(R, r, tube, radial);
+  if(axis==='y') g.rotateX(Math.PI/2);
+  else if(axis==='x') g.rotateY(Math.PI/2);
+  g.translate(center.x, center.y, center.z);
+  return g;
+}
+
 function boxGeometry(center, sx, sy, sz, bevel=0){
   const g = new THREE.BoxGeometry(sx,sy,sz, 2,2,2);
   if(bevel>0){
@@ -3852,7 +3968,7 @@ function boxGeometry(center, sx, sy, sz, bevel=0){
    but a thigh can no longer drag the coat sleeve with it. This one change is
    the difference between articulated body parts and a bag of jelly. */
 function skinParts(parts, rig, opts={}){
-  const { power=3.2, maxDist=0.62 } = opts;
+  const { power=3.2, maxDist=0.62, dirtH=0.42, dirtAmt=0.55 } = opts;
   // Merge with groups so one SkinnedMesh can carry several materials.
   const posArr=[], nrmArr=[], uvArr=[], idxArr=[], groups=[];
   let vOff=0, iOff=0;
@@ -3950,10 +4066,63 @@ function skinParts(parts, rig, opts={}){
     for(let k=0;k<4;k++) skinWgt[i*4+k] /= sum;
   }
 
+  /* Vertex-colour dirt and occlusion (§2 "vertex-colour dirt"). Three terms,
+     all multiplied into a colour attribute the materials pick up with
+     vertexColors:true:
+       ground dust — a dust-rose tint rising from the ground plane, so boots,
+                     hooves and coat hems read as walked-in rather than new;
+       underside AO — faces that look down get less sky, and a hard-bound part
+                     that hangs under another (a satchel, a jaw) shows it;
+       crease AO   — the deeper a vertex sits inside the body (close to the
+                     bone axis relative to the part's own reach) the more it
+                     is tucked into a fold, so armpits, the groin and the
+                     inside of the elbow darken without a single texture. */
+  const colArr = new Float32Array(vCount*3);
+  const partMaxD = new Float32Array(parts.length);
+  for(let i=0;i<vCount;i++){
+    const pi = vPart[i];
+    if(hardIdx[pi] >= 0) continue;
+    const allowed = allowCache[pi];
+    v.set(posArr[i*3], posArr[i*3+1], posArr[i*3+2]);
+    let best = 1e9;
+    for(const s of allowed){
+      ab.subVectors(s.b, s.a); const l2 = ab.lengthSq();
+      let t = 0; if(l2>1e-8){ av.subVectors(v, s.a); t = M.sat(av.dot(ab)/l2); }
+      const d = Math.hypot(v.x-(s.a.x+ab.x*t), v.y-(s.a.y+ab.y*t), v.z-(s.a.z+ab.z*t));
+      if(d < best) best = d;
+    }
+    if(best > partMaxD[pi]) partMaxD[pi] = best;
+  }
+  const DUST = [0.72, 0.63, 0.50];
+  for(let i=0;i<vCount;i++){
+    const pi = vPart[i];
+    const y = posArr[i*3+1], ny = nrmArr[i*3+1];
+    const dust = dirtAmt * (1 - M.sat((y - 0.015)/dirtH));
+    const under = 1 - 0.22*M.sat(-ny);
+    let crease = 1;
+    if(hardIdx[pi] < 0 && partMaxD[pi] > 1e-4){
+      const allowed = allowCache[pi];
+      v.set(posArr[i*3], y, posArr[i*3+2]);
+      let best = 1e9;
+      for(const s of allowed){
+        ab.subVectors(s.b, s.a); const l2 = ab.lengthSq();
+        let t = 0; if(l2>1e-8){ av.subVectors(v, s.a); t = M.sat(av.dot(ab)/l2); }
+        const d = Math.hypot(v.x-(s.a.x+ab.x*t), v.y-(s.a.y+ab.y*t), v.z-(s.a.z+ab.z*t));
+        if(d < best) best = d;
+      }
+      crease = 1 - 0.16*(1 - M.sat(best/partMaxD[pi]));
+    }
+    const k = under*crease;
+    colArr[i*3]   = M.lerp(1, DUST[0], dust)*k;
+    colArr[i*3+1] = M.lerp(1, DUST[1], dust)*k;
+    colArr[i*3+2] = M.lerp(1, DUST[2], dust)*k;
+  }
+
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(posArr,3));
   geo.setAttribute('normal',   new THREE.Float32BufferAttribute(nrmArr,3));
   geo.setAttribute('uv',       new THREE.Float32BufferAttribute(uvArr,2));
+  geo.setAttribute('color',    new THREE.Float32BufferAttribute(colArr,3));
   geo.setAttribute('skinIndex',  new THREE.Uint16BufferAttribute(skinIdx,4));
   geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skinWgt,4));
   /* The index type is decided by the highest VERTEX index, not by how many
@@ -4389,7 +4558,8 @@ function buildJarrad(lib){
   /* Material slots:
      0 coat cloth · 1 waistcoat teal · 2 skin · 3 leather · 4 hat felt
      5 shirt linen · 6 satchel leather */
-  const MAT = { COAT:0, VEST:1, SKIN:2, BOOT:3, HAT:4, SHIRT:5, BAG:6 };
+  const MAT = { COAT:0, VEST:1, SKIN:2, BOOT:3, HAT:4, SHIRT:5, BAG:6,
+                BRASS:7, SCLERA:8, IRIS:9, HAIR:10 };
 
   /* --- Torso ------------------------------------------------------------
      Built to measured proportions rather than by eye. A man of 1.80 m has
@@ -4411,7 +4581,7 @@ function buildJarrad(lib){
        {radial:14, rings:4, squashX:1.10, squashZ:0.88}), MAT.COAT, HIPS);
   /* Lapels: two thin slabs angled off the chest. */
   for(const sd of [1,-1]){
-    push(limbGeometry(V(sd*0.048,1.49,0.082), V(sd*0.112,1.20,0.050), 0.026, 0.044,
+    push(limbGeometry(V(sd*0.050,1.49,0.140), V(sd*0.118,1.20,0.118), 0.026, 0.046,
          {radial:5, rings:2, squashZ:0.4}), MAT.COAT, CHEST);
   }
   /* Collar — closed, so you cannot see down inside his coat. */
@@ -4428,8 +4598,30 @@ function buildJarrad(lib){
   for(const sd of [1,-1])
     push(blobGeometry(V(sd*0.098,1.700,-0.004), 0.016, 0.030, 0.020, 8), MAT.SKIN,
          ['head'], true);
-  /* Short dark hair as a skull cap. */
-  push(blobGeometry(V(0,1.722,-0.014), 0.100, 0.096, 0.106, 14), MAT.HAT, ['head'], true);
+  /* Short dark hair as a skull cap, with a hairline that sits above the brow
+     and sideburns that come down in front of the ears. */
+  push(blobGeometry(V(0,1.724,-0.018), 0.101, 0.094, 0.104, 14), MAT.HAIR, ['head'], true);
+  for(const sd of [1,-1])
+    push(blobGeometry(V(sd*0.090,1.672,0.020), 0.014, 0.036, 0.022, 8), MAT.HAIR,
+         ['head'], true);
+  /* Eyes: a sclera set into the socket, an iris proud of it, and a lid ridge
+     over the top so the eye reads as set IN the face rather than stuck on. */
+  for(const sd of [1,-1]){
+    push(blobGeometry(V(sd*0.036,1.712,0.086), 0.016, 0.012, 0.011, 10), MAT.SCLERA,
+         ['head'], true);
+    push(blobGeometry(V(sd*0.036,1.712,0.096), 0.0075, 0.0075, 0.005, 8), MAT.IRIS,
+         ['head'], true);
+    push(limbGeometry(V(sd*0.018,1.727,0.088), V(sd*0.056,1.724,0.078), 0.009, 0.008,
+         {radial:5, rings:1, squashZ:0.5}), MAT.SKIN, ['head'], true);     // upper lid
+    push(limbGeometry(V(sd*0.016,1.748,0.086), V(sd*0.060,1.742,0.074), 0.007, 0.005,
+         {radial:5, rings:1, squashZ:0.6}), MAT.HAIR, ['head'], true);     // brow
+  }
+  /* Mouth: a lip line on the jaw, so the phoneme animation has something to
+     move. Cheekbones give the face its planes. */
+  push(boxGeometry(V(0,1.628,0.106), 0.040, 0.006, 0.010, 0.2), MAT.HAIR, ['jaw'], true);
+  for(const sd of [1,-1])
+    push(blobGeometry(V(sd*0.062,1.690,0.062), 0.024, 0.026, 0.026, 8), MAT.SKIN,
+         ['head'], true);
   /* Neck */
   push(limbGeometry(V(0,1.545,0), V(0,1.645,-0.004), 0.058, 0.052,
        {radial:10, rings:2}), MAT.SKIN, ['spine3','neck','head']);
@@ -4464,10 +4656,19 @@ function buildJarrad(lib){
     // Hand: palm block plus a thumb, enough for a readable silhouette.
     push(blobGeometry(V(sd*0.222,0.940,0.004), 0.036, 0.054, 0.026, 10), MAT.SKIN,
          ['hand'+S2], true);
-    push(limbGeometry(V(sd*0.222,0.912,0.010), V(sd*0.224,0.856,0.028), 0.026, 0.018,
-         {radial:6, rings:2}), MAT.SKIN, ['hand'+S2], true);
-    push(limbGeometry(V(sd*0.198,0.930,0.010), V(sd*0.176,0.906,0.034), 0.017, 0.013,
-         {radial:5, rings:1}), MAT.SKIN, ['hand'+S2], true);
+    /* Four fingers, tapered, curled a little forward the way a hand hangs at
+       rest, and a thumb set off the palm. */
+    for(let f=0;f<4;f++){
+      const fx = sd*0.222 + (f-1.5)*0.0155*1.0, fz = 0.004 + (f===0||f===3 ? -0.002 : 0.002);
+      const len = [0.048,0.056,0.054,0.044][f];
+      push(limbGeometry(V(fx,0.914,fz+0.006), V(fx*1.005,0.914-len,fz+0.026),
+           0.0085, 0.0068, {radial:5, rings:2}), MAT.SKIN, ['hand'+S2], true);
+    }
+    push(limbGeometry(V(sd*0.198,0.932,0.012), V(sd*0.176,0.902,0.038), 0.012, 0.009,
+         {radial:5, rings:2}), MAT.SKIN, ['hand'+S2], true);
+    /* Knuckle ridge across the back of the hand. */
+    push(limbGeometry(V(sd*0.200,0.916,-0.004), V(sd*0.244,0.916,-0.002), 0.010, 0.010,
+         {radial:5, rings:1, squashZ:0.6}), MAT.SKIN, ['hand'+S2], true);
     // Shoulder cap. Enough to read as broad, not enough to read as armour.
     push(blobGeometry(V(sd*0.178,1.498,0.000), 0.070, 0.066, 0.070, 10), MAT.COAT,
          ['spine3','clav'+S2,'arm'+S2]);
@@ -4487,6 +4688,17 @@ function buildJarrad(lib){
          {radial:9, rings:3, squashZ:0.9, squashX:0.86}), MAT.BOOT, footCh(S2));
     push(boxGeometry(V(sd*0.114,0.022,-0.040), 0.075, 0.044, 0.070, 0.12), MAT.BOOT,
          ['foot'+S2], true);
+    /* Pull straps at the top of the shaft, one either side. */
+    for(const px of [1,-1])
+      push(boxGeometry(V(sd*0.114 + px*0.066, 0.318, -0.004), 0.010, 0.050, 0.024, 0.2),
+           MAT.BAG, ['shin'+S2], true);
+    /* Spur: a strap round the instep, a shank off the heel, and a rowel. */
+    push(limbGeometry(V(sd*0.114,0.084,-0.075), V(sd*0.114,0.078,0.030), 0.064, 0.060,
+         {radial:10, rings:1, squashZ:0.55, tipRound:false}), MAT.BAG, ['foot'+S2], true);
+    push(limbGeometry(V(sd*0.114,0.070,-0.080), V(sd*0.114,0.066,-0.118), 0.008, 0.006,
+         {radial:5, rings:1}), MAT.BRASS, ['foot'+S2], true);
+    push(ringGeometry(V(sd*0.114,0.066,-0.126), 0.020, 0.0045, 'x', 12, 5), MAT.BRASS,
+         ['foot'+S2], true);
   }
 
   /* --- Belt and satchel of contracts ------------------------------------ */
@@ -4499,11 +4711,43 @@ function buildJarrad(lib){
   push(limbGeometry(V(0.170,1.048,0.010), V(0.086,1.410,-0.050), 0.018, 0.018,
        {radial:5, rings:3, squashZ:0.4}), MAT.BAG, SPINE);
 
+  /* --- Fittings: the third tier of the silhouette (§2) --------------------
+     Buttons, cord, buckles, a chain. None of it is big; all of it is what
+     the eye uses to decide that a coat is a coat. */
+  // Waistcoat: five brass buttons down the front with a teal cord loop at each.
+  for(let i=0;i<5;i++){
+    const y = 1.03 + i*0.058, z = 0.104 + i*0.0025;
+    push(blobGeometry(V(0.012,y,z), 0.0085, 0.0085, 0.004, 6), MAT.BRASS, SPINE);
+    push(limbGeometry(V(-0.030,y,z-0.002), V(0.012,y+0.004,z-0.001), 0.0032, 0.0028,
+         {radial:4, rings:1}), MAT.VEST, SPINE);
+  }
+  // Frock-coat buttons, two rows, on the chest either side of the opening.
+  for(let i=0;i<3;i++) for(const sd of [1,-1])
+    push(blobGeometry(V(sd*0.034, 1.19 + i*0.10, 0.132 - i*0.004), 0.010, 0.010, 0.0045, 6),
+         MAT.HAIR, SPINE);
+  // Collar stud where the shirt closes, and a teal cravat knot under it.
+  push(blobGeometry(V(0,1.552,0.104), 0.024, 0.018, 0.014, 8), MAT.VEST, CHEST);
+  push(blobGeometry(V(0,1.566,0.096), 0.006, 0.006, 0.004, 5), MAT.BRASS, CHEST);
+  // Watch chain from the second vest button to the right-hand pocket.
+  push(limbGeometry(V(0.012,1.146,0.106), V(0.078,1.088,0.098), 0.0035, 0.0035,
+       {radial:4, rings:3}), MAT.BRASS, SPINE);
+  // Belt buckle, and a keeper loop beside it.
+  push(boxGeometry(V(0,0.972,0.150), 0.052, 0.040, 0.012, 0.3), MAT.BRASS, HIPS);
+  push(boxGeometry(V(0,0.972,0.147), 0.036, 0.026, 0.014, 0.0), MAT.BAG, HIPS);
+  push(boxGeometry(V(0.046,0.972,0.144), 0.012, 0.042, 0.016, 0.2), MAT.BAG, HIPS);
+  // Satchel: flap strap down the face and a buckle where it lands.
+  push(boxGeometry(V(0.290,0.930,0.030), 0.012, 0.070, 0.028, 0.1), MAT.BAG, ['pelvis'], true);
+  push(boxGeometry(V(0.294,0.884,0.030), 0.010, 0.026, 0.024, 0.3), MAT.BRASS, ['pelvis'], true);
+  push(boxGeometry(V(0.218,0.986,0.030), 0.150, 0.014, 0.096, 0.1), MAT.BAG, ['pelvis'], true);
+  // Hat band buckle, front-left of the crown, the way a cattleman wears it.
+  push(boxGeometry(V(0.030,hatY+0.025,0.100), 0.020, 0.018, 0.008, 0.3), MAT.BRASS,
+       ['head'], true);
+
   const geo = skinParts(parts, rig, {power:3.6});
 
   const S = (t, extra={})=> new THREE.MeshStandardMaterial(Object.assign({
     map:t.map, roughnessMap:t.roughnessMap, normalMap:t.normalMap,
-    roughness:1, metalness:0 }, extra));
+    roughness:1, metalness:0, vertexColors:true }, extra));
 
   const mats = [
     S(lib.cloth_coat,  {color:0xffffff}),
@@ -4513,8 +4757,13 @@ function buildJarrad(lib){
     S(lib.cloth_coat,  {color:0x6b6257}),
     S(lib.cloth_shirt),
     S(lib.leather_tack),
+    S(lib.metal_brass, {color:0xd6b064, metalness:0.85, roughness:0.32}),   // brass
+    new THREE.MeshStandardMaterial({color:0xf2ede4, roughness:0.45, vertexColors:true}),
+    new THREE.MeshStandardMaterial({color:0x2c3a30, roughness:0.22, vertexColors:true}),
+    new THREE.MeshStandardMaterial({color:0x1c1714, roughness:0.88, vertexColors:true,
+      map:lib.hide_wolf.map, normalMap:lib.hide_wolf.normalMap}),            // hair
   ];
-  mats.forEach(m=>{ if(m.map){ m.map.repeat.set(2,2);
+  mats.forEach(m=>{ if(m.map && m.roughnessMap){ m.map.repeat.set(2,2);
     m.roughnessMap.repeat.set(2,2); m.normalMap.repeat.set(2,2); } });
 
   const mesh = new THREE.SkinnedMesh(geo, mats);
@@ -5310,7 +5559,7 @@ function buildOllie(lib){
                       femL:0.9, femR:0.9 };
   const V=(x,y,z)=>new THREE.Vector3(x,y,z);
   const parts=[]; const push=(g,m,bones,hard)=>parts.push({geo:g, group:m, bones, hard});
-  const MAT = { COAT:0, MASK:1, EYE:2, MANE:3, TACK:4, HOOF:5 };
+  const MAT = { COAT:0, MASK:1, EYE:2, MANE:3, TACK:4, HOOF:5, BLANKET:6, BRASS:7 };
 
   /* Every part is bound to the chain it actually belongs to. Before this,
      the auto-skin had a vertex on the belly picking up a share of a femur and
@@ -5355,9 +5604,19 @@ function buildOllie(lib){
      letting it blend into the neck was the reason her face kept swelling and
      shrinking as she ran. */
   push(blobGeometry(V(0,2.16,1.34), 0.285, 0.275, 0.275, 20), MAT.COAT, ['head'], true);
-  push(blobGeometry(V(0.20,2.38,1.30), 0.075, 0.070, 0.075, 8), MAT.COAT, ['head'], true);
-  push(limbGeometry(V(0.235,2.00,1.30), V(0.300,1.94,1.26), 0.038, 0.020,
-       {radial:6, rings:2}), MAT.COAT, ['head'], true);
+  /* Ears: a pair, tapered, set back on the crown and turned a little out,
+     with the inside of each ear in the dark mane colour. */
+  for(const sd of [1,-1]){
+    push(limbGeometry(V(sd*0.150,2.34,1.24), V(sd*0.215,2.54,1.17), 0.062, 0.018,
+         {radial:8, rings:3, squashZ:0.55}), MAT.COAT, ['head'], true);
+    push(limbGeometry(V(sd*0.158,2.38,1.262), V(sd*0.206,2.51,1.198), 0.032, 0.010,
+         {radial:6, rings:2, squashZ:0.45}), MAT.MANE, ['head'], true);
+  }
+  /* Nostrils and a mouth line on the muzzle, so the jaw has a mouth to open. */
+  for(const sd of [1,-1])
+    push(blobGeometry(V(sd*0.052,1.995,1.572), 0.017, 0.013, 0.010, 7), MAT.MANE,
+         ['head'], true);
+  push(boxGeometry(V(0,1.952,1.560), 0.096, 0.007, 0.012, 0.2), MAT.MANE, ['jaw'], true);
   // Mask: a rounded rectangle sitting proud of the face.
   push(blobGeometry(V(0,2.20,1.545), 0.175, 0.098, 0.075, 16), MAT.MASK, ['head'], true);
   push(boxGeometry(V(0,2.20,1.535), 0.320, 0.170, 0.080, 0.34), MAT.MASK, ['head'], true);
@@ -5369,20 +5628,26 @@ function buildOllie(lib){
   push(blobGeometry(V(0,2.02,1.44), 0.150, 0.105, 0.140, 12), MAT.COAT, ['head','jaw']);
 
   /* --- Mane: strands along the crest. --------- */
-  for(let i=0;i<14;i++){
-    const t = i/13;
-    const y = M.lerp(1.76, 2.24, t), z = M.lerp(0.80, 1.22, t);
-    const len = M.lerp(0.30, 0.20, Math.abs(t-0.4)*1.4);
-    push(limbGeometry(V(0, y+0.06, z), V(M.imperfection(i,0.06), y-len, z-0.05),
-         0.055, 0.020, {radial:5, rings:3, squashX:0.35}), MAT.MANE, NECK);
+  for(let i=0;i<22;i++){
+    const t = i/21;
+    const y = M.lerp(1.76, 2.26, t), z = M.lerp(0.80, 1.24, t);
+    const len = M.lerp(0.32, 0.20, Math.abs(t-0.4)*1.4);
+    const sway = M.imperfection(i,0.09) + (i%2 ? 0.03 : -0.03);
+    push(limbGeometry(V(0, y+0.06, z), V(sway, y-len, z-0.06), 0.042, 0.014,
+         {radial:5, rings:3, squashX:0.35}), MAT.MANE, NECK);
   }
+  /* Forelock falling between the ears. */
+  for(let i=0;i<4;i++)
+    push(limbGeometry(V((i-1.5)*0.045, 2.44, 1.30), V((i-1.5)*0.06, 2.30, 1.52),
+         0.030, 0.010, {radial:5, rings:2, squashX:0.4}), MAT.MANE, ['head'], true);
   /* --- Tail ------------------------------------------------------------- */
   push(limbGeometry(V(0,1.44,-0.92), V(0,1.06,-1.38), 0.085, 0.055,
        {radial:8, rings:4, squashX:0.7}), MAT.MANE, TAIL);
-  for(let i=0;i<7;i++){
-    const a = (i/7)*Math.PI*2;
-    push(limbGeometry(V(Math.cos(a)*0.05,1.32,-1.16),
-         V(Math.cos(a)*0.10, 0.72, -1.40+Math.sin(a)*0.06), 0.030, 0.014,
+  push(blobGeometry(V(0,1.45,-0.90), 0.10, 0.09, 0.10, 10), MAT.COAT, ['pelvis','tail1']);
+  for(let i=0;i<11;i++){
+    const a = (i/11)*Math.PI*2, rr = 0.05 + (i%3)*0.015;
+    push(limbGeometry(V(Math.cos(a)*rr,1.32,-1.16),
+         V(Math.cos(a)*0.11, 0.66 + (i%2)*0.06, -1.42+Math.sin(a)*0.07), 0.026, 0.011,
          {radial:4, rings:3}), MAT.MANE, TAIL);
   }
 
@@ -5402,6 +5667,12 @@ function buildOllie(lib){
          {radial:8,rings:2}), MAT.COAT, foreCh(S2,3));
     push(limbGeometry(V(sd*0.33,0.16,0.68), V(sd*0.33,0.045,0.745), 0.048,0.062,
          {radial:9,rings:2}), MAT.HOOF, ['hof'+S2], true);
+    push(blobGeometry(V(sd*0.33,0.80,0.63), 0.080, 0.070, 0.082, 10), MAT.COAT,
+         foreCh(S2,2));                                                    // knee
+    push(blobGeometry(V(sd*0.33,0.17,0.68), 0.058, 0.052, 0.060, 9), MAT.COAT,
+         foreCh(S2,4));                                                    // fetlock
+    push(limbGeometry(V(sd*0.33,0.135,0.688), V(sd*0.33,0.155,0.684), 0.054, 0.052,
+         {radial:9,rings:1,tipRound:false}), MAT.MANE, ['hof'+S2], true);   // coronet
     // Hind
     push(limbGeometry(V(sd*0.30,1.40,-0.70), V(sd*0.32,1.00,-0.86), 0.20,0.15,
          {radial:9,rings:3,bulge:0.16}), MAT.COAT, hindCh(S2,0));
@@ -5411,6 +5682,12 @@ function buildOllie(lib){
          {radial:8,rings:3}), MAT.COAT, hindCh(S2,2));
     push(limbGeometry(V(sd*0.32,0.30,-0.74), V(sd*0.32,0.045,-0.79), 0.050,0.062,
          {radial:9,rings:3}), MAT.HOOF, ['hhof'+S2,'hcan'+S2]);
+    push(blobGeometry(V(sd*0.32,0.62,-0.68), 0.078, 0.076, 0.086, 10), MAT.COAT,
+         hindCh(S2,2));                                                    // hock
+    push(blobGeometry(V(sd*0.32,0.29,-0.745), 0.056, 0.050, 0.058, 9), MAT.COAT,
+         hindCh(S2,3));                                                    // fetlock
+    push(limbGeometry(V(sd*0.32,0.135,-0.756), V(sd*0.32,0.155,-0.752), 0.054, 0.052,
+         {radial:9,rings:1,tipRound:false}), MAT.MANE, ['hhof'+S2], true);  // coronet
   }
 
   /* --- Tack: saddle, blanket, girth, bridle, reins ---------------------- */
@@ -5422,34 +5699,75 @@ function buildOllie(lib){
   push(limbGeometry(V(0,1.96,0.34), V(0,2.02,0.40), 0.055, 0.038,
        {radial:8, rings:2}), MAT.TACK, ['spine1'], true);        // saddle horn
   push(limbGeometry(V(0,1.88,0.46), V(0,1.88,-0.16), 0.34, 0.34,
-       {radial:12, rings:2, squashX:0.98, squashZ:1.0}), MAT.MANE,
-       ['spine1','spine2'], true);
+       {radial:12, rings:2, squashX:0.98, squashZ:1.0}), MAT.BLANKET,
+       ['spine1','spine2'], true);                                   // saddle blanket
+  push(blobGeometry(V(0,1.835,0.18), 0.37, 0.030, 0.36, 14), MAT.TACK,
+       ['spine1','spine2'], true);                                   // saddle skirt
+  push(blobGeometry(V(0,1.975,0.42), 0.165, 0.060, 0.070, 10), MAT.TACK,
+       ['spine1'], true);                                            // swell
+  push(blobGeometry(V(0,1.985,0.02), 0.170, 0.075, 0.075, 10), MAT.TACK,
+       ['spine1','spine2'], true);                                   // cantle
+  push(limbGeometry(V(0,1.475,0.36), V(0,1.475,0.28), 0.455, 0.455,
+       {radial:16, rings:1, squashX:0.94, tipRound:false}), MAT.TACK,
+       ['spine1','spine2']);                                         // cinch
   for(const sd of [1,-1]){
-    push(limbGeometry(V(sd*0.30,1.78,0.22), V(sd*0.42,1.28,0.24), 0.030,0.028,
+    push(boxGeometry(V(sd*0.335,1.60,0.24), 0.026, 0.44, 0.24, 0.18), MAT.TACK,
+         ['spine1'], true);                                          // fender
+    push(limbGeometry(V(sd*0.30,1.78,0.22), V(sd*0.42,1.30,0.24), 0.030,0.028,
          {radial:5,rings:2,squashZ:0.4}), MAT.TACK, ['spine1'], true);  // stirrup leather
-    push(limbGeometry(V(sd*0.42,1.26,0.24), V(sd*0.42,1.20,0.24), 0.085,0.085,
-         {radial:8,rings:1,squashZ:0.5}), MAT.HOOF, ['spine1'], true);  // stirrup
+    push(ringGeometry(V(sd*0.42,1.22,0.24), 0.078, 0.012, 'x', 12, 5), MAT.HOOF,
+         ['spine1'], true);                                          // stirrup iron
+    push(boxGeometry(V(sd*0.42,1.145,0.24), 0.034, 0.018, 0.10, 0.2), MAT.HOOF,
+         ['spine1'], true);                                          // tread
+    push(boxGeometry(V(sd*0.30,1.74,-0.12), 0.11, 0.22, 0.26, 0.28), MAT.TACK,
+         ['spine2','spine3'], true);                                 // saddle bag
+    push(boxGeometry(V(sd*0.30,1.86,-0.12), 0.12, 0.03, 0.27, 0.1), MAT.TACK,
+         ['spine2','spine3'], true);                                 // bag flap
+    push(boxGeometry(V(sd*0.30,1.68,-0.008), 0.012, 0.022, 0.024, 0.3), MAT.BRASS,
+         ['spine2','spine3'], true);                                 // bag buckle
+    // Breast collar from the swell round the chest.
+    push(limbGeometry(V(sd*0.30,1.80,0.40), V(0,1.44,0.90), 0.020, 0.018,
+         {radial:5, rings:3, squashZ:0.5}), MAT.TACK, ['withers','spine1']);
   }
-  // Bridle + reins running from the bit back along the neck.
-  push(limbGeometry(V(0,2.08,1.52), V(0,2.30,1.30), 0.022,0.022,
+  push(ringGeometry(V(0,1.44,0.905), 0.032, 0.007, 'z', 10, 5), MAT.BRASS, ['withers'], true);
+  push(limbGeometry(V(-0.24,1.98,-0.16), V(0.24,1.98,-0.16), 0.085, 0.085,
+       {radial:10, rings:2}), MAT.BLANKET, ['spine2','spine3'], true);  // bedroll
+  for(const bx of [-0.14,0.14])
+    push(limbGeometry(V(bx,1.90,-0.16), V(bx,2.07,-0.16), 0.010, 0.010,
+         {radial:4, rings:1, squashX:6.0}), MAT.TACK, ['spine2','spine3'], true); // bedroll straps
+  /* Bridle: browband across the forehead, cheek pieces down to the bit,
+     noseband round the muzzle, a throat latch, and bit rings. */
+  push(limbGeometry(V(-0.215,2.33,1.47), V(0.215,2.33,1.47), 0.014, 0.014,
+       {radial:5, rings:3}), MAT.TACK, ['head'], true);
+  for(const sd of [1,-1]){
+    push(limbGeometry(V(sd*0.245,2.28,1.40), V(sd*0.20,2.00,1.53), 0.013, 0.012,
+         {radial:5, rings:2}), MAT.TACK, ['head'], true);
+    push(ringGeometry(V(sd*0.185,1.985,1.545), 0.030, 0.006, 'x', 10, 5), MAT.BRASS,
+         ['head'], true);
+  }
+  push(limbGeometry(V(0,2.03,1.535), V(0,2.03,1.505), 0.165, 0.165,
+       {radial:14, rings:1, squashZ:0.72, tipRound:false}), MAT.TACK, ['head'], true);
+  push(limbGeometry(V(0,2.08,1.52), V(0,2.30,1.30), 0.020,0.020,
        {radial:5,rings:2}), MAT.TACK, ['head'], true);
   for(const sd of [1,-1])
     push(limbGeometry(V(sd*0.13,2.10,1.50), V(sd*0.10,1.98,0.42), 0.016,0.016,
          {radial:4,rings:4}), MAT.TACK, NECK);
 
-  const geo = skinParts(parts, rig, {power:3.6});
+  const geo = skinParts(parts, rig, {power:3.6, dirtH:0.50, dirtAmt:0.5});
   const S=(t,extra={})=> new THREE.MeshStandardMaterial(Object.assign({
     map:t.map, roughnessMap:t.roughnessMap, normalMap:t.normalMap,
-    roughness:1, metalness:0 }, extra));
+    roughness:1, metalness:0, vertexColors:true }, extra));
   const mats = [
     S(lib.hide_ollie),                                                // coat
-    new THREE.MeshStandardMaterial({color:0xf6f4ef, roughness:0.62}), // mask
-    new THREE.MeshStandardMaterial({color:0x0a0a0a, roughness:0.30}), // eyes
-    new THREE.MeshStandardMaterial({color:0x171412, roughness:0.86,
+    new THREE.MeshStandardMaterial({color:0xf6f4ef, roughness:0.62, vertexColors:true}), // mask
+    new THREE.MeshStandardMaterial({color:0x0a0a0a, roughness:0.30, vertexColors:true}), // eyes
+    new THREE.MeshStandardMaterial({color:0x171412, roughness:0.86, vertexColors:true,
       map:lib.hide_wolf.map, normalMap:lib.hide_wolf.normalMap}),     // mane/tail
     S(lib.leather_tack),                                              // tack
-    new THREE.MeshStandardMaterial({color:0x2b2622, roughness:0.52,
+    new THREE.MeshStandardMaterial({color:0x2b2622, roughness:0.52, vertexColors:true,
       metalness:0.15, map:lib.rock_grey.map}),                        // hoof/metal
+    S(lib.cloth_shirt, {color:0x2f7472}),                             // teal blanket + bedroll
+    S(lib.metal_brass, {color:0xd6b064, metalness:0.85, roughness:0.32}), // brass
   ];
   const mesh = new THREE.SkinnedMesh(geo, mats);
   mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
@@ -8152,6 +8470,14 @@ class Particles {
         4.5+Math.random()*3.5, 0.55+Math.random()*0.55,
         dark, dark*0.96, dark*0.94);
     }
+  }
+  /* Chimney smoke: thin, pale, slow, and leaning with the wind (§15 "smoke
+     from every chimney"). One puff per call. */
+  chimney(pos, windDir, windStr){
+    this.spawn(pos.x+(Math.random()-0.5)*0.3, pos.y, pos.z+(Math.random()-0.5)*0.3,
+      windDir.x*(0.6+windStr*1.6)+(Math.random()-0.5)*0.3, 0.9+Math.random()*0.6,
+      windDir.y*(0.6+windStr*1.6)+(Math.random()-0.5)*0.3,
+      6+Math.random()*4, 0.45+Math.random()*0.4, 0.62,0.60,0.58);
   }
   breath(pos, dir){
     for(let i=0;i<3;i++)
@@ -10902,6 +11228,20 @@ function animalMesh(s, lib){
            V(sd*s.head*0.80, hy+s.head*0.55+s.ears, hx-s.head*0.35),
            s.head*0.26, s.head*0.10, {radial:6, rings:2, squashZ:0.45}),
            HIDE, ['head'], true);
+    if(s.ears > 0.01)
+      push(limbGeometry(V(sd*s.head*0.58, hy+s.head*0.60, hx-s.head*0.08),
+           V(sd*s.head*0.78, hy+s.head*0.55+s.ears*0.85, hx-s.head*0.30),
+           s.head*0.15, s.head*0.05, {radial:5, rings:2, squashZ:0.35}),
+           DARK, ['head'], true);                                        // ear inner
+    push(blobGeometry(V(sd*s.head*0.24, hy-s.head*0.30, hx+s.head*1.52),
+         s.head*0.09, s.head*0.07, s.head*0.06, 6), EYE, ['head'], true);   // nostril
+    /* Bison: a pair of short curved horns and a beard under the jaw. */
+    if(s.hump > 0.2 && s.antlers < 0.01){
+      const h0 = V(sd*s.head*0.55, hy+s.head*0.55, hx-s.head*0.15);
+      const h1 = V(sd*s.head*1.05, hy+s.head*0.95, hx-s.head*0.05);
+      push(limbGeometry(h0, h1, s.head*0.16, s.head*0.05, {radial:6, rings:3}),
+           HORN, ['head'], true);
+    }
     if(s.antlers > 0.01){
       const a0 = V(sd*s.head*0.45, hy+s.head*0.65, hx-s.head*0.2);
       const a1 = V(sd*(s.head*0.45+s.antlers*0.30), hy+s.head*0.65+s.antlers*0.75,
@@ -10918,10 +11258,36 @@ function animalMesh(s, lib){
     }
   }
 
-  /* Tail. */
+  push(boxGeometry(V(0, hy-s.head*0.62, hx+s.head*1.45), s.head*0.5, s.head*0.06,
+       s.head*0.10, 0.2), EYE, ['jaw'], true);                            // mouth line
+  if(s.hump > 0.2)
+    push(blobGeometry(V(0, hy-s.head*0.85, hx+s.head*0.55), s.head*0.42, s.head*0.55,
+         s.head*0.60, 8), DARK, ['head','jaw']);                          // bison beard
+
+  /* Tail. A wolf or coyote carries a brush; a rabbit a tuft; a kangaroo a
+     thick counterweight; everyone else a thin switch with a tuft on the end. */
+  const brush = s.predator && s.tail > 0.28 && s.tail < 0.6;
   push(limbGeometry(V(0, LEGY+G*0.92, -L*0.50),
        V(0, LEGY+G*0.92-s.tail*0.55, -L*0.50-s.tail*0.85),
-       G*0.28, G*0.12, {radial:7, rings:4}), s.tail > 0.5 ? HIDE : DARK, TAIL);
+       G*(s.hop ? 0.55 : brush ? 0.42 : 0.28), G*(s.hop ? 0.22 : brush ? 0.30 : 0.12),
+       {radial:7, rings:4, bulge: brush ? 0.25 : 0}), s.tail > 0.5 || brush ? HIDE : DARK, TAIL);
+  if(!s.hop && s.tail > 0.1 && s.tail < 1.0)
+    push(blobGeometry(V(0, LEGY+G*0.92-s.tail*0.55, -L*0.50-s.tail*0.85),
+         G*(brush?0.26:0.16), G*(brush?0.26:0.18), G*(brush?0.30:0.16), 7),
+         brush ? HIDE : DARK, ['tail3','tail2']);                         // tuft
+  if(s.tail <= 0.1)
+    push(blobGeometry(V(0, LEGY+G*0.95, -L*0.52), G*0.30, G*0.30, G*0.30, 7),
+         HORN, ['pelvis','tail1']);                                        // cotton tail
+  /* Alligator: a double row of scutes down the back and tail. */
+  if(s.leg < 0.25 && s.tail > 0.9){
+    for(let i=0;i<14;i++){
+      const t = i/13, z = L*0.45 - t*(L*0.95 + s.tail*0.85);
+      const y = LEGY + G*1.75 - t*s.tail*0.52, w = G*0.28*(1-t*0.6);
+      for(const sd of [1,-1])
+        push(boxGeometry(V(sd*G*0.30, y, z), w, w*0.9, w*1.4, 0.4), DARK,
+             t < 0.45 ? ['spine1','spine2','withers'] : ['tail1','tail2','tail3']);
+    }
+  }
 
   /* Legs. */
   for(const sd of [1,-1]){
@@ -10932,24 +11298,40 @@ function animalMesh(s, lib){
          G*0.24, G*0.14, {radial:6, rings:3}), HIDE, ['hum'+S,'can'+S]);
     push(limbGeometry(V(x, LEGY*0.26, L*0.30), V(x, 0.015, L*0.32),
          G*0.14, G*0.16, {radial:6, rings:2}), DARK, ['can'+S,'hof'+S]);
+    push(blobGeometry(V(x, LEGY*0.60, L*0.32), G*0.25, G*0.22, G*0.27, 7), HIDE,
+         ['hum'+S,'can'+S]);                                              // knee
+    push(blobGeometry(V(x, LEGY*0.27, L*0.30), G*0.17, G*0.15, G*0.18, 6), HIDE,
+         ['can'+S,'hof'+S]);                                              // fetlock
     push(limbGeometry(V(x, LEGY+G*0.5, -L*0.40), V(x, LEGY*0.58, -L*0.46),
          G*0.46, G*0.26, {radial:7, rings:3, bulge:0.14}), HIDE, ['hip'+S,'tib'+S]);
     push(limbGeometry(V(x, LEGY*0.58, -L*0.46), V(x, LEGY*0.24, -L*0.38),
          G*0.24, G*0.14, {radial:6, rings:3}), HIDE, ['tib'+S,'hcan'+S]);
     push(limbGeometry(V(x, LEGY*0.24, -L*0.38), V(x, 0.015, -L*0.38),
          G*0.14, G*0.16, {radial:6, rings:2}), DARK, ['hcan'+S,'hhof'+S]);
+    push(blobGeometry(V(x, LEGY*0.58, -L*0.46), G*0.25, G*0.23, G*0.28, 7), HIDE,
+         ['tib'+S,'hcan'+S]);                                             // hock
+    push(blobGeometry(V(x, LEGY*0.25, -L*0.38), G*0.17, G*0.15, G*0.18, 6), HIDE,
+         ['hcan'+S,'hhof'+S]);                                            // fetlock
+    /* Haunch: the big hindquarter mass every quadruped reads by. */
+    push(blobGeometry(V(x*0.9, LEGY+G*0.55, -L*0.40), G*0.34, G*0.48, G*0.42, 8), HIDE,
+         ['pelvis','hip'+S]);
+    push(blobGeometry(V(x*0.9, LEGY+G*0.55, L*0.30), G*0.30, G*0.40, G*0.36, 8), HIDE,
+         ['withers','sh'+S]);                                             // shoulder
   }
 
   const t = lib[s.hide] || lib.hide_deer;
   const S2 = (extra)=> new THREE.MeshStandardMaterial(Object.assign({
     map:t.map, roughnessMap:t.roughnessMap, normalMap:t.normalMap,
-    roughness:1 }, extra||{}));
+    roughness:1, vertexColors:true }, extra||{}));
   const mats = [
     S2(), S2({ color:0x3a3129 }),
-    new THREE.MeshStandardMaterial({ color:0xbfae8c, roughness:0.72 }),
-    new THREE.MeshStandardMaterial({ color:0x14100c, roughness:0.30 }),
+    new THREE.MeshStandardMaterial({ color:0xbfae8c, roughness:0.72, vertexColors:true }),
+    new THREE.MeshStandardMaterial({ color:0x14100c, roughness:0.30, vertexColors:true }),
   ];
-  const mesh = new THREE.SkinnedMesh(skinParts(parts, rig, {power:3.4}), mats);
+  /* Dirt height scales with the animal: a rabbit is dusty to the belly, a
+     bison to the knee. */
+  const mesh = new THREE.SkinnedMesh(skinParts(parts, rig,
+    {power:3.4, dirtH: Math.max(0.12, s.leg*0.55), dirtAmt:0.45}), mats);
   mesh.castShadow = true; mesh.frustumCulled = false;
   mesh.add(rig.root);
   mesh.bind(new THREE.Skeleton(rig.bones));
@@ -12024,6 +12406,7 @@ class Game {
       Math.floor(innerHeight*this.renderer.getPixelRatio()));
     this.composer.opts.ssao = q.ssao;
     this.composer.opts.bloom = q.bloom;
+    this.composer.opts.shafts = q.shafts !== false;
     this.composer.setSSAOScale(q.ssaoScale);
     this.tod.sun.shadow.mapSize.set(q.shadow, q.shadow);
     const sm = this.tod.sun.shadow.map;
@@ -12372,16 +12755,19 @@ class Game {
     const mountDist = p.mounted ? 0 : p.pos.distanceTo(h.pos);
     this.ui.setPrompt('mount','E', p.mounted?'Dismount':'Mount Ollie',
                       p.mounted || mountDist < 3.4);
-    this.ui.setPrompt('whistle','Q','Whistle', !p.mounted && mountDist >= 3.4);
-    this.ui.setPrompt('brush','R','Brush Ollie', !p.mounted && mountDist < 3.0);
-    this.ui.setPrompt('rear','X','Rear up', p.mounted && h.bond>=2);
+    this.ui.setPrompt('whistle','G','Whistle Ollie', !p.mounted && mountDist >= 3.4);
+    const armed = !!(this.arsenal && this.arsenal.equipped);   // a tool is out
+    this.ui.setPrompt('brush','R','Brush Ollie', !p.mounted && mountDist < 3.0 && !armed);
+    this.ui.setPrompt('rear','X','Rear up', p.mounted && h.bond>=2 && !armed);
     this.ui.setPrompt('ledger','Tab','Ledger', true);
 
     if(inp.once('KeyE')){
       if(p.mounted) h.dismount();
       else if(mountDist < 3.4) h.mount(p);
     }
-    if(inp.once('KeyQ') && !p.mounted){
+    /* G whistles. It used to share Q with the rope, so every whistle also
+       shook the lasso out and every rope-out also called the horse. */
+    if(inp.once('KeyG') && !p.mounted){
       p.anim.playOverride('whistle', UPPER_MASK, 1, 0.10, false);
       setTimeout(()=>p.anim.stopOverride('whistle'), 1000);
       this.audio.whistleSfx(p.pos);
@@ -12389,11 +12775,11 @@ class Game {
         this.ui.toast('', `Ollie is coming — ${Math.round(h.pos.distanceTo(p.pos))}m`, 2.2);
       else this.ui.toast('', 'Too far. She cannot hear you.', 2.2);
     }
-    if(inp.once('KeyR') && !p.mounted && mountDist<3.0){
+    if(inp.once('KeyR') && !p.mounted && mountDist<3.0 && !armed){
       h.brush(); this.ui.toast('','Ollie: bond '+h.bond.toFixed(1), 1.6);
       h.say('highBond', true);
     }
-    if(inp.once('KeyX') && p.mounted) h.rear();
+    if(inp.once('KeyX') && p.mounted && !armed) h.rear();
     if(inp.once('KeyH')) p.anim.playOverride('tip_hat', UPPER_MASK, 1, 0.10, false),
                          setTimeout(()=>p.anim.stopOverride('tip_hat'), 1350);
     if(inp.once('KeyC')) p.crouched = !p.crouched;
@@ -12460,6 +12846,22 @@ class Game {
     }
     if(this.tod.dayAmt > 0.35 && W.cur.cloud < 0.7)
       this.particles.dustMotes(this.camera.position, this.tod.dayAmt);
+    /* Chimneys within earshot smoke from dusk to breakfast, and all day in
+       the cold. Staggered so a street of them does not puff in unison. */
+    {
+      const cold = p.pos.y > 130 || W.state==='snow' || W.state==='blizzard';
+      const lit = this.tod.nightAmt > 0.15 || this.tod.hour < 9 || cold;
+      if(lit){
+        this._chimT = (this._chimT||0) - dt;
+        if(this._chimT <= 0){
+          this._chimT = 0.32;
+          for(const [key, g] of this.towns.built)
+            for(const c of (g.userData.chimneys||[]))
+              if(Math.random() < 0.6 && c.distanceToSquared(this.camera.position) < 8100)
+                this.particles.chimney(c, W.windDir, W.windStr);
+        }
+      }
+    }
     const biome = this.terrain.biomeAt(p.pos.x, p.pos.z);
     if(biome===BIOME.DELTA && this.tod.nightAmt > 0.5)
       this.particles.fireflies(this.camera.position);
@@ -12613,6 +13015,8 @@ class Game {
                                                         : BIOME_NAMES[biome]}`;
 
     /* Render. */
+    this.composer.setSun(this.tod.sunDir, this.camera, this.tod.elev,
+                         W.cur.cloud, this.tod.fog.density);
     this.composer.render(this.elapsed);
     inp.endFrame();
   }
@@ -12902,7 +13306,9 @@ function bldPrism(x,y,z, w,h,d, group, parts){
 }
 function bldPost(x,z, y0,y1, r, group, parts, seed=0){
   const g = new THREE.CylinderGeometry(r*(0.92+M.imperfection(seed,0.08)), r,
-                                       y1-y0, 6, 1);
+                                       y1-y0, 9, 1);
+  g.rotateZ(M.imperfection(seed*3+1, 0.012));
+  g.rotateX(M.imperfection(seed*7+2, 0.012));
   g.translate(x, (y0+y1)/2, z);
   parts.push({geo:g, group});
 }
@@ -12913,16 +13319,105 @@ function bldPorch(parts, w, d, depth, height, rail, rnd){
   bldBox(0, 0.10, d/2+depth/2, w+0.5, 0.20, depth+0.3, BM.BOARD, parts);
   for(const sx of [-w/2+0.3, w/2-0.3])
     bldPost(sx, d/2+depth-0.15, 0.2, height, 0.075, BM.TIMBER, parts, sx*13);
+  const pz = d/2+depth-0.15;
+  for(const sx of [-w/2+0.3, w/2-0.3]){
+    bldBox(sx, height-0.10, pz, 0.20, 0.10, 0.20, BM.TIMBER, parts, 0.5, {col:false}); // cap
+    bldBox(sx + (sx<0?0.22:-0.22), height-0.20, pz, 0.30, 0.06, 0.06, BM.TIMBER, parts,
+           0.5, {col:false});                                                    // bracket
+  }
+  /* A step down to the street, and a nosing board on the deck edge. */
+  bldBox(0, 0.05, d/2+depth+0.30, w*0.5, 0.10, 0.34, BM.BOARD, parts, 0.5, {col:false});
+  bldBox(0, 0.21, d/2+depth+0.02, w+0.5, 0.06, 0.08, BM.TIMBER, parts, 0.5, {col:false});
   if(rail){
     for(const sx of [-w/2+0.3, w/2-0.3])
-      bldBox(sx, 0.72, d/2+depth-0.15, 0.10, 1.0, 0.10, BM.TIMBER, parts);
-    bldBox(0, 1.02, d/2+depth-0.15, w*0.55, 0.09, 0.09, BM.TIMBER, parts);
+      bldBox(sx, 0.72, pz, 0.10, 1.0, 0.10, BM.TIMBER, parts);
+    bldBox(0, 1.02, pz, w*0.55, 0.09, 0.09, BM.TIMBER, parts);
+    bldBox(0, 0.36, pz, w*0.55, 0.06, 0.06, BM.TIMBER, parts, 0.5, {col:false});
+    const n = Math.max(3, Math.round(w*0.55/0.42));
+    for(let i=0;i<n;i++)
+      bldBox(-w*0.275 + (i+0.5)*(w*0.55/n), 0.68, pz, 0.035, 0.62, 0.035, BM.TIMBER,
+             parts, 0.5, {col:false});
   }
 }
 function bldWindows(parts, w, d, y, count, ww, wh){
   for(let i=0;i<count;i++){
     const sx = count===1 ? 0 : -w/2 + (i+0.5)*(w/count);
-    bldBox(sx, y, d/2+0.23, ww, wh, 0.08, BM.GLASS, parts, 0.5, {col:false});
+    const z = d/2+0.23;
+    bldBox(sx, y, z, ww, wh, 0.08, BM.GLASS, parts, 0.5, {col:false});
+    bldWindowFrame(parts, sx, y, z, ww, wh);
+  }
+}
+/* The medium tier of a window (§2): jambs, a head, a sill that sticks out,
+   and a mullion cross. The glass alone reads as a hole in the wall. */
+function bldWindowFrame(parts, sx, y, z, ww, wh){
+  const t = 0.075, pz = z + 0.05;
+  for(const dx of [-1,1])
+    bldBox(sx + dx*(ww/2+t/2), y, pz, t, wh+t*2, 0.12, BM.TIMBER, parts, 0.5, {col:false});
+  bldBox(sx, y+wh/2+t/2, pz, ww+t*2, t, 0.12, BM.TIMBER, parts, 0.5, {col:false});
+  bldBox(sx, y-wh/2-t/2, pz+0.04, ww+t*2+0.10, 0.06, 0.20, BM.TIMBER, parts, 0.5, {col:false});
+  bldBox(sx, y, z+0.03, 0.03, wh, 0.05, BM.TIMBER, parts, 0.5, {col:false});
+  bldBox(sx, y, z+0.03, ww, 0.03, 0.05, BM.TIMBER, parts, 0.5, {col:false});
+}
+
+/* ---- Dressing pass ---------------------------------------------------------
+   Runs on every building after its archetype has laid out the big shapes.
+   It finds the main wall box, and adds the things a carpenter adds last:
+   corner boards, a skirting board at the base, a fascia along the eaves, a
+   ridge cap on the roof, and a chimney with a cap. Everything it adds is
+   col:false — none of it changes where the player can walk. */
+const CHIMNEY_KINDS = new Set(['store','saloon','hotel','bank','office','jail',
+                               'courthouse','shack','gunsmith','station','stable']);
+const UNDRESSED_KINDS = new Set(['watertower','headframe','windpump','tent','mast']);
+function dressBuilding(b, kind, rnd){
+  const parts = b.parts;
+  if(!parts || !parts.length || UNDRESSED_KINDS.has(kind)) return;
+  // The main wall: the largest boarded or stone box.
+  let wall = null, wallVol = 0, roofTop = null, roofY = -1e9;
+  const bb = new THREE.Box3();
+  for(const p of parts){
+    if(!p.geo.boundingBox) p.geo.computeBoundingBox();
+    bb.copy(p.geo.boundingBox);
+    const sz = new THREE.Vector3(); bb.getSize(sz);
+    if(p.group===BM.BOARD || p.group===BM.STONE){
+      const vol = sz.x*sz.y*sz.z;
+      if(vol > wallVol && sz.y > 2.0){ wallVol = vol; wall = bb.clone(); }
+    }
+    if(p.group===BM.ROOF && bb.max.y > roofY){ roofY = bb.max.y; roofTop = bb.clone(); }
+  }
+  if(!wall) return;
+  const W = wall.max.x - wall.min.x, D = wall.max.z - wall.min.z;
+  const cx = (wall.max.x+wall.min.x)/2, cz = (wall.max.z+wall.min.z)/2;
+  const y0 = Math.max(0, wall.min.y), y1 = wall.max.y, H = y1 - y0;
+  if(W < 2 || D < 2) return;
+  /* Corner boards, slightly proud of the wall. */
+  for(const sx of [-1,1]) for(const sz of [-1,1])
+    bldBox(cx + sx*(W/2), y0+H/2, cz + sz*(D/2), 0.16, H, 0.16, BM.TIMBER, parts, 0.5, {col:false});
+  /* Skirting round the base, and a fascia at the eaves, on each long side. */
+  for(const sz of [-1,1]){
+    bldBox(cx, y0+0.12, cz + sz*(D/2+0.03), W+0.2, 0.24, 0.10, BM.TIMBER, parts, 0.5, {col:false});
+    bldBox(cx, y1-0.10, cz + sz*(D/2+0.04), W+0.3, 0.20, 0.10, BM.TIMBER, parts, 0.5, {col:false});
+  }
+  for(const sx of [-1,1])
+    bldBox(cx + sx*(W/2+0.03), y0+0.12, cz, 0.10, 0.24, D+0.2, BM.TIMBER, parts, 0.5, {col:false});
+  /* Ridge cap along the top of the roof. */
+  if(roofTop && roofY > y1 + 0.4){
+    const rl = roofTop.max.z - roofTop.min.z, rw = roofTop.max.x - roofTop.min.x;
+    if(rl > rw) bldBox((roofTop.max.x+roofTop.min.x)/2, roofY+0.02,
+                       (roofTop.max.z+roofTop.min.z)/2, 0.22, 0.09, rl, BM.TIMBER,
+                       parts, 0.5, {col:false});
+    else        bldBox((roofTop.max.x+roofTop.min.x)/2, roofY+0.02,
+                       (roofTop.max.z+roofTop.min.z)/2, rw, 0.09, 0.22, BM.TIMBER,
+                       parts, 0.5, {col:false});
+  }
+  /* A chimney at the back on one side, with a cap and a crown. */
+  if(CHIMNEY_KINDS.has(kind) && rnd() < 0.85){
+    const sx = rnd() < 0.5 ? -1 : 1;
+    const chx = cx + sx*(W/2 - 0.75), chz = cz - D/2 + 0.9;
+    const top = (roofTop ? roofY : y1) + 1.0 + rnd()*0.5;
+    bldBox(chx, top/2, chz, 0.64, top, 0.64, BM.STONE, parts, 0.5, {col:false});
+    bldBox(chx, top+0.06, chz, 0.80, 0.12, 0.80, BM.STONE, parts, 0.5, {col:false});
+    bldBox(chx, top+0.24, chz, 0.50, 0.24, 0.50, BM.METAL, parts, 0.5, {col:false});
+    b.chimney = { x:chx, y:top+0.36, z:chz };
   }
 }
 
@@ -13424,10 +13919,10 @@ function makeProps(rnd, kind){
       bldBox(0, 1.15, 0, 2.6, 0.12, 0.12, BM.TIMBER, parts);
       break;
     case 'barrel': {
-      const g = new THREE.CylinderGeometry(0.36,0.31,0.92,10);
+      const g = new THREE.CylinderGeometry(0.36,0.31,0.92,16);
       g.translate(0,0.46,0); parts.push({geo:g, group:BM.BOARD});
       for(const yy of [0.20,0.72]){
-        const r = new THREE.TorusGeometry(0.355,0.028,4,10);
+        const r = new THREE.TorusGeometry(0.355,0.028,5,16);
         r.rotateX(Math.PI/2); r.translate(0,yy,0);
         parts.push({geo:r, group:BM.METAL});
       }
@@ -13450,9 +13945,19 @@ function makeProps(rnd, kind){
     case 'cart':
       bldBox(0,0.85,0, 1.6,0.58,2.8, BM.BOARD, parts);
       for(const sx of [-0.9,0.9]) for(const sz of [-0.9,1.0]){
-        const wl = new THREE.TorusGeometry(0.60,0.078,5,12);
+        const wl = new THREE.TorusGeometry(0.60,0.078,6,18);
         wl.rotateY(Math.PI/2); wl.translate(sx,0.62,sz);
         parts.push({geo:wl, group:BM.TIMBER});
+        /* Hub and eight spokes: a wheel without spokes is a tyre. */
+        const hub = new THREE.CylinderGeometry(0.11,0.11,0.16,8);
+        hub.rotateZ(Math.PI/2); hub.translate(sx,0.62,sz);
+        parts.push({geo:hub, group:BM.TIMBER});
+        for(let k=0;k<8;k++){
+          const sp = new THREE.CylinderGeometry(0.022,0.026,0.52,5);
+          sp.translate(0,0.30,0); sp.rotateX(k*Math.PI/4);
+          sp.translate(sx,0.62,sz);
+          parts.push({geo:sp, group:BM.TIMBER});
+        }
       }
       bldBox(0,0.9,2.0, 0.10,0.10,1.6, BM.TIMBER, parts); break;
     case 'headstone': {
@@ -13822,6 +14327,7 @@ class Towns {
               : kind==='warehouse'  ? 'GRAND MERIDIAN FREIGHT'
               : undefined;
     const b = gen(ctx.rnd, name);
+    dressBuilding(b, kind, ctx.rnd);
 
     /* Give the building a coat of paint. Roofs and stone keep their own
        colour; only the boarding and trim take it, which is how a real street
@@ -13856,6 +14362,8 @@ class Towns {
                        rot, w:s.w, h:s.h, accent:s.accent, bg:s.bg });
     for(const l of b.lamps)
       ctx.lamps.push(new THREE.Vector3(l.x,l.y,l.z).applyMatrix4(mtx));
+    if(b.chimney)
+      ctx.chimneys.push(new THREE.Vector3(b.chimney.x,b.chimney.y,b.chimney.z).applyMatrix4(mtx));
 
     // Colliders come straight off the parts, in the building's own frame.
     ctx.colliderJobs.push({ parts:b.parts, mtx, rot });
@@ -14083,7 +14591,7 @@ class Towns {
     const ctx = {
       rnd: M.rng(town.key.length*7919 + Math.floor(town.x)),
       parts:[], signs:[], lamps:[], npcSpots:[], colliderJobs:[],
-      propInstances:[], walkways:[], streetLen:0, shops:[],
+      propInstances:[], walkways:[], streetLen:0, shops:[], chimneys:[],
     };
     (PLANS[town.character] || PLANS.company)(this, town, ctx);
     this._station(town, ctx);
@@ -14140,6 +14648,7 @@ class Towns {
         wk.yaw, { solid:false, climb:true });
 
     group.userData.lamps = ctx.lamps;
+    group.userData.chimneys = ctx.chimneys;
     group.userData.npcSpots = ctx.npcSpots;
     group.userData.shops = ctx.shops;
     const half = (ctx.streetLen||60)*0.5;
@@ -15173,10 +15682,15 @@ function buildTownsfolkVariant(lib, variant){
                       clavL:0.6, clavR:0.6, toeL:0.7, toeR:0.7 };
   const V=(x,y,z)=>new THREE.Vector3(x,y,z);
   const parts=[]; const push=(g,m,bones,hard)=>parts.push({geo:g, group:m, bones, hard});
-  const MAT = { COAT:0, SHIRT:1, SKIN:2, BOOT:3, HAT:4 };
+  const MAT = { COAT:0, SHIRT:1, SKIN:2, BOOT:3, HAT:4, BRASS:5, SCLERA:6, IRIS:7, HAIR:8 };
 
   const stout = [1.0,1.14,0.92,1.06,0.96,1.18,0.90,1.04][variant % 8];
   const skirt = OUT.skirt;
+  /* Per-variant face: beards on some of the men, hair lengths, a neckerchief
+     on the drovers. Enough that two townsmen in the same coat still differ. */
+  const beard = !skirt && (variant % 3 === 1);
+  const longHair = skirt || (variant % 4 === 2);
+  const kerchief = OUT.id === 'drover' || OUT.id === 'poncho';
   /* Same discipline as Jarrad: every part names its chain, so a townsman's
      arm cannot drag his coat-tail around with it. */
   const SPINE=['pelvis','spine1','spine2','spine3'], CHEST=['spine2','spine3','neck'];
@@ -15196,13 +15710,40 @@ function buildTownsfolkVariant(lib, variant){
   push(limbGeometry(V(0,1.52,0.005), V(0,0.98,0), 0.196*stout, 0.172*stout,
        {radial:11, rings:4, squashX:1.04, squashZ:0.70}), MAT.COAT, SPINE);
 
-  /* Head — rigid to the head bone. */
+  /* Head — rigid to the head bone. Skull, jaw, nose, ears, brow, eyes with a
+     sclera and an iris, a lip line, hair, and a beard on the men who have one. */
   push(blobGeometry(V(0,1.695,-0.004), 0.094, 0.110, 0.104, 12), MAT.SKIN, ['head'], true);
   push(blobGeometry(V(0,1.645, 0.028), 0.078, 0.066, 0.082, 10), MAT.SKIN, ['jaw','head']);
   push(blobGeometry(V(0,1.690, 0.094), 0.019, 0.028, 0.025, 6),  MAT.SKIN, ['head'], true);
-  push(blobGeometry(V(0,1.722,-0.014), 0.098, 0.096, 0.104, 10), MAT.HAT, ['head'], true);
+  push(blobGeometry(V(0,1.734, 0.074), 0.068, 0.024, 0.028, 8),  MAT.SKIN, ['head'], true); // brow
+  for(const sd of [1,-1]){
+    push(blobGeometry(V(sd*0.094,1.698,-0.004), 0.015, 0.028, 0.019, 6), MAT.SKIN,
+         ['head'], true);                                                       // ear
+    push(blobGeometry(V(sd*0.035,1.710,0.083), 0.015, 0.011, 0.010, 8), MAT.SCLERA,
+         ['head'], true);
+    push(blobGeometry(V(sd*0.035,1.710,0.092), 0.007, 0.007, 0.0045, 6), MAT.IRIS,
+         ['head'], true);
+    push(limbGeometry(V(sd*0.016,1.745,0.082), V(sd*0.058,1.740,0.070), 0.0065, 0.005,
+         {radial:4, rings:1, squashZ:0.6}), MAT.HAIR, ['head'], true);           // brow line
+    push(blobGeometry(V(sd*0.060,1.688,0.058), 0.022, 0.024, 0.024, 6), MAT.SKIN,
+         ['head'], true);                                                       // cheek
+  }
+  push(boxGeometry(V(0,1.630,0.102), 0.036, 0.006, 0.010, 0.2), MAT.HAIR, ['jaw'], true);
+  if(longHair){
+    push(blobGeometry(V(0,1.718,-0.020), 0.102, 0.098, 0.108, 10), MAT.HAIR, ['head'], true);
+    push(blobGeometry(V(0,1.640,-0.060), 0.085, 0.090, 0.060, 8), MAT.HAIR, ['head'], true);
+  } else
+    push(blobGeometry(V(0,1.722,-0.014), 0.098, 0.096, 0.104, 10), MAT.HAIR, ['head'], true);
+  if(beard)
+    push(blobGeometry(V(0,1.628,0.040), 0.080, 0.058, 0.076, 8), MAT.HAIR, ['jaw','head']);
   push(limbGeometry(V(0,1.545,0), V(0,1.645,-0.004), 0.055, 0.050,
        {radial:8, rings:2}), MAT.SKIN, ['spine3','neck','head']);
+  if(kerchief){
+    push(limbGeometry(V(0,1.520,0.0), V(0,1.560,-0.004), 0.082, 0.070,
+         {radial:10, rings:1, squashZ:0.9}), MAT.COAT, ['spine3','neck']);
+    push(limbGeometry(V(0,1.520,0.070), V(0,1.400,0.100), 0.060, 0.012,
+         {radial:5, rings:2, squashX:1.4, squashZ:0.3}), MAT.COAT, ['spine3','spine2']);
+  }
 
   /* Arms */
   for(const s of [1,-1]){
@@ -15213,9 +15754,28 @@ function buildTownsfolkVariant(lib, variant){
          0.052, 0.040, {radial:7, rings:3}), MAT.COAT, foreCh(S2));
     push(blobGeometry(V(s*0.220,0.940,0.004), 0.033, 0.050, 0.024, 8), MAT.SKIN,
          ['hand'+S2], true);
+    for(let f=0;f<4;f++){
+      const fx = s*0.220 + (f-1.5)*0.0145, len = [0.040,0.048,0.046,0.038][f];
+      push(limbGeometry(V(fx,0.914,0.010), V(fx,0.914-len,0.028), 0.0078, 0.0062,
+           {radial:4, rings:1}), MAT.SKIN, ['hand'+S2], true);
+    }
+    push(limbGeometry(V(s*0.198,0.930,0.012), V(s*0.178,0.902,0.036), 0.011, 0.008,
+         {radial:4, rings:1}), MAT.SKIN, ['hand'+S2], true);                    // thumb
+    push(limbGeometry(V(s*0.216,1.010,-0.006), V(s*0.218,0.980,-0.005), 0.052, 0.046,
+         {radial:8, rings:1}), MAT.SHIRT, ['forearm'+S2,'hand'+S2]);            // cuff
     push(blobGeometry(V(s*0.186,1.500,0.000), 0.080, 0.072, 0.082, 8), MAT.COAT,
          ['spine3','clav'+S2,'arm'+S2]);
   }
+  if(!skirt){
+    push(limbGeometry(V(0,0.955,0), V(0,0.995,0), 0.176*stout, 0.176*stout,
+         {radial:12, rings:1, squashX:1.10, squashZ:0.76, tipRound:false}), MAT.BOOT,
+         ['pelvis','spine1']);                                                  // belt
+    push(boxGeometry(V(0,0.975,0.136*stout+0.006), 0.046, 0.034, 0.012, 0.3), MAT.BRASS,
+         ['pelvis','spine1']);                                                  // buckle
+  }
+  if(OUT.vest) for(let i=0;i<4;i++)
+    push(blobGeometry(V(0.008, 1.06 + i*0.075, 0.100*stout + 0.012 + i*0.002),
+         0.0085, 0.0085, 0.004, 5), MAT.BRASS, SPINE);
 
   /* Waistcoat, apron, or a poncho over the top. */
   if(OUT.vest)
@@ -15253,6 +15813,10 @@ function buildTownsfolkVariant(lib, variant){
            0.066, 0.058, {radial:8, rings:2}), MAT.BOOT, ['shin'+S2,'foot'+S2]);
       push(limbGeometry(V(s*0.112,0.048,-0.040), V(s*0.112,0.042,0.150),
            0.055, 0.040, {radial:7, rings:2, squashZ:0.9}), MAT.BOOT, footCh(S2));
+      push(boxGeometry(V(s*0.112,0.020,-0.040), 0.070, 0.040, 0.066, 0.12), MAT.BOOT,
+           ['foot'+S2], true);                                                  // heel
+      push(limbGeometry(V(s*0.112,0.290,-0.004), V(s*0.112,0.305,-0.004), 0.069, 0.069,
+           {radial:8, rings:1, tipRound:false}), MAT.HAIR, ['shin'+S2]);        // top band
     }
   }
   return { geo: skinParts(parts, rig, {power:3.4}), skirt, outfit:OUT };
@@ -15344,15 +15908,25 @@ class NPC {
     const rig = makeSkeleton(boneDefFromWorld(JARRAD_BONES));
     this.rig = rig;
     const P = NPC_PALETTES[palette % NPC_PALETTES.length];
-    const S=(t,col)=> new THREE.MeshStandardMaterial({
+    const S=(t,col,extra)=> new THREE.MeshStandardMaterial(Object.assign({
       map:t.map, roughnessMap:t.roughnessMap, normalMap:t.normalMap,
-      color:col, roughness:1, metalness:0 });
+      color:col, roughness:1, metalness:0, vertexColors:true }, extra||{}));
+    /* Hair colour follows the skin palette: fair skin, fair-to-brown hair;
+       darker skin, darker hair. Eye colour likewise. */
+    const skinC = new THREE.Color(P.skin);
+    const fair = skinC.r > 0.85;
+    const hairC = new THREE.Color().setHSL(0.07, fair ? 0.35 : 0.25, fair ? 0.30 : 0.10);
+    const irisC = new THREE.Color().setHSL(fair ? 0.56 : 0.08, 0.35, fair ? 0.32 : 0.14);
     this.mats = [
       S(lib.cloth_coat,  P.coat),
       S(lib.cloth_shirt, P.shirt),
       S(lib.skin_pale,   P.skin),
       S(lib.leather_boot,0xffffff),
       S(lib.cloth_coat,  P.hat),
+      S(lib.metal_brass, 0xcfa95c, {metalness:0.8, roughness:0.36}),
+      new THREE.MeshStandardMaterial({color:0xf2ede4, roughness:0.45, vertexColors:true}),
+      new THREE.MeshStandardMaterial({color:irisC, roughness:0.22, vertexColors:true}),
+      S(lib.hide_wolf, hairC, {roughness:0.9}),
     ];
     this.outfit = variant.outfit;
     this.mesh = new THREE.SkinnedMesh(variant.geo, this.mats);
@@ -17635,7 +18209,7 @@ const MISSIONS = [
     steps:[
       { t:'goto', town:'gulch', r:48,
         text:'Ride to Yes Gulch',
-        hint:'Follow the road. Ollie knows the way — press F to whistle her over.' },
+        hint:'Follow the road. Ollie knows the way — press G to whistle her over.' },
       { t:'beat', kicker:'YES GULCH', title:'Population 60, and falling',
         sub:'A company town that has forgotten what the company was for' },
       { t:'talk', who:'halloran',
