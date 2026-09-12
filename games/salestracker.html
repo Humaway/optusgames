@@ -1,0 +1,3689 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Reddy Sales Tracker</title>
+<style>
+/* ==========================================================================
+   TOKENS
+   Board colours are taken straight from the store sheet and should not be
+   changed lightly — the boards are meant to read as the spreadsheet.
+   Everything outside the boards (nav, entry, admin) uses the chrome tokens.
+   ========================================================================== */
+:root{
+  /* board palette — from the sheet */
+  --plum:#5b2150;
+  --plum-ink:#43163b;
+  --forest:#143a1e;
+  --midgreen:#4e8b3a;
+  --mint:#dcefd3;
+  --valgrey:#d9d9d9;
+  --na:#000000;
+  --gridline:#ffffff;
+
+  /* chrome palette */
+  --paper:#f2f5f1;
+  --card:#ffffff;
+  --text:#1c211d;
+  --muted:#606b62;
+  --line:#dfe4de;
+  --line-strong:#c3ccc3;
+  --accent:#5b2150;
+  --accent-text:#ffffff;
+  --ok:#1f7a3d;
+  --warn:#9a6200;
+  --bad:#a32020;
+  --focus:#8fd05a;
+
+  --serif:"Rockwell","Roboto Slab","Bookman Old Style",Georgia,"Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --r:10px;
+  --tap:44px;
+  --shadow:0 1px 2px rgba(20,35,22,.10), 0 6px 18px rgba(20,35,22,.06);
+}
+[data-theme="dark"]{
+  --paper:#141815;
+  --card:#1d231f;
+  --text:#e7ede6;
+  --muted:#9aa89b;
+  --line:#2c352e;
+  --line-strong:#3b463d;
+  --accent:#84427a;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.35);
+  --gridline:#1d231f;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);color:var(--text);
+  font-family:var(--sans);font-size:16px;line-height:1.45;
+  -webkit-text-size-adjust:100%;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+h1,h2,h3{margin:0 0 .4em;line-height:1.2}
+h1{font-size:1.35rem}
+h2{font-size:1.1rem}
+h3{font-size:.98rem}
+p{margin:0 0 .7em}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.hidden{display:none !important}
+.muted{color:var(--muted)}
+.small{font-size:.85rem}
+.nowrap{white-space:nowrap}
+.right{text-align:right}
+.center{text-align:center}
+.spread{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.stack{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.grow{flex:1 1 auto;min-width:0}
+
+/* ---------- controls ---------- */
+button,.btn{
+  font:inherit;font-weight:600;cursor:pointer;
+  min-height:var(--tap);padding:10px 16px;border-radius:var(--r);
+  border:1px solid var(--line-strong);background:var(--card);color:var(--text);
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+}
+button:active{transform:translateY(1px)}
+button[disabled]{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-text)}
+.btn-go{background:var(--forest);border-color:var(--forest);color:#fff}
+.btn-danger{background:#fff;border-color:var(--bad);color:var(--bad)}
+[data-theme="dark"] .btn-danger{background:transparent}
+.btn-sm{min-height:36px;padding:6px 12px;font-size:.85rem;border-radius:8px}
+.btn-block{width:100%}
+input,select,textarea{
+  font:inherit;color:var(--text);background:var(--card);
+  min-height:var(--tap);padding:10px 12px;
+  border:1px solid var(--line-strong);border-radius:var(--r);width:100%;
+}
+textarea{min-height:72px}
+label{display:block;font-size:.85rem;font-weight:600;color:var(--muted);margin:0 0 4px}
+fieldset{border:0;margin:0;padding:0}
+.field{margin-bottom:12px}
+.inline-check{display:flex;align-items:center;gap:10px;min-height:var(--tap);font-weight:600}
+.inline-check input[type=checkbox]{width:24px;height:24px;min-height:24px;flex:0 0 auto}
+
+/* segmented buttons — big tap targets for the entry screen */
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{
+  flex:1 1 auto;min-width:88px;min-height:var(--tap);
+  background:var(--card);border:1px solid var(--line-strong);
+  font-weight:600;
+}
+.seg button[aria-pressed="true"]{
+  background:var(--forest);border-color:var(--forest);color:#fff;
+}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{min-width:74px}
+
+/* ---------- layout ---------- */
+#topbar{
+  position:sticky;top:0;z-index:40;
+  background:var(--plum);color:#fff;
+  padding:8px 12px;padding-top:calc(8px + env(safe-area-inset-top));
+  box-shadow:0 2px 10px rgba(0,0,0,.18);
+}
+#topbar .brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+#brandName{font-family:var(--serif);font-weight:700;font-size:1.05rem;letter-spacing:.2px}
+#brandSub{font-size:.78rem;opacity:.85}
+#topbar .barrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#topbar button{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);color:#fff}
+#topbar button[aria-pressed="true"]{background:#fff;color:var(--plum-ink);border-color:#fff}
+#navLinks{display:flex;gap:6px;overflow-x:auto;padding:6px 0 2px;scrollbar-width:none}
+#navLinks::-webkit-scrollbar{display:none}
+#navLinks a{
+  color:#fff;text-decoration:none;font-weight:700;font-size:.9rem;
+  padding:9px 14px;border-radius:999px;min-height:var(--tap);
+  display:inline-flex;align-items:center;white-space:nowrap;
+  background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);
+}
+#navLinks a[aria-current="page"]{background:#fff;color:var(--plum-ink);border-color:#fff}
+#whoami{font-size:.78rem;opacity:.9;text-align:right;line-height:1.25}
+main{padding:12px;max-width:1400px;margin:0 auto}
+.panel{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:14px;box-shadow:var(--shadow);margin-bottom:14px;
+}
+.panel > h2:first-child,.panel > h3:first-child{margin-top:0}
+.grid{display:grid;gap:14px}
+@media (min-width:900px){
+  .grid-mtd{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .grid-eod{grid-template-columns:minmax(0,420px) minmax(0,1fr)}
+}
+.banner{
+  padding:10px 14px;font-weight:700;text-align:center;font-size:.9rem;
+  background:var(--warn);color:#fff;
+}
+.banner.bad{background:var(--bad)}
+.banner.ok{background:var(--ok)}
+
+/* ==========================================================================
+   THE BOARD — matches the store sheet. Rows, colours and black N/A cells
+   are deliberate. Row content is driven by TUNE.boardRows in the script.
+   ========================================================================== */
+.boardwrap{overflow:hidden;border-radius:6px;background:var(--gridline)}
+table.board{
+  width:100%;border-collapse:separate;border-spacing:2px;
+  background:var(--gridline);font-family:var(--serif);table-layout:fixed;
+}
+table.board th,table.board td{
+  padding:7px 10px;font-weight:700;font-size:1.02rem;
+  border:0;vertical-align:middle;
+}
+.b-title{background:var(--plum);color:#fff;text-align:center;font-size:1.1rem;padding:10px 8px}
+.b-title .b-date{display:block;font-size:.92rem;font-weight:700;margin-top:2px}
+.b-head{background:var(--forest);color:#fff;text-align:center;font-size:.98rem}
+.b-section{background:var(--forest);color:#fff;text-align:center;letter-spacing:.5px}
+.b-cat{background:var(--midgreen);color:#fff;text-align:right;width:44%}
+.b-vol{background:var(--mint);color:#000;text-align:center;font-size:1.12rem}
+.b-val{background:var(--valgrey);color:#000;text-align:center;font-size:1.12rem}
+.b-na{background:var(--na);padding:0}
+.b-flag{outline:3px solid var(--bad);outline-offset:-3px}
+
+/* Total Points box — same treatment as the sheet's box */
+.pointsbox{width:190px;max-width:100%;border-spacing:2px;border-collapse:separate;background:var(--gridline);font-family:var(--serif)}
+.pointsbox td{padding:8px 10px;font-weight:700;text-align:center}
+.pointsbox .pb-label{background:var(--midgreen);color:#fff;font-size:1.02rem}
+.pointsbox .pb-value{background:var(--mint);color:#000;font-size:1.7rem}
+
+/* Metrics + awards panels reuse the board look */
+table.metrics,table.awards{
+  width:100%;border-collapse:separate;border-spacing:2px;background:var(--gridline);
+  font-family:var(--serif);table-layout:fixed;
+}
+table.metrics th,table.awards th,table.metrics td,table.awards td{padding:7px 10px;font-weight:700}
+.m-name{background:var(--midgreen);color:#fff;text-align:right;width:50%}
+.m-val{background:var(--mint);color:#000;text-align:center}
+.a-name{background:var(--midgreen);color:#fff;text-align:right;width:46%}
+.a-win{background:var(--mint);color:#000;text-align:center}
+.a-total{background:var(--mint);color:#000;text-align:center;width:22%;font-size:1.12rem}
+.lead-change{animation:leadpulse 1.6s ease-out 1}
+@keyframes leadpulse{0%{background:#fff5b8}100%{background:var(--mint)}}
+@media (prefers-reduced-motion:reduce){.lead-change{animation:none}}
+
+/* ---------- generic data tables (breakdown, users, history) ---------- */
+table.data{width:100%;border-collapse:collapse;font-size:.9rem}
+table.data th,table.data td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line)}
+table.data th{font-size:.78rem;color:var(--muted);cursor:pointer;white-space:nowrap}
+table.data th[data-sort]::after{content:"";opacity:.4}
+table.data th[aria-sort="ascending"]::after{content:" \25B2"}
+table.data th[aria-sort="descending"]::after{content:" \25BC"}
+table.data td.num,table.data th.num{text-align:right;font-variant-numeric:tabular-nums}
+table.data tbody tr:hover{background:rgba(78,139,58,.07)}
+.voidrow td{opacity:.5;text-decoration:line-through}
+
+/* Wide tables become stacked cards on phones. The board itself stays a grid —
+   it is only three columns and is meant to be read as the sheet. */
+@media (max-width:767px){
+  table.data,table.data tbody,table.data tr,table.data td{display:block;width:100%}
+  table.data thead{display:none}
+  table.data tr{
+    border:1px solid var(--line);border-radius:var(--r);
+    padding:8px;margin-bottom:10px;background:var(--card);
+  }
+  table.data td{border:0;padding:6px 4px;display:flex;justify-content:space-between;gap:12px}
+  table.data td::before{content:attr(data-label);font-weight:700;color:var(--muted);font-size:.78rem}
+  table.data td.num{text-align:right}
+  table.board th,table.board td{padding:6px 7px;font-size:.95rem}
+  .b-vol,.b-val{font-size:1.02rem}
+}
+
+/* ---------- entry screen ---------- */
+.basketrow{border:1px solid var(--line);border-radius:var(--r);padding:12px;background:var(--card);margin-bottom:12px}
+.basketrow.is-invalid{border-color:var(--bad);box-shadow:0 0 0 2px rgba(163,32,32,.12)}
+.basketrow header{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.basketrow .rowno{font-family:var(--serif);font-weight:700;font-size:1.05rem}
+.totalsbar{
+  position:sticky;bottom:0;z-index:30;background:var(--card);
+  border-top:2px solid var(--forest);padding:10px 12px;
+  padding-bottom:calc(10px + env(safe-area-inset-bottom));
+  display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;
+  box-shadow:0 -4px 14px rgba(0,0,0,.08);margin:0 -12px;
+}
+.totalsbar .figs{display:flex;gap:16px;font-family:var(--serif);font-weight:700}
+.totalsbar .figs span small{display:block;font-family:var(--sans);font-size:.68rem;color:var(--muted);font-weight:600}
+.success{border:2px solid var(--forest);border-radius:var(--r);padding:14px;background:var(--mint);color:#000}
+.success .pts{font-family:var(--serif);font-size:2rem;font-weight:700}
+
+/* ---------- misc ---------- */
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.72rem;font-weight:700;border:1px solid var(--line-strong);color:var(--muted)}
+.pill.mod{background:var(--plum);color:#fff;border-color:var(--plum)}
+.pill.pending{background:var(--warn);color:#fff;border-color:var(--warn)}
+.pill.user{background:var(--forest);color:#fff;border-color:var(--forest)}
+.pill.susp{background:var(--bad);color:#fff;border-color:var(--bad)}
+#toastHost{position:fixed;left:0;right:0;bottom:16px;z-index:100;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.toast{background:var(--forest);color:#fff;padding:12px 18px;border-radius:999px;font-weight:600;box-shadow:var(--shadow);max-width:92vw}
+.toast.bad{background:var(--bad)}
+.toast.warn{background:var(--warn)}
+#modalHost{position:fixed;inset:0;z-index:90;background:rgba(10,20,12,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--card);border-radius:14px;padding:18px;max-width:560px;width:100%;max-height:90vh;overflow:auto;box-shadow:var(--shadow)}
+.emptystate{padding:18px;text-align:center;color:var(--muted);border:1px dashed var(--line-strong);border-radius:var(--r)}
+.authwrap{max-width:420px;margin:8vh auto 0}
+.authwrap .logo{font-family:var(--serif);font-size:1.6rem;font-weight:700;text-align:center;margin-bottom:4px}
+.setupwarn{background:#fff3cd;border:1px solid #e0c56a;color:#5a4300;padding:12px;border-radius:var(--r);margin-bottom:12px;font-size:.9rem}
+[data-theme="dark"] .setupwarn{background:#3a3113;color:#f2e3b0}
+.trend{width:100%;height:160px;display:block}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:.92rem}
+.kv dt{color:var(--muted);font-weight:600}
+.kv dd{margin:0;font-weight:700}
+code{font-family:var(--mono);font-size:.85em;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px}
+[data-theme="dark"] code{background:rgba(255,255,255,.09)}
+.formula{font-family:var(--mono);font-size:.8rem;white-space:pre-wrap;background:rgba(0,0,0,.05);padding:10px;border-radius:8px;max-height:240px;overflow:auto}
+[data-theme="dark"] .formula{background:rgba(255,255,255,.06)}
+
+/* ---------- print: A4 month report ---------- */
+#printArea{display:none}
+@media print{
+  @page{size:A4 portrait;margin:12mm}
+  body{background:#fff;color:#000}
+  #topbar,#toastHost,#modalHost,main,.no-print{display:none !important}
+  #printArea{display:block}
+  #printArea .pbreak{break-before:page;page-break-before:always}
+  #printArea h1{font-family:var(--serif);font-size:16pt;margin-bottom:2mm}
+  #printArea .printgrid{display:grid;grid-template-columns:1fr 1fr;gap:6mm;align-items:start}
+  table.board,table.awards,table.metrics{background:#fff}
+  table.board th,table.board td,table.awards td,table.metrics td{
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
+  table.data{font-size:9pt}
+  table.data tr{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<div id="offlineBanner" class="banner hidden" role="status"></div>
+
+<header id="topbar">
+  <div class="barrow">
+    <div class="brand">
+      <span id="brandName">Yes Optus Redcliffe</span>
+      <span id="brandSub">Dealer W0405 &middot; Chloe Dunn</span>
+    </div>
+    <div class="row" style="gap:6px">
+      <div id="whoami" class="hidden"></div>
+      <button id="btnTheme" class="btn-sm" title="Toggle dark mode" aria-label="Toggle dark mode">Dark</button>
+      <button id="btnSignOut" class="btn-sm hidden">Sign out</button>
+    </div>
+  </div>
+  <nav id="navLinks" class="hidden" aria-label="Main">
+    <a href="#/mtd">Month to date</a>
+    <a href="#/eod">End of day</a>
+    <a href="#/me">My sales</a>
+    <a href="#/enter">Log a sale</a>
+    <a href="#/admin" id="navAdmin">Admin</a>
+  </nav>
+</header>
+
+<main>
+
+<!-- ============================ AUTH ============================ -->
+<section id="view-auth" class="hidden">
+  <div class="authwrap">
+    <div id="setupWarn" class="setupwarn hidden"></div>
+    <div class="panel">
+      <div class="logo" id="authStoreName">Reddy</div>
+      <p class="center muted small" style="margin-bottom:14px">Sales tracker</p>
+      <div class="seg" style="margin-bottom:14px">
+        <button id="tabSignIn" aria-pressed="true">Sign in</button>
+        <button id="tabSignUp" aria-pressed="false">Create account</button>
+      </div>
+
+      <div id="paneSignIn">
+        <div class="field"><label for="siEmail">Email</label>
+          <input id="siEmail" type="email" autocomplete="username" inputmode="email"></div>
+        <div class="field"><label for="siPass">Password</label>
+          <input id="siPass" type="password" autocomplete="current-password"></div>
+        <button id="btnSignIn" class="btn-primary btn-block">Sign in</button>
+        <button id="btnReset" class="btn-block btn-sm" style="margin-top:8px;border:0;background:none;color:var(--muted)">Email me a reset link</button>
+      </div>
+
+      <div id="paneSignUp" class="hidden">
+        <div class="field"><label for="suName">Display name (shows on the board)</label>
+          <input id="suName" maxlength="12" autocapitalize="characters" placeholder="LUKA"></div>
+        <div class="field"><label for="suEmail">Email</label>
+          <input id="suEmail" type="email" autocomplete="username" inputmode="email"></div>
+        <div class="field"><label for="suPass">Password (8+ characters)</label>
+          <input id="suPass" type="password" autocomplete="new-password"></div>
+        <div class="field"><label for="suCode">Access code (optional)</label>
+          <input id="suCode" type="password" autocomplete="off" placeholder="Leave blank unless you're a manager"></div>
+        <button id="btnSignUp" class="btn-primary btn-block">Create account</button>
+        <p class="small muted" style="margin-top:10px">New accounts wait for a manager to approve them before they can log sales.</p>
+      </div>
+
+      <p id="authMsg" class="small" style="margin-top:12px;min-height:1.2em"></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ PENDING ============================ -->
+<section id="view-pending" class="hidden">
+  <div class="authwrap">
+    <div class="panel center">
+      <h1>Waiting for approval</h1>
+      <p class="muted">Hi <strong id="pendingName">there</strong> — your account is created. A store manager needs to approve it before you can log sales.</p>
+      <p class="small muted">This screen updates by itself the moment you're approved.</p>
+      <button id="btnPendingSignOut" class="btn-sm">Sign out</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ MTD ============================ -->
+<section id="view-mtd" class="hidden">
+  <div class="panel no-print">
+    <div class="spread">
+      <div class="row">
+        <div>
+          <label for="mtdMonth">Month</label>
+          <input id="mtdMonth" type="month">
+        </div>
+        <button id="btnMtdThis" class="btn-sm">This month</button>
+      </div>
+      <div class="row" id="mtdModTools"></div>
+    </div>
+    <p id="mtdLockNote" class="small hidden" style="margin:10px 0 0"></p>
+  </div>
+
+  <div class="grid grid-mtd">
+    <div>
+      <div class="panel">
+        <div class="boardwrap"><div id="mtdBoard"></div></div>
+        <p id="mtdAssert" class="small hidden" style="color:var(--bad);margin:10px 0 0;font-weight:700"></p>
+      </div>
+      <div class="panel">
+        <div id="mtdMetrics"></div>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <div id="mtdAwards"></div>
+      </div>
+      <div class="panel">
+        <h3>By person</h3>
+        <div id="mtdBreakdown"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ EOD ============================ -->
+<section id="view-eod" class="hidden">
+  <div class="panel no-print">
+    <div class="spread">
+      <div class="row">
+        <div>
+          <label for="eodDate">Date</label>
+          <input id="eodDate" type="date">
+        </div>
+        <button id="btnEodToday" class="btn-sm">Today</button>
+      </div>
+      <div class="row" id="eodModTools"></div>
+    </div>
+    <p id="eodPostedNote" class="small hidden" style="margin:10px 0 0"></p>
+  </div>
+
+  <div class="grid grid-eod">
+    <div class="panel">
+      <div class="boardwrap"><div id="eodBoard"></div></div>
+      <p id="eodAssert" class="small hidden" style="color:var(--bad);margin:10px 0 0;font-weight:700"></p>
+    </div>
+    <div>
+      <div class="panel">
+        <div id="eodPoints"></div>
+      </div>
+      <div class="panel">
+        <div id="eodMetrics"></div>
+      </div>
+      <div class="panel">
+        <h3>Today by person</h3>
+        <div id="eodBreakdown"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ ME ============================ -->
+<section id="view-me" class="hidden">
+  <div class="panel">
+    <div class="seg" id="meScope">
+      <button data-scope="today" aria-pressed="false">Today</button>
+      <button data-scope="month" aria-pressed="true">Month to date</button>
+      <button data-scope="range" aria-pressed="false">Custom range</button>
+    </div>
+    <div id="meRangeWrap" class="row hidden" style="margin-top:10px">
+      <div class="grow"><label for="meFrom">From</label><input id="meFrom" type="date"></div>
+      <div class="grow"><label for="meTo">To</label><input id="meTo" type="date"></div>
+    </div>
+  </div>
+
+  <div class="grid grid-mtd">
+    <div>
+      <div class="panel">
+        <div class="boardwrap"><div id="meBoard"></div></div>
+      </div>
+      <div class="panel">
+        <h3>Where you sit</h3>
+        <div id="meStats"></div>
+      </div>
+    </div>
+    <div>
+      <div class="panel">
+        <h3>Daily points this month</h3>
+        <div id="meChart"></div>
+      </div>
+      <div class="panel">
+        <h3>Award standings</h3>
+        <div id="meAwardStandings"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Your sales</h3>
+    <div id="meHistory"></div>
+  </div>
+</section>
+
+<!-- ============================ ENTER ============================ -->
+<section id="view-enter" class="hidden">
+  <div class="panel">
+    <div class="spread">
+      <div class="grow">
+        <label for="entQty">How many services?</label>
+        <div class="row" style="flex-wrap:nowrap">
+          <button id="entQtyMinus" class="btn-sm" aria-label="One fewer service">&minus;</button>
+          <select id="entQty" style="max-width:120px"></select>
+          <button id="entQtyPlus" class="btn-sm" aria-label="One more service">+</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="entModPanel" class="panel hidden">
+    <div class="spread">
+      <div class="row grow">
+        <div class="grow"><label for="entDate">Business date</label><input id="entDate" type="date"></div>
+        <div class="grow"><label for="entPerson">Log for</label><select id="entPerson"></select></div>
+      </div>
+      <button id="btnEntReset" class="btn-sm">Back to today, me</button>
+    </div>
+    <p id="entBackdateNote" class="banner hidden" style="margin-top:12px;border-radius:8px"></p>
+  </div>
+
+  <div id="entSuccess" class="panel hidden"></div>
+  <div id="entRows"></div>
+
+  <div class="totalsbar">
+    <div class="figs" id="entTotals"></div>
+    <button id="btnSubmitBasket" class="btn-go">Log sales</button>
+  </div>
+
+  <div class="panel" style="margin-top:14px">
+    <h3 id="entRecentTitle">Your last 5 entries</h3>
+    <div id="entRecent"></div>
+  </div>
+</section>
+
+<!-- ============================ ADMIN ============================ -->
+<section id="view-admin" class="hidden">
+  <div class="panel">
+    <h2>Pending approvals</h2>
+    <div id="admPending"></div>
+  </div>
+  <div class="panel">
+    <h2>People</h2>
+    <div id="admUsers"></div>
+  </div>
+  <div class="panel">
+    <h2>Back-enter a sale</h2>
+    <div id="admBackdate"></div>
+  </div>
+  <div class="panel">
+    <h2>Store</h2>
+    <div id="admStore"></div>
+  </div>
+  <div class="panel">
+    <h2>Points</h2>
+    <div id="admPoints"></div>
+  </div>
+  <div class="panel">
+    <h2>Metrics panel</h2>
+    <div id="admMetrics"></div>
+  </div>
+  <div class="panel">
+    <h2>Targets</h2>
+    <div id="admTargets"></div>
+  </div>
+  <div class="panel">
+    <h2>Access code</h2>
+    <div id="admAccess"></div>
+  </div>
+  <div class="panel">
+    <h2>Data</h2>
+    <div id="admData"></div>
+  </div>
+</section>
+
+</main>
+
+<div id="printArea"></div>
+<div id="toastHost" aria-live="polite"></div>
+<div id="modalHost" class="hidden"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script>
+/* ############################################################################
+   #                                                                          #
+   #   1.  FIREBASE CONFIG  —  PASTE YOUR KEYS HERE AND NOWHERE ELSE          #
+   #                                                                          #
+   #   Firebase console > Project settings > Your apps > Web app > Config.     #
+   #   Enable: Authentication (Email/Password) and Cloud Firestore.            #
+   #                                                                          #
+   ############################################################################ */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAUaVk44uLlgwvWK1myhKMWoT-lZtuZxSo",
+  authDomain: "optussalestrack.firebaseapp.com",
+  projectId: "optussalestrack",
+  storageBucket: "optussalestrack.firebasestorage.app",
+  messagingSenderId: "297753720116",
+  appId: "1:297753720116:web:1b7bcaa90283874328e161"
+};
+
+
+/* ############################################################################
+   #                                                                          #
+   #   2.  TUNABLES  —  everything you are likely to want to change lives      #
+   #       in this one object. Editing it changes the app; no other code       #
+   #       needs touching. Values saved in Firestore by a manager (points,     #
+   #       targets, metrics, store details) override the defaults here.        #
+   #                                                                          #
+   ############################################################################ */
+
+const TUNE = {
+
+  /* ---- store identity (defaults only — editable in Admin, stored in config/store) ---- */
+  store: {
+    name:       "Yes Optus Redcliffe",  // full name, shown in the top bar
+    shortName:  "Reddy",                // the name printed on the boards
+    dealerCode: "W0405",
+    manager:    "Chloe Dunn"
+  },
+
+  /* ---- time ---- */
+  timezone: "Australia/Sydney",   // every business date is bucketed in this zone
+  /* Trading-day rollover. 0 = the day rolls at midnight (a sale at 11:58pm
+     belongs to that day). Set to 21 and anything logged from 9:00pm onwards
+     counts towards the NEXT trading day. Editable in Admin. */
+  rolloverHour: 0,
+
+  /* How long a person can edit or void their own sale before it becomes
+     manager-only. */
+  editWindowHours: 24,
+
+  /* ---- sale entry ---- */
+  planChips:      [59, 60, 70, 79, 90],  // preset plan prices, plus "Other"
+  autoUnpPrices:  [79],                  // these prices auto-tick Upgrade & Protect
+  deviceTerms:    [12, 24, 36],          // months
+  maxBasket:      10,                    // "How many services?" ceiling
+  outrightPicklist: [
+    "Galaxy Buds", "AirPods", "Case", "Screen protector", "Charger",
+    "Smart watch", "Tablet", "Speaker", "Other accessory"
+  ],
+
+  /* ---- points engine defaults (config/points overrides these) ----
+     mode "multiplier" -> points = plan price (or recharge) x value
+     mode "flat"       -> points = value
+     Nothing else in the app hard-codes a number; change these and every new
+     sale is scored the new way. Existing sales keep their stored score until
+     a manager runs the recompute in Admin.                                  */
+  points: {
+    mobile_new_consumer: { label:"Mobile new connect (consumer)", mode:"multiplier", value:1 },
+    mobile_new_business: { label:"Mobile new connect (business)", mode:"multiplier", value:1 },
+    mobile_recon:        { label:"Mobile recontract",             mode:"multiplier", value:1 },
+    handset_long:        { label:"Handset attached (24m & 36m)",  mode:"flat",       value:30 },
+    handset_12m:         { label:"Handset attached (12m)",        mode:"flat",       value:10 },
+    mbb_new:             { label:"MBB new connect",               mode:"multiplier", value:1 },
+    mbb_recon:           { label:"MBB recontract",                mode:"multiplier", value:1 },
+    mbb_device:          { label:"MBB device attached",           mode:"flat",       value:30 },
+    upgrade_protect:     { label:"Upgrade & Protect",             mode:"flat",       value:15 },
+    prepaid_sim:         { label:"Prepaid SIM (x recharge)",      mode:"multiplier", value:1.5 },
+    prepaid_device:      { label:"Prepaid device",                mode:"flat",       value:10 },
+    fixed_new:           { label:"Fixed new connect",             mode:"multiplier", value:1.5 },
+    fixed_recon:         { label:"Fixed recontract",              mode:"multiplier", value:1 },
+    outright:            { label:"Outright (each)",               mode:"flat",       value:10 }
+  },
+
+  /* Does the Handsets row count MBB devices too? The sheet lists MBB Device
+     separately, so no by default. */
+  handsetsIncludeMbb: false,
+
+  /* ---- the board ----
+     Row order and labels come straight off the sheet. `value:"na"` renders the
+     solid black cell. Add or remove rows here and every board, the CSV export
+     and the print sheet follow.                                             */
+  boardRows: [
+    { section: "CORE" },
+    { key:"total_ga",       label:"Total GA" },
+    { key:"consumer",       label:"Consumer" },
+    { key:"business",       label:"Business" },
+    { key:"recons",         label:"Recons" },
+    { key:"handsets",       label:"Handsets",       value:"na" },
+    { key:"mbb",            label:"MBB" },
+    { key:"mbb_device",     label:"MBB Device",     value:"na" },
+    { key:"unp",            label:"U&P",            value:"na" },
+    { section: "PREPAID" },
+    { key:"prepaid",        label:"Prepaid" },
+    { key:"prepaid_device", label:"Prepaid Device", value:"na" },
+    { section: "HOME" },
+    { key:"fixed_new",      label:"Fixed New" },
+    { key:"fixed_recon",    label:"Fixed Recon" }
+  ],
+
+  /* ---- Best of the Month ----
+     `metric` returns the number that wins the award, given one person's
+     rolled-up totals. Highest wins; ties list every tied handle.
+     "Captian" is spelled the way the sheet spells it — deliberate.          */
+  awards: [
+    { key:"captain_connect", label:"Captian Connect",   metric: r => r.total_ga.v,                  fmt:"int"   },
+    { key:"recon_reaper",    label:"Recon Reaper",      metric: r => r.recons.v,                    fmt:"int"   },
+    { key:"handset_hustler", label:"Handset Hustler",   metric: r => r.handsets.v,                  fmt:"int"   },
+    { key:"the_monster",     label:"The Monster (MBB)", metric: r => r.mbb.v,                       fmt:"int"   },
+    { key:"prepaid_prodigy", label:"Prepaid Prodigy",   metric: r => r.prepaid.v,                   fmt:"int"   },
+    { key:"fibre_phantom",   label:"Fibre Phantom",     metric: r => r.fixed_new.v + r.fixed_recon.v, fmt:"int" },
+    { key:"cheeky_chowner",  label:"Cheeky Chowner",    metric: r => r.totalValue,                  fmt:"int"   }
+  ],
+
+  /* Which metrics show in the Metrics panel by default. A manager can add or
+     remove rows in Admin (stored in config/metrics). Definitions live in
+     METRIC_DEFS further down — add one there and it appears in the picker.  */
+  metrics: [
+    "handset_attach", "unp_attach", "avg_plan_ga", "mbb_attach",
+    "services_per_day", "fixed_per_day", "total_points", "pct_target"
+  ],
+
+  /* ---- monthly store targets (config/targets overrides) ---- */
+  targets: { points: 0, total_ga: 0, recons: 0, handsets: 0, mbb: 0, prepaid: 0, fixed_new: 0 }
+};
+
+const SALE_CATEGORIES = [
+  { key:"mobile",   label:"Mobile",       types:[["new","New connect"],["new_business","New business"],["recon","Recontract"]] },
+  { key:"mbb",      label:"MBB",          types:[["new","New connect"],["recon","Recontract"]] },
+  { key:"prepaid",  label:"Prepaid",      types:[] },
+  { key:"fixed",    label:"Fixed home",   types:[["new","New connect"],["recon","Recontract"]] },
+  { key:"outright", label:"Outright",     types:[] }
+];
+
+
+/* ############################################################################
+   3.  UTILITIES
+   ############################################################################ */
+
+const $  = (sel, root) => (root || document).querySelector(sel);
+const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+
+function esc(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+function num(n){ const x = Number(n); return isFinite(x) ? x : 0; }
+function round1(n){ return Math.round(num(n) * 10) / 10; }
+function money(n){ return "$" + num(n).toLocaleString("en-AU", { maximumFractionDigits: 0 }); }
+function int(n){ return Math.round(num(n)).toLocaleString("en-AU"); }
+function pad2(n){ return String(n).padStart(2, "0"); }
+function pct(a, b){ return b ? Math.round((a / b) * 1000) / 10 + "%" : "—"; }
+
+/* ---- dates, all in the store's timezone ---- */
+function zoneParts(d){
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: cfgTimezone(), year:"numeric", month:"2-digit", day:"2-digit",
+    hour:"2-digit", minute:"2-digit", hour12:false
+  });
+  const p = {};
+  fmt.formatToParts(d || new Date()).forEach(x => { if (x.type !== "literal") p[x.type] = x.value; });
+  return { y:+p.year, m:+p.month, d:+p.day, h:+(p.hour === "24" ? 0 : p.hour), min:+p.minute };
+}
+function cfgTimezone(){ return (state.storeCfg && state.storeCfg.timezone) || TUNE.timezone; }
+function cfgRollover(){
+  const v = state.storeCfg && state.storeCfg.rolloverHour;
+  return (v === 0 || v) ? num(v) : TUNE.rolloverHour;
+}
+function ymd(y, m, d){ return y + "-" + pad2(m) + "-" + pad2(d); }
+
+/* The business date a sale logged at `when` belongs to. */
+function businessDateFor(when){
+  const p = zoneParts(when || new Date());
+  let dt = new Date(Date.UTC(p.y, p.m - 1, p.d));
+  const roll = cfgRollover();
+  if (roll > 0 && p.h >= roll) dt = new Date(dt.getTime() + 86400000);
+  return ymd(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+}
+function todayBD(){ return businessDateFor(new Date()); }
+function monthOf(bd){ return String(bd).slice(0, 7); }
+function thisMonth(){ return monthOf(todayBD()); }
+function dmy(bd){
+  if (!bd) return "";
+  const [y, m, d] = String(bd).split("-");
+  return num(d) + "/" + num(m) + "/" + y;
+}
+function monthLabel(m){
+  const [y, mo] = String(m).split("-");
+  const names = ["January","February","March","April","May","June","July",
+                 "August","September","October","November","December"];
+  return names[num(mo) - 1] + " " + y;
+}
+function addDays(bd, n){
+  const [y, m, d] = String(bd).split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + n));
+  return ymd(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+}
+function toUTC(bd){
+  const [y, m, d] = String(bd).split("-").map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+function daysBetween(a, b){ return Math.round((toUTC(b) - toUTC(a)) / 86400000); }
+function daysInMonth(m){
+  const [y, mo] = String(m).split("-").map(Number);
+  return new Date(Date.UTC(y, mo, 0)).getUTCDate();
+}
+/* Days elapsed in a month — used for the per-day metrics. */
+function elapsedDays(m){
+  const t = todayBD();
+  if (monthOf(t) === m) return num(t.slice(8));
+  return daysInMonth(m);
+}
+function hoursSince(ts){
+  if (!ts) return 1e9;
+  const ms = ts.toMillis ? ts.toMillis() : (ts.seconds ? ts.seconds * 1000 : +new Date(ts));
+  return (Date.now() - ms) / 3600000;
+}
+function tsToLocal(ts){
+  if (!ts) return "";
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleString("en-AU", { timeZone: cfgTimezone(), day:"numeric", month:"short",
+                                     hour:"numeric", minute:"2-digit" });
+}
+
+/* ---- SHA-256. Uses WebCrypto where available (including file:// in Chrome
+        and Firefox) and falls back to a small pure-JS implementation so the
+        access code still works everywhere. ---- */
+async function sha256Hex(str){
+  try {
+    if (window.crypto && crypto.subtle && crypto.subtle.digest) {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+  } catch (e) { /* fall through */ }
+  return sha256Fallback(str);
+}
+function sha256Fallback(ascii){
+  function rr(v, a){ return (v >>> a) | (v << (32 - a)); }
+  const K = [], H = [];
+  let p = 2, n = 0;
+  while (n < 64) {
+    let isP = true;
+    for (let f = 2; f * f <= p; f++) if (p % f === 0) { isP = false; break; }
+    if (isP) {
+      if (n < 8) H[n] = (Math.pow(p, 0.5) % 1 * 4294967296) | 0;
+      K[n] = (Math.pow(p, 1 / 3) % 1 * 4294967296) | 0;
+      n++;
+    }
+    p++;
+  }
+  const bytes = [];
+  const utf8 = unescape(encodeURIComponent(ascii));
+  for (let i = 0; i < utf8.length; i++) bytes.push(utf8.charCodeAt(i) & 0xff);
+  const bitLen = bytes.length * 8;
+  bytes.push(0x80);
+  while (bytes.length % 64 !== 56) bytes.push(0);
+  for (let i = 7; i >= 0; i--) bytes.push((bitLen / Math.pow(2, i * 8)) & 0xff);
+  const w = new Array(64);
+  const h = H.slice();
+  for (let b = 0; b < bytes.length; b += 64) {
+    for (let i = 0; i < 16; i++) {
+      w[i] = (bytes[b + i * 4] << 24) | (bytes[b + i * 4 + 1] << 16) |
+             (bytes[b + i * 4 + 2] << 8) | bytes[b + i * 4 + 3];
+    }
+    for (let i = 16; i < 64; i++) {
+      const s0 = rr(w[i - 15], 7) ^ rr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+      const s1 = rr(w[i - 2], 17) ^ rr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+    }
+    let [a, bb, c, d, e, f, g, hh] = h;
+    for (let i = 0; i < 64; i++) {
+      const S1 = rr(e, 6) ^ rr(e, 11) ^ rr(e, 25);
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (hh + S1 + ch + K[i] + w[i]) | 0;
+      const S0 = rr(a, 2) ^ rr(a, 13) ^ rr(a, 22);
+      const mj = (a & bb) ^ (a & c) ^ (bb & c);
+      const t2 = (S0 + mj) | 0;
+      hh = g; g = f; f = e; e = (d + t1) | 0;
+      d = c; c = bb; bb = a; a = (t1 + t2) | 0;
+    }
+    h[0] = (h[0] + a) | 0;  h[1] = (h[1] + bb) | 0; h[2] = (h[2] + c) | 0;  h[3] = (h[3] + d) | 0;
+    h[4] = (h[4] + e) | 0;  h[5] = (h[5] + f) | 0;  h[6] = (h[6] + g) | 0;  h[7] = (h[7] + hh) | 0;
+  }
+  return h.map(x => (x >>> 0).toString(16).padStart(8, "0")).join("");
+}
+
+/* ---- feedback ---- */
+function toast(msg, kind){
+  const host = $("#toastHost");
+  const el = document.createElement("div");
+  el.className = "toast" + (kind ? " " + kind : "");
+  el.textContent = msg;
+  host.appendChild(el);
+  setTimeout(() => el.remove(), kind === "bad" ? 5200 : 3200);
+}
+function modal(html){
+  const host = $("#modalHost");
+  host.innerHTML = '<div class="modal" role="dialog" aria-modal="true">' + html + "</div>";
+  host.classList.remove("hidden");
+  return $(".modal", host);
+}
+function closeModal(){ $("#modalHost").classList.add("hidden"); $("#modalHost").innerHTML = ""; }
+
+function askConfirm(title, body, okLabel, danger){
+  return new Promise(resolve => {
+    const m = modal(
+      "<h2>" + esc(title) + "</h2><div>" + body + "</div>" +
+      '<div class="row" style="justify-content:flex-end;margin-top:16px">' +
+      '<button id="mCancel">Cancel</button>' +
+      '<button id="mOk" class="' + (danger ? "btn-danger" : "btn-primary") + '">' + esc(okLabel || "Confirm") + "</button></div>"
+    );
+    $("#mCancel", m).onclick = () => { closeModal(); resolve(false); };
+    $("#mOk", m).onclick = () => { closeModal(); resolve(true); };
+  });
+}
+function askText(title, label, value, type){
+  return new Promise(resolve => {
+    const m = modal(
+      "<h2>" + esc(title) + '</h2><div class="field"><label for="mInput">' + esc(label) + "</label>" +
+      '<input id="mInput" type="' + (type || "text") + '" value="' + esc(value || "") + '"></div>' +
+      '<div class="row" style="justify-content:flex-end"><button id="mCancel">Cancel</button>' +
+      '<button id="mOk" class="btn-primary">Save</button></div>'
+    );
+    const inp = $("#mInput", m);
+    inp.focus(); inp.select();
+    $("#mCancel", m).onclick = () => { closeModal(); resolve(null); };
+    $("#mOk", m).onclick = () => { const v = inp.value; closeModal(); resolve(v); };
+    inp.onkeydown = e => { if (e.key === "Enter") $("#mOk", m).click(); };
+  });
+}
+
+function downloadFile(filename, mime, text){
+  const blob = new Blob([text], { type: mime + ";charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+}
+async function copyText(text){
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) { /* fall through to the textarea trick */ }
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+  ta.remove();
+  return ok;
+}
+function csvCell(v){
+  const s = String(v == null ? "" : v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function csvRows(rows){ return rows.map(r => r.map(csvCell).join(",")).join("\r\n"); }
+
+/* ############################################################################
+   4.  STATE + FIREBASE INIT
+   ############################################################################ */
+
+const state = {
+  ready:false,
+  user:null,            // firebase auth user
+  profile:null,         // users/{uid}
+  users:[],             // all users (readable by approved staff)
+  route:"#/mtd",
+  monthSel:null,        // "YYYY-MM" shown on the MTD tab
+  daySel:null,          // "YYYY-MM-DD" shown on the EOD tab
+  meScope:"month",
+  meFrom:null, meTo:null,
+  sales:{},             // month -> array of sale docs
+  subs:{},              // month -> unsubscribe fn
+  storeCfg:{},          // config/store
+  pointsCfg:null,       // config/points (falls back to TUNE.points)
+  metricsCfg:null,      // config/metrics
+  targetsCfg:null,      // config/targets
+  archives:{},          // "YYYY-MM" -> archive doc (presence = month locked)
+  eodPosts:{},          // "YYYY-MM-DD" -> eod doc
+  queued:0,
+  lastLeaders:{},       // award key -> winner string, for the change animation
+  basket:[],
+  entryDate:null,       // manager back-entry: which business date to log to
+  entryPerson:null,     // manager back-entry: whose sale it is
+  lastSubmit:null,
+  submitting:false,
+  sortBreakdown:{ col:"points", dir:-1 }
+};
+
+let fbOK = false, auth = null, db = null;
+
+function configLooksUnset(){
+  return !firebaseConfig.projectId || /^PASTE_/.test(firebaseConfig.projectId) ||
+         !firebaseConfig.apiKey   || /^PASTE_/.test(firebaseConfig.apiKey);
+}
+
+function initFirebase(){
+  if (configLooksUnset()) {
+    $("#setupWarn").classList.remove("hidden");
+    $("#setupWarn").innerHTML =
+      "<strong>Firebase isn't configured yet.</strong><br>Open this file in a text editor and " +
+      "paste your keys into the <code>firebaseConfig</code> block at the top of the script. " +
+      "Until then, sign-in won't work.";
+    return false;
+  }
+  try {
+    firebase.initializeApp(firebaseConfig);
+    auth = firebase.auth();
+    db = firebase.firestore();
+    db.enablePersistence({ synchronizeTabs:true }).catch(err => {
+      // Multiple tabs or an unsupported browser. The app still works online.
+      console.warn("Offline persistence unavailable:", err && err.code);
+    });
+    fbOK = true;
+    return true;
+  } catch (e) {
+    $("#setupWarn").classList.remove("hidden");
+    $("#setupWarn").textContent = "Firebase failed to start: " + e.message;
+    return false;
+  }
+}
+
+/* ############################################################################
+   5.  AUTH + ROLES
+   ############################################################################ */
+
+function isMod(){ return !!state.profile && state.profile.role === "moderator" && !state.profile.suspended; }
+function isActive(){
+  const p = state.profile;
+  return !!p && !p.suspended && p.approved === true && (p.role === "user" || p.role === "moderator");
+}
+function monthLocked(m){ return !!state.archives[m]; }
+function canEditSale(sale){
+  if (!sale || sale.voided) return false;
+  if (monthLocked(sale.month)) return false;
+  if (isMod()) return true;
+  if (!state.user || sale.uid !== state.user.uid) return false;
+  const limit = num(state.storeCfg.editWindowHours || TUNE.editWindowHours);
+  return hoursSince(sale.createdAt) < limit;
+}
+
+function authMsg(text, bad){
+  const el = $("#authMsg");
+  el.textContent = text || "";
+  el.style.color = bad ? "var(--bad)" : "var(--ok)";
+}
+
+function slugName(s){ return String(s || "").trim().toLowerCase().replace(/\s+/g, " "); }
+
+async function doSignUp(){
+  const name = $("#suName").value.trim();
+  const email = $("#suEmail").value.trim();
+  const pass = $("#suPass").value;
+  const code = $("#suCode").value;
+
+  if (name.length < 2) return authMsg("Pick a display name of at least 2 characters.", true);
+  if (!/^[A-Za-z0-9 _.\-]+$/.test(name)) return authMsg("Display names can use letters, numbers, spaces, dot, dash and underscore.", true);
+  if (!email) return authMsg("Enter your email.", true);
+  if (pass.length < 8) return authMsg("Passwords need at least 8 characters.", true);
+
+  const btn = $("#btnSignUp");
+  btn.disabled = true;
+  authMsg("Creating your account…");
+
+  let cred = null;
+  try {
+    cred = await auth.createUserWithEmailAndPassword(email, pass);
+    const uid = cred.user.uid;
+
+    // Is the code right? Compared against a SHA-256 hash held in config/access.
+    // This runs after the account exists because the rules only let a
+    // signed-in caller read that doc.
+    let wantsMod = false;
+    if (code) {
+      const snap = await db.collection("config").doc("access").get();
+      const stored = snap.exists ? snap.data().moderatorHash : null;
+      if (stored) wantsMod = (await sha256Hex(code)) === stored;
+      if (!wantsMod) authMsg("That access code didn't match — creating a standard account.", true);
+    }
+
+    const slug = slugName(name);
+
+    // One transaction claims the display name, decides the bootstrap, and
+    // writes the profile — so two people signing up at once can't collide.
+    await db.runTransaction(async tx => {
+      const nameRef  = db.collection("displayNames").doc(slug);
+      const storeRef = db.collection("config").doc("store");
+      const userRef  = db.collection("users").doc(uid);
+
+      const nameSnap  = await tx.get(nameRef);
+      if (nameSnap.exists) throw new Error("NAME_TAKEN");
+      const storeSnap = await tx.get(storeRef);
+      const first = !storeSnap.exists || storeSnap.data().bootstrapped !== true;
+
+      const role = (first || wantsMod) ? "moderator" : "pending";
+
+      tx.set(nameRef, { uid:uid, displayName:name });
+      if (first) {
+        tx.set(storeRef, Object.assign({}, TUNE.store, {
+          bootstrapped:true,
+          timezone:TUNE.timezone,
+          rolloverHour:TUNE.rolloverHour,
+          editWindowHours:TUNE.editWindowHours
+        }), { merge:true });
+      }
+      tx.set(userRef, {
+        uid:uid,
+        displayName:name,
+        displayNameLower:slug,
+        email:email,
+        role:role,
+        approved:(role === "moderator"),
+        suspended:false,
+        storeId:(storeSnap.exists && storeSnap.data().dealerCode) || TUNE.store.dealerCode,
+        createdAt:firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    authMsg("");
+    toast("Account created");
+  } catch (e) {
+    if (e && e.message === "NAME_TAKEN") {
+      authMsg("That display name is already taken in this store. Pick another.", true);
+      if (cred && cred.user) { try { await cred.user.delete(); } catch (x) {} }
+    } else {
+      authMsg(friendlyAuthError(e), true);
+      if (cred && cred.user) { try { await cred.user.delete(); } catch (x) {} }
+    }
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function doSignIn(){
+  const email = $("#siEmail").value.trim();
+  const pass = $("#siPass").value;
+  if (!email || !pass) return authMsg("Enter your email and password.", true);
+  const btn = $("#btnSignIn");
+  btn.disabled = true;
+  authMsg("Signing in…");
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+    authMsg("");
+  } catch (e) {
+    authMsg(friendlyAuthError(e), true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function friendlyAuthError(e){
+  const c = (e && e.code) || "";
+  if (c === "auth/invalid-email") return "That email address doesn't look right.";
+  if (c === "auth/user-not-found" || c === "auth/wrong-password" || c === "auth/invalid-credential")
+    return "Email or password is wrong.";
+  if (c === "auth/email-already-in-use") return "There's already an account on that email — sign in instead.";
+  if (c === "auth/weak-password") return "Choose a longer password.";
+  if (c === "auth/network-request-failed") return "No connection to Firebase. Check the store wifi and try again.";
+  if (c === "auth/too-many-requests") return "Too many attempts. Wait a minute and try again.";
+  if (c === "permission-denied") return "Firestore rules blocked that. Check the rules block at the bottom of this file.";
+  return (e && e.message) || "Something went wrong.";
+}
+
+async function doReset(){
+  const email = $("#siEmail").value.trim();
+  if (!email) return authMsg("Type your email above first, then tap reset.", true);
+  try {
+    await auth.sendPasswordResetEmail(email);
+    authMsg("Reset link sent to " + email + ".");
+  } catch (e) { authMsg(friendlyAuthError(e), true); }
+}
+
+/* ############################################################################
+   6.  DATA LAYER  —  reads, subscriptions, writes
+   ############################################################################ */
+
+let unsubProfile = null, unsubUsers = null, unsubCfg = [], unsubArchives = null, unsubEod = null;
+
+function startSubscriptions(uid){
+  stopSubscriptions();
+
+  unsubProfile = db.collection("users").doc(uid).onSnapshot(snap => {
+    const was = state.profile;
+    state.profile = snap.exists ? snap.data() : null;
+    if (!snap.exists) {
+      // Auth account with no profile doc — happens if sign-up half-failed.
+      state.profile = null;
+    }
+    if (!was || was.role !== (state.profile && state.profile.role) ||
+        was.approved !== (state.profile && state.profile.approved)) {
+      onRoleChanged();
+    }
+    renderChrome();
+    route();
+  }, err => {
+    console.warn("profile listener", err);
+    toast("Can't read your profile — check Firestore rules.", "bad");
+  });
+
+  // config docs
+  ["store", "points", "metrics", "targets"].forEach(name => {
+    const u = db.collection("config").doc(name).onSnapshot(snap => {
+      const d = snap.exists ? snap.data() : null;
+      if (name === "store")   state.storeCfg   = d || {};
+      if (name === "points")  state.pointsCfg  = d || null;
+      if (name === "metrics") state.metricsCfg = d || null;
+      if (name === "targets") state.targetsCfg = d || null;
+      renderChrome();
+      renderCurrent();
+    }, () => {});
+    unsubCfg.push(u);
+  });
+}
+
+function onRoleChanged(){
+  if (isActive()) {
+    subscribeUsers();
+    subscribeArchives();
+    subscribeEod();
+    ensureMonth(state.monthSel || thisMonth());
+    ensureMonth(monthOf(state.daySel || todayBD()));
+  }
+}
+
+function subscribeUsers(){
+  if (unsubUsers) return;
+  unsubUsers = db.collection("users").onSnapshot(snap => {
+    state.users = snap.docs.map(d => Object.assign({ id:d.id }, d.data()));
+    renderChrome();
+    renderCurrent();
+  }, err => console.warn("users listener", err));
+}
+
+function subscribeArchives(){
+  if (unsubArchives) return;
+  unsubArchives = db.collection("archives").onSnapshot(snap => {
+    state.archives = {};
+    snap.docs.forEach(d => { state.archives[d.id] = d.data(); });
+    renderCurrent();
+  }, () => {});
+}
+
+function subscribeEod(){
+  if (unsubEod) return;
+  unsubEod = db.collection("eod").onSnapshot(snap => {
+    state.eodPosts = {};
+    snap.docs.forEach(d => { state.eodPosts[d.id] = d.data(); });
+    renderCurrent();
+  }, () => {});
+}
+
+/* One live listener per month. Equality filters only, so no composite index
+   is needed — ordering happens client-side. */
+function ensureMonth(month){
+  if (!month || state.subs[month] || !isActive()) return;
+  const storeId = storeId_();
+  state.subs[month] = db.collection("sales")
+    .where("storeId", "==", storeId)
+    .where("month", "==", month)
+    .onSnapshot({ includeMetadataChanges:true }, snap => {
+      state.sales[month] = snap.docs.map(d => Object.assign({ id:d.id }, d.data()));
+      state.queued = snap.docs.filter(d => d.metadata.hasPendingWrites).length;
+      renderOfflineBanner();
+      renderCurrent();
+    }, err => {
+      console.warn("sales listener " + month, err);
+      toast("Couldn't load " + monthLabel(month) + ".", "bad");
+    });
+}
+
+function stopSubscriptions(){
+  if (unsubProfile) { unsubProfile(); unsubProfile = null; }
+  if (unsubUsers)   { unsubUsers();   unsubUsers = null; }
+  if (unsubArchives){ unsubArchives(); unsubArchives = null; }
+  if (unsubEod)     { unsubEod();     unsubEod = null; }
+  unsubCfg.forEach(u => u && u());
+  unsubCfg = [];
+  Object.keys(state.subs).forEach(m => { state.subs[m](); delete state.subs[m]; });
+  state.sales = {};
+  state.users = [];
+}
+
+function storeId_(){ return (state.storeCfg && state.storeCfg.dealerCode) || TUNE.store.dealerCode; }
+function storeShort(){ return (state.storeCfg && state.storeCfg.shortName) || TUNE.store.shortName; }
+function storeName(){ return (state.storeCfg && state.storeCfg.name) || TUNE.store.name; }
+
+/* Live sales for a month, voided rows dropped. */
+function salesFor(month){
+  return (state.sales[month] || []).filter(s => !s.voided);
+}
+function salesForDay(bd){
+  return salesFor(monthOf(bd)).filter(s => s.businessDate === bd);
+}
+function salesForRange(from, to){
+  const out = [];
+  let m = monthOf(from);
+  const endM = monthOf(to);
+  for (let guard = 0; guard < 36; guard++) {
+    ensureMonth(m);
+    salesFor(m).forEach(s => { if (s.businessDate >= from && s.businessDate <= to) out.push(s); });
+    if (m === endM) break;
+    const [y, mo] = m.split("-").map(Number);
+    const nxt = new Date(Date.UTC(y, mo, 1));
+    m = ymd(nxt.getUTCFullYear(), nxt.getUTCMonth() + 1, 1).slice(0, 7);
+  }
+  return out;
+}
+
+/* ---- writes ---- */
+async function writeBasket(rows, businessDate, actor){
+  const W = pointsConfig();
+  const batch = db.batch();
+  const ids = [];
+  const bkey = "b" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+  const bd = businessDate || todayBD();
+
+  rows.forEach(r => {
+    const ref = db.collection("sales").doc();
+    ids.push(ref.id);
+    const sale = buildSaleDoc(r, bd, bkey, actor);
+    sale.points = computePoints(sale, W);
+    batch.set(ref, sale);
+  });
+
+  // Deliberately not awaited past the local commit: with offline persistence
+  // on, the promise resolves when the server confirms, which may be minutes
+  // away on bad in-store reception. The write is already durable locally.
+  batch.commit().catch(err => {
+    console.warn("batch commit", err);
+    toast("A sale failed to reach the server. It's queued and will retry.", "warn");
+  });
+  return ids;
+}
+
+/* `actor` is who the sale belongs to. It defaults to the signed-in person;
+   a manager back-entering a missed sale passes someone else, and the sale is
+   credited to them while `enteredBy` records who actually keyed it in. */
+function buildSaleDoc(r, bd, bkey, actor){
+  const who = actor || { uid:state.user.uid, displayName:state.profile.displayName };
+  const onBehalf = who.uid !== state.user.uid;
+  const cat = r.category;
+  const doc = {
+    uid: who.uid,
+    displayName: who.displayName,
+    enteredBy: onBehalf ? state.profile.displayName : null,
+    enteredByUid: onBehalf ? state.user.uid : null,
+    backdated: bd !== todayBD(),
+    storeId: storeId_(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    businessDate: bd,
+    month: monthOf(bd),
+    batchKey: bkey || null,
+    category: cat,
+    saleType: (cat === "prepaid" || cat === "outright") ? null : (r.saleType || null),
+    planPrice: (cat === "prepaid" || cat === "outright") ? null : num(r.planPrice),
+    device: {
+      attached: (cat === "mobile" || cat === "mbb") ? !!r.deviceAttached : false,
+      term: (cat === "mobile" || cat === "mbb") && r.deviceAttached ? num(r.term) : null,
+      model: r.model || ""
+    },
+    upgradeProtect: (cat === "mobile" || cat === "mbb") ? !!r.unp : false,
+    prepaid: cat === "prepaid"
+      ? { deviceAttached: !!r.prepaidDevice, rechargeAmount: num(r.recharge) }
+      : null,
+    outright: cat === "outright"
+      ? { description: r.description || "", value: num(r.value), qty: Math.max(1, num(r.qty) || 1) }
+      : null,
+    points: 0,
+    notes: r.notes || "",
+    voided: false,
+    voidedBy: null,
+    voidedAt: null,
+    editedAt: null,
+    editedBy: null
+  };
+  return doc;
+}
+
+async function updateSale(id, rowConfig, sale){
+  const W = pointsConfig();
+  const fresh = buildSaleDoc(rowConfig, sale.businessDate, sale.batchKey);
+  const patch = {
+    category: fresh.category,
+    saleType: fresh.saleType,
+    planPrice: fresh.planPrice,
+    device: fresh.device,
+    upgradeProtect: fresh.upgradeProtect,
+    prepaid: fresh.prepaid,
+    outright: fresh.outright,
+    notes: fresh.notes,
+    editedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    editedBy: state.profile.displayName
+  };
+  patch.points = computePoints(Object.assign({}, sale, patch), W);
+  await db.collection("sales").doc(id).update(patch);
+  await flagIfPosted(sale.businessDate, "edited", sale);
+}
+
+async function voidSale(sale){
+  await db.collection("sales").doc(sale.id).update({
+    voided:true,
+    voidedBy:state.profile.displayName,
+    voidedAt:firebase.firestore.FieldValue.serverTimestamp()
+  });
+  await flagIfPosted(sale.businessDate, "voided", sale);
+}
+
+/* Voiding or editing a sale that's already inside a posted EOD doesn't rewrite
+   the posted day — it records a discrepancy against it instead. */
+async function flagIfPosted(bd, what, sale){
+  const posted = state.eodPosts[bd];
+  if (!posted) return;
+  try {
+    await db.collection("eod").doc(bd).update({
+      discrepancies: firebase.firestore.FieldValue.arrayUnion({
+        saleId: sale.id,
+        who: state.profile.displayName,
+        action: what,
+        points: num(sale.points),
+        at: new Date().toISOString()
+      })
+    });
+    toast("Heads up: " + dmy(bd) + " was already posted. Flagged as a discrepancy.", "warn");
+  } catch (e) {
+    console.warn("discrepancy flag", e);
+  }
+}
+
+/* A sale added into a day that has already been posted doesn't rewrite the
+   posted figures — it gets flagged against them, same as a void or an edit. */
+async function flagAddedToPosted(bd, count, points, forWho){
+  if (!state.eodPosts[bd]) return;
+  try {
+    await db.collection("eod").doc(bd).update({
+      discrepancies: firebase.firestore.FieldValue.arrayUnion({
+        action:"added",
+        count:count,
+        points:num(points),
+        who:state.profile.displayName,
+        forWho:forWho,
+        at:new Date().toISOString()
+      })
+    });
+    toast(dmy(bd) + " was already posted. The added sales are flagged as a discrepancy.", "warn");
+  } catch (e) { console.warn("added-discrepancy flag", e); }
+}
+
+/* ---- online / offline ---- */
+function renderOfflineBanner(){
+  const b = $("#offlineBanner");
+  const off = !navigator.onLine;
+  if (off || state.queued > 0) {
+    b.classList.remove("hidden");
+    b.className = "banner" + (off ? " bad" : "");
+    if (off && state.queued > 0) {
+      b.textContent = "Offline — " + state.queued + " sale" + (state.queued === 1 ? "" : "s") + " queued. They'll send when signal returns.";
+    } else if (off) {
+      b.textContent = "Offline — you can keep logging sales, they'll send when signal returns.";
+    } else {
+      b.textContent = "Sending " + state.queued + " queued sale" + (state.queued === 1 ? "" : "s") + "…";
+    }
+  } else {
+    b.classList.add("hidden");
+  }
+}
+window.addEventListener("online", () => { renderOfflineBanner(); toast("Back online"); });
+window.addEventListener("offline", renderOfflineBanner);
+
+/* ############################################################################
+   7.  POINTS ENGINE
+   Weights come from config/points when a manager has saved them, otherwise
+   from TUNE.points. Points are computed here and stored on the sale doc at
+   write time so a later weight change can't silently rewrite history.
+   ############################################################################ */
+
+function pointsConfig(){
+  const base = JSON.parse(JSON.stringify(TUNE.points));
+  const saved = state.pointsCfg && state.pointsCfg.weights;
+  if (saved) {
+    Object.keys(base).forEach(k => {
+      if (saved[k]) {
+        if (saved[k].mode)  base[k].mode  = saved[k].mode;
+        if (saved[k].value !== undefined) base[k].value = num(saved[k].value);
+      }
+    });
+  }
+  return base;
+}
+
+function applyWeight(rule, base){
+  if (!rule) return 0;
+  return rule.mode === "multiplier" ? num(base) * num(rule.value) : num(rule.value);
+}
+
+function computePoints(s, W){
+  W = W || pointsConfig();
+  let p = 0;
+  const price = num(s.planPrice);
+
+  if (s.category === "mobile") {
+    if (s.saleType === "new")               p += applyWeight(W.mobile_new_consumer, price);
+    else if (s.saleType === "new_business") p += applyWeight(W.mobile_new_business, price);
+    else if (s.saleType === "recon")        p += applyWeight(W.mobile_recon, price);
+    if (s.device && s.device.attached) {
+      p += num(s.device.term) === 12
+        ? applyWeight(W.handset_12m, price)
+        : applyWeight(W.handset_long, price);
+    }
+    if (s.upgradeProtect) p += applyWeight(W.upgrade_protect, price);
+
+  } else if (s.category === "mbb") {
+    if (s.saleType === "recon") p += applyWeight(W.mbb_recon, price);
+    else                        p += applyWeight(W.mbb_new, price);
+    if (s.device && s.device.attached) p += applyWeight(W.mbb_device, price);
+    if (s.upgradeProtect)              p += applyWeight(W.upgrade_protect, price);
+
+  } else if (s.category === "prepaid") {
+    const rc = s.prepaid ? num(s.prepaid.rechargeAmount) : 0;
+    p += applyWeight(W.prepaid_sim, rc);
+    if (s.prepaid && s.prepaid.deviceAttached) p += applyWeight(W.prepaid_device, rc);
+
+  } else if (s.category === "fixed") {
+    p += s.saleType === "recon"
+      ? applyWeight(W.fixed_recon, price)
+      : applyWeight(W.fixed_new, price);
+
+  } else if (s.category === "outright") {
+    const qty = s.outright ? Math.max(1, num(s.outright.qty)) : 1;
+    p += applyWeight(W.outright, s.outright ? num(s.outright.value) : 0) * qty;
+  }
+
+  return round1(p);
+}
+
+/* Human-readable version of the live weights, shown in Admin. */
+function formulaText(W){
+  const lines = [];
+  Object.keys(W).forEach(k => {
+    const r = W[k];
+    const rhs = r.mode === "multiplier"
+      ? (r.value === 1 ? "plan cost" : r.value + " x plan cost")
+      : r.value + " pts";
+    lines.push(pad(r.label, 34) + " = " + rhs);
+  });
+  return lines.join("\n");
+  function pad(s, n){ s = String(s); return s + " ".repeat(Math.max(1, n - s.length)); }
+}
+
+/* ############################################################################
+   8.  ROLLUPS
+   One pass over a list of sales produces every board row, the points total
+   and the total dollar value written.
+   ############################################################################ */
+
+const ROLLUP_KEYS = ["total_ga","consumer","business","recons","handsets","mbb",
+                     "mbb_device","unp","prepaid","prepaid_device","fixed_new","fixed_recon"];
+
+function emptyRollup(){
+  const r = { points:0, totalValue:0, count:0, orphans:0, outright:{ v:0, $:0 } };
+  ROLLUP_KEYS.forEach(k => { r[k] = { v:0, $:0 }; });
+  return r;
+}
+
+function rollup(sales){
+  const r = emptyRollup();
+  const includeMbbInHandsets = TUNE.handsetsIncludeMbb;
+
+  (sales || []).forEach(s => {
+    if (s.voided) return;
+    r.count++;
+    r.points += num(s.points);
+    const price = num(s.planPrice);
+
+    if (s.category === "mobile") {
+      if (s.saleType === "new" || s.saleType === "new_business") {
+        r.total_ga.v++; r.total_ga.$ += price;
+        if (s.saleType === "new")          { r.consumer.v++; r.consumer.$ += price; }
+        if (s.saleType === "new_business") { r.business.v++; r.business.$ += price; }
+      } else if (s.saleType === "recon") {
+        r.recons.v++; r.recons.$ += price;
+      } else {
+        // A mobile sale with no recognised connect type belongs to no row on
+        // the sheet. Count it so the board can say so instead of losing it.
+        r.orphans++;
+      }
+      if (s.device && s.device.attached) r.handsets.v++;
+      if (s.upgradeProtect) r.unp.v++;
+      r.totalValue += price;
+
+    } else if (s.category === "mbb") {
+      r.mbb.v++; r.mbb.$ += price;
+      if (s.device && s.device.attached) {
+        r.mbb_device.v++;
+        if (includeMbbInHandsets) r.handsets.v++;
+      }
+      if (s.upgradeProtect) r.unp.v++;
+      r.totalValue += price;
+
+    } else if (s.category === "prepaid") {
+      const rc = s.prepaid ? num(s.prepaid.rechargeAmount) : 0;
+      r.prepaid.v++; r.prepaid.$ += rc;
+      if (s.prepaid && s.prepaid.deviceAttached) r.prepaid_device.v++;
+      r.totalValue += rc;
+
+    } else if (s.category === "fixed") {
+      if (s.saleType === "recon") { r.fixed_recon.v++; r.fixed_recon.$ += price; }
+      else                        { r.fixed_new.v++;   r.fixed_new.$   += price; }
+      r.totalValue += price;
+
+    } else if (s.category === "outright") {
+      const o = s.outright || {};
+      const qty = Math.max(1, num(o.qty));
+      const val = num(o.value) * qty;
+      r.outright.v += qty; r.outright.$ += val;
+      r.totalValue += val;
+    }
+  });
+
+  r.points = round1(r.points);
+  return r;
+}
+
+/* The sheet's rule: Total GA must equal Consumer + Business. If it ever
+   doesn't, something wrote a mobile sale with an unexpected type — say so on
+   the board rather than quietly disagreeing with the spreadsheet. */
+function gaAssertion(r){
+  const sum = r.consumer.v + r.business.v;
+  if (sum !== r.total_ga.v) {
+    return "Total GA (" + r.total_ga.v + ") doesn't equal Consumer + Business (" + sum +
+           "). Check the line items before trusting this board.";
+  }
+  if (r.orphans > 0) {
+    return r.orphans + " mobile sale" + (r.orphans === 1 ? " has" : "s have") +
+           " no connect type, so " + (r.orphans === 1 ? "it isn't" : "they aren't") +
+           " counted in GA or Recons. Edit " + (r.orphans === 1 ? "it" : "them") + " to fix the board.";
+  }
+  return null;
+}
+
+/* Per-person rollups. Every approved person gets a row, even on zero. */
+function perUserRollups(sales, users){
+  const byUid = {};
+  (users || []).forEach(u => {
+    if (u.approved !== true && u.role !== "moderator") return;
+    byUid[u.uid || u.id] = { uid:u.uid || u.id, name:u.displayName || "?", suspended:!!u.suspended, r:emptyRollup(), sales:[] };
+  });
+  (sales || []).forEach(s => {
+    if (s.voided) return;
+    if (!byUid[s.uid]) {
+      // Someone whose account was removed — their history still counts.
+      byUid[s.uid] = { uid:s.uid, name:s.displayName || "(removed)", suspended:false, r:emptyRollup(), sales:[], gone:true };
+    }
+    byUid[s.uid].sales.push(s);
+  });
+  Object.keys(byUid).forEach(uid => { byUid[uid].r = rollup(byUid[uid].sales); });
+  return Object.keys(byUid).map(k => byUid[k]);
+}
+
+/* ---- awards ---- */
+function awardResults(sales, users){
+  const people = perUserRollups(sales, users);
+  return TUNE.awards.map(a => {
+    let best = 0, winners = [];
+    people.forEach(p => {
+      const v = num(a.metric(p.r));
+      if (v <= 0) return;
+      if (v > best) { best = v; winners = [p.name]; }
+      else if (v === best) winners.push(p.name);
+    });
+    winners.sort();
+    return {
+      key:a.key, label:a.label,
+      winners: winners.length ? winners.join(", ") : "—",
+      total: winners.length ? best : null,
+      standings: people
+        .map(p => ({ name:p.name, v:num(a.metric(p.r)) }))
+        .sort((x, y) => y.v - x.v)
+    };
+  });
+}
+
+/* ############################################################################
+   9.  METRICS
+   Add a definition here and it turns up in the Admin picker automatically.
+   fn(r, ctx) -> string.  ctx = { days, targets, scope }
+   ############################################################################ */
+
+const METRIC_DEFS = {
+  handset_attach: {
+    label:"Handset attach rate",
+    fn:(r) => pct(r.handsets.v, r.total_ga.v + r.recons.v)
+  },
+  unp_attach: {
+    label:"U&P attach rate",
+    fn:(r) => pct(r.unp.v, r.total_ga.v + r.recons.v)
+  },
+  avg_plan_ga: {
+    label:"Average plan value (GA)",
+    fn:(r) => r.total_ga.v ? money(r.total_ga.$ / r.total_ga.v) : "—"
+  },
+  mbb_attach: {
+    label:"MBB attach rate",
+    fn:(r) => pct(r.mbb.v, r.total_ga.v + r.recons.v)
+  },
+  services_per_day: {
+    label:"Services per day",
+    fn:(r, c) => c.days ? round1(r.count / c.days) : "—"
+  },
+  fixed_per_day: {
+    label:"Fixed per day",
+    fn:(r, c) => c.days ? round1((r.fixed_new.v + r.fixed_recon.v) / c.days) : "—"
+  },
+  total_points: {
+    label:"Total points",
+    fn:(r) => int(r.points)
+  },
+  pct_target: {
+    label:"% to points target",
+    fn:(r, c) => {
+      const t = num(c.targets.points);
+      if (!t) return "—";
+      return Math.round((r.points / t) * 100) + "%";
+    }
+  },
+  total_value: {
+    label:"Total value written",
+    fn:(r) => money(r.totalValue)
+  },
+  recon_ratio: {
+    label:"Recons per GA",
+    fn:(r) => r.total_ga.v ? round1(r.recons.v / r.total_ga.v) : "—"
+  },
+  prepaid_avg: {
+    label:"Average recharge",
+    fn:(r) => r.prepaid.v ? money(r.prepaid.$ / r.prepaid.v) : "—"
+  },
+  points_per_service: {
+    label:"Points per service",
+    fn:(r) => r.count ? round1(r.points / r.count) : "—"
+  }
+};
+
+function activeMetricKeys(){
+  const saved = state.metricsCfg && Array.isArray(state.metricsCfg.list) ? state.metricsCfg.list : null;
+  return (saved || TUNE.metrics).filter(k => METRIC_DEFS[k]);
+}
+function targetsConfig(){
+  return Object.assign({}, TUNE.targets, (state.targetsCfg || {}));
+}
+
+/* Daily points for the trend chart. */
+function dailyPoints(sales, month){
+  const days = daysInMonth(month);
+  const out = [];
+  for (let d = 1; d <= days; d++) out.push({ day:d, pts:0 });
+  (sales || []).forEach(s => {
+    if (s.voided || monthOf(s.businessDate) !== month) return;
+    const d = num(String(s.businessDate).slice(8));
+    if (d >= 1 && d <= days) out[d - 1].pts += num(s.points);
+  });
+  return out;
+}
+
+/* ############################################################################
+   10.  RENDER — shared pieces
+   ############################################################################ */
+
+function renderChrome(){
+  $("#brandName").textContent = storeName();
+  $("#brandSub").textContent = "Dealer " + storeId_() +
+    ((state.storeCfg && state.storeCfg.manager) || TUNE.store.manager
+      ? " · " + ((state.storeCfg && state.storeCfg.manager) || TUNE.store.manager) : "");
+  $("#authStoreName").textContent = storeShort();
+
+  const signedIn = !!state.user;
+  $("#btnSignOut").classList.toggle("hidden", !signedIn);
+  $("#navLinks").classList.toggle("hidden", !isActive());
+  $("#navAdmin").classList.toggle("hidden", !isMod());
+
+  const who = $("#whoami");
+  if (signedIn && state.profile) {
+    who.classList.remove("hidden");
+    who.innerHTML = esc(state.profile.displayName) + "<br>" +
+      '<span class="pill ' + (state.profile.role === "moderator" ? "mod" : state.profile.role === "pending" ? "pending" : "user") + '">' +
+      esc(state.profile.role === "moderator" ? "Manager" : state.profile.role === "pending" ? "Pending" : "Staff") + "</span>";
+  } else {
+    who.classList.add("hidden");
+  }
+  $$("#navLinks a").forEach(a => {
+    if (a.getAttribute("href") === state.route) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  });
+}
+
+/* ---- the board itself ---- */
+function boardHTML(r, title, dateLine){
+  let h = '<table class="board"><colgroup><col style="width:44%"><col style="width:28%"><col style="width:28%"></colgroup><tbody>';
+  h += '<tr><td class="b-title" colspan="3">' + esc(title) +
+       (dateLine ? '<span class="b-date">' + esc(dateLine) + "</span>" : "") + "</td></tr>";
+  h += '<tr><th class="b-head">CATEGORY</th><th class="b-head">VOLUME</th><th class="b-head">VALUE</th></tr>';
+
+  const flagGA = !!gaAssertion(r);
+
+  TUNE.boardRows.forEach(row => {
+    if (row.section) {
+      h += '<tr><td class="b-section" colspan="3">' + esc(row.section) + "</td></tr>";
+      return;
+    }
+    const cell = r[row.key] || { v:0, $:0 };
+    const volClass = "b-vol" + (row.key === "total_ga" && flagGA ? " b-flag" : "");
+    h += "<tr><td class=\"b-cat\">" + esc(row.label) + "</td>" +
+         '<td class="' + volClass + '">' + int(cell.v) + "</td>" +
+         (row.value === "na"
+            ? '<td class="b-na" aria-label="Not applicable"></td>'
+            : '<td class="b-val">' + int(cell.$) + "</td>") +
+         "</tr>";
+  });
+  h += "</tbody></table>";
+  return h;
+}
+
+function pointsBoxHTML(points, label){
+  return '<table class="pointsbox"><tbody>' +
+    '<tr><td class="pb-label">' + esc(label || "Total Points") + "</td></tr>" +
+    '<tr><td class="pb-value">' + int(points) + "</td></tr>" +
+    "</tbody></table>";
+}
+
+function metricsHTML(todayR, monthR, ctxToday, ctxMonth){
+  const keys = activeMetricKeys();
+  let h = '<table class="metrics"><colgroup><col style="width:50%"><col style="width:25%"><col style="width:25%"></colgroup><tbody>';
+  h += '<tr><td class="b-title" colspan="3">Metrics</td></tr>';
+  h += '<tr><th class="b-head">Metric</th><th class="b-head">Today</th><th class="b-head">Month</th></tr>';
+  if (!keys.length) {
+    h += '<tr><td class="m-name">—</td><td class="m-val">—</td><td class="m-val">—</td></tr>';
+  }
+  keys.forEach(k => {
+    const def = METRIC_DEFS[k];
+    let t = "—", m = "—";
+    try { t = String(def.fn(todayR, ctxToday)); } catch (e) { t = "—"; }
+    try { m = String(def.fn(monthR, ctxMonth)); } catch (e) { m = "—"; }
+    h += '<tr><td class="m-name">' + esc(def.label) + "</td>" +
+         '<td class="m-val">' + esc(t) + "</td>" +
+         '<td class="m-val">' + esc(m) + "</td></tr>";
+  });
+  h += "</tbody></table>";
+  return h;
+}
+
+function awardsHTML(results, animate){
+  let h = '<table class="awards"><colgroup><col style="width:46%"><col style="width:32%"><col style="width:22%"></colgroup><tbody>';
+  h += '<tr><td class="b-title" colspan="3">Best of the Month</td></tr>';
+  h += '<tr><th class="b-head"></th><th class="b-head">Winner/s</th><th class="b-head">Total</th></tr>';
+  results.forEach(a => {
+    const changed = animate && state.lastLeaders[a.key] !== undefined && state.lastLeaders[a.key] !== a.winners;
+    if (animate) state.lastLeaders[a.key] = a.winners;
+    const cls = "a-win" + (changed ? " lead-change" : "");
+    h += '<tr><td class="a-name">' + esc(a.label) + "</td>" +
+         '<td class="' + cls + '">' + esc(a.winners) + "</td>" +
+         '<td class="a-total">' + (a.total === null ? "—" : int(a.total)) + "</td></tr>";
+  });
+  h += "</tbody></table>";
+  return h;
+}
+
+/* ---- per-person breakdown ---- */
+const BREAKDOWN_COLS = [
+  { key:"name",      label:"Person",   get:p => p.name,            type:"text" },
+  { key:"total_ga",  label:"GA",       get:p => p.r.total_ga.v },
+  { key:"consumer",  label:"Cons",     get:p => p.r.consumer.v },
+  { key:"business",  label:"Bus",      get:p => p.r.business.v },
+  { key:"recons",    label:"Recons",   get:p => p.r.recons.v },
+  { key:"handsets",  label:"Handsets", get:p => p.r.handsets.v },
+  { key:"mbb",       label:"MBB",      get:p => p.r.mbb.v },
+  { key:"unp",       label:"U&P",      get:p => p.r.unp.v },
+  { key:"prepaid",   label:"Prepaid",  get:p => p.r.prepaid.v },
+  { key:"fixed",     label:"Fixed",    get:p => p.r.fixed_new.v + p.r.fixed_recon.v },
+  { key:"value",     label:"Value",    get:p => p.r.totalValue,    fmt:money },
+  { key:"points",    label:"Points",   get:p => p.r.points }
+];
+
+function breakdownHTML(people, sortState){
+  if (!people.length) return '<div class="emptystate">No one to show yet.</div>';
+  const col = BREAKDOWN_COLS.find(c => c.key === sortState.col) || BREAKDOWN_COLS[BREAKDOWN_COLS.length - 1];
+  const sorted = people.slice().sort((a, b) => {
+    const av = col.get(a), bv = col.get(b);
+    if (col.type === "text") return String(av).localeCompare(String(bv)) * sortState.dir;
+    return (num(av) - num(bv)) * sortState.dir;
+  });
+
+  let h = '<div style="overflow-x:auto"><table class="data"><thead><tr>';
+  BREAKDOWN_COLS.forEach(c => {
+    const isSort = c.key === sortState.col;
+    h += '<th data-sort="' + c.key + '"' + (c.type === "text" ? "" : ' class="num"') +
+         (isSort ? ' aria-sort="' + (sortState.dir === 1 ? "ascending" : "descending") + '"' : "") +
+         ">" + esc(c.label) + "</th>";
+  });
+  h += "</tr></thead><tbody>";
+  sorted.forEach(p => {
+    h += "<tr>";
+    BREAKDOWN_COLS.forEach(c => {
+      const raw = c.get(p);
+      const val = c.fmt ? c.fmt(raw) : (c.type === "text" ? raw : int(raw));
+      const badge = c.key === "name" && p.suspended ? ' <span class="pill susp">suspended</span>' : "";
+      h += '<td data-label="' + esc(c.label) + '"' + (c.type === "text" ? "" : ' class="num"') + ">" +
+           esc(val) + badge + "</td>";
+    });
+    h += "</tr>";
+  });
+  h += "</tbody></table></div>";
+  return h;
+}
+
+function wireBreakdownSort(container, redraw){
+  $$("th[data-sort]", container).forEach(th => {
+    th.onclick = () => {
+      const k = th.getAttribute("data-sort");
+      if (state.sortBreakdown.col === k) state.sortBreakdown.dir *= -1;
+      else state.sortBreakdown = { col:k, dir:k === "name" ? 1 : -1 };
+      redraw();
+    };
+  });
+}
+
+/* ############################################################################
+   11.  MONTH TO DATE
+   ############################################################################ */
+
+function renderMTD(){
+  const m = state.monthSel || thisMonth();
+  ensureMonth(m);
+  $("#mtdMonth").value = m;
+
+  const monthSales = salesFor(m);
+  const today = todayBD();
+  const todaySales = monthOf(today) === m ? monthSales.filter(s => s.businessDate === today) : [];
+  const rMonth = rollup(monthSales);
+  const rToday = rollup(todaySales);
+
+  $("#mtdBoard").innerHTML = boardHTML(
+    rMonth,
+    storeShort() + " (Month to Date)",
+    dmy(monthOf(today) === m ? today : m + "-" + daysInMonth(m))
+  );
+
+  const assert = gaAssertion(rMonth);
+  $("#mtdAssert").classList.toggle("hidden", !assert);
+  if (assert) $("#mtdAssert").textContent = assert;
+
+  const targets = targetsConfig();
+  $("#mtdMetrics").innerHTML = metricsHTML(
+    rToday, rMonth,
+    { days:1, targets:targets, scope:"today" },
+    { days:elapsedDays(m), targets:targets, scope:"month" }
+  );
+
+  const awards = awardResults(monthSales, state.users);
+  $("#mtdAwards").innerHTML = awardsHTML(awards, m === thisMonth());
+
+  const people = perUserRollups(monthSales, state.users);
+  $("#mtdBreakdown").innerHTML = breakdownHTML(people, state.sortBreakdown);
+  wireBreakdownSort($("#mtdBreakdown"), renderMTD);
+
+  // lock notice
+  const locked = monthLocked(m);
+  const note = $("#mtdLockNote");
+  note.classList.toggle("hidden", !locked && m === thisMonth());
+  if (locked) {
+    note.innerHTML = '<strong style="color:var(--bad)">' + monthLabel(m) + " is locked.</strong> " +
+      "It's read-only — no sales can be added, edited or voided in it.";
+  } else if (m !== thisMonth()) {
+    note.innerHTML = "Viewing " + esc(monthLabel(m)) + ". Past months are read-only for staff.";
+  }
+
+  renderMtdTools(m, locked);
+}
+
+function renderMtdTools(m, locked){
+  const host = $("#mtdModTools");
+  if (!isMod()) { host.innerHTML = ""; return; }
+  host.innerHTML =
+    '<button id="btnPrint" class="btn-sm">Print month</button>' +
+    '<button id="btnCsv" class="btn-sm">Export CSV</button>' +
+    '<button id="btnJson" class="btn-sm">Export JSON</button>' +
+    '<button id="btnImport" class="btn-sm">Import JSON</button>' +
+    (locked
+      ? '<button id="btnUnlock" class="btn-sm btn-danger">Unlock month</button>'
+      : '<button id="btnLock" class="btn-sm btn-danger">Lock month</button>');
+
+  $("#btnPrint").onclick = () => printMonth(m);
+  $("#btnCsv").onclick = () => exportCSV(m);
+  $("#btnJson").onclick = () => exportJSON(m);
+  $("#btnImport").onclick = () => importJSON();
+  if ($("#btnLock"))   $("#btnLock").onclick   = () => lockMonth(m);
+  if ($("#btnUnlock")) $("#btnUnlock").onclick = () => unlockMonth(m);
+}
+
+/* ############################################################################
+   12.  END OF DAY
+   ############################################################################ */
+
+function renderEOD(){
+  const d = state.daySel || todayBD();
+  const m = monthOf(d);
+  ensureMonth(m);
+  $("#eodDate").value = d;
+
+  const daySales = salesForDay(d);
+  const r = rollup(daySales);
+  const monthR = rollup(salesFor(m));
+
+  $("#eodBoard").innerHTML = boardHTML(r, storeShort() + " EOD", dmy(d));
+  $("#eodPoints").innerHTML = pointsBoxHTML(r.points, "Total Points");
+
+  const assert = gaAssertion(r);
+  $("#eodAssert").classList.toggle("hidden", !assert);
+  if (assert) $("#eodAssert").textContent = assert;
+
+  const targets = targetsConfig();
+  $("#eodMetrics").innerHTML = metricsHTML(
+    r, monthR,
+    { days:1, targets:targets, scope:"today" },
+    { days:elapsedDays(m), targets:targets, scope:"month" }
+  );
+
+  const people = perUserRollups(daySales, state.users).filter(p => p.r.count > 0);
+  $("#eodBreakdown").innerHTML = people.length
+    ? breakdownHTML(people, state.sortBreakdown)
+    : '<div class="emptystate">Nothing logged for ' + esc(dmy(d)) + " yet.</div>";
+  if (people.length) wireBreakdownSort($("#eodBreakdown"), renderEOD);
+
+  const posted = state.eodPosts[d];
+  const note = $("#eodPostedNote");
+  note.classList.toggle("hidden", !posted);
+  if (posted) {
+    const disc = (posted.discrepancies || []).length;
+    note.innerHTML = "<strong>Posted</strong> " + esc(tsToLocal(posted.postedAt)) +
+      " by " + esc(posted.postedBy || "?") + ". Points at posting: " + int(posted.points) +
+      (disc ? ' <span style="color:var(--bad);font-weight:700">· ' + disc +
+              " change" + (disc === 1 ? "" : "s") + " since posting</span>" : "");
+  }
+
+  renderEodTools(d, !!posted);
+}
+
+function renderEodTools(d, posted){
+  const host = $("#eodModTools");
+  let h = '<button id="btnCopyEod" class="btn-sm">Copy summary</button>';
+  if (isMod()) {
+    h += '<button id="btnPostEod" class="btn-sm btn-go"' + (posted ? " disabled" : "") + ">" +
+         (posted ? "Posted" : "Post EOD") + "</button>";
+  }
+  host.innerHTML = h;
+  $("#btnCopyEod").onclick = async () => {
+    const ok = await copyText(eodSummaryText(d));
+    toast(ok ? "Summary copied — paste it into the group chat" : "Couldn't copy. Long-press to select instead.", ok ? "" : "bad");
+  };
+  if ($("#btnPostEod") && !posted) $("#btnPostEod").onclick = () => postEOD(d);
+}
+
+function eodSummaryText(d){
+  const sales = salesForDay(d);
+  const r = rollup(sales);
+  const people = perUserRollups(sales, state.users).filter(p => p.r.count > 0)
+    .sort((a, b) => b.r.points - a.r.points);
+  const top = people.length
+    ? people.filter(p => p.r.points === people[0].r.points).map(p => p.name).join(", ")
+    : "—";
+
+  const lines = [];
+  lines.push(storeShort() + " EOD — " + dmy(d));
+  lines.push("");
+  TUNE.boardRows.forEach(row => {
+    if (row.section) { lines.push("— " + row.section + " —"); return; }
+    const c = r[row.key] || { v:0, $:0 };
+    lines.push(row.label + ": " + c.v + (row.value === "na" ? "" : "  ($" + int(c.$) + ")"));
+  });
+  if (r.outright.v) lines.push("Outright: " + r.outright.v + "  ($" + int(r.outright.$) + ")");
+  lines.push("");
+  lines.push("Total points: " + int(r.points));
+  lines.push("Total value: " + money(r.totalValue));
+  lines.push("Top performer: " + top + (people.length ? " (" + int(people[0].r.points) + " pts)" : ""));
+  return lines.join("\n");
+}
+
+async function postEOD(d){
+  const sales = salesForDay(d);
+  const r = rollup(sales);
+  const ok = await askConfirm(
+    "Post " + dmy(d) + "?",
+    "<p>This freezes the day as it stands: <strong>" + int(r.points) + " points</strong> across " +
+    r.count + " service" + (r.count === 1 ? "" : "s") + ".</p>" +
+    "<p class=\"small muted\">Sales voided or edited afterwards won't change the posted figures — they get flagged as discrepancies instead.</p>",
+    "Post EOD"
+  );
+  if (!ok) return;
+
+  const people = perUserRollups(sales, state.users).filter(p => p.r.count > 0)
+    .sort((a, b) => b.r.points - a.r.points);
+  const rows = {};
+  ROLLUP_KEYS.forEach(k => { rows[k] = { v:r[k].v, value:r[k].$ }; });
+
+  try {
+    await db.collection("eod").doc(d).set({
+      businessDate:d,
+      storeId:storeId_(),
+      month:monthOf(d),
+      rows:rows,
+      points:r.points,
+      totalValue:r.totalValue,
+      count:r.count,
+      byPerson:people.map(p => ({ name:p.name, uid:p.uid, points:p.r.points, services:p.r.count })),
+      topPerformer:people.length ? people[0].name : null,
+      summaryText:eodSummaryText(d),
+      postedBy:state.profile.displayName,
+      postedAt:firebase.firestore.FieldValue.serverTimestamp(),
+      discrepancies:[]
+    });
+    const copied = await copyText(eodSummaryText(d));
+    toast(copied ? "Posted and copied to your clipboard" : "Posted");
+  } catch (e) {
+    toast("Couldn't post: " + friendlyAuthError(e), "bad");
+  }
+}
+
+/* ############################################################################
+   13.  MY SALES
+   ############################################################################ */
+
+function meSalesAndLabel(){
+  const uid = state.user.uid;
+  const t = todayBD();
+  if (state.meScope === "today") {
+    ensureMonth(monthOf(t));
+    return { sales:salesForDay(t).filter(s => s.uid === uid), label:dmy(t), scopeDays:1 };
+  }
+  if (state.meScope === "range") {
+    const from = state.meFrom || t, to = state.meTo || t;
+    const lo = from <= to ? from : to, hi = from <= to ? to : from;
+    const days = daysBetween(lo, hi) + 1;
+    return { sales:salesForRange(lo, hi).filter(s => s.uid === uid), label:dmy(lo) + " – " + dmy(hi), scopeDays:Math.max(1, days) };
+  }
+  const m = thisMonth();
+  ensureMonth(m);
+  return { sales:salesFor(m).filter(s => s.uid === uid), label:monthLabel(m), scopeDays:elapsedDays(m) };
+}
+
+function renderMe(){
+  const { sales, label } = meSalesAndLabel();
+  const r = rollup(sales);
+  $("#meBoard").innerHTML = boardHTML(r, esc(state.profile.displayName), label);
+
+  $$("#meScope button").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.getAttribute("data-scope") === state.meScope)));
+  $("#meRangeWrap").classList.toggle("hidden", state.meScope !== "range");
+
+  // where they sit, using the current month for rank
+  const m = thisMonth();
+  const monthSales = salesFor(m);
+  const people = perUserRollups(monthSales, state.users)
+    .sort((a, b) => b.r.points - a.r.points);
+  const meIdx = people.findIndex(p => p.uid === state.user.uid);
+  const mine = meIdx >= 0 ? people[meIdx] : null;
+  const rank = meIdx >= 0 ? meIdx + 1 : "—";
+  const ahead = meIdx > 0 ? people[meIdx - 1] : null;
+
+  $("#meStats").innerHTML =
+    '<div class="row" style="gap:18px;align-items:flex-end">' +
+      pointsBoxHTML(r.points, state.meScope === "month" ? "Points This Month" : "Points") +
+      '<dl class="kv" style="flex:1 1 220px">' +
+        "<dt>Services</dt><dd>" + int(r.count) + "</dd>" +
+        "<dt>Value written</dt><dd>" + money(r.totalValue) + "</dd>" +
+        "<dt>Store rank (month)</dt><dd>" + rank + " of " + people.length + "</dd>" +
+        (mine ? "<dt>Month points</dt><dd>" + int(mine.r.points) + "</dd>" : "") +
+        (ahead ? "<dt>To pass " + esc(ahead.name) + "</dt><dd>" +
+                 int(Math.max(0, ahead.r.points - (mine ? mine.r.points : 0)) + 1) + " pts</dd>" : "") +
+      "</dl></div>";
+
+  // trend
+  const mySalesMonth = monthSales.filter(s => s.uid === state.user.uid);
+  $("#meChart").innerHTML = trendSVG(dailyPoints(mySalesMonth, m));
+
+  // award standings
+  const awards = awardResults(monthSales, state.users);
+  let ah = '<table class="data"><tbody>';
+  awards.forEach(a => {
+    const st = a.standings;
+    const idx = st.findIndex(x => x.name === state.profile.displayName);
+    const mineV = idx >= 0 ? st[idx].v : 0;
+    const leader = st.length ? st[0] : null;
+    let text;
+    if (!leader || leader.v <= 0) {
+      text = "Nobody has one yet — first in leads it.";
+    } else if (mineV > 0 && mineV === leader.v) {
+      const tied = st.filter(x => x.v === leader.v).length > 1;
+      text = tied ? "Tied in front on " + int(mineV) : "Leading on " + int(mineV);
+    } else {
+      const better = st.filter(x => x.v > mineV).length;
+      text = ordinal(better + 1) + ", " + int(leader.v - mineV) + " behind " + leader.name;
+    }
+    ah += '<tr><td data-label="Award"><strong>' + esc(a.label) + "</strong></td>" +
+          '<td data-label="You" class="num">' + esc(text) + "</td></tr>";
+  });
+  ah += "</tbody></table>";
+  $("#meAwardStandings").innerHTML = ah;
+
+  // full history for the chosen scope, newest first
+  $("#meHistory").innerHTML = historyHTML(sales, true);
+  wireHistory($("#meHistory"));
+}
+
+function ordinal(n){
+  const s = ["th", "st", "nd", "rd"], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function trendSVG(days){
+  const w = 640, h = 160, padL = 30, padB = 20, padT = 10;
+  const max = Math.max(10, ...days.map(d => d.pts));
+  const bw = (w - padL - 6) / days.length;
+  let bars = "", labels = "";
+  days.forEach((d, i) => {
+    const bh = max ? (h - padB - padT) * (d.pts / max) : 0;
+    const x = padL + i * bw;
+    const y = h - padB - bh;
+    bars += '<rect x="' + (x + 1).toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + Math.max(2, bw - 2).toFixed(1) +
+            '" height="' + Math.max(0, bh).toFixed(1) + '" fill="#4e8b3a" rx="1"></rect>';
+    if (d.day % 5 === 0 || d.day === 1) {
+      labels += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (h - 6) + '" font-size="9" text-anchor="middle" fill="currentColor" opacity=".6">' + d.day + "</text>";
+    }
+  });
+  const grid = [0, 0.5, 1].map(f => {
+    const y = padT + (h - padB - padT) * (1 - f);
+    return '<line x1="' + padL + '" y1="' + y.toFixed(1) + '" x2="' + w + '" y2="' + y.toFixed(1) +
+           '" stroke="currentColor" opacity=".15"></line>' +
+           '<text x="2" y="' + (y + 3).toFixed(1) + '" font-size="9" fill="currentColor" opacity=".6">' + Math.round(max * f) + "</text>";
+  }).join("");
+  const total = days.reduce((a, d) => a + d.pts, 0);
+  if (!total) return '<div class="emptystate">No points logged this month yet.</div>';
+  return '<svg class="trend" viewBox="0 0 ' + w + " " + h + '" preserveAspectRatio="none" role="img" aria-label="Daily points this month">' +
+         grid + bars + labels + "</svg>";
+}
+
+/* ---- sale history rows with edit / void ---- */
+function saleSummary(s){
+  const bits = [];
+  const cat = SALE_CATEGORIES.find(c => c.key === s.category);
+  bits.push(cat ? cat.label : s.category);
+  if (s.saleType) {
+    const t = (cat && cat.types.find(t => t[0] === s.saleType));
+    bits.push(t ? t[1] : s.saleType);
+  }
+  if (s.planPrice) bits.push("$" + int(s.planPrice));
+  if (s.device && s.device.attached) bits.push("device " + (s.device.term || "?") + "m" + (s.device.model ? " " + s.device.model : ""));
+  if (s.upgradeProtect) bits.push("U&P");
+  if (s.category === "prepaid") {
+    bits.push("recharge $" + int(s.prepaid ? s.prepaid.rechargeAmount : 0));
+    if (s.prepaid && s.prepaid.deviceAttached) bits.push("device");
+  }
+  if (s.category === "outright" && s.outright) {
+    bits.push((s.outright.qty > 1 ? s.outright.qty + " x " : "") + (s.outright.description || "item") + " $" + int(s.outright.value));
+  }
+  return bits.join(" · ");
+}
+
+function historyHTML(sales, showAll){
+  const all = (state.sales[thisMonth()] || []);
+  const list = sales.slice();
+  // include voided rows belonging to the same people so nothing vanishes silently
+  if (showAll) {
+    all.forEach(s => {
+      if (s.voided && s.uid === state.user.uid && !list.find(x => x.id === s.id)) list.push(s);
+    });
+  }
+  list.sort((a, b) => {
+    const am = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+    const bm = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+    return bm - am;
+  });
+  if (!list.length) return '<div class="emptystate">Nothing logged yet. Head to <strong>Log a sale</strong> to start the day.</div>';
+
+  let h = '<table class="data"><thead><tr><th>When</th><th>Sale</th><th class="num">Points</th><th></th></tr></thead><tbody>';
+  list.forEach(s => {
+    const editable = canEditSale(s);
+    h += '<tr class="' + (s.voided ? "voidrow" : "") + '">' +
+      '<td data-label="When">' + esc(dmy(s.businessDate)) + '<br><span class="small muted">' + esc(tsToLocal(s.createdAt)) + "</span></td>" +
+      '<td data-label="Sale">' + esc(saleSummary(s)) + (s.voided ? ' <span class="pill susp">void</span>' : "") +
+        (s.editedAt ? ' <span class="pill">edited</span>' : "") +
+        (s.enteredBy ? ' <span class="pill">added by ' + esc(s.enteredBy) + "</span>" : "") +
+        (s.displayName && s.uid !== state.user.uid ? ' <span class="pill">' + esc(s.displayName) + "</span>" : "") + "</td>" +
+      '<td data-label="Points" class="num">' + int(s.points) + "</td>" +
+      '<td data-label="">' + (editable
+        ? '<button class="btn-sm" data-edit="' + s.id + '">Edit</button> ' +
+          '<button class="btn-sm btn-danger" data-void="' + s.id + '">Void</button>'
+        : '<span class="small muted">' + (s.voided ? "" : "locked") + "</span>") + "</td></tr>";
+  });
+  h += "</tbody></table>";
+  return h;
+}
+
+function findSale(id){
+  let hit = null;
+  Object.keys(state.sales).forEach(m => {
+    const f = (state.sales[m] || []).find(s => s.id === id);
+    if (f) hit = f;
+  });
+  return hit;
+}
+
+function wireHistory(container){
+  $$("[data-edit]", container).forEach(b => {
+    b.onclick = () => openEditSale(b.getAttribute("data-edit"));
+  });
+  $$("[data-void]", container).forEach(b => {
+    b.onclick = async () => {
+      const s = findSale(b.getAttribute("data-void"));
+      if (!s) return;
+      const ok = await askConfirm("Void this sale?",
+        "<p>" + esc(saleSummary(s)) + " — " + int(s.points) + " points.</p>" +
+        '<p class="small muted">The row stays in the database marked void so the month still audits, but it drops out of every total.</p>',
+        "Void it", true);
+      if (!ok) return;
+      try { await voidSale(s); toast("Sale voided"); }
+      catch (e) { toast("Couldn't void: " + friendlyAuthError(e), "bad"); }
+    };
+  });
+}
+
+async function openEditSale(id){
+  const s = findSale(id);
+  if (!s) return;
+  if (!canEditSale(s)) return toast("That sale is outside your edit window.", "warn");
+  const row = saleToRow(s);
+  const m = modal("<h2>Edit sale</h2><div id=\"editHost\"></div>" +
+    '<div class="row" style="justify-content:flex-end;margin-top:14px">' +
+    '<button id="mCancel">Cancel</button><button id="mOk" class="btn-primary">Save changes</button></div>');
+  const host = $("#editHost", m);
+  const draw = () => { host.innerHTML = rowEditorHTML(row, "e"); wireRowEditor(host, row, draw, () => {}); };
+  draw();
+  $("#mCancel", m).onclick = closeModal;
+  $("#mOk", m).onclick = async () => {
+    const bad = rowProblem(row);
+    if (bad) return toast(bad, "bad");
+    closeModal();
+    try { await updateSale(id, row, s); toast("Sale updated"); }
+    catch (e) { toast("Couldn't save: " + friendlyAuthError(e), "bad"); }
+  };
+}
+
+function saleToRow(s){
+  return {
+    category:s.category,
+    saleType:s.saleType,
+    planPrice:num(s.planPrice),
+    otherPrice:!TUNE.planChips.includes(num(s.planPrice)) && num(s.planPrice) > 0,
+    deviceAttached:!!(s.device && s.device.attached),
+    term:(s.device && s.device.term) || 24,
+    model:(s.device && s.device.model) || "",
+    unp:!!s.upgradeProtect,
+    prepaidDevice:!!(s.prepaid && s.prepaid.deviceAttached),
+    recharge:s.prepaid ? num(s.prepaid.rechargeAmount) : 0,
+    description:s.outright ? s.outright.description : "",
+    value:s.outright ? num(s.outright.value) : 0,
+    qty:s.outright ? num(s.outright.qty) || 1 : 1,
+    notes:s.notes || ""
+  };
+}
+
+/* ############################################################################
+   14.  SALE ENTRY
+   ############################################################################ */
+
+function blankRow(copyFrom){
+  if (copyFrom) return JSON.parse(JSON.stringify(copyFrom));
+  return {
+    category:"mobile", saleType:"new", planPrice:TUNE.planChips[0], otherPrice:false,
+    deviceAttached:false, term:24, model:"", unp:false,
+    prepaidDevice:false, recharge:0,
+    description:"", value:0, qty:1, notes:""
+  };
+}
+
+function rowProblem(r){
+  if (r.category === "mobile" || r.category === "mbb" || r.category === "fixed") {
+    if (!r.saleType) return "Pick a connect type.";
+    if (!(num(r.planPrice) > 0)) return "Enter the plan price.";
+    if (r.deviceAttached && !num(r.term)) return "Pick a device term.";
+  }
+  if (r.category === "prepaid" && !(num(r.recharge) > 0)) return "Enter the recharge amount.";
+  if (r.category === "outright") {
+    if (!String(r.description || "").trim()) return "Say what was sold outright.";
+    if (!(num(r.value) > 0)) return "Enter the outright value.";
+  }
+  return null;
+}
+
+function rowValueOf(r){
+  if (r.category === "prepaid") return num(r.recharge);
+  if (r.category === "outright") return num(r.value) * Math.max(1, num(r.qty));
+  return num(r.planPrice);
+}
+function rowPointsOf(r){
+  if (rowProblem(r)) return 0;
+  const doc = buildSaleDoc(r, todayBD(), null);
+  return computePoints(doc, pointsConfig());
+}
+
+function segHTML(name, options, current, attr){
+  return '<div class="seg" role="group">' + options.map(o =>
+    "<button type=\"button\" data-" + attr + "=\"" + esc(o[0]) + "\" aria-pressed=\"" +
+    (String(o[0]) === String(current)) + "\">" + esc(o[1]) + "</button>").join("") + "</div>";
+}
+
+function rowEditorHTML(r, idPrefix){
+  const cat = SALE_CATEGORIES.find(c => c.key === r.category) || SALE_CATEGORIES[0];
+  let h = "";
+
+  h += '<div class="field"><label>Service</label>' +
+       segHTML("cat", SALE_CATEGORIES.map(c => [c.key, c.label]), r.category, "cat") + "</div>";
+
+  if (cat.types.length) {
+    h += '<div class="field"><label>Type</label>' +
+         segHTML("type", cat.types, r.saleType, "type") + "</div>";
+  }
+
+  if (r.category === "mobile" || r.category === "mbb" || r.category === "fixed") {
+    const chips = TUNE.planChips.map(p => [p, "$" + p]).concat([["other", "Other"]]);
+    const cur = r.otherPrice ? "other" : num(r.planPrice);
+    h += '<div class="field"><label>Plan price / month</label>' +
+         '<div class="chips">' + chips.map(c =>
+           '<button type="button" data-price="' + esc(c[0]) + '" aria-pressed="' +
+           (String(c[0]) === String(cur)) + '">' + esc(c[1]) + "</button>").join("") + "</div>";
+    if (r.otherPrice) {
+      h += '<input type="number" inputmode="decimal" min="0" step="1" data-field="planPrice" value="' +
+           (num(r.planPrice) || "") + '" placeholder="Plan price" style="margin-top:8px">';
+    }
+    h += "</div>";
+  }
+
+  if (r.category === "mobile" || r.category === "mbb") {
+    h += '<label class="inline-check"><input type="checkbox" data-check="deviceAttached"' +
+         (r.deviceAttached ? " checked" : "") + "> " +
+         (r.category === "mbb" ? "MBB device attached" : "Handset attached") + "</label>";
+    if (r.deviceAttached) {
+      h += '<div class="field"><label>Term</label>' +
+           segHTML("term", TUNE.deviceTerms.map(t => [t, t + " months"]), r.term, "term") +
+           '<input data-field="model" value="' + esc(r.model) + '" placeholder="Model (optional)" style="margin-top:8px">' +
+           "</div>";
+    }
+    h += '<label class="inline-check"><input type="checkbox" data-check="unp"' +
+         (r.unp ? " checked" : "") + "> Upgrade &amp; Protect</label>";
+  }
+
+  if (r.category === "prepaid") {
+    h += '<label class="inline-check"><input type="checkbox" data-check="prepaidDevice"' +
+         (r.prepaidDevice ? " checked" : "") + "> Prepaid device attached</label>";
+    h += '<div class="field"><label>Recharge amount</label>' +
+         '<input type="number" inputmode="decimal" min="0" step="1" data-field="recharge" value="' +
+         (num(r.recharge) || "") + '" placeholder="e.g. 150"></div>';
+  }
+
+  if (r.category === "outright") {
+    h += '<div class="field"><label>What was sold</label>' +
+         '<input list="' + idPrefix + 'OutrightList" data-field="description" value="' + esc(r.description) + '" placeholder="Galaxy Buds">' +
+         '<datalist id="' + idPrefix + 'OutrightList">' +
+         TUNE.outrightPicklist.map(o => '<option value="' + esc(o) + '">').join("") + "</datalist></div>";
+    h += '<div class="row"><div class="grow"><label>Value each</label>' +
+         '<input type="number" inputmode="decimal" min="0" step="1" data-field="value" value="' + (num(r.value) || "") + '"></div>' +
+         '<div style="width:110px"><label>Qty</label>' +
+         '<input type="number" inputmode="numeric" min="1" step="1" data-field="qty" value="' + (Math.max(1, num(r.qty)) || 1) + '"></div></div>';
+  }
+
+  h += '<div class="field"><label>Notes (optional)</label><input data-field="notes" value="' + esc(r.notes) + '"></div>';
+  return h;
+}
+
+/* Wire a row editor. `rerender` is called for changes that change the shape of
+   the form; `soft` for typing that only affects the running totals. */
+function wireRowEditor(scope, r, rerender, soft){
+  $$("[data-cat]", scope).forEach(b => b.onclick = () => {
+    r.category = b.getAttribute("data-cat");
+    const cat = SALE_CATEGORIES.find(c => c.key === r.category);
+    r.saleType = cat.types.length ? (cat.types.find(t => t[0] === r.saleType) ? r.saleType : cat.types[0][0]) : null;
+    rerender();
+  });
+  $$("[data-type]", scope).forEach(b => b.onclick = () => { r.saleType = b.getAttribute("data-type"); rerender(); });
+  $$("[data-term]", scope).forEach(b => b.onclick = () => { r.term = num(b.getAttribute("data-term")); rerender(); });
+
+  $$("[data-price]", scope).forEach(b => b.onclick = () => {
+    const v = b.getAttribute("data-price");
+    if (v === "other") { r.otherPrice = true; }
+    else {
+      r.otherPrice = false;
+      r.planPrice = num(v);
+      // $79 carries Upgrade & Protect — tick it for them.
+      if (TUNE.autoUnpPrices.includes(num(v)) && (r.category === "mobile" || r.category === "mbb")) r.unp = true;
+    }
+    rerender();
+  });
+
+  $$("[data-check]", scope).forEach(cb => cb.onchange = async () => {
+    const f = cb.getAttribute("data-check");
+    if (f === "unp" && !cb.checked) {
+      // Untick needs a deliberate second tap so it can't be knocked off by accident.
+      cb.checked = true;
+      const ok = await askConfirm("Remove Upgrade & Protect?",
+        "<p>This sale is set to include U&amp;P. Removing it drops the points for the line.</p>", "Remove it", true);
+      if (!ok) return;
+      r.unp = false;
+    } else {
+      r[f] = cb.checked;
+    }
+    rerender();
+  });
+
+  $$("[data-field]", scope).forEach(inp => inp.oninput = () => {
+    const f = inp.getAttribute("data-field");
+    r[f] = (inp.type === "number") ? num(inp.value) : inp.value;
+    soft();
+  });
+}
+
+function renderEnter(){
+  if (!state.basket.length) state.basket = [blankRow()];
+
+  // quantity control
+  const sel = $("#entQty");
+  if (sel.options.length !== TUNE.maxBasket) {
+    sel.innerHTML = "";
+    for (let i = 1; i <= TUNE.maxBasket; i++) {
+      const o = document.createElement("option");
+      o.value = i; o.textContent = i + (i === 1 ? " service" : " services");
+      sel.appendChild(o);
+    }
+  }
+  sel.value = state.basket.length;
+
+  renderEntryModPanel();
+
+  // rows
+  const host = $("#entRows");
+  host.innerHTML = state.basket.map((r, i) => {
+    const problem = rowProblem(r);
+    return '<div class="basketrow' + (problem ? " is-invalid" : "") + '" data-idx="' + i + '">' +
+      "<header><span class=\"rowno\">Service " + (i + 1) + "</span>" +
+      '<span class="row" style="gap:6px">' +
+        (i > 0 ? '<button class="btn-sm" data-same="' + i + '">Same again</button>' : "") +
+        (state.basket.length > 1 ? '<button class="btn-sm btn-danger" data-del="' + i + '">Remove</button>' : "") +
+      "</span></header>" +
+      '<div class="roweditor"></div>' +
+      (problem ? '<p class="small" style="color:var(--bad);font-weight:600;margin:6px 0 0">' + esc(problem) + "</p>" : "") +
+      "</div>";
+  }).join("");
+
+  $$(".basketrow", host).forEach(div => {
+    const i = num(div.getAttribute("data-idx"));
+    const r = state.basket[i];
+    const scope = $(".roweditor", div);
+    scope.innerHTML = rowEditorHTML(r, "b" + i);
+    wireRowEditor(scope, r, renderEnter, renderEntryTotals);
+  });
+  $$("[data-same]", host).forEach(b => b.onclick = () => {
+    const i = num(b.getAttribute("data-same"));
+    state.basket[i] = blankRow(state.basket[i - 1]);
+    renderEnter();
+  });
+  $$("[data-del]", host).forEach(b => b.onclick = () => {
+    state.basket.splice(num(b.getAttribute("data-del")), 1);
+    renderEnter();
+  });
+
+  renderEntryTotals();
+  renderRecent();
+  renderSuccess();
+}
+
+function renderEntryTotals(){
+  const value = state.basket.reduce((a, r) => a + rowValueOf(r), 0);
+  const pts = state.basket.reduce((a, r) => a + rowPointsOf(r), 0);
+  $("#entTotals").innerHTML =
+    "<span>" + state.basket.length + "<small>services</small></span>" +
+    "<span>" + money(value) + "<small>value</small></span>" +
+    "<span>" + int(pts) + "<small>points</small></span>";
+  const blocked = state.basket.some(r => rowProblem(r)) || state.submitting ||
+                  monthLocked(monthOf(entryDate()));
+  $("#btnSubmitBasket").disabled = blocked;
+  $("#btnSubmitBasket").textContent = state.submitting ? "Saving…"
+    : "Log " + state.basket.length + " sale" + (state.basket.length === 1 ? "" : "s");
+}
+
+/* Managers can point the entry screen at another date and another person.
+   Everyone else always logs today, as themselves. */
+function entryDate(){
+  return (isMod() && state.entryDate) ? state.entryDate : todayBD();
+}
+function entryActor(){
+  if (isMod() && state.entryPerson && state.entryPerson !== state.user.uid) {
+    const u = state.users.find(x => (x.uid || x.id) === state.entryPerson);
+    if (u) return { uid:u.uid || u.id, displayName:u.displayName };
+  }
+  return { uid:state.user.uid, displayName:state.profile.displayName };
+}
+function entryIsBackEntry(){
+  return isMod() && (entryDate() !== todayBD() || entryActor().uid !== state.user.uid);
+}
+
+function renderEntryModPanel(){
+  const panel = $("#entModPanel");
+  panel.classList.toggle("hidden", !isMod());
+  if (!isMod()) return;
+
+  const bd = entryDate();
+  const me = state.user.uid;
+  $("#entDate").value = bd;
+  $("#entDate").max = todayBD();
+
+  const people = state.users
+    .filter(u => u.approved === true && !u.suspended)
+    .sort((a, b) => String(a.displayName).localeCompare(String(b.displayName)));
+  const chosen = state.entryPerson || me;
+  let opts = people.map(u => {
+    const uid = u.uid || u.id;
+    return '<option value="' + esc(uid) + '"' + (uid === chosen ? " selected" : "") + ">" +
+           esc(u.displayName) + (uid === me ? " (you)" : "") + "</option>";
+  }).join("");
+  if (!people.some(u => (u.uid || u.id) === me)) {
+    opts = '<option value="' + esc(me) + '"' + (chosen === me ? " selected" : "") + ">" +
+           esc(state.profile.displayName) + " (you)</option>" + opts;
+  }
+  $("#entPerson").innerHTML = opts;
+
+  const actor = entryActor();
+  const note = $("#entBackdateNote");
+  const locked = monthLocked(monthOf(bd));
+  const posted = !!state.eodPosts[bd];
+
+  if (locked) {
+    note.classList.remove("hidden");
+    note.className = "banner bad";
+    note.textContent = monthLabel(monthOf(bd)) + " is locked. Unlock it in Admin before adding sales to it.";
+  } else if (entryIsBackEntry()) {
+    note.classList.remove("hidden");
+    note.className = "banner";
+    note.textContent = "Back-entry: these will be logged to " + actor.displayName +
+      " on " + dmy(bd) + "." +
+      (posted ? " That day is already posted, so they'll be flagged as a discrepancy." : "");
+  } else {
+    note.classList.add("hidden");
+  }
+}
+
+function renderRecent(){
+  const m = monthOf(entryDate());
+  ensureMonth(m);
+  const actor = entryActor();
+  $("#entRecentTitle").textContent =
+    (actor.uid === state.user.uid ? "Your" : actor.displayName + "'s") + " last 5 entries" +
+    (m !== thisMonth() ? " — " + monthLabel(m) : "");
+  const mine = salesFor(m).filter(s => s.uid === actor.uid);
+  mine.sort((a, b) => {
+    const am = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : Date.now();
+    const bm = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : Date.now();
+    return bm - am;
+  });
+  const last5 = mine.slice(0, 5);
+  $("#entRecent").innerHTML = last5.length
+    ? historyHTML(last5, false)
+    : '<div class="emptystate">Nothing logged for ' + esc(monthLabel(m)) + " yet.</div>";
+  wireHistory($("#entRecent"));
+}
+
+function renderSuccess(){
+  const host = $("#entSuccess");
+  const last = state.lastSubmit;
+  if (!last) { host.classList.add("hidden"); return; }
+  host.classList.remove("hidden");
+
+  const month = last.month || thisMonth();
+  const monthSales = salesFor(month);
+  const people = perUserRollups(monthSales, state.users).sort((a, b) => b.r.points - a.r.points);
+  const idx = people.findIndex(p => p.uid === last.uid);
+  const awards = awardResults(monthSales, state.users);
+  const leading = awards.filter(a => a.winners.split(", ").includes(last.name));
+  const self = last.uid === state.user.uid;
+  const subject = self ? "You're" : esc(last.name) + " is";
+
+  host.innerHTML = '<div class="success">' +
+    "<div>Logged " + last.count + " service" + (last.count === 1 ? "" : "s") +
+      (self ? "" : " for " + esc(last.name)) +
+      (last.businessDate !== todayBD() ? " on " + esc(dmy(last.businessDate)) : "") + "</div>" +
+    '<div class="pts">+' + int(last.points) + " points</div>" +
+    "<div>" + (idx >= 0
+      ? subject + " " + ordinal(idx + 1) + " in the store for " + esc(monthLabel(month)) +
+        " on " + int(people[idx].r.points) + " points."
+      : "") + "</div>" +
+    (leading.length
+      ? "<div>" + (self ? "Currently holding " : "Currently holding ") + leading.map(a => esc(a.label)).join(", ") + ".</div>"
+      : "") +
+    '<button id="btnAnother" class="btn-go" style="margin-top:10px">Log another</button>' +
+    "</div>";
+  $("#btnAnother").onclick = () => {
+    state.lastSubmit = null;
+    state.basket = [blankRow()];
+    renderEnter();
+    window.scrollTo({ top:0, behavior:"smooth" });
+  };
+}
+
+async function submitBasket(){
+  if (state.submitting) return;
+  const bad = state.basket.map(rowProblem).find(Boolean);
+  if (bad) return toast(bad, "bad");
+  const bd = entryDate();
+  if (monthLocked(monthOf(bd))) return toast(monthLabel(monthOf(bd)) + " is locked.", "bad");
+
+  const actor = entryActor();
+  const pts = state.basket.reduce((a, r) => a + rowPointsOf(r), 0);
+  const count = state.basket.length;
+
+  // Back-entry is deliberate, so it takes one extra tap to confirm.
+  if (entryIsBackEntry()) {
+    const ok = await askConfirm("Log this as a back-entry?",
+      "<p><strong>" + count + " service" + (count === 1 ? "" : "s") + "</strong>, " + int(pts) +
+      " points, credited to <strong>" + esc(actor.displayName) + "</strong> on <strong>" +
+      esc(dmy(bd)) + "</strong>.</p>" +
+      (state.eodPosts[bd]
+        ? '<p class="small" style="color:var(--bad);font-weight:700">' + esc(dmy(bd)) +
+          " has already been posted as EOD. The posted figures stay as they are and this will be flagged against them.</p>"
+        : "") +
+      '<p class="small muted">Your name is recorded against the entry as the person who keyed it in.</p>',
+      "Log it");
+    if (!ok) return;
+  }
+
+  state.submitting = true;
+  renderEntryTotals();
+
+  try {
+    await writeBasket(state.basket, bd, actor);
+    await flagAddedToPosted(bd, count, pts, actor.displayName);
+    state.lastSubmit = {
+      count:count, points:pts, at:Date.now(),
+      uid:actor.uid, name:actor.displayName,
+      businessDate:bd, month:monthOf(bd)
+    };
+    state.basket = [blankRow()];
+    toast("Logged " + count + " service" + (count === 1 ? "" : "s") +
+          (actor.uid === state.user.uid ? "" : " for " + actor.displayName));
+  } catch (e) {
+    toast("Couldn't save: " + friendlyAuthError(e), "bad");
+  } finally {
+    state.submitting = false;
+    renderEnter();
+    window.scrollTo({ top:0, behavior:"smooth" });
+  }
+}
+
+/* ############################################################################
+   15.  ADMIN
+   ############################################################################ */
+
+function renderAdmin(){
+  if (!isMod()) return;
+  renderAdminPending();
+  renderAdminUsers();
+  renderAdminBackdate();
+  renderAdminStore();
+  renderAdminPoints();
+  renderAdminMetrics();
+  renderAdminTargets();
+  renderAdminAccess();
+  renderAdminData();
+}
+
+function renderAdminPending(){
+  const pend = state.users.filter(u => u.role === "pending" || u.approved !== true);
+  const host = $("#admPending");
+  if (!pend.length) { host.innerHTML = '<div class="emptystate">No one waiting.</div>'; return; }
+  host.innerHTML = '<table class="data"><tbody>' + pend.map(u =>
+    '<tr><td data-label="Name"><strong>' + esc(u.displayName) + "</strong><br>" +
+    '<span class="small muted">' + esc(u.email || "") + "</span></td>" +
+    '<td data-label="" class="num">' +
+      '<button class="btn-sm btn-go" data-approve="' + esc(u.uid || u.id) + '">Approve</button> ' +
+      '<button class="btn-sm btn-danger" data-reject="' + esc(u.uid || u.id) + '">Reject</button>' +
+    "</td></tr>").join("") + "</tbody></table>";
+
+  $$("[data-approve]", host).forEach(b => b.onclick = async () => {
+    try {
+      await db.collection("users").doc(b.getAttribute("data-approve"))
+        .update({ role:"user", approved:true, suspended:false });
+      toast("Approved");
+    } catch (e) { toast(friendlyAuthError(e), "bad"); }
+  });
+  $$("[data-reject]", host).forEach(b => b.onclick = async () => {
+    const ok = await askConfirm("Reject this account?",
+      "<p>They'll stay signed out of the boards. You can approve them later.</p>", "Reject", true);
+    if (!ok) return;
+    try {
+      await db.collection("users").doc(b.getAttribute("data-reject"))
+        .update({ approved:false, role:"pending", suspended:true });
+      toast("Rejected");
+    } catch (e) { toast(friendlyAuthError(e), "bad"); }
+  });
+}
+
+function renderAdminUsers(){
+  const host = $("#admUsers");
+  const users = state.users.slice().sort((a, b) => String(a.displayName).localeCompare(String(b.displayName)));
+  if (!users.length) { host.innerHTML = '<div class="emptystate">No accounts yet.</div>'; return; }
+  host.innerHTML = '<table class="data"><thead><tr><th>Name</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>' +
+    users.map(u => {
+      const uid = u.uid || u.id;
+      const me = state.user && uid === state.user.uid;
+      return "<tr>" +
+        '<td data-label="Name"><strong>' + esc(u.displayName) + "</strong>" + (me ? ' <span class="pill">you</span>' : "") +
+          '<br><span class="small muted">' + esc(u.email || "") + "</span></td>" +
+        '<td data-label="Role"><select data-role="' + esc(uid) + '"' + (me ? " disabled" : "") + ">" +
+          ["pending", "user", "moderator"].map(r =>
+            '<option value="' + r + '"' + (u.role === r ? " selected" : "") + ">" +
+            (r === "moderator" ? "Manager" : r === "user" ? "Staff" : "Pending") + "</option>").join("") +
+          "</select></td>" +
+        '<td data-label="Status">' + (u.suspended ? '<span class="pill susp">Suspended</span>' :
+           u.approved ? '<span class="pill user">Active</span>' : '<span class="pill pending">Not approved</span>') + "</td>" +
+        '<td data-label="" class="num">' +
+          '<button class="btn-sm" data-rename="' + esc(uid) + '">Rename</button> ' +
+          '<button class="btn-sm" data-susp="' + esc(uid) + '"' + (me ? " disabled" : "") + ">" +
+            (u.suspended ? "Restore" : "Suspend") + "</button>" +
+        "</td></tr>";
+    }).join("") + "</tbody></table>" +
+    '<p class="small muted" style="margin-top:8px">Suspending someone stops them signing in to the boards. Their past sales stay in the store totals and on past leaderboards.</p>';
+
+  $$("[data-role]", host).forEach(sel => sel.onchange = async () => {
+    const uid = sel.getAttribute("data-role");
+    const role = sel.value;
+    try {
+      await db.collection("users").doc(uid).update({
+        role:role,
+        approved:(role !== "pending")
+      });
+      toast("Role updated");
+    } catch (e) { toast(friendlyAuthError(e), "bad"); }
+  });
+  $$("[data-susp]", host).forEach(b => b.onclick = async () => {
+    const uid = b.getAttribute("data-susp");
+    const u = state.users.find(x => (x.uid || x.id) === uid);
+    try {
+      await db.collection("users").doc(uid).update({ suspended:!u.suspended });
+      toast(u.suspended ? "Restored" : "Suspended");
+    } catch (e) { toast(friendlyAuthError(e), "bad"); }
+  });
+  $$("[data-rename]", host).forEach(b => b.onclick = async () => {
+    const uid = b.getAttribute("data-rename");
+    const u = state.users.find(x => (x.uid || x.id) === uid);
+    const name = await askText("Change display name", "Shows on the boards", u.displayName);
+    if (name === null) return;
+    const trimmed = name.trim();
+    if (trimmed.length < 2) return toast("Too short.", "bad");
+    try {
+      await db.runTransaction(async tx => {
+        const newRef = db.collection("displayNames").doc(slugName(trimmed));
+        const snap = await tx.get(newRef);
+        if (snap.exists && snap.data().uid !== uid) throw new Error("NAME_TAKEN");
+        tx.set(newRef, { uid:uid, displayName:trimmed });
+        if (u.displayNameLower && u.displayNameLower !== slugName(trimmed)) {
+          tx.delete(db.collection("displayNames").doc(u.displayNameLower));
+        }
+        tx.update(db.collection("users").doc(uid), {
+          displayName:trimmed, displayNameLower:slugName(trimmed)
+        });
+      });
+      toast("Renamed. Past sales keep the old handle until you re-stamp them.");
+    } catch (e) {
+      toast(e.message === "NAME_TAKEN" ? "That name is taken." : friendlyAuthError(e), "bad");
+    }
+  });
+}
+
+function renderAdminBackdate(){
+  const host = $("#admBackdate");
+  const me = state.user.uid;
+  const people = state.users
+    .filter(u => u.approved === true && !u.suspended)
+    .sort((a, b) => String(a.displayName).localeCompare(String(b.displayName)));
+
+  host.innerHTML =
+    '<p class="small muted">For sales that were missed on the day. The sale is credited to the person you pick, on the date you pick, and your name is stored against it as the person who entered it.</p>' +
+    '<div class="row">' +
+      '<div class="grow"><label for="bdDate">Business date</label>' +
+        '<input id="bdDate" type="date" value="' + esc(state.entryDate || todayBD()) + '" max="' + esc(todayBD()) + '"></div>' +
+      '<div class="grow"><label for="bdPerson">Credit the sale to</label><select id="bdPerson">' +
+        (people.length
+          ? people.map(u => {
+              const uid = u.uid || u.id;
+              return '<option value="' + esc(uid) + '"' + (uid === (state.entryPerson || me) ? " selected" : "") + ">" +
+                     esc(u.displayName) + (uid === me ? " (you)" : "") + "</option>";
+            }).join("")
+          : '<option value="' + esc(me) + '">' + esc(state.profile.displayName) + " (you)</option>") +
+      "</select></div>" +
+      '<button id="btnBackdateGo" class="btn-primary">Open sale entry</button>' +
+    "</div>" +
+    '<p id="bdWarn" class="small" style="margin-top:8px"></p>';
+
+  const refreshWarn = () => {
+    const d = $("#bdDate").value || todayBD();
+    const warn = $("#bdWarn");
+    if (monthLocked(monthOf(d))) {
+      warn.style.color = "var(--bad)";
+      warn.textContent = monthLabel(monthOf(d)) + " is locked — unlock it below before adding sales to it.";
+    } else if (state.eodPosts[d]) {
+      warn.style.color = "var(--warn)";
+      warn.textContent = dmy(d) + " has already been posted as EOD. The posted numbers won't change; the added sales get flagged against them.";
+    } else {
+      warn.style.color = "var(--muted)";
+      warn.textContent = d === todayBD() ? "That's today — this is just the normal entry screen." : "";
+    }
+  };
+  refreshWarn();
+  $("#bdDate").onchange = refreshWarn;
+
+  $("#btnBackdateGo").onclick = () => {
+    const d = $("#bdDate").value || todayBD();
+    const who = $("#bdPerson").value;
+    state.entryDate = (d !== todayBD()) ? d : null;
+    state.entryPerson = (who !== me) ? who : null;
+    if (state.entryDate) ensureMonth(monthOf(state.entryDate));
+    location.hash = "#/enter";
+  };
+}
+
+function renderAdminStore(){
+  const c = Object.assign({}, TUNE.store, state.storeCfg);
+  $("#admStore").innerHTML =
+    '<div class="row"><div class="grow"><label for="cfgName">Store name</label><input id="cfgName" value="' + esc(c.name) + '"></div>' +
+    '<div class="grow"><label for="cfgShort">Board name</label><input id="cfgShort" value="' + esc(c.shortName) + '"></div></div>' +
+    '<div class="row"><div class="grow"><label for="cfgCode">Dealer code</label><input id="cfgCode" value="' + esc(c.dealerCode) + '"></div>' +
+    '<div class="grow"><label for="cfgMgr">Store manager</label><input id="cfgMgr" value="' + esc(c.manager || "") + '"></div></div>' +
+    '<div class="row"><div class="grow"><label for="cfgTz">Timezone</label><input id="cfgTz" value="' + esc(c.timezone || TUNE.timezone) + '"></div>' +
+    '<div class="grow"><label for="cfgRoll">Day rolls over at</label><select id="cfgRoll">' +
+      Array.from({ length:24 }, (_, i) => '<option value="' + i + '"' +
+        (num(c.rolloverHour) === i ? " selected" : "") + ">" + (i === 0 ? "Midnight" : pad2(i) + ":00") + "</option>").join("") +
+      "</select></div>" +
+    '<div class="grow"><label for="cfgWindow">Self-edit window (hours)</label>' +
+      '<input id="cfgWindow" type="number" min="0" step="1" value="' + num(c.editWindowHours || TUNE.editWindowHours) + '"></div></div>' +
+    '<p class="small muted">Changing the dealer code changes which sales this app reads. Only change it when setting the file up for a different store.</p>' +
+    '<button id="btnSaveStore" class="btn-primary">Save store details</button>';
+
+  $("#btnSaveStore").onclick = async () => {
+    try {
+      await db.collection("config").doc("store").set({
+        name:$("#cfgName").value.trim(),
+        shortName:$("#cfgShort").value.trim(),
+        dealerCode:$("#cfgCode").value.trim(),
+        manager:$("#cfgMgr").value.trim(),
+        timezone:$("#cfgTz").value.trim() || TUNE.timezone,
+        rolloverHour:num($("#cfgRoll").value),
+        editWindowHours:num($("#cfgWindow").value),
+        bootstrapped:true
+      }, { merge:true });
+      toast("Store details saved");
+    } catch (e) { toast(friendlyAuthError(e), "bad"); }
+  };
+}
+
+function renderAdminPoints(){
+  const W = pointsConfig();
+  $("#admPoints").innerHTML =
+    '<p class="small muted">"x plan cost" multiplies the plan price (or the recharge amount, for prepaid). "Flat" awards the same points every time.</p>' +
+    '<table class="data"><thead><tr><th>Event</th><th>How it scores</th><th class="num">Value</th></tr></thead><tbody>' +
+    Object.keys(W).map(k =>
+      '<tr><td data-label="Event">' + esc(W[k].label) + "</td>" +
+      '<td data-label="How"><select data-pmode="' + k + '">' +
+        '<option value="multiplier"' + (W[k].mode === "multiplier" ? " selected" : "") + ">x plan cost</option>" +
+        '<option value="flat"' + (W[k].mode === "flat" ? " selected" : "") + ">Flat points</option>" +
+      "</select></td>" +
+      '<td data-label="Value" class="num"><input type="number" step="0.5" min="0" data-pval="' + k + '" value="' + num(W[k].value) + '" style="max-width:110px"></td></tr>'
+    ).join("") + "</tbody></table>" +
+    '<div class="row" style="margin-top:12px"><button id="btnSavePoints" class="btn-primary">Save points</button>' +
+    '<button id="btnResetPoints" class="btn-sm">Reset to built-in defaults</button>' +
+    '<button id="btnRecompute" class="btn-sm btn-danger">Recompute this month</button></div>' +
+    "<h3 style=\"margin-top:16px\">Live formula</h3><div class=\"formula\">" + esc(formulaText(W)) + "</div>";
+
+  $("#btnSavePoints").onclick = async () => {
+    const weights = {};
+    Object.keys(W).forEach(k => {
+      weights[k] = {
+        label:W[k].label,
+        mode:$('[data-pmode="' + k + '"]').value,
+        value:num($('[data-pval="' + k + '"]').value)
+      };
+    });
+    try {
+      await db.collection("config").doc("points").set({ weights:weights,
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+        updatedBy:state.profile.displayName }, { merge:true });
+      toast("Points saved. New sales score the new way.");
+    } catch (e) { toast(friendlyAuthError(e), "bad"); }
+  };
+  $("#btnResetPoints").onclick = async () => {
+    const ok = await askConfirm("Reset points?", "<p>Puts every weight back to the defaults written into this file.</p>", "Reset");
+    if (!ok) return;
+    try {
+      await db.collection("config").doc("points").set({ weights:JSON.parse(JSON.stringify(TUNE.points)) });
+      toast("Points reset");
+    } catch (e) { toast(friendlyAuthError(e), "bad"); }
+  };
+  $("#btnRecompute").onclick = () => recomputeMonth(state.monthSel || thisMonth());
+}
+
+async function recomputeMonth(m){
+  if (monthLocked(m)) return toast(monthLabel(m) + " is locked.", "bad");
+  const sales = (state.sales[m] || []);
+  const ok = await askConfirm(
+    "Rescore " + monthLabel(m) + "?",
+    "<p>This rewrites the stored points on <strong>" + sales.length + " sales</strong> using the weights as they are now.</p>" +
+    '<p class="small" style="color:var(--bad);font-weight:700">Historical scores will change. If a day has already been posted as EOD, the posted figure stays but will no longer match the live board.</p>',
+    "Rescore them", true
+  );
+  if (!ok) return;
+  const W = pointsConfig();
+  let changed = 0;
+  try {
+    for (let i = 0; i < sales.length; i += 400) {
+      const batch = db.batch();
+      sales.slice(i, i + 400).forEach(s => {
+        const p = computePoints(s, W);
+        if (p !== num(s.points)) {
+          changed++;
+          batch.update(db.collection("sales").doc(s.id), { points:p });
+        }
+      });
+      await batch.commit();
+    }
+    toast("Rescored " + changed + " sale" + (changed === 1 ? "" : "s"));
+  } catch (e) { toast(friendlyAuthError(e), "bad"); }
+}
+
+function renderAdminMetrics(){
+  const active = activeMetricKeys();
+  const available = Object.keys(METRIC_DEFS).filter(k => !active.includes(k));
+  $("#admMetrics").innerHTML =
+    '<p class="small muted">These are the rows in the Metrics panel on the boards, in order.</p>' +
+    '<table class="data"><tbody>' + (active.length ? active.map((k, i) =>
+      '<tr><td data-label="Metric">' + esc(METRIC_DEFS[k].label) + "</td>" +
+      '<td data-label="" class="num">' +
+        '<button class="btn-sm" data-mup="' + i + '"' + (i === 0 ? " disabled" : "") + ">&uarr;</button> " +
+        '<button class="btn-sm" data-mdown="' + i + '"' + (i === active.length - 1 ? " disabled" : "") + ">&darr;</button> " +
+        '<button class="btn-sm btn-danger" data-mdel="' + i + '">Remove</button>' +
+      "</td></tr>").join("") : '<tr><td class="muted">None — the panel will render empty, like the sheet.</td></tr>') +
+    "</tbody></table>" +
+    (available.length
+      ? '<div class="row" style="margin-top:10px"><select id="mAdd" style="max-width:280px">' +
+        available.map(k => '<option value="' + k + '">' + esc(METRIC_DEFS[k].label) + "</option>").join("") +
+        '</select><button id="btnAddMetric" class="btn-sm btn-primary">Add row</button></div>'
+      : "");
+
+  const save = async list => {
+    try { await db.collection("config").doc("metrics").set({ list:list }); }
+    catch (e) { toast(friendlyAuthError(e), "bad"); }
+  };
+  $$("[data-mup]", $("#admMetrics")).forEach(b => b.onclick = () => {
+    const i = num(b.getAttribute("data-mup")), l = active.slice();
+    [l[i - 1], l[i]] = [l[i], l[i - 1]]; save(l);
+  });
+  $$("[data-mdown]", $("#admMetrics")).forEach(b => b.onclick = () => {
+    const i = num(b.getAttribute("data-mdown")), l = active.slice();
+    [l[i + 1], l[i]] = [l[i], l[i + 1]]; save(l);
+  });
+  $$("[data-mdel]", $("#admMetrics")).forEach(b => b.onclick = () => {
+    const l = active.slice(); l.splice(num(b.getAttribute("data-mdel")), 1); save(l);
+  });
+  if ($("#btnAddMetric")) $("#btnAddMetric").onclick = () => save(active.concat([$("#mAdd").value]));
+}
+
+function renderAdminTargets(){
+  const t = targetsConfig();
+  const rows = [
+    ["points", "Points"], ["total_ga", "Total GA"], ["recons", "Recons"],
+    ["handsets", "Handsets"], ["mbb", "MBB"], ["prepaid", "Prepaid"], ["fixed_new", "Fixed new"]
+  ];
+  $("#admTargets").innerHTML =
+    '<p class="small muted">Monthly store targets. The points target drives the "% to points target" metric; leave a target at 0 to hide it.</p>' +
+    '<div class="row">' + rows.map(r =>
+      '<div style="width:140px"><label>' + esc(r[1]) + "</label>" +
+      '<input type="number" min="0" step="1" data-target="' + r[0] + '" value="' + num(t[r[0]]) + '"></div>').join("") + "</div>" +
+    '<button id="btnSaveTargets" class="btn-primary" style="margin-top:10px">Save targets</button>';
+  $("#btnSaveTargets").onclick = async () => {
+    const out = {};
+    $$("[data-target]").forEach(i => { out[i.getAttribute("data-target")] = num(i.value); });
+    try { await db.collection("config").doc("targets").set(out, { merge:true }); toast("Targets saved"); }
+    catch (e) { toast(friendlyAuthError(e), "bad"); }
+  };
+}
+
+function renderAdminAccess(){
+  $("#admAccess").innerHTML =
+    '<p class="small muted">Anyone who types this code at sign-up gets a manager account straight away. Only the hash is stored.</p>' +
+    '<div class="row"><div class="grow"><label for="acNew">New access code</label>' +
+    '<input id="acNew" type="password" autocomplete="off" placeholder="At least 6 characters"></div>' +
+    '<button id="btnSaveCode" class="btn-primary">Set code</button></div>' +
+    '<p class="small muted" style="margin-top:6px">This is obfuscation, not security. The real protection is the Firestore rules at the bottom of this file, ' +
+    "where only an existing manager can set someone's role.</p>";
+  $("#btnSaveCode").onclick = async () => {
+    const v = $("#acNew").value;
+    if (v.length < 6) return toast("Use at least 6 characters.", "bad");
+    try {
+      await db.collection("config").doc("access").set({
+        moderatorHash:await sha256Hex(v),
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+        updatedBy:state.profile.displayName
+      });
+      $("#acNew").value = "";
+      toast("Access code set");
+    } catch (e) { toast(friendlyAuthError(e), "bad"); }
+  };
+}
+
+function renderAdminData(){
+  const m = state.monthSel || thisMonth();
+  $("#admData").innerHTML =
+    "<p>Working month: <strong>" + esc(monthLabel(m)) + "</strong>" +
+    (monthLocked(m) ? ' <span class="pill susp">locked</span>' : "") + "</p>" +
+    '<div class="row">' +
+      '<button id="adCsv" class="btn-sm">Export CSV</button>' +
+      '<button id="adJson" class="btn-sm">Export JSON</button>' +
+      '<button id="adImport" class="btn-sm">Import JSON</button>' +
+      '<button id="adPrint" class="btn-sm">Print month</button>' +
+      (monthLocked(m)
+        ? '<button id="adUnlock" class="btn-sm btn-danger">Unlock month</button>'
+        : '<button id="adLock" class="btn-sm btn-danger">Lock month</button>') +
+    "</div>" +
+    '<p class="small muted" style="margin-top:8px">Change the working month on the Month to date tab.</p>';
+  $("#adCsv").onclick = () => exportCSV(m);
+  $("#adJson").onclick = () => exportJSON(m);
+  $("#adImport").onclick = () => importJSON();
+  $("#adPrint").onclick = () => printMonth(m);
+  if ($("#adLock"))   $("#adLock").onclick   = () => lockMonth(m);
+  if ($("#adUnlock")) $("#adUnlock").onclick = () => unlockMonth(m);
+}
+
+/* ############################################################################
+   16.  EXPORT, PRINT, LOCK
+   ############################################################################ */
+
+function exportCSV(m){
+  const all = (state.sales[m] || []);
+  const live = all.filter(s => !s.voided);
+  const r = rollup(live);
+  const people = perUserRollups(live, state.users);
+
+  // 1. the board, as the sheet reads
+  const summary = [["Board", storeShort(), monthLabel(m)], [], ["CATEGORY", "VOLUME", "VALUE"]];
+  TUNE.boardRows.forEach(row => {
+    if (row.section) { summary.push([row.section, "", ""]); return; }
+    const c = r[row.key] || { v:0, $:0 };
+    summary.push([row.label, c.v, row.value === "na" ? "n/a" : c.$]);
+  });
+  summary.push([]);
+  summary.push(["Outright units", r.outright.v, r.outright.$]);
+  summary.push(["Total points", r.points, ""]);
+  summary.push(["Total value written", r.totalValue, ""]);
+  summary.push([]);
+  summary.push(["Best of the Month", "Winner/s", "Total"]);
+  awardResults(live, state.users).forEach(a => summary.push([a.label, a.winners, a.total === null ? "—" : a.total]));
+  summary.push([]);
+  summary.push(["By person"].concat(BREAKDOWN_COLS.slice(1).map(c => c.label)));
+  people.forEach(p => summary.push([p.name].concat(BREAKDOWN_COLS.slice(1).map(c => num(c.get(p))))));
+  downloadFile(storeShort() + "-" + m + "-summary.csv", "text/csv", csvRows(summary));
+
+  // 2. every line item, voided rows included and flagged
+  const head = ["id", "businessDate", "createdAt", "person", "uid", "category", "type",
+                "planPrice", "deviceAttached", "term", "model", "upgradeProtect",
+                "prepaidDevice", "rechargeAmount", "outrightDescription", "outrightValue",
+                "outrightQty", "points", "value", "notes", "voided", "voidedBy", "editedBy",
+                "enteredBy", "backdated"];
+  const lines = [head];
+  all.slice().sort((a, b) => String(a.businessDate).localeCompare(String(b.businessDate))).forEach(s => {
+    lines.push([
+      s.id, s.businessDate, tsToLocal(s.createdAt), s.displayName, s.uid, s.category, s.saleType || "",
+      s.planPrice == null ? "" : s.planPrice,
+      s.device && s.device.attached ? "yes" : "no",
+      (s.device && s.device.term) || "", (s.device && s.device.model) || "",
+      s.upgradeProtect ? "yes" : "no",
+      s.prepaid && s.prepaid.deviceAttached ? "yes" : "no",
+      s.prepaid ? s.prepaid.rechargeAmount : "",
+      s.outright ? s.outright.description : "",
+      s.outright ? s.outright.value : "",
+      s.outright ? s.outright.qty : "",
+      s.points,
+      s.voided ? 0 : rollup([s]).totalValue,
+      s.notes || "",
+      s.voided ? "VOIDED" : "",
+      s.voidedBy || "", s.editedBy || "",
+      s.enteredBy || "", s.backdated ? "yes" : ""
+    ]);
+  });
+  downloadFile(storeShort() + "-" + m + "-lines.csv", "text/csv", csvRows(lines));
+  toast("Two CSVs downloaded");
+}
+
+function exportJSON(m){
+  const payload = {
+    format:"reddy-sales-tracker-v1",
+    exportedAt:new Date().toISOString(),
+    exportedBy:state.profile.displayName,
+    store:Object.assign({}, TUNE.store, state.storeCfg),
+    month:m,
+    points:pointsConfig(),
+    targets:targetsConfig(),
+    metrics:activeMetricKeys(),
+    users:state.users.map(u => ({ uid:u.uid || u.id, displayName:u.displayName, role:u.role, approved:u.approved, suspended:!!u.suspended })),
+    eod:Object.keys(state.eodPosts).filter(d => monthOf(d) === m).map(d => Object.assign({ id:d }, state.eodPosts[d])),
+    sales:(state.sales[m] || []).map(s => {
+      const c = Object.assign({}, s);
+      c.createdAt = s.createdAt && s.createdAt.toDate ? s.createdAt.toDate().toISOString() : null;
+      c.voidedAt = s.voidedAt && s.voidedAt.toDate ? s.voidedAt.toDate().toISOString() : null;
+      c.editedAt = s.editedAt && s.editedAt.toDate ? s.editedAt.toDate().toISOString() : null;
+      return c;
+    })
+  };
+  downloadFile(storeShort() + "-" + m + "-backup.json", "application/json", JSON.stringify(payload, null, 2));
+  toast("JSON backup downloaded");
+}
+
+function importJSON(){
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "application/json,.json";
+  inp.onchange = async () => {
+    const file = inp.files && inp.files[0];
+    if (!file) return;
+    let data;
+    try { data = JSON.parse(await file.text()); }
+    catch (e) { return toast("That file isn't valid JSON.", "bad"); }
+    if (!data || !Array.isArray(data.sales)) return toast("No sales found in that file.", "bad");
+    if (monthLocked(data.month)) return toast(monthLabel(data.month) + " is locked — unlock it first.", "bad");
+
+    const ok = await askConfirm("Import " + monthLabel(data.month) + "?",
+      "<p><strong>" + data.sales.length + " sales</strong> from " + esc(data.store ? data.store.shortName : "another store") +
+      ", exported " + esc(String(data.exportedAt || "").slice(0, 10)) + ".</p>" +
+      '<p class="small muted">Sales are written with their original ids, so importing the same file twice overwrites rather than duplicates. ' +
+      "Sales already in this month that aren't in the file are left alone.</p>", "Import");
+    if (!ok) return;
+
+    try {
+      let n = 0;
+      for (let i = 0; i < data.sales.length; i += 400) {
+        const batch = db.batch();
+        data.sales.slice(i, i + 400).forEach(s => {
+          const doc = Object.assign({}, s);
+          const id = doc.id || db.collection("sales").doc().id;
+          delete doc.id;
+          doc.createdAt = doc.createdAt
+            ? firebase.firestore.Timestamp.fromDate(new Date(doc.createdAt))
+            : firebase.firestore.FieldValue.serverTimestamp();
+          doc.voidedAt = doc.voidedAt ? firebase.firestore.Timestamp.fromDate(new Date(doc.voidedAt)) : null;
+          doc.editedAt = doc.editedAt ? firebase.firestore.Timestamp.fromDate(new Date(doc.editedAt)) : null;
+          doc.storeId = storeId_();
+          doc.month = monthOf(doc.businessDate);
+          batch.set(db.collection("sales").doc(id), doc);
+          n++;
+        });
+        await batch.commit();
+      }
+      ensureMonth(data.month);
+      toast("Imported " + n + " sales");
+    } catch (e) { toast(friendlyAuthError(e), "bad"); }
+  };
+  inp.click();
+}
+
+async function lockMonth(m){
+  const live = salesFor(m);
+  const r = rollup(live);
+  const ok = await askConfirm("Lock " + monthLabel(m) + "?",
+    "<p>Freezes the month: <strong>" + int(r.points) + " points</strong> from " + r.count + " services, " +
+    money(r.totalValue) + " written.</p>" +
+    "<p>Nobody — including you — can add, edit or void sales in a locked month until it's unlocked.</p>",
+    "Lock the month", true);
+  if (!ok) return;
+
+  const rows = {};
+  ROLLUP_KEYS.forEach(k => { rows[k] = { v:r[k].v, value:r[k].$ }; });
+  try {
+    await db.collection("archives").doc(m).set({
+      month:m, storeId:storeId_(), rows:rows,
+      points:r.points, totalValue:r.totalValue, count:r.count,
+      awards:awardResults(live, state.users).map(a => ({ key:a.key, label:a.label, winners:a.winners, total:a.total })),
+      byPerson:perUserRollups(live, state.users).map(p => ({
+        uid:p.uid, name:p.name, points:p.r.points, services:p.r.count, value:p.r.totalValue
+      })),
+      lockedBy:state.profile.displayName,
+      lockedAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    toast(monthLabel(m) + " locked");
+  } catch (e) { toast(friendlyAuthError(e), "bad"); }
+}
+
+async function unlockMonth(m){
+  const ok = await askConfirm("Unlock " + monthLabel(m) + "?",
+    "<p>The month becomes editable again and the frozen snapshot is removed.</p>", "Unlock", true);
+  if (!ok) return;
+  try { await db.collection("archives").doc(m).delete(); toast(monthLabel(m) + " unlocked"); }
+  catch (e) { toast(friendlyAuthError(e), "bad"); }
+}
+
+function printMonth(m){
+  const live = salesFor(m);
+  const r = rollup(live);
+  const people = perUserRollups(live, state.users);
+  const targets = targetsConfig();
+  const today = todayBD();
+  const todayR = rollup(live.filter(s => s.businessDate === today));
+
+  $("#printArea").innerHTML =
+    "<h1>" + esc(storeName()) + " — " + esc(monthLabel(m)) + "</h1>" +
+    '<p class="small">Dealer ' + esc(storeId_()) + " · printed " + esc(dmy(todayBD())) + "</p>" +
+    '<div class="printgrid">' +
+      "<div>" + boardHTML(r, storeShort() + " (Month to Date)", dmy(today)) + "</div>" +
+      "<div>" + awardsHTML(awardResults(live, state.users), false) +
+        '<div style="margin-top:6mm">' + metricsHTML(todayR, r,
+          { days:1, targets:targets, scope:"today" },
+          { days:elapsedDays(m), targets:targets, scope:"month" }) + "</div>" +
+        '<div style="margin-top:6mm">' + pointsBoxHTML(r.points, "Total Points") + "</div>" +
+      "</div>" +
+    "</div>" +
+    '<div class="pbreak"><h1>By person — ' + esc(monthLabel(m)) + "</h1>" +
+      breakdownHTML(people, { col:"points", dir:-1 }) + "</div>";
+  window.print();
+}
+
+/* ############################################################################
+   17.  ROUTER
+   ############################################################################ */
+
+const VIEWS = ["auth", "pending", "mtd", "eod", "me", "enter", "admin"];
+
+function showView(name){
+  VIEWS.forEach(v => $("#view-" + v).classList.toggle("hidden", v !== name));
+}
+
+function route(){
+  const hash = location.hash || "#/mtd";
+  state.route = hash;
+
+  if (!state.user) { showView("auth"); renderChrome(); return; }
+  if (!state.profile) { showView("pending"); $("#pendingName").textContent = "there"; return; }
+  if (!isActive()) {
+    showView("pending");
+    $("#pendingName").textContent = state.profile.displayName || "there";
+    if (state.profile.suspended) {
+      $("#view-pending h1").textContent = "Account suspended";
+    }
+    renderChrome();
+    return;
+  }
+
+  const target = hash.replace("#/", "");
+  const known = ["mtd", "eod", "me", "enter", "admin"];
+  const view = known.includes(target) ? target : "mtd";
+  if (view === "admin" && !isMod()) { location.hash = "#/mtd"; return; }
+
+  showView(view);
+  renderChrome();
+  renderCurrent();
+}
+
+function renderCurrent(){
+  if (!state.user || !state.profile || !isActive()) return;
+  const view = state.route.replace("#/", "");
+  try {
+    if (view === "mtd" || view === "") renderMTD();
+    else if (view === "eod") renderEOD();
+    else if (view === "me") renderMe();
+    else if (view === "enter") renderEnter();
+    else if (view === "admin") renderAdmin();
+  } catch (e) {
+    console.error("render " + view, e);
+  }
+}
+
+/* ############################################################################
+   18.  WIRING + BOOT
+   ############################################################################ */
+
+function applyTheme(mode){
+  document.documentElement.setAttribute("data-theme", mode);
+  $("#btnTheme").textContent = mode === "dark" ? "Light" : "Dark";
+  try { localStorage.setItem("reddy-theme", mode); } catch (e) {}
+}
+
+function wireUI(){
+  // theme
+  let saved = "light";
+  try { saved = localStorage.getItem("reddy-theme") || "light"; } catch (e) {}
+  applyTheme(saved);
+  $("#btnTheme").onclick = () =>
+    applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
+
+  // auth panes
+  $("#tabSignIn").onclick = () => {
+    $("#tabSignIn").setAttribute("aria-pressed", "true");
+    $("#tabSignUp").setAttribute("aria-pressed", "false");
+    $("#paneSignIn").classList.remove("hidden");
+    $("#paneSignUp").classList.add("hidden");
+    authMsg("");
+  };
+  $("#tabSignUp").onclick = () => {
+    $("#tabSignUp").setAttribute("aria-pressed", "true");
+    $("#tabSignIn").setAttribute("aria-pressed", "false");
+    $("#paneSignUp").classList.remove("hidden");
+    $("#paneSignIn").classList.add("hidden");
+    authMsg("");
+  };
+  $("#btnSignIn").onclick = doSignIn;
+  $("#btnSignUp").onclick = doSignUp;
+  $("#btnReset").onclick = doReset;
+  $("#siPass").onkeydown = e => { if (e.key === "Enter") doSignIn(); };
+  $("#suPass").onkeydown = e => { if (e.key === "Enter") doSignUp(); };
+  $("#btnSignOut").onclick = () => auth.signOut();
+  $("#btnPendingSignOut").onclick = () => auth.signOut();
+
+  // MTD controls
+  $("#mtdMonth").onchange = () => {
+    state.monthSel = $("#mtdMonth").value || thisMonth();
+    ensureMonth(state.monthSel);
+    renderMTD();
+  };
+  $("#btnMtdThis").onclick = () => { state.monthSel = thisMonth(); renderMTD(); };
+
+  // EOD controls
+  $("#eodDate").onchange = () => {
+    state.daySel = $("#eodDate").value || todayBD();
+    ensureMonth(monthOf(state.daySel));
+    renderEOD();
+  };
+  $("#btnEodToday").onclick = () => { state.daySel = todayBD(); renderEOD(); };
+
+  // Me controls
+  $$("#meScope button").forEach(b => b.onclick = () => {
+    state.meScope = b.getAttribute("data-scope");
+    if (state.meScope === "range") {
+      if (!state.meFrom) state.meFrom = thisMonth() + "-01";
+      if (!state.meTo) state.meTo = todayBD();
+      $("#meFrom").value = state.meFrom;
+      $("#meTo").value = state.meTo;
+    }
+    renderMe();
+  });
+  $("#meFrom").onchange = () => { state.meFrom = $("#meFrom").value; renderMe(); };
+  $("#meTo").onchange   = () => { state.meTo   = $("#meTo").value;   renderMe(); };
+
+  // entry controls
+  $("#entQty").onchange = () => {
+    const want = num($("#entQty").value) || 1;
+    while (state.basket.length < want) state.basket.push(blankRow(state.basket[state.basket.length - 1]));
+    while (state.basket.length > want) state.basket.pop();
+    renderEnter();
+  };
+  $("#entQtyMinus").onclick = () => {
+    if (state.basket.length > 1) { state.basket.pop(); renderEnter(); }
+  };
+  $("#entQtyPlus").onclick = () => {
+    if (state.basket.length < TUNE.maxBasket) {
+      state.basket.push(blankRow(state.basket[state.basket.length - 1]));
+      renderEnter();
+    }
+  };
+  $("#entDate").onchange = () => {
+    const v = $("#entDate").value;
+    state.entryDate = (v && v !== todayBD()) ? v : null;
+    if (state.entryDate) ensureMonth(monthOf(state.entryDate));
+    renderEnter();
+  };
+  $("#entPerson").onchange = () => {
+    const v = $("#entPerson").value;
+    state.entryPerson = (v && v !== state.user.uid) ? v : null;
+    renderEnter();
+  };
+  $("#btnEntReset").onclick = () => {
+    state.entryDate = null;
+    state.entryPerson = null;
+    renderEnter();
+  };
+  $("#btnSubmitBasket").onclick = submitBasket;
+
+  window.addEventListener("hashchange", route);
+
+  // Month boundary: if the app is left open overnight, roll the boards over.
+  setInterval(() => {
+    const t = todayBD();
+    if (state.lastKnownDay && state.lastKnownDay !== t) {
+      state.monthSel = thisMonth();
+      state.daySel = t;
+      ensureMonth(thisMonth());
+      renderCurrent();
+      toast("New trading day — boards reset to " + dmy(t));
+    }
+    state.lastKnownDay = t;
+  }, 60000);
+}
+
+let booted = false;
+function boot(){
+  if (booted) return;
+  booted = true;
+  wireUI();
+  state.monthSel = thisMonth();
+  state.daySel = todayBD();
+  state.lastKnownDay = todayBD();
+  state.basket = [blankRow()];
+
+  if (!initFirebase()) { showView("auth"); return; }
+
+  auth.onAuthStateChanged(user => {
+    state.user = user || null;
+    if (user) {
+      startSubscriptions(user.uid);
+      if (!location.hash || location.hash === "#/") location.hash = "#/mtd";
+    } else {
+      stopSubscriptions();
+      state.profile = null;
+      showView("auth");
+    }
+    renderChrome();
+    route();
+  });
+
+  route();
+}
+
+document.addEventListener("DOMContentLoaded", boot);
+if (document.readyState !== "loading") boot();
+</script>
+
+<!-- ============================================================================
+     FIRESTORE SECURITY RULES
+     ============================================================================
+     Paste this into Firebase console > Firestore Database > Rules > Publish.
+     The app will not behave correctly without it — the access code in the
+     sign-up form is obfuscation only. THESE RULES are the actual enforcement.
+
+     Covered here:
+       - a person can only write sale docs carrying their own uid
+       - role / approved / suspended are writable by managers only, never by
+         the account itself
+       - a pending account can read its own user doc and the access hash, and
+         nothing else
+       - a locked month (archives/{YYYY-MM}) is read-only for everyone
+       - a posted EOD is immutable apart from appended discrepancy flags
+       - sales are never hard-deleted; voiding is an update
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn(){
+      return request.auth != null;
+    }
+    function me(){
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function isStaff(){
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && me().approved == true
+        && me().suspended != true;
+    }
+    function isMod(){
+      return isStaff() && me().role == 'moderator';
+    }
+    function monthOpen(m){
+      return !exists(/databases/$(database)/documents/archives/$(m));
+    }
+    // True only until the very first account claims the store.
+    function bootstrapNeeded(){
+      return !exists(/databases/$(database)/documents/config/store);
+    }
+
+    // ---------------------------------------------------------------- users
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isStaff());
+
+      // Sign-up writes your own doc, and only as 'pending' — unless the store
+      // is brand new, in which case the first account becomes the manager so
+      // nobody is locked out on day one.
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.suspended == false
+        && (
+             (request.resource.data.role == 'pending' && request.resource.data.approved == false)
+             || (bootstrapNeeded() && request.resource.data.role == 'moderator')
+           );
+
+      // Managers can change anything. You can change your own display name but
+      // never your own role, approval or suspension.
+      allow update: if isMod()
+        || (signedIn() && request.auth.uid == uid
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.approved == resource.data.approved
+            && request.resource.data.suspended == resource.data.suspended);
+
+      allow delete: if isMod();
+    }
+
+    // ------------------------------------------------------- display names
+    // One doc per lowercased handle, which is what makes sign-up names unique.
+    match /displayNames/{slug} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isMod();
+    }
+
+    // ---------------------------------------------------------------- sales
+    match /sales/{saleId} {
+      allow read: if isStaff();
+
+      allow create: if isStaff()
+        && monthOpen(request.resource.data.month)
+        && request.resource.data.voided == false
+        && request.resource.data.month == request.resource.data.businessDate[0:7]
+        // your own uid only; a manager may back-enter on someone's behalf
+        && (isMod() || request.resource.data.uid == request.auth.uid);
+
+      allow update: if isStaff()
+        && monthOpen(resource.data.month)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.month == resource.data.month
+        && (
+             isMod()
+             || (resource.data.uid == request.auth.uid
+                 && request.time < resource.data.createdAt + duration.value(24, 'h'))
+           );
+
+      // Never hard-delete: voiding sets voided = true so the month still audits.
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------------------------ eod
+    match /eod/{businessDate} {
+      allow read: if isStaff();
+      allow create: if isMod();
+      // Immutable once posted. The only permitted change is appending a
+      // discrepancy when a sale inside a posted day is voided or edited.
+      allow update: if isStaff()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['discrepancies']);
+      allow delete: if isMod();
+    }
+
+    // ------------------------------------------------------------- archives
+    // The presence of a doc here is what makes a month read-only.
+    match /archives/{month} {
+      allow read: if isStaff();
+      allow create: if isMod();
+      allow update: if false;
+      allow delete: if isMod();
+    }
+
+    // --------------------------------------------------------------- config
+    // The access hash has to be readable by a freshly created (still pending)
+    // account, because that is when the code is checked.
+    match /config/access {
+      allow read: if signedIn();
+      allow write: if isMod();
+    }
+    match /config/{docId} {
+      allow read: if isStaff();
+      // config/store is writable once by the first account, to bootstrap the store.
+      allow write: if isMod() || (docId == 'store' && bootstrapNeeded());
+    }
+
+    // Anything not matched above is denied.
+  }
+}
+
+     ============================================================================
+     SETTING THIS UP
+     ============================================================================
+     1. Firebase console > create a project.
+     2. Build > Authentication > Sign-in method > enable Email/Password.
+     3. Build > Firestore Database > create database (production mode).
+     4. Rules tab > paste the block above > Publish.
+     5. Project settings > Your apps > Web > copy the config object into the
+        firebaseConfig block at the top of this file's script.
+     6. Open this file. The first account you create becomes the manager.
+     7. Admin tab > Access code > set the code you'll give other managers.
+     8. Everyone else signs up with the code box left blank, then you approve
+        them from Admin > Pending approvals.
+
+     No indexes need creating: every query filters on equality only and sorts
+     in the browser.
+     ============================================================================ -->
+</body>
+</html>
