@@ -15,27 +15,29 @@
 // Title of the game shown in the big hero panel.
 const FEATURED_GAME_TITLE = "Optus Rep Redemption";
 
+/* ---------------------------------------------------------------------------
+   GITHUB — fill these two in and the page starts showing real "last updated"
+   times pulled from the repo's commit history.
+
+   owner/name  : github.com/<owner>/<name>
+   branch      : whatever the site is served from (usually "main" or "gh-pages")
+   pathPrefix  : leave "" if index.html sits at the repo root. If the site lives
+                 in a subfolder (e.g. docs/index.html) put "docs" here.
+   manifest    : updates.json, built by the GitHub Action. It's one request
+                 instead of thirty-odd, so it never hits the API rate limit.
+                 The live API is only used as a fallback if the file is missing.
+--------------------------------------------------------------------------- */
+const REPO = {
+  owner: "YOUR-GITHUB-USERNAME",
+  name: "YOUR-REPO-NAME",
+  branch: "main",
+  pathPrefix: ""
+};
+const MANIFEST_URL  = "updates.json";  // set to "" to always use the live API
+const CACHE_TTL_MIN = 30;              // how long a fetched result is reused
+const FRESH_DAYS    = 7;               // "Updated" badge shows within this many days
+
 const GAMES = [
-   {
-    title: "Optus Pokies",
-    description: "Get addicted, but it's the good cool kind of addiction, not the life ruining kind haha amirite?",
-    image: "thumbnails/optuspokies.png",
-    url: "games/optuspokies.html",
-    tags: ["Arcade"],
-    releaseDate: "Before 1st Aug, 2026",
-    version: "Version 2 | Release 1.1",
-    creator: "Luka & Chase w/Gemini Pro & Fable 5.1 + Opus 5"
-  },
-   {
-    title: "Optus Wilds",
-    description: "D A C# A D C# B A B C# A",
-    image: "thumbnails/optuswilds.jpg",
-    url: "games/optuswilds.html",
-    tags: ["Arcade", "Sandbox"],
-    releaseDate: "14th Sep, 2026",
-    version: "Version 2 | v1.4",
-    creator: "Luka & Chase w/Claude Opus 5 & Fable 5.1"
-  },
     {
     title: "Redcliffe Optus Sales Tracker",
     description: "Now while he stands tough, notice that this mann did NOT have his hands UP!",
@@ -85,6 +87,16 @@ const GAMES = [
     releaseDate: "8th Sep, 2026",
     version: "Alpha 2",
     creator: "Luka & Chase w/Claude Opus 5"
+  },
+   {
+    title: "Optus Wilds",
+    description: "D A C# A D C# B A B C# A",
+    image: "thumbnails/optuswilds.jpg",
+    url: "games/optuswilds.html",
+    tags: ["Arcade", "Sandbox"],
+    releaseDate: "14th Sep, 2026",
+    version: "Version 2 | v1.4",
+    creator: "Luka & Chase w/Claude Opus 5 & Fable 5.1"
   },
   {
     title: "Ollie-man",
@@ -285,6 +297,16 @@ const GAMES = [
     releaseDate: "Before 1st Aug, 2026",
     version: "Release 1.0",
     creator: "Luka & Chloe w/Gemini Pro"
+  },
+ {
+    title: "Optus Pokies",
+    description: "Get addicted, but it's the good cool kind of addiction, not the life ruining kind haha amirite?",
+    image: "thumbnails/optuspokies.png",
+    url: "games/optuspokies.html",
+    tags: ["Arcade"],
+    releaseDate: "Before 1st Aug, 2026",
+    version: "Version 2 | Release 1.1",
+    creator: "Luka & Chase w/Gemini Pro & Fable 5.1 + Opus 5"
   },
   {
     title: "Optus Smash",
@@ -494,6 +516,14 @@ img { display: block; }
   font-variant-numeric: tabular-nums;
 }
 
+.hero-updated {
+  font-size: 0.85rem;
+  color: var(--aqua);
+  font-variant-numeric: tabular-nums;
+  margin-top: -6px;
+  min-height: 1.2em;
+}
+
 .play {
   align-self: flex-start;
   margin-top: 6px;
@@ -642,6 +672,7 @@ select.sort {
   cursor: pointer;
 }
 select.sort:focus { outline: none; border-color: var(--aqua); }
+select.sort option:disabled { color: var(--faint); }
 
 .views { display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .views button {
@@ -663,12 +694,51 @@ select.sort:focus { outline: none; border-color: var(--aqua); }
    ============================================================================ */
 main { flex: 1; padding: 22px var(--pad) 64px; }
 
+.statusline {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
 .count {
   font-size: 0.82rem;
   color: var(--faint);
-  margin-bottom: 14px;
   font-variant-numeric: tabular-nums;
 }
+
+.sync {
+  font-size: 0.78rem;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sync.working::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--aqua);
+  animation: ping 1.2s ease-in-out infinite;
+}
+.sync.problem { color: #C98B5E; }
+@keyframes ping { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+
+.sync button {
+  font: 600 0.78rem var(--body);
+  color: var(--dim);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.sync button:hover { color: var(--text); border-color: var(--aqua); }
 
 .library { display: flex; flex-direction: column; gap: 10px; }
 
@@ -713,6 +783,19 @@ main { flex: 1; padding: 22px var(--pad) 64px; }
 }
 .thumb.done::before { display: none; }
 @keyframes sweep { to { background-position: -300% 0; } }
+
+.fresh {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  left: 8px;
+  font: 700 0.68rem var(--body);
+  color: #000;
+  background: var(--aqua);
+  border-radius: 4px;
+  padding: 3px 7px;
+  box-shadow: 0 2px 8px rgba(6, 9, 10, 0.5);
+}
 
 .card-body {
   flex: 1;
@@ -768,6 +851,7 @@ main { flex: 1; padding: 22px var(--pad) 64px; }
 .card-meta .ship { color: var(--text); }
 .card-meta .ver { color: var(--yellow); font-weight: 600; }
 .card-meta .by { color: var(--faint); }
+.card-meta .upd { color: var(--aqua); }
 .card-meta .tool {
   margin-top: 4px;
   font-size: 0.68rem;
@@ -866,6 +950,7 @@ footer {
   * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
   html { scroll-behavior: auto; }
   .thumb::before { background: #0A1214; }
+  .sync.working::before { opacity: 1; }
 }
 </style>
 </head>
@@ -889,6 +974,7 @@ footer {
       <option value="new">Newest first</option>
       <option value="old">Oldest first</option>
       <option value="az">A to Z</option>
+      <option value="upd" id="sort-upd" disabled>Recently updated</option>
     </select>
     <div class="views" role="group" aria-label="Layout">
       <button id="view-list" aria-pressed="true" aria-label="List view" title="List view">
@@ -902,7 +988,10 @@ footer {
 </div>
 
 <main>
-  <p class="count" id="count" aria-live="polite"></p>
+  <div class="statusline">
+    <p class="count" id="count" aria-live="polite"></p>
+    <p class="sync" id="sync"></p>
+  </div>
   <div class="library" id="library"></div>
   <div class="empty" id="empty">
     <h3>Nothing matches that</h3>
@@ -961,6 +1050,37 @@ function splitCreator(str) {
   return { people: str.slice(0, i).trim(), tool: str.slice(i).replace(/^\s*w\//i, "").trim() };
 }
 
+/* Relative time: "2 days ago", "just now". Falls back gracefully on old
+   browsers that never shipped Intl.RelativeTimeFormat. */
+const RTF = (function () {
+  try { return new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }); }
+  catch (e) { return null; }
+})();
+const AGO_UNITS = [
+  ["year", 31536000], ["month", 2592000], ["week", 604800],
+  ["day", 86400], ["hour", 3600], ["minute", 60]
+];
+
+function ago(ms) {
+  if (!ms) return "";
+  const delta = (ms - Date.now()) / 1000;
+  for (const [unit, size] of AGO_UNITS) {
+    if (Math.abs(delta) >= size) {
+      const n = Math.round(delta / size);
+      if (RTF) return RTF.format(n, unit);
+      const a = Math.abs(n);
+      return a + " " + unit + (a === 1 ? "" : "s") + (n < 0 ? " ago" : " from now");
+    }
+  }
+  return "just now";
+}
+
+function fullDate(ms) {
+  const d = new Date(ms);
+  return d.getDate() + " " + MONTH_NAMES[d.getMonth()] + " " + d.getFullYear() +
+         ", " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 /* ---- state --------------------------------------------------------------- */
 let query = "";
 let activeTag = "All";
@@ -974,6 +1094,8 @@ const emptyEl   = document.getElementById("empty");
 const heroEl    = document.getElementById("hero");
 const noteEl    = document.getElementById("shelf-note");
 const sortEl    = document.getElementById("sort");
+const syncEl    = document.getElementById("sync");
+const sortUpdEl = document.getElementById("sort-upd");
 
 /* Each game keeps a reference to its DOM node and a prebuilt search string, so
    filtering only toggles a class. The cards are never rebuilt, which means the
@@ -983,6 +1105,7 @@ const entries = GAMES.map(g => {
   return {
     game: g,
     time: d ? d.time : -Infinity,
+    updated: 0,            // filled in by the GitHub check below
     haystack: (g.title + " " + (g.description || "") + " " + (g.tags || []).join(" ") + " " + (g.creator || "")).toLowerCase(),
     node: null
   };
@@ -1063,6 +1186,7 @@ function renderHero() {
       '<p class="hero-kicker"><span class="bars"><i></i><i></i><i></i><i></i></span> Playing this week</p>' +
       "<h2></h2><p class='lead'></p>" +
       '<p class="hero-meta"></p>' +
+      '<p class="hero-updated" id="hero-updated"></p>' +
       '<a class="play" target="_blank" rel="noopener">Play now</a>' +
     "</div>" +
     '<div class="hero-art"></div>';
@@ -1156,7 +1280,8 @@ function sorted() {
   const list = entries.slice();
   if (sortMode === "new") list.sort((a, b) => b.time - a.time);
   if (sortMode === "old") list.sort((a, b) => a.time - b.time);
-  if (sortMode === "az") list.sort((a, b) => a.game.title.localeCompare(b.game.title));
+  if (sortMode === "az")  list.sort((a, b) => a.game.title.localeCompare(b.game.title));
+  if (sortMode === "upd") list.sort((a, b) => (b.updated || 0) - (a.updated || 0) || b.time - a.time);
   return list;
 }
 
@@ -1215,6 +1340,216 @@ function renderNote() {
   noteEl.append(strong, document.createTextNode(", " + prettyDate(latest.game.releaseDate) + "."));
 }
 
+/* ============================================================================
+   9. LAST-UPDATED CHECK  (reads the repo's own commit history)
+   ============================================================================
+   Two ways in, tried in order:
+
+   1. updates.json — a tiny file the GitHub Action rebuilds on every push. One
+      request, no rate limit, no API key. This is the path that should normally
+      run.
+   2. The GitHub REST API, one request per game. Only used when the manifest
+      isn't there. Unauthenticated calls are capped at 60 per hour per IP, and
+      everyone on the store wifi shares that IP, so results are cached and the
+      whole run aborts the moment GitHub says no.
+   ========================================================================== */
+const CACHE_KEY = "optusgames:lastupdated:v1";
+let updateSource = "";
+
+function repoPath(url) {
+  const prefix = (REPO.pathPrefix || "").replace(/^\/+|\/+$/g, "");
+  const file = String(url || "").replace(/^\.?\//, "");
+  return (prefix ? prefix + "/" : "") + file;
+}
+
+function repoConfigured() {
+  return REPO.owner && REPO.name && !/^YOUR-/i.test(REPO.owner) && !/^YOUR-/i.test(REPO.name);
+}
+
+function readCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw);
+    if (!c || !c.at || Date.now() - c.at > CACHE_TTL_MIN * 60000) return null;
+    return c;
+  } catch (e) { return null; }
+}
+
+function writeCache(files, source) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), source: source, files: files }));
+  } catch (e) { /* private mode, quota, sandboxed iframe — not worth caring about */ }
+}
+
+function clearCache() {
+  try { localStorage.removeItem(CACHE_KEY); } catch (e) {}
+}
+
+/* --- source 1: the generated manifest ------------------------------------- */
+async function fromManifest() {
+  if (!MANIFEST_URL) return null;
+  try {
+    const res = await fetch(MANIFEST_URL, { cache: "no-cache" });
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (!json || typeof json.files !== "object") return null;
+    return json.files;
+  } catch (e) { return null; }
+}
+
+/* --- source 2: the live API ----------------------------------------------- */
+async function fromApi(paths) {
+  if (!repoConfigured()) return null;
+
+  const base = "https://api.github.com/repos/" +
+               encodeURIComponent(REPO.owner) + "/" + encodeURIComponent(REPO.name) + "/commits";
+  const queue = paths.slice();
+  const files = {};
+  let blocked = false;
+
+  async function worker() {
+    while (queue.length && !blocked) {
+      const path = queue.shift();
+      const url = base + "?per_page=1&sha=" + encodeURIComponent(REPO.branch) +
+                  "&path=" + encodeURIComponent(path);
+      try {
+        const res = await fetch(url, { headers: { "Accept": "application/vnd.github+json" } });
+        if (res.status === 403 || res.status === 429) { blocked = true; return; }
+        if (!res.ok) continue;                     // 404 = file isn't in the repo yet
+        const commits = await res.json();
+        if (Array.isArray(commits) && commits[0]) {
+          const c = commits[0];
+          files[path] = {
+            date: (c.commit.committer || c.commit.author).date,
+            sha: String(c.sha).slice(0, 7),
+            message: String(c.commit.message || "").split("\n")[0]
+          };
+        }
+      } catch (e) { /* offline or CORS-blocked; keep going */ }
+    }
+  }
+
+  // four at a time: quick enough, gentle enough
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  if (blocked && !Object.keys(files).length) return "ratelimited";
+  return files;
+}
+
+/* --- painting ------------------------------------------------------------- */
+function paintEntry(entry, info) {
+  const ms = Date.parse(info && info.date);
+  if (!ms) return;
+  entry.updated = ms;
+
+  const meta = entry.node.querySelector(".card-meta");
+  if (!meta) return;
+
+  let span = meta.querySelector(".upd");
+  if (!span) {
+    span = document.createElement("span");
+    span.className = "upd";
+    meta.insertBefore(span, meta.firstChild);
+  }
+  span.textContent = "Updated " + ago(ms);
+  span.title = fullDate(ms) + (info.message ? " — " + info.message : "") +
+               (info.sha ? " (" + info.sha + ")" : "");
+
+  // badge on the thumbnail for anything touched in the last week
+  const thumb = entry.node.querySelector(".thumb");
+  const isFresh = Date.now() - ms < FRESH_DAYS * 86400000;
+  let badge = thumb && thumb.querySelector(".fresh");
+  if (isFresh && thumb && !badge) {
+    badge = document.createElement("span");
+    badge.className = "fresh";
+    badge.textContent = "Updated";
+    thumb.appendChild(badge);
+  } else if (!isFresh && badge) {
+    badge.remove();
+  }
+}
+
+function paintHero(files) {
+  const el = document.getElementById("hero-updated");
+  if (!el) return;
+  const g = GAMES.find(x => x.title === FEATURED_GAME_TITLE) || GAMES[0];
+  const info = g && files[repoPath(g.url)];
+  const ms = Date.parse(info && info.date);
+  if (!ms) return;
+  el.textContent = "Last updated " + ago(ms);
+  el.title = fullDate(ms) + (info.message ? " — " + info.message : "");
+}
+
+function setSync(text, state) {
+  syncEl.className = "sync" + (state ? " " + state : "");
+  syncEl.textContent = "";
+  syncEl.append(document.createTextNode(text));
+  if (state !== "working") {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = "Check again";
+    btn.addEventListener("click", () => { clearCache(); checkUpdates(true); });
+    syncEl.appendChild(btn);
+  }
+}
+
+function applyUpdates(files) {
+  let hits = 0;
+  entries.forEach(e => {
+    const info = files[repoPath(e.game.url)];
+    if (info) { paintEntry(e, info); hits++; }
+  });
+  paintHero(files);
+
+  if (hits) {
+    sortUpdEl.disabled = false;
+    if (sortMode === "upd") reorder();
+  }
+  return hits;
+}
+
+async function checkUpdates(force) {
+  if (!repoConfigured() && !MANIFEST_URL) return;
+
+  const cached = force ? null : readCache();
+  if (cached) {
+    const hits = applyUpdates(cached.files);
+    setSync(hits
+      ? "Update times from GitHub, checked " + ago(cached.at)
+      : "No matching files in the repo", hits ? "" : "problem");
+    return;
+  }
+
+  setSync("Checking GitHub for updates", "working");
+
+  let files = await fromManifest();
+  let source = "manifest";
+
+  if (!files) {
+    const api = await fromApi(entries.map(e => repoPath(e.game.url)));
+    if (api === "ratelimited") {
+      setSync("GitHub rate limit hit — try again in an hour", "problem");
+      return;
+    }
+    files = api;
+    source = "api";
+  }
+
+  if (!files || !Object.keys(files).length) {
+    setSync(repoConfigured()
+      ? "Couldn't reach GitHub"
+      : "Set REPO.owner and REPO.name to show update times", "problem");
+    return;
+  }
+
+  updateSource = source;
+  writeCache(files, source);
+  const hits = applyUpdates(files);
+  setSync(hits
+    ? "Update times from GitHub, checked just now"
+    : "Nothing in the repo matched the game paths", hits ? "" : "problem");
+}
+
 /* ---- wiring -------------------------------------------------------------- */
 let raf = 0;
 searchEl.addEventListener("input", e => {
@@ -1260,6 +1595,8 @@ window.addEventListener("load", () => {
   const idle = window.requestIdleCallback || (fn => setTimeout(fn, 600));
   idle(warmRemaining);
 });
+
+checkUpdates(false);
 </script>
 </body>
 </html>
