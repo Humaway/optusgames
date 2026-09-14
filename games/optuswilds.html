@@ -43,6 +43,34 @@ html,body{width:100%;height:100%;background:var(--navy);color:var(--ink);font-fa
 #loghint{position:absolute;left:18px;bottom:14px;color:var(--dim);font-size:0.8rem;letter-spacing:0.08em}
 #fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none}
 .screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(7,10,20,0.78);backdrop-filter:blur(3px);z-index:5}
+#title{background:linear-gradient(90deg,rgba(4,6,12,0.92) 0%,rgba(4,6,12,0.72) 38%,rgba(4,6,12,0) 62%);backdrop-filter:none;justify-content:flex-start;align-items:center}
+.titlewrap{margin-left:8vw;max-width:min(560px,52vw)}
+.titlemark{font-size:clamp(22px,2.6vw,38px);letter-spacing:0.42em;color:#ff8a2a;font-weight:normal}
+.titlemark .dot{display:inline-block;width:0.62em;height:0.62em;margin-right:0.22em;border-radius:50%;background:#ff8a2a;box-shadow:inset -0.18em -0.05em 0 0 rgba(4,6,12,0.95);vertical-align:0.02em}
+.titlename{font-size:clamp(58px,8.4vw,128px);line-height:0.92;letter-spacing:0.06em;color:#ff8a2a;margin-top:-0.04em}
+.rule{height:1px;margin:26px 0 0;background:repeating-linear-gradient(90deg,rgba(255,138,42,0.55) 0 3px,transparent 3px 9px)}
+.rule.low{margin:30px 0 0}
+#title button{display:block;margin:52px 0 0;padding:0;border:none;background:none;color:#ff8a2a;font-size:clamp(15px,1.5vw,21px);letter-spacing:0.22em;animation:pulse 2.6s ease-in-out infinite}
+#title button:hover{background:none;color:#ffb066}
+@keyframes pulse{0%,100%{opacity:0.55}50%{opacity:1}}
+.ver{margin-top:14px;color:rgba(255,138,42,0.45);font-size:0.78rem;letter-spacing:0.14em}
+.titlehint{margin-top:40px;color:rgba(255,243,208,0.4);font-size:0.82rem;line-height:1.7;max-width:440px}
+#epilogue{position:fixed;inset:0;z-index:8;background:#04060c;display:flex;align-items:center;justify-content:center}
+.epiwrap{max-width:min(620px,84vw);text-align:left}
+.epiwrap h1{font-size:clamp(34px,5vw,64px);letter-spacing:0.12em;color:#ff8a2a;margin-bottom:28px}
+.epiwrap p{color:var(--ink);font-size:1.12rem;line-height:1.75;margin-bottom:14px}
+.epiwrap .small{color:var(--dim);font-size:0.85rem;margin-top:26px;letter-spacing:0.06em}
+.epiwrap button{margin-top:26px;letter-spacing:0.16em}
+#boot{position:fixed;inset:0;z-index:20;background:#04060c;display:flex;align-items:center;justify-content:center;transition:opacity .6s}
+#boot.gone{opacity:0;pointer-events:none}
+.bootinner{text-align:left;width:min(420px,74vw)}
+.bootlogo{font-size:26px;letter-spacing:0.42em;color:#ff8a2a}
+.bootlogo .o{display:inline-block}
+.bootlogo2{font-size:74px;line-height:0.95;letter-spacing:0.06em;color:#ff8a2a}
+.bootrule{height:1px;margin:22px 0 18px;background:repeating-linear-gradient(90deg,rgba(255,138,42,0.5) 0 3px,transparent 3px 9px)}
+#bootlabel{color:rgba(255,243,208,0.55);font-size:0.86rem;letter-spacing:0.1em;margin-bottom:12px;min-height:1.2em}
+.bootbar{height:3px;background:rgba(255,138,42,0.15);border-radius:2px;overflow:hidden}
+.bootbar i{display:block;height:100%;width:0;background:#ff8a2a;transition:width .25s ease-out}
 .card{width:min(560px,92vw);max-height:90vh;overflow:auto;background:rgba(10,13,24,0.95);border:1px solid rgba(255,196,0,0.4);border-radius:12px;padding:30px 34px;box-shadow:0 30px 80px rgba(0,0,0,0.7)}
 h1{font-weight:normal;letter-spacing:0.14em;color:var(--yel);font-size:2.2rem;margin-bottom:4px}
 h2{font-weight:normal;letter-spacing:0.1em;color:var(--yel);font-size:1.4rem;margin-bottom:14px}
@@ -61,6 +89,15 @@ button:hover{background:rgba(255,196,0,0.25)}button.big{font-size:1.25rem;paddin
 </style>
 </head>
 <body>
+<div id="boot">
+ <div class="bootinner">
+  <div class="bootlogo"><span class="o">O</span>UTER</div>
+  <div class="bootlogo2">WILDS</div>
+  <div class="bootrule"></div>
+  <div id="bootlabel">warming up the projector</div>
+  <div class="bootbar"><i id="bootfill"></i></div>
+ </div>
+</div>
 <canvas id="c"></canvas>
 <div id="hud"><div id="cross"></div><canvas id="wrist"></canvas><div id="prompt"></div><div id="sub"></div><div id="shipmsg"></div><div id="tgt"></div><div id="look"></div><div id="shipmark"></div><div id="logbadge" class="hidden">TAB  ·  new in the Ship Log</div><canvas id="globe"></canvas>
  <div id="scope" class="hidden"><div id="scopering"></div><div id="scopemarks"></div><div id="scopelabel">COVERAGE SCOPE  ·  V to lower</div></div>
@@ -71,20 +108,46 @@ button:hover{background:rgba(255,196,0,0.25)}button.big{font-size:1.25rem;paddin
  <tr><td>X</td><td>match velocity with the nearest world</td></tr><tr><td>T</td><td>target the world you are looking at</td></tr><tr><td>R</td><td>autopilot to the target (again to cancel)</td></tr><tr><td>G</td><td>landing camera on / off</td></tr><tr><td>F</td><td>stand up</td></tr><tr><td>H</td><td>hide this card</td></tr></table></div></div>
 <div id="log" class="hidden"><div id="logmap"><canvas id="logcv"></canvas></div><div id="logside"></div><div id="loghint">Tab to close</div></div>
 <div id="fade"></div>
-<div id="title" class="screen"><div class="card">
- <h1>OPTUS WILDS</h1><p class="tag">Ten minutes. Seven worlds. One store on the edge of it all.</p>
- <button id="startBtn" class="big">Clock on</button>
- <p class="small">WASD walk &middot; mouse look &middot; Space jump / jetpack &middot; Shift run / boost &middot; E interact &middot; F Interpreter &middot; V Scope &middot; Q Handset &middot; L lamp &middot; Tab Ship Log &middot; Esc pause. Go aboard the ship through its rear hatch, take the pilot seat with E, and the flight controls will be on screen.</p>
- <p class="small">This build is Milestones 1 to 3: the loop, the solar system, the ship, the music engine, and the Floor — store, Observatory, training moon and your kit. Sit by the fire for a moment before you go.</p>
+<div id="title" class="screen"><div class="titlewrap">
+ <div class="titlemark"><span class="dot"></span>OPTUS</div>
+ <div class="titlename">WILDS</div>
+ <div class="rule"></div>
+ <button id="startBtn">PRESS TO CLOCK ON</button>
+ <div class="rule low"></div>
+ <div class="ver">v1.0 &middot; ten minutes &middot; eight worlds</div>
+ <div class="titlehint">
+ WASD walk &middot; mouse look &middot; Space jump and jetpack &middot; Shift run &middot; E interact &middot; F Interpreter &middot; V Scope &middot; Q Handset &middot; L lamp &middot; Tab Ship Log &middot; Esc pause<br>
+ The ship is up the ramp. Board it through the rear hatch, take the seat with E, and the flight controls come up on screen.</div>
 </div></div>
 <div id="pause" class="screen hidden"><div class="card menu"><h2>Paused</h2><button id="resumeBtn">Resume</button><button id="optionsBtn">Options</button><button id="controlsBtn">Controls</button><button id="devBtn">Dev panel (`)</button><p class="small">The loop is paused while a menu is open.</p></div></div>
 <div id="options" class="screen hidden"><div class="card"><h2>Options</h2><div id="optList"></div><p class="small">Heads-up: the last minute of every loop is loud and bright. Reduced motion softens the flashes and removes camera shake and grain.</p><button id="optBack">Back</button></div></div>
 <div id="controls" class="screen hidden"><div class="card"><h2>Controls</h2><p class="small">Click a key to rebind it. Gamepad: left stick move, right stick look, A jump/up, B down, X interact, Y handset, LB scope, RB/RT boost, LT match velocity, Start pause, Back log.</p><div id="ctlList"></div><button id="ctlBack">Back</button></div></div>
+<div id="epilogue" class="hidden"></div>
 <div id="debug" class="hidden"></div>
 <div id="perf" class="hidden"></div>
 <script type="module">
 // ======================================================================
-//  OPTUS WILDS — single-file build. Milestones 1-3 complete, 4 and 6 in part.
+//  OPTUS WILDS — single-file build. Milestones 1-5 complete, 6 and 7 in part.
+//  Sand hourglass: Ledger is walkable until T+7:20, Backlog from T+2:15. The
+//  column always runs from whichever twin is draining into the one filling.
+//   - The Relay: a built station on a tight inner orbit (400 m, 58 s) with a
+//     ring truss, solar wings, radiators, plating, two pads, a shack and a
+//     dish that tracks the star. The star fills 53 degrees of its sky.
+//   - Ending: gather all four pieces and all five people, then sit at your
+//     fire. They are already there. The layers enter one at a time, they say
+//     their piece, and it closes on the epilogue screen.
+//   - Audio budget: 3-oscillator strings, a thinned string bed, a 3.4 s space
+//     reverb and a 44-voice pool. Worst case measured is 23 voices, so the
+//     pool never steals a note mid-ring (that was the glitching).
+//   - ground(d) is the surface we draw AND collide with: raw noise plus every
+//     site's flattening. Outlying sheds and campfires each get their own pad
+//     levelled to the real ground, so nothing floats.
+//   - The two shafts (Deep vault, Stack void) are walled: a ring of wall
+//     segments with one doorway and a helix ramp down the inside. You cannot
+//     walk out over the lip; you take the ramp or you fall in.
+//   - Sky: a scattering-style dome - blue zenith, thick warm horizon, a real
+//     red band when the local sun is low, Mie glow around the disc. The sun
+//     light and the fog warm to match, so sunrise and sunset actually land.
 //  ASSUMPTIONS (every call the brief left to me):
 //   - The telco is "Optus" used strictly as parody. No real logo, wordmark
 //     or typeface is drawn; the store insignia is an original spiral of
@@ -135,6 +198,18 @@ button:hover{background:rgba(255,196,0,0.25)}button.big{font-size:1.25rem;paddin
 //     way people at a store actually talk. The spine: they could not stop
 //     the star, so they each wrote down one thing and left it somewhere it
 //     would keep. Four pieces; the log assembles them.
+//   - The Nest pod is three domes sitting on the ground, one inside the next,
+//     each with a walk-in mouth on a different bearing. Inside, things that
+//     cannot see come to noise, and noise scales with your actual speed: a
+//     walk is under their threshold, a run and the pack are not.
+//   - Every board and plate outdoors stands on its own lit frame with a clear
+//     face - nothing is mounted behind racks, beams or ramps any more.
+//   - The Vision is a quantum body: it only moves while nobody is looking at
+//     it, and it carries whoever is standing on it when it goes.
+//   - The four who wrote the pieces are still alive, each at a fire with an
+//     instrument. Walking up to one brings their layer into the tune and the
+//     layers of everyone you have already met, quieter and further off.
+//     Gather all four pieces and all five people, then sit at the fire.
 //   - The Ship Log is a rumour graph: nodes are places, arrows are who told
 //     you about what. Solid = visited, dashed + '?' = a lead you have heard
 //     of but not seen. Drag to pan, wheel to zoom, click to read.
@@ -176,7 +251,7 @@ const YUP=new V3(0,1,0);
 // ======================================================================
 //  AUDIO ENGINE
 // ======================================================================
-const AU={ctx:null,ok:false,voices:[],vol:{master:0.9,music:0.75,sfx:0.9,voice:1},duck:1,rev:{}};
+const AU={ctx:null,ok:false,voices:[],maxVoices:44,vol:{master:0.9,music:0.75,sfx:0.9,voice:1},duck:1,rev:{}};
 function audioInit(){
  if(AU.ok)return; const ctx=new (window.AudioContext||window.webkitAudioContext)(); AU.ctx=ctx;
  AU.master=ctx.createGain();
@@ -190,7 +265,7 @@ function audioInit(){
  AU.sfx=ctx.createGain(); AU.sfx.connect(AU.master);
  AU.voice=ctx.createGain(); AU.voice.connect(AU.master);
  AU.noiseBuf=makeNoise(2.5);
- AU.rev.room=makeReverb(1.1,0.55,0.9); AU.rev.hall=makeReverb(2.6,0.7,0.8); AU.rev.space=makeReverb(5.0,0.85,0.7);
+ AU.rev.room=makeReverb(1.0,0.55,0.9); AU.rev.hall=makeReverb(2.2,0.7,0.8); AU.rev.space=makeReverb(3.4,0.85,0.7);
  for(const k in AU.rev)AU.rev[k].out.connect(AU.music);
  AU.sfxRev=makeReverb(1.4,0.6,0.5); AU.sfxRev.out.connect(AU.sfx);
  AU.ok=true; applyVolumes(); buildLayers(); startScheduler(); startFragmentClock();
@@ -205,10 +280,13 @@ function makeReverb(sec,tailLP,outGain){
   for(let e=0;e<10;e++){const p=Math.floor(sr*(0.006+r()*0.06));if(p<n)d[p]+=(r()-0.5)*1.2;}}
  const conv=ctx.createConvolver();conv.buffer=b;const inp=ctx.createGain(),out=ctx.createGain();out.gain.value=outGain;inp.connect(conv);conv.connect(out);return{in:inp,out};}
 // voice pool (32 cap). Every node is disconnected and dropped on release.
-function voice(nodes,end,gainNode){const v={nodes,end,g:gainNode,dead:false};AU.voices.push(v);if(AU.voices.length>32){killVoice(AU.voices[0],true);}return v;}
+function voice(nodes,end,gainNode){const v={nodes,end,g:gainNode,dead:false};AU.voices.push(v);
+ if(AU.voices.length>AU.maxVoices){ // steal the one closest to finishing, not the oldest, and fade it out properly
+  let best=0,bt=1e9; for(let i=0;i<AU.voices.length-1;i++){const e=AU.voices[i].end;if(e<bt){bt=e;best=i;}} killVoice(AU.voices[best],true); }
+ return v;}
 function killVoice(v,fade){ if(!v||v.dead)return; v.dead=true; const i=AU.voices.indexOf(v); if(i>=0)AU.voices.splice(i,1);
  const doKill=()=>{for(const n of v.nodes){try{if(n.stop)n.stop();}catch(e){}try{n.disconnect();}catch(e){}}v.nodes.length=0;v.g=null;};
- if(fade&&v.g&&AU.ok){const t=AU.ctx.currentTime;try{v.g.gain.cancelScheduledValues(t);v.g.gain.setValueAtTime(v.g.gain.value,t);v.g.gain.linearRampToValueAtTime(0.0001,t+0.03);}catch(e){}setTimeout(doKill,50);}else doKill(); }
+ if(fade&&v.g&&AU.ok){const t=AU.ctx.currentTime;try{v.g.gain.cancelScheduledValues(t);v.g.gain.setValueAtTime(v.g.gain.value,t);v.g.gain.linearRampToValueAtTime(0.0001,t+0.18);}catch(e){}setTimeout(doKill,260);}else doKill(); }
 function attachSend(g,dest,amt,nodes){ if(!dest.sends||amt<=0)return; for(const k in dest.sends){const s=AU.ctx.createGain();s.gain.value=amt;g.connect(s);s.connect(dest.sends[k]);nodes.push(s);} }
 
 // ------------------------------------------------ Karplus-Strong plucks
@@ -248,9 +326,8 @@ function stringsNote(midi,t,vel,dur,dest,opts){
  const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1600+vel*800; lp.Q.value=0.3; lp.connect(g);
  const lfo=ctx.createOscillator(); lfo.frequency.value=5.2; const lg=ctx.createGain(); lg.gain.setValueAtTime(0,t); lg.gain.setValueAtTime(0,t+0.3); lg.gain.linearRampToValueAtTime(f*0.0035,t+1.1); lfo.connect(lg);
  const nodes=[g,lp,lfo,lg]; const end=t+dur+R+0.05;
- for(const d of [-8,-3,0,4,9]){const o=ctx.createOscillator();o.type='sawtooth';o.frequency.value=f;o.detune.setValueAtTime(d+(opts.detune||0),t);if(opts.wob)o.detune.linearRampToValueAtTime(d+(opts.detune||0)+opts.wob,end);lg.connect(o.frequency);const og=ctx.createGain();og.gain.value=0.2;o.connect(og);og.connect(lp);o.start(t);o.stop(end);nodes.push(o,og);}
- const n=ctx.createBufferSource(); n.buffer=AU.noiseBuf; n.loop=true; const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=2600; const ng=ctx.createGain(); ng.gain.value=0.012; n.connect(hp); hp.connect(ng); ng.connect(g); n.start(t); n.stop(end); nodes.push(n,hp,ng);
- lfo.start(t); lfo.stop(end); g.connect(dest.dry); attachSend(g,dest,0.55,nodes);
+ for(const d of [-7,0,6]){const o=ctx.createOscillator();o.type='sawtooth';o.frequency.value=f;o.detune.setValueAtTime(d+(opts.detune||0),t);if(opts.wob)o.detune.linearRampToValueAtTime(d+(opts.detune||0)+opts.wob,end);lg.connect(o.frequency);const og=ctx.createGain();og.gain.value=0.3;o.connect(og);og.connect(lp);o.start(t);o.stop(end);nodes.push(o,og);}
+ lfo.start(t); lfo.stop(end); g.connect(dest.dry); attachSend(g,dest,0.45,nodes);
  const v=voice(nodes,end,g); lfo.onended=()=>killVoice(v,false);
 }
 function harmonicaNote(midi,t,vel,dur,dest,opts){
@@ -309,6 +386,9 @@ const CHART_A=[bar('Gadd9'),bar('Cadd9'),bar('Em7'),bar('D'),bar('Gadd9'),bar('C
 const CHART_B=[bar('Em7'),bar('Cadd9'),bar('GB'),bar('D'),bar('Em7'),bar('Cadd9'),bar('Am7'),bar('D','Gadd9')];
 const CHART=[CHART_A,CHART_A,CHART_B,CHART_A];
 const CHART_MINOR=[bar('Em7'),bar('Cadd9'),bar('Em7'),bar('Bm7'),bar('Em7'),bar('Cadd9'),bar('Am7'),bar('Em7')];
+// the last minute gets its own line: chord tones only, long notes, nothing that fights the F# in the Bm7 bar
+const MEL_END=[[[0,64,2],[2,67,2]],[[0,72,3],[3,74,1]],[[0,71,2],[2,67,2]],[[0,66,4]],
+               [[0,64,1],[1,67,1],[2,71,2]],[[0,72,2],[2,74,2]],[[0,72,3],[3,69,1]],[[0,64,4]]];
 // melody: [beat, midi, beats]
 const MEL_A=[[[0,62,1],[1,67,1.5],[2.5,69,0.5]],[[0,71,1],[1,69,1],[2,67,1],[3,64,1]],[[0,62,1],[1,64,1],[2,67,2]],[[0,62,4]],
  [[0,62,1],[1,67,1.5],[2.5,69,0.5]],[[0,71,1],[1,74,1],[2,71,1],[3,69,1]],[[0,72,2],[2,71,1],[3,69,1]],[[0,67,4]]];
@@ -332,7 +412,7 @@ const SONGS={
  deep:{id:'deep',name:'The Current',form:[CHART_D_A,CHART_D_A,CHART_D_B,CHART_D_A],mels:[MEL_D,MEL_D,MEL_D,MEL_D],melody:'musicbox',style:{guitar:'thumb',whistle:'descant',bassLong:true},mix:{strings:0.48,musicbox:0.4,guitar:0.32,whistle:0.2,bass:0.22}},
  space:{id:'space',name:'Between Worlds',form:[CHART_A,CHART_A,CHART_B,CHART_A],mels:[MEL_A,MEL_A,MEL_B,MEL_A],melody:'banjo',style:{rolls:'none',guitar:'none'},mix:{banjo:0.32,strings:0.22}},
 };
-SONGS.ledger=SONGS.twins; SONGS.backlog=SONGS.twins; SONGS.moon=SONGS.floor; SONGS.nest=null; SONGS.exchange=null;
+SONGS.ledger=SONGS.twins; SONGS.backlog=SONGS.twins; SONGS.moon=SONGS.floor; SONGS.station=SONGS.space; SONGS.nest=null; SONGS.exchange=null;
 // register + subdivision contract for the five Traveller layers
 const REG={banjo:{lo:62,hi:78,sub:'melody/16th rolls'},guitar:{lo:43,hi:61,sub:'swung 8ths'},bass:{lo:26,hi:41,sub:'quarters'},harmonica:{lo:79,hi:86,sub:'halves'},whistle:{lo:88,hi:100,sub:'sparse dotted'}};
 function checkRegisters(){ const names=Object.keys(REG),out=[];let ok=true; for(let m=1;m<32;m++){const set=names.filter((n,i)=>m&(1<<i));let bad=null;for(let i=0;i<set.length&&!bad;i++)for(let j=i+1;j<set.length&&!bad;j++){const a=REG[set[i]],b=REG[set[j]];if(!(a.hi<b.lo||b.hi<a.lo))bad=set[i]+'/'+set[j]+' register';else if(a.sub===b.sub)bad=set[i]+'/'+set[j]+' subdivision';}if(bad){ok=false;out.push('FAIL '+set.join('+')+': '+bad);}}
@@ -374,7 +454,7 @@ function musicStart(){ if(!AU.ok)return; if(MUS.active)return; MUS.active=true; 
 function musicStop(){ MUS.active=false; MUS.queue.length=0; for(const n in LAYERS)setLayerLevel(n,0,0.4); }
 function setScene(name,opts){
  if(!AU.ok)return; opts=opts||{}; const s=SCENES[name]; if(!s)return; if(MUS.scene===name&&!opts.force&&(!opts.song||opts.song===MUS.song||opts.song===MUS.pendingSong))return;
- const prevTempo=MUS.tempo; MUS.scene=name; MUS.sceneStart=AU.ctx.currentTime; MUS.tempo=s.tempo||84; MUS.minor=!!s.minor; MUS.gap=!!s.gap; MUS.rev=s.rev||{room:0,hall:0.3,space:0}; MUS.frag=!!s.frag; MUS.onBar=null; MUS.detune={}; MUS.wobble=0;
+ const prevTempo=MUS.tempo; MUS.token=(MUS.token||0)+1; MUS.scene=name; MUS.sceneStart=AU.ctx.currentTime; MUS.tempo=s.tempo||84; MUS.minor=!!s.minor; MUS.gap=!!s.gap; MUS.rev=s.rev||{room:0,hall:0.3,space:0}; MUS.frag=!!s.frag; MUS.onBar=null; MUS.detune={}; MUS.wobble=0;
  const song=opts.song||SONGS.floor; const mix=opts.layers||((name==='world'&&song.mix)?song.mix:s.layers); const swap=MUS.active&&song!==MUS.song&&!opts.restart&&MUS.bar%8!==0&&(s.tempo||84)===prevTempo;
  if(swap){ MUS.pendingSong=song; MUS.pendingMix=mix; for(const n of LAYER_NAMES){ const v=mix[n]||0; if(v>0&&LAYERS[n].target>0.001)setLayerLevel(n,v,3); else if(v===0)setLayerLevel(n,0,3); } }
  else{ MUS.song=song; MUS.pendingSong=null; MUS.pendingMix=null; for(const n of LAYER_NAMES)setLayerLevel(n,mix[n]||0,opts.ramp||1.5); }
@@ -384,6 +464,7 @@ function setScene(name,opts){
  if(name==='ending')setupEnding(); if(name==='endtimes')setupEndtimes(); if(name==='epilogue')setupEpilogue();
 }
 function schedTick(){ if(!AU.ok||!MUS.active)return; const now=AU.ctx.currentTime; let guard=0;
+ if(MUS.barStart<now-1.5){ MUS.barStart=now+0.05; MUS.queue.length=0; }   // a stalled tab must not generate a burst of bars
  while(MUS.barStart<now+0.15&&guard++<8)genBar();
  while(MUS.queue.length&&MUS.queue[0].t<now+0.12){const e=MUS.queue.shift();if(e.t<now-0.06)continue;fire(e);}
  if(MUS.wobbleTarget!==undefined)MUS.wobble+= (MUS.wobbleTarget-MUS.wobble)*0.02; }
@@ -406,13 +487,13 @@ function genBar(){
  const push=(layer,fn,bp,midi,durBeats,vel,extra)=>{ const bias=fn==='bass'?-0.01:fn==='banjo'?0.008:0; const t=t0+beatWarp(bp)*beat+MUS.drift+(rng()*2-1)*0.004+bias; ev.push(Object.assign({t,layer,fn,midi,dur:durBeats*beat,vel:clamp(vel*accent(bp)*(1+(rng()-0.5)*0.3),0.05,1)},extra||{})); };
  const gapPhrase=MUS.gap&&(phrase%2===1);
  if(!gapPhrase){
-  const mel=(MUS.minor?MEL_A:song.mels[sec])[bi]; const varied=(sec===1||sec===3)||MUS.minor;
+  const mel=(MUS.minor?MEL_END:song.mels[sec])[bi]; const varied=(sec===1||sec===3)&&!MUS.minor;
   // ---- banjo: melody + forward rolls + high-G drone
   if(on('banjo')&&(melL==='banjo'||MUS.minor)){ let prev=null; const rolls=st.rolls||'sparse'; for(let i=0;i<mel.length;i++){ let [bp,m,d]=mel[i]; m=fitRange(m,REG.banjo.lo,REG.banjo.hi); if(varied&&d<=1&&bp>0&&rng()<0.1){prev=m;continue;} const ex={}; if(varied&&prev!==null&&m>prev&&m-prev<=2&&rng()<0.2)ex.slide=-(m-prev)*100; push('banjo','banjo',bp,m,d,0.62,ex); prev=m;
-    if(d>=1.5&&bi!==7&&rolls!=='none'&&(rolls==='full'||sec===2||MUS.minor)){ const ch=chordAt(bp); const tones=chordTonesIn(ch,REG.banjo.lo,REG.banjo.hi).filter(x=>x!==67); const above=tones.filter(x=>x>m)[0]||m+12; const below=tones.filter(x=>x<m).pop()||m; const cyc=[fitRange(above,62,78),67,fitRange(below,62,78)]; const rollEnd=Math.min(bp+d,bp+2)-0.25; let k=0; for(let p=bp+0.25;p<=rollEnd+1e-6;p+=0.25){ if(varied&&rng()<0.08){k++;continue;} push('banjo','banjo',p,cyc[k%3],0.25,0.24); k++; } } }
-   if(bi!==3&&bi!==7&&rolls!=='none'){ if(rng()<0.6)push('banjo','banjo',1.5,67,0.5,0.2); if(rng()<0.6)push('banjo','banjo',3.5,67,0.5,0.2); } }
+    if(d>=1.5&&bi!==7&&rolls!=='none'&&!MUS.minor&&(rolls==='full'||sec===2)){ const ch=chordAt(bp); const tones=chordTonesIn(ch,REG.banjo.lo,REG.banjo.hi).filter(x=>x!==67); const above=tones.filter(x=>x>m)[0]||m+12; const below=tones.filter(x=>x<m).pop()||m; const cyc=[fitRange(above,62,78),67,fitRange(below,62,78)]; const rollEnd=Math.min(bp+d,bp+2)-0.25; let k=0; for(let p=bp+0.25;p<=rollEnd+1e-6;p+=0.25){ if(varied&&rng()<0.08){k++;continue;} push('banjo','banjo',p,cyc[k%3],0.25,0.24); k++; } } }
+   if(bi!==3&&bi!==7&&rolls!=='none'&&!MUS.minor){ if(rng()<0.6)push('banjo','banjo',1.5,67,0.5,0.2); if(rng()<0.6)push('banjo','banjo',3.5,67,0.5,0.2); } }
   // ---- guitar: fingerpicked, thumb on 1 & 3, strum only at section ends
-  const gst=MUS.minor?'finger':(st.guitar||'finger');
+  const gst=MUS.minor?'thumb':(st.guitar||'finger');
   if(on('guitar')&&gst!=='none'){ for(let k=0;k<4;k++){ const ch=chordAt(k); const g=ch.gtr;
     if(gst==='thumb'){ if(k===0)push('guitar','guitar',0,g[0],2,0.6); if(k===2&&rng()<0.7)push('guitar','guitar',2,g[1],2,0.45); continue; }
     if(gst==='muted'){ push('guitar','guitar',k,g[k%2?2:0],0.5,0.4); if(k%2===1)push('guitar','guitar',k+0.5,g[3],0.5,0.3); continue; }
@@ -432,12 +513,13 @@ function genBar(){
    else if((bi===1||bi===5)&&rng()<0.8){ const n=nearest(tonesAt(2.5),genState.harm); genState.harm=n; push('harmonica','harmonica',2.5,n,1.4,0.6); } }
   // ---- tin whistle: sparse descant, sits phrases out
   if(on('whistle')&&melL==='whistle'&&!MUS.minor){ for(const [bp,m,d] of mel){ if(varied&&d<=1&&bp>0&&rng()<0.12)continue; push('whistle','whistle',bp,fitRange(m+12,84,98),Math.max(0.5,d*0.9),0.45); } }
-  else if(on('whistle')&&(st.whistle==='descant'||MUS.minor)){ if(genState.phrase!==phrase){genState.phrase=phrase;genState.phraseOut=mulberry(cycle*997+phrase*13)()<0.35;} if(!genState.phraseOut){ const tonesAt=bp=>chordTonesIn(chordAt(bp),REG.whistle.lo,REG.whistle.hi);
+  else if(on('whistle')&&(st.whistle==='descant'||MUS.minor)){ if(genState.phrase!==phrase){genState.phrase=phrase;genState.phraseOut=mulberry(cycle*997+phrase*13)()<(MUS.minor?0.55:0.35);} if(!genState.phraseOut){ const tonesAt=bp=>chordTonesIn(chordAt(bp),REG.whistle.lo,REG.whistle.hi);
    if(bi===2){ let n=nearest(tonesAt(1.5),genState.whis); push('whistle','whistle',1.5,n,1,0.5); n=nearest(tonesAt(2.5).filter(x=>x!==n),n+2); genState.whis=n; push('whistle','whistle',2.5,n,1.5,0.5); }
    else if(bi===5){ let n=nearest(tonesAt(0.5),genState.whis-2); push('whistle','whistle',0.5,n,1.5,0.5); n=nearest(tonesAt(3).filter(x=>x!==n),n+3); genState.whis=n; push('whistle','whistle',3,n,1,0.45); }
    else if(bi===6){ const n=nearest(tonesAt(1),genState.whis-1); genState.whis=n; push('whistle','whistle',1,n,3,0.5); } } }
   // ---- strings bed: the world's own voice
-  if(on('strings')){ let acc=0; for(const x of barChords){ const ch=CHORDS[x.c]; let notes=ch.str; if(MUS.scene==='endtimes'&&AU.ctx.currentTime-MUS.sceneStart>26)notes=notes.slice(0,3).map(m=>m-12); notes.forEach(m=>ev.push({t:t0+beatWarp(acc)*beat+MUS.drift-0.02,layer:'strings',fn:'strings',midi:m,dur:x.beats*beat-0.1,vel:0.6})); acc+=x.beats; } }
+  if(on('strings')){ let acc=0; for(const x of barChords){ const ch=CHORDS[x.c]; let notes=ch.str.slice(0,4); if(MUS.scene==='endtimes'&&AU.ctx.currentTime-MUS.sceneStart>26)notes=notes.slice(0,2).map(m=>m-12); else if(MUS.scene!=='ending')notes=notes.filter((m,i2)=>i2%2===0||i2===1);   // a three-note bed holds the harmony without stacking voices
+   notes.forEach(m=>ev.push({t:t0+beatWarp(acc)*beat+MUS.drift-0.02,layer:'strings',fn:'strings',midi:m,dur:x.beats*beat-0.1,vel:0.62})); acc+=x.beats; } }
   // ---- music box (epilogue): melody alone, half tempo, ends on the ninth
   if(on('musicbox')&&MUS.scene==='epilogue'){ const mm=(sec===2?MEL_B:MEL_A)[bi]; for(const [bp,m,d] of mm){ const note=(MUS.epilogueFinal&&bi===7)?69:m; ev.push({t:t0+beatWarp(bp)*beat+(rng()*2-1)*0.01,layer:'musicbox',fn:'musicbox',midi:note+12,dur:d*beat,vel:0.7}); if(MUS.epilogueFinal&&bi===7)break; } }
   else if(on('musicbox')&&melL==='musicbox'&&!MUS.minor){ for(const [bp,m,d] of mel){ ev.push({t:t0+beatWarp(bp)*beat+MUS.drift,layer:'musicbox',fn:'musicbox',midi:m+12,dur:d*beat,vel:0.55}); } }
@@ -449,8 +531,9 @@ function genBar(){
 function setupEnding(){ const order=[[8,'guitar',0.85],[16,'bass',0.8],[24,'harmonica',0.7],[32,'whistle',0.7],[40,'strings',0.55]];
  MUS.onBar=b=>{ for(const [at,n,v] of order)if(b===at)setLayerLevel(n,v,2.5); if(b===72){ MUS.active=false; MUS.queue.length=0; finalRing(); if(MUS.loopTune)setTimeout(()=>setScene('ending',{force:true,restart:true}),9000);} }; }
 function finalRing(){ if(!AU.ok)return; const t=AU.ctx.currentTime+0.1; const L=LAYERS.guitar,B=LAYERS.banjo,S=LAYERS.strings; CHORDS.Gadd9.gtr.forEach((m,i)=>pluck(INST.guitar,m,t+i*0.03,0.6,L,{})); [62,67,69,71].forEach((m,i)=>pluck(INST.banjo,m,t+0.02+i*0.025,0.5,B,{})); CHORDS.Gadd9.str.forEach(m=>stringsNote(m,t,0.5,7,S,{attack:0.4,release:6})); }
-function setupEndtimes(){ const drops=[[8,'guitar'],[14,'bass'],[20,'harmonica'],[27,'banjo'],[36,'whistle'],[43,'strings']]; MUS.wobbleTarget=0;
- const tick=()=>{ if(MUS.scene!=='endtimes')return; const el=AU.ctx.currentTime-MUS.sceneStart; for(const [at,n] of drops)if(el>=at&&LAYERS[n].target>0)setLayerLevel(n,0,2.5); const k=clamp(el/30,0,1); for(const n of LAYER_NAMES)if(!(n in MUS.detune))MUS.detune[n]=(Math.random()*2-1); MUS.wobbleTarget=12*k; for(const n of LAYER_NAMES)MUS.detune[n]=Math.sign(MUS.detune[n]||1)*lerp(0,25,k)*(0.6+0.4*Math.abs(MUS.detune[n]||1)); if(el>=30&&el<44&&!MUS.bloom){MUS.bloom=true;bloomSwell(14);} if(el>=45){MUS.bloom=false;musicStop();return;} setTimeout(tick,500); }; MUS.bloom=false; tick(); }
+function setupEndtimes(){ const drops=[[8,'guitar'],[14,'bass'],[20,'harmonica'],[27,'banjo'],[34,'whistle']]; MUS.wobbleTarget=0; const token=MUS.token;
+ const tick=()=>{ if(MUS.scene!=='endtimes'||MUS.token!==token)return; const el=AU.ctx.currentTime-MUS.sceneStart; for(const [at,n] of drops)if(el>=at&&LAYERS[n].target>0)setLayerLevel(n,0,2.5); const k=clamp(el/30,0,1); for(const n of LAYER_NAMES)if(!(n in MUS.detune))MUS.detune[n]=(Math.random()*2-1); MUS.wobbleTarget=12*k; for(const n of LAYER_NAMES)MUS.detune[n]=Math.sign(MUS.detune[n]||1)*lerp(0,25,k)*(0.6+0.4*Math.abs(MUS.detune[n]||1)); if(el>=30&&el<44&&!MUS.bloom){MUS.bloom=true;bloomSwell(16);} if(el>=36&&LAYERS.strings.target>0.2)setLayerLevel('strings',0.16,6);
+ if(el>=46.5){MUS.bloom=false;musicStop();MUS.scene='silence';return;} setTimeout(tick,500); }; MUS.bloom=false; tick(); }
 function bloomSwell(dur){ const ctx=AU.ctx,t=ctx.currentTime; const n=ctx.createBufferSource(); n.buffer=AU.noiseBuf; n.loop=true; const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.setValueAtTime(300,t); bp.frequency.exponentialRampToValueAtTime(2400,t+dur); bp.Q.value=1.2; const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.09,t+dur*0.92); g.gain.linearRampToValueAtTime(0.0001,t+dur+0.3); n.connect(bp); bp.connect(g); g.connect(AU.rev.space.in); n.start(t); n.stop(t+dur+0.4); const v=voice([n,bp,g],t+dur+0.5,g); n.onended=()=>killVoice(v,false); }
 function setupEpilogue(){ MUS.epilogueFinal=false; MUS.onBar=b=>{ if(b===7)MUS.epilogueFinal=true; if(b===8){MUS.active=false;MUS.queue.length=0;MUS.epilogueFinal=false;if(MUS.loopTune)setTimeout(()=>setScene('epilogue',{force:true,restart:true}),8000);} }; }
 // ---- surface fragments: two or three motif notes, rarely
@@ -499,10 +582,13 @@ function sparkSound(){ if(!AU.ok)return; const ctx=AU.ctx,t=ctx.currentTime; for
 // ======================================================================
 //  RENDERER, SCENE, LIGHTS, POST
 // ======================================================================
+const BOOT={fill:document.getElementById('bootfill'),label:document.getElementById('bootlabel'),el:document.getElementById('boot')};
+const bootStep=(pct,text)=>{ if(BOOT.fill)BOOT.fill.style.width=pct+'%'; if(BOOT.label&&text)BOOT.label.textContent=text; };
+const yieldFrame=()=>new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));
 const OPT={sens:1.0,invertY:false,fov:75,bloom:true,scale:0.85,shake:true,reduced:false,subs:true,subSize:1,cb:false,blur:false,landAssist:true};
 const canvas=$('c');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
-renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.0;
+renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.06;
 renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 const scene=new THREE.Scene(); scene.background=new THREE.Color(0x070A14);
 const camera=new THREE.PerspectiveCamera(OPT.fov,1,0.08,40000);
@@ -512,7 +598,7 @@ const shadowLight=new THREE.DirectionalLight(0xfff0d0,0.5); shadowLight.castShad
 const hemi=new THREE.HemisphereLight(0x30405a,0x0a0c14,0.12); scene.add(hemi);
 // ---- post: bloom (restrained) + own final pass: vignette, grain, chromatic, whiteout
 const composer=new EffectComposer(renderer); const renderPass=new RenderPass(scene,camera); composer.addPass(renderPass);
-const bloomPass=new UnrealBloomPass(new THREE.Vector2(1,1),0.28,0.45,0.92); composer.addPass(bloomPass);
+const bloomPass=new UnrealBloomPass(new THREE.Vector2(1,1),0.34,0.62,0.85); composer.addPass(bloomPass);
 const finalPass=new ShaderPass({uniforms:{tDiffuse:{value:null},uTime:{value:0},uVig:{value:0.42},uGrain:{value:0.028},uChroma:{value:0.0},uWhite:{value:0},uTint:{value:new THREE.Color(1,1,1)}},
  vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
  fragmentShader:`uniform sampler2D tDiffuse;uniform float uTime,uVig,uGrain,uChroma,uWhite;uniform vec3 uTint;varying vec2 vUv;
@@ -529,19 +615,20 @@ window.addEventListener('resize',resize);
 //  BODIES ON RAILS
 // ======================================================================
 const BODIES=[]; const BY={};
-const PAIR={orbit:1500,period:1900,phase:0.25,incl:1.1,pairPhase:0.6,pairPeriod:130,sep:90};
+const PAIR={orbit:1950,period:2400,phase:2.4,incl:1.1,pairPhase:0.6,pairPeriod:150,sep:75};
 const dirLL=(lat,lon)=>new V3(Math.cos(lat)*Math.sin(lon),Math.sin(lat),Math.cos(lat)*Math.cos(lon));
 class Body{
- constructor(d){ Object.assign(this,d); this.pos=new V3(); this.vel=new V3(); this.quat=new Q(); this.qinv=new Q(); this.omega=new V3(); this.axis=new V3(0,1,0); this.group=new THREE.Group(); scene.add(this.group); this.sites=this.sites||[]; this.colliders=[]; this.cut=this.R*(this.star?2.4:4.2); this.uConsume={value:0}; this.uConsumeCol={value:new THREE.Color(this.flash||0xffffff)}; this.sandR=0; this.consumed=false; this.hasSand=!!this.sand; }
- orbitPos(t,out){ if(this.moonOf){ const par=BY[this.moonOf]; par.orbitPos(t,out); const th=this.moonPhase+TWO_PI*t/this.moonPeriod; out.x+=Math.cos(th)*this.moonOrbit; out.y+=Math.sin(th)*this.moonOrbit*0.35; out.z+=Math.sin(th)*this.moonOrbit; return out; } if(this.pair){const th=this.pair.phase+TWO_PI*t/this.pair.period; out.set(Math.cos(th)*this.pair.orbit,Math.sin(th*1.3+this.pair.incl)*this.pair.orbit*0.05,Math.sin(th)*this.pair.orbit); const pa=this.pair.pairPhase+TWO_PI*t/this.pair.pairPeriod; out.x+=Math.cos(pa)*this.pairSide*this.pair.sep; out.z+=Math.sin(pa)*this.pairSide*this.pair.sep; return out;}
+ constructor(d){ Object.assign(this,d); this.shells=[]; this.pos=new V3(); this.vel=new V3(); this.quat=new Q(); this.qinv=new Q(); this.omega=new V3(); this.axis=new V3(0,1,0); this.group=new THREE.Group(); scene.add(this.group); this.sites=this.sites||[]; this.colliders=[]; this.cut=this.R*(this.star?2.4:4.2); this.uConsume={value:0}; this.uConsumeCol={value:new THREE.Color(this.flash||0xffffff)}; this.sandR=0; this.consumed=false; this.hasSand=!!this.sand; }
+ orbitPos(t,out){ if(this.quantum)return out.copy(this.anchor||_v[5].set(0,0,0)); if(this.moonOf){ const par=BY[this.moonOf]; par.orbitPos(t,out); const th=this.moonPhase+TWO_PI*t/this.moonPeriod; out.x+=Math.cos(th)*this.moonOrbit; out.y+=Math.sin(th)*this.moonOrbit*0.35; out.z+=Math.sin(th)*this.moonOrbit; return out; } if(this.pair){const th=this.pair.phase+TWO_PI*t/this.pair.period; out.set(Math.cos(th)*this.pair.orbit,Math.sin(th*1.3+this.pair.incl)*this.pair.orbit*0.05,Math.sin(th)*this.pair.orbit); const pa=this.pair.pairPhase+TWO_PI*t/this.pair.pairPeriod; out.x+=Math.cos(pa)*this.pairSide*this.pair.sep; out.z+=Math.sin(pa)*this.pairSide*this.pair.sep; return out;}
   if(!this.orbit)return out.set(0,0,0); const th=this.phase+TWO_PI*t/this.period; return out.set(Math.cos(th)*this.orbit,Math.sin(th*1.3+this.incl)*this.orbit*0.05,Math.sin(th)*this.orbit); }
  rotAngle(t){ if(this.pair){const pa=this.pair.pairPhase+TWO_PI*t/this.pair.pairPeriod; return this.pairSide>0?Math.PI-pa:-pa;} return (this.rotPhase||0)+TWO_PI*t/this.rotP; }
  update(t){ this.orbitPos(t,this.pos); this.orbitPos(t+0.02,_v[5]); this.vel.copy(_v[5]).sub(this.pos).divideScalar(0.02); const a=this.rotAngle(t); this.quat.setFromAxisAngle(this.axis,a); this.qinv.copy(this.quat).invert(); this.omega.copy(this.axis).multiplyScalar(this.pair?-TWO_PI/this.pair.pairPeriod:TWO_PI/this.rotP); this.group.position.copy(this.pos); this.group.quaternion.copy(this.quat);
   if(this.hasSand){ this.sandR=this.sand.from+(this.sand.to-this.sand.from)*clamp(t/LOOP,0,1); if(this.sandMesh){const s=Math.max(0.01,this.sandR); this.sandMesh.scale.setScalar(s); this.sandMesh.visible=this.sandR>this.R*0.6;} } }
  terrain(d){ let h=this.R*(1+this.amp*(fbm3(d.x*this.freq+this.seed,d.y*this.freq+this.seed*0.7,d.z*this.freq,4)*2-1)); if(this.ridge)h+=this.R*this.ridge*Math.abs(noise3(d.x*this.freq*0.5+9,d.y*this.freq*0.5,d.z*this.freq*0.5)-0.5);
-  for(const s of this.sites){const a=Math.acos(clamp(d.dot(s.dir),-1,1)); if(a<s.r1){const w=1-smooth(s.r0,s.r1,a); h=lerp(h,(this.R+s.h)/Math.max(0.5,Math.cos(a)),w);}} return h; }
- height(d){ const h=this.terrain(d); return this.hasSand?Math.max(h,this.sandR):h; }
- material(d){ if(this.hasSand&&this.sandR>this.terrain(d)+0.2)return 'sand'; if(this.water)return 'water'; for(const s of this.sites)if(s.mat&&Math.acos(clamp(d.dot(s.dir),-1,1))<s.r1*0.7)return s.mat; return this.mat||'rock'; }
+  return h; }
+ ground(d){ let h=this.terrain(d); for(const s of this.sites){const a=Math.acos(clamp(d.dot(s.dir),-1,1)); if(a<s.r1){const w=1-smooth(s.r0,s.r1,a); h=lerp(h,(this.R+s.h)/Math.max(0.5,Math.cos(a)),w);}} return h; }
+ height(d){ const h=this.ground(d); return this.hasSand?Math.max(h,this.sandR):h; }
+ material(d){ if(this.hasSand&&this.sandR>this.terrain(d)+0.2)return 'sand'; for(const s of this.sites)if(s.mat&&Math.acos(clamp(d.dot(s.dir),-1,1))<s.r0)return s.mat; if(this.water)return 'water'; for(const s of this.sites)if(s.mat&&Math.acos(clamp(d.dot(s.dir),-1,1))<s.r1*0.7)return s.mat; return this.mat||'rock'; }
  toLocal(w,out){ return out.copy(w).sub(this.pos).applyQuaternion(this.qinv); }
  toWorld(l,out){ return out.copy(l).applyQuaternion(this.quat).add(this.pos); }
  surfaceVel(w,out){ return out.copy(this.omega).cross(_v[4].copy(w).sub(this.pos)).add(this.vel); }
@@ -550,13 +637,17 @@ function addBody(d){ const b=new Body(d); BODIES.push(b); BY[b.id]=b; return b; 
 addBody({id:'exchange',name:'The Exchange',R:200,orbit:0,rotP:400,g:34,star:true,amp:0,freq:1,seed:0});
 addBody({id:'floor',name:'The Floor',R:110,orbit:1000,period:1500,phase:0,incl:0.4,rotP:260,rotPhase:-Math.PI/2,g:11,atmo:{col:0x8fd08a,pow:2.4,i:1.0,breath:true},pal:['#2d5a2a','#4a8a3a','#9fb45f','#6d6152'],mat:'grass',amp:0.03,freq:2.4,seed:1,flash:0xc8ff90,
  sites:[{dir:dirLL(0.32,0),r0:0.06,r1:0.10,h:0.3,mat:'grass'},{dir:dirLL(0.2,-0.5),r0:0.2,r1:0.3,h:-1.2,mat:'rock'},{dir:dirLL(0.36,0.85),r0:0.26,r1:0.36,h:0.3,mat:'metal'},{dir:dirLL(-0.12,0.42),r0:0.1,r1:0.2,h:2.2,mat:'rock'}]});
-addBody({id:'ledger',name:'Ledger',R:60,sites:[{dir:dirLL(0.25,0.2),r0:0.3,r1:0.45,h:0.2,mat:'metal'}],pair:PAIR,pairSide:-1,g:9,pal:['#6b4a2a','#a7793d','#d9b77a','#5a3d6a'],amp:0.05,freq:3.2,seed:7,sand:{from:35,to:76},flash:0xffd070,atmo:{col:0xd8a870,pow:3,i:0.5}});
-addBody({id:'backlog',name:'Backlog',R:60,sites:[{dir:dirLL(-0.3,-0.4),r0:0.3,r1:0.45,h:0.2,mat:'metal'}],pair:PAIR,pairSide:1,g:9,pal:['#4a3060','#7a5a8a','#b08cc0','#6b4a2a'],amp:0.05,freq:3.2,seed:8,sand:{from:95,to:63},flash:0xd0a0ff,atmo:{col:0xb090d0,pow:3,i:0.5}});
-addBody({id:'stack',name:'The Stack',R:150,sites:[{dir:dirLL(0.5,1.1),r0:0.13,r1:0.22,h:0.2,mat:'metal'}],orbit:1950,period:2300,phase:3.9,incl:2.2,rotP:300,g:10,pal:['#2a3038','#4a5260','#7a8290','#c65a1a'],mat:'metal',amp:0.06,freq:3.8,seed:3,ridge:0.04,flash:0xff7a20,atmo:{col:0xff6a20,pow:2.2,i:0.8}});
-addBody({id:'deep',name:'The Deep',R:190,sites:[{dir:dirLL(-0.2,2.2),r0:0.1,r1:0.17,h:1.6,mat:'metal'}],orbit:2350,period:2900,phase:5.3,incl:3.0,rotP:220,g:12,pal:['#0f5a52','#1a8a78','#36b2a0','#0b3d3a'],water:true,amp:0.004,freq:12,seed:5,flash:0x80ffe0,atmo:{col:0x40d0b0,pow:2.6,i:1.1,breath:true}});
-addBody({id:'nest',name:'The Nest',R:80,sites:[{dir:dirLL(0.8,-1.0),r0:0.16,r1:0.26,h:0.2,mat:'metal'}],orbit:2700,period:3400,phase:1.2,incl:4.1,rotP:500,g:6,pal:['#0a0a0e','#1a1018','#2a1826','#ff5aa0'],amp:0.12,freq:5,seed:9,ridge:0.06,flash:0xff40a0,atmo:{col:0xff3a90,pow:1.6,i:0.7}});
-addBody({id:'moon',name:'Training Moon',R:24,moonOf:'floor',moonOrbit:300,moonPeriod:260,moonPhase:1.1,rotP:180,rotPhase:0.4,g:4,pal:['#5c5a56','#7d7a74','#a19d95','#c8c2b5'],mat:'rock',amp:0.07,freq:4,seed:13,flash:0xe0e0ff,sites:[{dir:dirLL(1.2,0.3),r0:0.3,r1:0.45,h:0.2,mat:'metal'}]});
-const FLOOR=BY.floor,SUN=BY.exchange,MOON=BY.moon;
+addBody({id:'ledger',name:'Ledger',R:60,sites:[{dir:dirLL(0.25,0.2),r0:0.3,r1:0.45,h:0.2,mat:'metal'}],pair:PAIR,pairSide:-1,g:9,pal:['#6b4a2a','#a7793d','#d9b77a','#5a3d6a'],amp:0.05,freq:3.2,seed:7,sand:{from:26,to:76},flash:0xffd070,atmo:{col:0xd8a870,pow:3,i:0.5}});
+addBody({id:'backlog',name:'Backlog',R:60,sites:[{dir:dirLL(-0.3,-0.4),r0:0.3,r1:0.45,h:0.2,mat:'metal'}],pair:PAIR,pairSide:1,g:9,pal:['#4a3060','#7a5a8a','#b08cc0','#6b4a2a'],amp:0.05,freq:3.2,seed:8,sand:{from:76,to:26},flash:0xd0a0ff,atmo:{col:0xb090d0,pow:3,i:0.5}});
+addBody({id:'stack',name:'The Stack',R:150,sites:[{dir:dirLL(0.5,1.1),r0:0.13,r1:0.22,h:0.2,mat:'metal'}],orbit:2550,period:2300,phase:3.9,incl:2.2,rotP:300,g:10,pal:['#2a3038','#4a5260','#7a8290','#c65a1a'],mat:'metal',amp:0.06,freq:3.8,seed:3,ridge:0.04,flash:0xff7a20,atmo:{col:0xff6a20,pow:2.2,i:0.8}});
+addBody({id:'deep',name:'The Deep',R:190,sites:[{dir:dirLL(-0.2,2.2),r0:0.1,r1:0.17,h:1.6,mat:'metal'}],orbit:3150,period:3600,phase:5.3,incl:3.0,rotP:220,g:12,pal:['#0f5a52','#1a8a78','#36b2a0','#0b3d3a'],water:true,amp:0.004,freq:12,seed:5,flash:0x80ffe0,atmo:{col:0x40d0b0,pow:2.6,i:1.1,breath:true}});
+addBody({id:'nest',name:'The Nest',R:80,sites:[{dir:dirLL(0.8,-1.0),r0:0.16,r1:0.26,h:0.2,mat:'metal'}],orbit:3600,period:3400,phase:1.2,incl:4.1,rotP:500,g:6,pal:['#0a0a0e','#1a1018','#2a1826','#ff5aa0'],amp:0.12,freq:5,seed:9,ridge:0.06,flash:0xff40a0,atmo:{col:0xff3a90,pow:1.6,i:0.7}});
+addBody({id:'moon',name:'Training Moon',R:24,moonOf:'floor',moonOrbit:300,moonPeriod:260,moonPhase:1.1,rotP:180,rotPhase:0.4,g:9,pal:['#5c5a56','#7d7a74','#a19d95','#c8c2b5'],mat:'rock',amp:0.07,freq:4,seed:13,flash:0xe0e0ff,sites:[{dir:dirLL(1.2,0.3),r0:0.3,r1:0.45,h:0.2,mat:'metal'}]});
+addBody({id:'station',name:'The Relay',R:34,orbit:400,period:58,phase:1.9,incl:1.9,rotP:90,rotPhase:0,g:18,station:true,pal:['#3c414a','#585f6a','#79818d','#9aa3af'],mat:'metal',amp:0.004,freq:9,seed:31,flash:0xbfe4ff,
+ sites:[{dir:dirLL(0.9,0.2),r0:0.68,r1:0.95,h:0.2,mat:'metal'},{dir:dirLL(-0.9,2.6),r0:0.34,r1:0.56,h:0.2,mat:'metal'}]});
+addBody({id:'vision',name:'The Vision',R:34,quantum:true,rotP:400,g:5,pal:['#3a3550','#5b5378','#8f86b4','#cfc6e8'],mat:'rock',amp:0.05,freq:5,seed:21,flash:0xd8c8ff});
+const FLOOR=BY.floor,SUN=BY.exchange,MOON=BY.moon,VISION=BY.vision,STATION=BY.station;
+VISION.anchor=new V3(); VISION.anchorIdx=-1;
 const SITE={camp:FLOOR.sites[0],store:FLOOR.sites[1],tower:FLOOR.sites[2],obs:FLOOR.sites[3],course:MOON.sites[0]};
 
 // ---------------------------------------------------------- terrain
@@ -569,9 +660,9 @@ function terrainMaterial(body,extra){
  m.customProgramCacheKey=()=>'consume'+(extra?JSON.stringify(Object.keys(extra)):''); return m; }
 function buildTerrain(body){
  const seg=body.R>100?128:body.R>60?96:72; const geo=new THREE.SphereGeometry(1,seg,Math.floor(seg*0.6)); const pos=geo.attributes.position; const col=new Float32Array(pos.count*3); const d=new V3(); const pal=body.pal.map(c=>new THREE.Color(c)); const c=new THREE.Color();
- for(let i=0;i<pos.count;i++){ d.set(pos.getX(i),pos.getY(i),pos.getZ(i)).normalize(); const h=body.terrain(d); pos.setXYZ(i,d.x*h,d.y*h,d.z*h); const rel=clamp((h-body.R)/(body.R*(body.amp+ (body.ridge||0))+1e-6),-1,1); const nz=noise3(d.x*9+3,d.y*9,d.z*9); let t=rel*0.5+0.5+ (nz-0.5)*0.35; t=clamp(t,0,1); if(t<0.5)c.copy(pal[0]).lerp(pal[1],t*2); else c.copy(pal[1]).lerp(pal[2],(t-0.5)*2); if(body.ridge&&rel>0.55)c.lerp(pal[3],(rel-0.55)*1.5); if(nz>0.82)c.lerp(pal[3],0.6); col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b; }
+ for(let i=0;i<pos.count;i++){ d.set(pos.getX(i),pos.getY(i),pos.getZ(i)).normalize(); const h=body.ground(d); pos.setXYZ(i,d.x*h,d.y*h,d.z*h); const rel=clamp((h-body.R)/(body.R*(body.amp+ (body.ridge||0))+1e-6),-1,1); const nz=noise3(d.x*9+3,d.y*9,d.z*9); let t=rel*0.5+0.5+ (nz-0.5)*0.35; t=clamp(t,0,1); if(t<0.5)c.copy(pal[0]).lerp(pal[1],t*2); else c.copy(pal[1]).lerp(pal[2],(t-0.5)*2); if(body.ridge&&rel>0.55)c.lerp(pal[3],(rel-0.55)*1.5); if(nz>0.82)c.lerp(pal[3],0.6); col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b; }
  geo.setAttribute('color',new THREE.BufferAttribute(col,3)); geo.computeVertexNormals();
- const mat=terrainMaterial(body,body.water?{flatShading:false,transparent:true,opacity:0.86,roughness:0.15,metalness:0.1}:null); const m=new THREE.Mesh(geo,mat); m.castShadow=!body.water; m.receiveShadow=true; body.group.add(m); body.mesh=m;
+ const mat=terrainMaterial(body,body.water?{flatShading:false,transparent:true,opacity:0.82,roughness:0.08,metalness:0.25,envMapIntensity:1.2}:(body.station?{flatShading:true,roughness:0.42,metalness:0.72}:null)); const m=new THREE.Mesh(geo,mat); m.castShadow=!body.water; m.receiveShadow=true; body.group.add(m); body.mesh=m;
  if(body.water){ const core=new THREE.Mesh(new THREE.SphereGeometry(body.R-14,48,32),terrainMaterial(body,{color:0x0b3d3a})); core.material.vertexColors=false; body.group.add(core); }
  if(body.hasSand){ const sm=new THREE.Mesh(new THREE.SphereGeometry(1,64,40),terrainMaterial(body,{color:0xc9a061,vertexColors:false,flatShading:false,roughness:1})); sm.material.vertexColors=false; sm.receiveShadow=true; sm.castShadow=true; body.group.add(sm); body.sandMesh=sm; }
  if(body.atmo)buildAtmo(body);
@@ -579,12 +670,21 @@ function buildTerrain(body){
 }
 const atmoVert='varying vec3 vN;varying vec3 vW;void main(){vN=normalize(mat3(modelMatrix)*normal);vec4 wp=modelMatrix*vec4(position,1.0);vW=wp.xyz;gl_Position=projectionMatrix*viewMatrix*wp;}';
 const atmoFrag=`uniform vec3 uColor;uniform float uPower,uI,uConsume;uniform vec3 uSunCol;varying vec3 vN;varying vec3 vW;
-void main(){vec3 V=normalize(cameraPosition-vW);float nv=dot(vN,V);float f=pow(1.0-clamp(nv,0.0,1.0),uPower);float l=clamp(dot(vN,normalize(-vW))*0.7+0.45,0.0,1.0);
-vec3 c=mix(uColor,uSunCol,0.25)*f*l*uI; c=mix(c,vec3(3.0),smoothstep(0.0,0.3,uConsume)*(1.0-smoothstep(0.3,1.0,uConsume)))*(1.0-smoothstep(0.5,1.0,uConsume)*0.9); gl_FragColor=vec4(c,clamp(f*l*1.3,0.0,1.0));}`;
+void main(){vec3 V=normalize(cameraPosition-vW);float nv=dot(vN,V);float f=pow(1.0-clamp(nv,0.0,1.0),uPower);
+ vec3 L=normalize(-vW);                       // the star sits at the origin
+ float lam=dot(vN,L);
+ float lit=smoothstep(-0.35,0.25,lam);         // soft terminator
+ float rim=pow(clamp(lam,0.0,1.0),1.6);
+ vec3 day=mix(uColor,uSunCol,0.22);
+ vec3 dusk=mix(vec3(1.0,0.42,0.2),uColor,0.35); // the band where the sun is grazing
+ float grazing=smoothstep(0.45,0.0,abs(lam))*lit;
+ vec3 c=(day*(0.35+0.9*rim)+dusk*grazing*1.5)*f*uI*(0.18+0.9*lit);
+ c=mix(c,vec3(3.0),smoothstep(0.0,0.3,uConsume)*(1.0-smoothstep(0.3,1.0,uConsume)))*(1.0-smoothstep(0.5,1.0,uConsume)*0.9);
+ gl_FragColor=vec4(c,clamp(f*(0.22+1.25*lit),0.0,1.0));}`;
 const sunCol=new THREE.Color(0xfff0d0);
 function buildAtmo(body){ const a=body.atmo; const mat=new THREE.ShaderMaterial({uniforms:{uColor:{value:new THREE.Color(a.col)},uPower:{value:a.pow},uI:{value:a.i},uConsume:body.uConsume,uSunCol:{value:sunCol}},vertexShader:atmoVert,fragmentShader:atmoFrag,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}); const m=new THREE.Mesh(new THREE.SphereGeometry(body.R*1.16,48,32),mat); body.group.add(m); body.atmoMesh=m; }
-function buildRocks(body){ if(body.water)return; const n=body.R>140?260:body.R>100?180:110; const geo=new THREE.DodecahedronGeometry(1,0); const mat=new THREE.MeshStandardMaterial({color:new THREE.Color(body.pal[3]),flatShading:true,roughness:0.95}); const im=new THREE.InstancedMesh(geo,mat,n); im.castShadow=true; im.receiveShadow=true; const r=mulberry(body.seed*17+5); const m4=new THREE.Matrix4(),q=new Q(),d=new V3(),s=new V3(); let k=0;
- for(let i=0;i<n*4&&k<n;i++){ d.set(r()*2-1,r()*2-1,r()*2-1); if(d.lengthSq()<0.05||d.lengthSq()>1)continue; d.normalize(); if(body.sites.some(st=>Math.acos(clamp(d.dot(st.dir),-1,1))<st.r1*1.1))continue; const h=body.terrain(d); const sc=0.6+r()*r()*3.2; s.set(sc*(0.7+r()*0.6),sc*(0.5+r()*0.5),sc*(0.7+r()*0.6)); q.setFromUnitVectors(YUP,d).multiply(_q[0].setFromAxisAngle(YUP,r()*TWO_PI)); m4.compose(_v[0].copy(d).multiplyScalar(h-sc*0.15),q,s); im.setMatrixAt(k++,m4); }
+function buildRocks(body){ if(body.water||body.station)return; const n=body.R>140?260:body.R>100?180:110; const geo=new THREE.DodecahedronGeometry(1,0); const mat=new THREE.MeshStandardMaterial({color:new THREE.Color(body.pal[3]),flatShading:true,roughness:0.95}); const im=new THREE.InstancedMesh(geo,mat,n); im.castShadow=true; im.receiveShadow=true; const r=mulberry(body.seed*17+5); const m4=new THREE.Matrix4(),q=new Q(),d=new V3(),s=new V3(); let k=0;
+ for(let i=0;i<n*4&&k<n;i++){ d.set(r()*2-1,r()*2-1,r()*2-1); if(d.lengthSq()<0.05||d.lengthSq()>1)continue; d.normalize(); if(body.sites.some(st=>Math.acos(clamp(d.dot(st.dir),-1,1))<st.r1*1.1))continue; const h=body.ground(d); const sc=0.6+r()*r()*3.2; s.set(sc*(0.7+r()*0.6),sc*(0.5+r()*0.5),sc*(0.7+r()*0.6)); q.setFromUnitVectors(YUP,d).multiply(_q[0].setFromAxisAngle(YUP,r()*TWO_PI)); m4.compose(_v[0].copy(d).multiplyScalar(h-sc*0.15),q,s); im.setMatrixAt(k++,m4); }
  im.count=k; im.instanceMatrix.needsUpdate=true; body.group.add(im); }
 // ---------------------------------------------------------- the star
 const sunMat=new THREE.ShaderMaterial({uniforms:{uTime:{value:0},uRed:{value:0},uWhite:{value:0}},vertexShader:'varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
@@ -608,7 +708,9 @@ const starMesh=buildStars(); starMesh.renderOrder=-20; starMesh.material.fog=fal
 // ---------------------------------------------------------- sand column between the twins
 const sandCol={n:1600,mesh:null,phase:null};
 { const p=new Float32Array(sandCol.n*3); sandCol.phase=new Float32Array(sandCol.n); const r=mulberry(77); for(let i=0;i<sandCol.n;i++){sandCol.phase[i]=r();p[i*3]=(r()-0.5);p[i*3+1]=0;p[i*3+2]=(r()-0.5);} const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(p,3)); sandCol.mesh=new THREE.Points(g,new THREE.PointsMaterial({color:0xe0b874,size:2.2,sizeAttenuation:true,transparent:true,opacity:0.85,depthWrite:false})); sandCol.mesh.frustumCulled=false; scene.add(sandCol.mesh); }
-function updateSandColumn(t){ const A=BY.backlog,B=BY.ledger; const a=A.pos,b=B.pos; const dir=_v[0].copy(b).sub(a); const len=dir.length(); dir.normalize(); const start=A.sandR-2, end=len-B.sandR+2; const span=Math.max(1,end-start); const P=sandCol.mesh.geometry.attributes.position; const q=_q[0].setFromUnitVectors(YUP,dir); sandCol.mesh.quaternion.copy(q); sandCol.mesh.position.copy(a);
+function updateSandColumn(t){ const drain=BY.backlog.sandR>=BY.ledger.sandR?BY.backlog:BY.ledger; const fill=drain===BY.backlog?BY.ledger:BY.backlog;
+ const A=drain,B=fill; const a=A.pos,b=B.pos; const dir=_v[0].copy(b).sub(a); const len=dir.length(); dir.normalize(); const start=A.sandR-2, end=len-B.sandR+2; const span=Math.max(1,end-start); const P=sandCol.mesh.geometry.attributes.position; const q=_q[0].setFromUnitVectors(YUP,dir); sandCol.mesh.quaternion.copy(q); sandCol.mesh.position.copy(a);
+ const fade=clamp((A.sandR-B.sandR)/10,0,1); sandCol.mesh.material.opacity=0.85*Math.max(0.25,fade); sandCol.mesh.visible=fade>0.02;
  for(let i=0;i<sandCol.n;i++){ const f=(sandCol.phase[i]+t*0.11*(0.8+sandCol.phase[i]*0.4))%1; const y=start+f*span; const w=(1-Math.abs(f-0.5)*2); const rad=lerp(2.5,11,w*w)+0.001; const ang=sandCol.phase[i]*TWO_PI*13+t*0.3; P.setXYZ(i,Math.cos(ang)*rad*(0.5+0.5*((i*7)%10)/10),y,Math.sin(ang)*rad*(0.5+0.5*((i*3)%10)/10)); } P.needsUpdate=true; }
 
 // ======================================================================
@@ -622,6 +724,11 @@ const MAT={hull:new THREE.MeshStandardMaterial({color:0xcfc9bb,roughness:0.6,met
  fire:new THREE.MeshBasicMaterial({color:0xff8a2a,transparent:true,opacity:0.85,blending:THREE.AdditiveBlending,depthWrite:false}),fire2:new THREE.MeshBasicMaterial({color:0xffe08a,transparent:true,opacity:0.8,blending:THREE.AdditiveBlending,depthWrite:false})};
 function box(w,h,d,mat,x,y,z){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(x||0,y||0,z||0); m.castShadow=true; m.receiveShadow=true; return m; }
 function cyl(rt,rb,h,mat,x,y,z,seg){ const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg||8),mat); m.position.set(x||0,y||0,z||0); m.castShadow=true; m.receiveShadow=true; return m; }
+function padSite(body,fromSite,yaw,out,rad,matName){ // a pad `out` metres from another site, levelled to the real ground
+ const east=_v[4].set(0,1,0).cross(fromSite.dir); if(east.lengthSq()<1e-5)east.set(1,0,0); east.normalize(); const north=_v[3].copy(fromSite.dir).cross(east).normalize();
+ const tangent=_v[2].copy(east).multiplyScalar(Math.cos(yaw||0)).addScaledVector(north,Math.sin(yaw||0)).normalize();
+ const rot=_v[1].crossVectors(fromSite.dir,tangent).normalize(); const dir=fromSite.dir.clone().applyAxisAngle(rot,out/body.R).normalize();
+ const site={dir,r0:rad/body.R,r1:rad*1.38/body.R,h:body.ground(dir)-body.R,mat:matName||'rock',pad:true}; body.sites.push(site); return site; }
 function siteGroup(body,site,yaw,offX,offZ){ const g=new THREE.Group(); g.position.copy(site.dir).multiplyScalar(body.R+site.h); g.quaternion.setFromUnitVectors(YUP,site.dir); if(yaw)g.quaternion.multiply(TQ[0].setFromAxisAngle(YUP,yaw)); if(offX||offZ){ g.position.add(_v[6].set(offX||0,0,offZ||0).applyQuaternion(g.quaternion)); const d=_v[6].copy(g.position).normalize(); g.position.copy(d).multiplyScalar((body.R+site.h)/Math.max(0.5,d.dot(site.dir))); g.quaternion.setFromUnitVectors(YUP,d); if(yaw)g.quaternion.multiply(TQ[0].setFromAxisAngle(YUP,yaw)); } body.group.add(g); return g; }
 function registerCollider(body,mesh,mat){ mesh.updateWorldMatrix(true,false); const c=new V3(),q=new Q(),s=new V3(); mesh.matrixWorld.decompose(c,q,s); const p=mesh.geometry.parameters; const rad=Math.max(p.radiusTop||0,p.radiusBottom||0,p.radius||0); const w=p.width!==undefined?p.width:rad*2, h=p.height!==undefined?p.height:rad*2, d=p.depth!==undefined?p.depth:rad*2; const half=new V3(w/2*s.x,h/2*s.y,d/2*s.z); if(![half.x,half.y,half.z].every(Number.isFinite)||half.x<=0||half.y<=0||half.z<=0){console.warn('collider skipped (bad extents)',mesh.geometry.type);return;} body.colliders.push({c,q,qi:q.clone().invert(),h:half,mat:mat||'metal',mesh}); }
 const CT={hit:false,n:new V3(),mat:'rock',depth:0}; const OB={n:new V3(),depth:0};
@@ -631,6 +738,7 @@ function sphereOBB(pL,col,radius){ const p=T[12].copy(pL).sub(col.c).applyQuater
 function collideBody(body,pL,radius,out,stick){ out.hit=false; out.depth=0; const r=pL.length()||1e-6; const dirL=T[11].copy(pL).divideScalar(r); const h=body.height(dirL);
  if(r<h+radius){out.depth=Math.max(out.depth,h+radius-r);pL.copy(dirL).multiplyScalar(h+radius);out.n.copy(dirL);out.hit=true;out.mat=body.material(dirL);}
  let boxHit=false; const upRef=body.localUp||dirL;
+ if(body.shells)for(const sh of body.shells){ const d=T[12].copy(pL).sub(sh.c); const dl=d.length()||1e-6; d.divideScalar(dl); if(d.dot(sh.gap)>sh.cos)continue; const gap=Math.abs(dl-sh.r); if(gap<radius){ const outside=dl>=sh.r; pL.copy(sh.c).addScaledVector(d,outside?sh.r+radius:sh.r-radius); out.n.copy(d).multiplyScalar(outside?1:-1); out.hit=true; boxHit=true; out.mat='metal'; out.depth=Math.max(out.depth,radius-gap); } }
  for(const c of body.colliders){ if(sphereOBB(pL,c,radius)){pL.addScaledVector(OB.n,OB.depth);out.n.copy(OB.n);out.hit=true;boxHit=true;out.mat=c.mat;out.depth=Math.max(out.depth,OB.depth);} else if(stick&&sphereOBB(pL,c,radius+0.45)&&OB.n.dot(upRef)>0.55){pL.addScaledVector(OB.n,-(0.45-OB.depth));out.n.copy(OB.n);out.hit=true;boxHit=true;out.mat=c.mat;} }
  // terrain stick only when no structure is holding us up, so ramps and pads win over the ground beneath them
  if(!boxHit&&!out.hit&&stick&&r<h+radius+0.5){pL.copy(dirL).multiplyScalar(h+radius);out.n.copy(dirL);out.hit=true;out.mat=body.material(dirL);}
@@ -643,13 +751,27 @@ const CAMP={site:siteGroup(FLOOR,SITE.camp,0),spawnLocal:new V3(),light:null,fla
  const seat=cyl(0.3,0.34,3,MAT.wood,0,0.3,3.2); seat.rotation.z=Math.PI/2; g.add(seat); const seat2=cyl(0.3,0.34,3,MAT.wood,-3.2,0.3,0); seat2.rotation.x=Math.PI/2; g.add(seat2);
  g.updateWorldMatrix(true,true); CAMP.spawnLocal.set(0,0.5,-2.8).applyMatrix4(g.matrixWorld); }
 // ---- Old Rep glyph panels: procedural glyphs on a plate; the Interpreter reads them
-const BODY_NODE={floor:{id:'floor',fact:'Home. The fire, the store, the Observatory, the pad.'},moon:{id:'moon',fact:'A small moon over the Floor with a training course on it.'},ledger:{id:'ledger-pillars',fact:'Ledger: sand falls all shift; the pillars stand over the shaft.'},backlog:{id:'backlog-engine',fact:'Backlog: the Engine turns, with nobody standing at it.'},stack:{id:'stack-node',fact:'The Stack: layer on layer, and a crust that will not last a shift.'},deep:{id:'deep-hold',fact:'The Deep: holds above the water, cyclones on a timer.'},nest:{id:'nest-post',fact:'The Nest: seeds inside seeds, and a warning post outside.'}};
+const BODY_NODE={station:{id:'station',fact:'The Relay: a pad, a shack and a dish, going round the star fast.'},floor:{id:'floor',fact:'Home. The fire, the store, the Observatory, the pad.'},moon:{id:'moon',fact:'A small moon over the Floor with a training course on it.'},ledger:{id:'ledger-pillars',fact:'Ledger: sand falls all shift; the pillars stand over the shaft.'},backlog:{id:'backlog-engine',fact:'Backlog: the Engine turns, with nobody standing at it.'},stack:{id:'stack-node',fact:'The Stack: layer on layer, and a crust that will not last a shift.'},deep:{id:'deep-hold',fact:'The Deep: holds above the water, cyclones on a timer.'},nest:{id:'nest-post',fact:'The Nest: seeds inside seeds, and a warning post outside.'}};
 const GLYPHS=[]; const THESIS_USES=1; // the story thesis phrase must appear exactly three times in the finished game; this file spends one of them (store values board)
 function glyphCanvas(seed,lines){ const cv=document.createElement('canvas'); cv.width=512; cv.height=64*lines+40; const c=cv.getContext('2d'); const r=mulberry(seed); c.fillStyle='#101420'; c.fillRect(0,0,cv.width,cv.height); c.strokeStyle='#4a5468'; c.lineWidth=4; c.strokeRect(6,6,cv.width-12,cv.height-12); c.strokeStyle='#d9c26a'; c.lineCap='round'; c.lineJoin='round';
  for(let L=0;L<lines;L++){ let x=30; const y=48+L*64; while(x<cv.width-40){ const w=14+r()*22; c.lineWidth=2.2+r()*1.4; c.beginPath(); const k=2+Math.floor(r()*3); for(let q=0;q<k;q++){ const x0=x+r()*w,y0=y-18+r()*36,x1=x+r()*w,y1=y-18+r()*36; c.moveTo(x0,y0); if(r()<0.5)c.lineTo(x1,y1); else c.quadraticCurveTo(x+w/2,y+(r()-0.5)*40,x1,y1);} c.stroke(); if(r()<0.3){c.beginPath();c.arc(x+w/2,y+(r()-0.5)*20,3,0,TWO_PI);c.fillStyle='#d9c26a';c.fill();} x+=w+10+r()*14; } }
  return cv; }
 function glyphPanel(body,parent,x,y,z,rotY,w,h,seed,lines,id,title,text,unlock){ const cv=glyphCanvas(seed,lines); const tex=new THREE.CanvasTexture(cv); tex.colorSpace=THREE.SRGBColorSpace; tex.generateMipmaps=false; tex.minFilter=THREE.LinearFilter; const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:tex,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:0.35,roughness:0.7})); m.position.set(x,y,z); m.rotation.y=rotY||0; parent.add(m); parent.updateWorldMatrix(true,true); const local=new V3(); m.getWorldPosition(local); const wq=m.getWorldQuaternion(new Q()); const n=new V3(0,0,1).applyQuaternion(wq); const quatLocal=body.qinv.clone().multiply(wq); GLYPHS.push({id,title,text,body,local,n,mesh:m,w,h,quatLocal,seedN:seed,unlock,logId:id}); return m; }
 function textCanvas(w,h,lines,opts){ opts=opts||{}; const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const c=cv.getContext('2d'); c.fillStyle=opts.bg||'#f4f1e8'; c.fillRect(0,0,w,h); c.fillStyle=opts.fg||'#1c2230'; c.textAlign='left'; let y=44; for(const ln of lines){ c.font=(ln.startsWith('#')?'bold 34px ':'26px ')+'Georgia,serif'; c.fillText(ln.replace(/^#/,''),24,y); y+=ln.startsWith('#')?46:36; } return cv; }
+const SIGNS=[];
+function signLamp(parent,x,y,z,col){ const l=new THREE.PointLight(col||0xfff0d0,6,13,2); l.position.set(x,y,z); parent.add(l); const bulb=new THREE.Mesh(new THREE.SphereGeometry(0.13,8,6),new THREE.MeshBasicMaterial({color:0xfff4e0})); bulb.position.set(x,y-0.12,z); parent.add(bulb); const hood=box(1.0,0.1,0.5,MAT.dark,x,y+0.05,z); parent.add(hood); return l; }
+// board + plate on a free-standing frame, lit from the front, with nothing allowed within 2.5 m of its face
+function signWall(body,parent,dist,yaw,plateId,plateTitle,plateText,seed,board,lampCol){
+ const g=new THREE.Group(); g.position.set(Math.sin(yaw)*dist,0,Math.cos(yaw)*dist); g.rotation.y=yaw; parent.add(g);
+ const postM=MAT.rust; for(const sx of [-2.6,2.6])g.add(cyl(0.12,0.16,3.4,postM,sx,1.7,0,6));
+ g.add(box(5.6,0.16,0.3,postM,0,3.35,0));
+ if(board)textPlane(g,textCanvas(512,300,board,{bg:'#efe9da'}),3.2,1.9,-1.35,2.0,0.08,0,0.2);
+ if(plateId)glyphPanel(body,g,1.45,2.0,0.08,0,2.9,1.65,seed,2,plateId,plateTitle,plateText);
+ const lamp=new THREE.PointLight(lampCol||0xfff0d0,7,12,2); lamp.position.set(0,3.0,1.5); g.add(lamp);
+ const bulb=new THREE.Mesh(new THREE.SphereGeometry(0.16,8,6),new THREE.MeshBasicMaterial({color:0xfff4e0})); bulb.position.set(0,3.15,1.4); g.add(bulb);
+ g.add(box(5.4,0.12,0.5,MAT.dark,0,3.22,1.3));
+ parent.updateWorldMatrix(true,true); const wp=new V3(); g.getWorldPosition(wp); const n=new V3(0,0,1).applyQuaternion(g.getWorldQuaternion(new Q()));
+ SIGNS.push({body,local:wp,n,group:g}); return g; }
 function textPlane(parent,cv,w,h,x,y,z,rotY,emis){ const tex=new THREE.CanvasTexture(cv); tex.colorSpace=THREE.SRGBColorSpace; tex.generateMipmaps=false; tex.minFilter=THREE.LinearFilter; const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshStandardMaterial({map:tex,emissive:emis?0xffffff:0x000000,emissiveMap:emis?tex:null,emissiveIntensity:emis||0,roughness:0.8})); m.position.set(x,y,z); m.rotation.y=rotY||0; parent.add(m); return m; }
 // ---- the store: a walk-in sales floor with a back-of-house behind it
 const STORE={site:siteGroup(FLOOR,SITE.store,0.4),doors:[],doorT:0};
@@ -701,8 +823,9 @@ const COURSE={site:siteGroup(MOON,SITE.course,0),rings:[],beacon:null,done:0};
  const pole=cyl(0.15,0.2,6,MAT.steel,-5.5,3,-5.5); g.add(pole); const top=new THREE.Mesh(new THREE.OctahedronGeometry(0.5,0),new THREE.MeshStandardMaterial({color:0xffc400,emissive:0xffc400,emissiveIntensity:1.5})); top.position.set(-5.5,6.3,-5.5); g.add(top); COURSE.beacon=top; const bl=new THREE.PointLight(0xffc400,4,20,2); bl.position.set(-5.5,6.6,-5.5); g.add(bl);
  const pts=[[0,4,14],[4,7,22],[0,11,30],[-5,10,37],[-3,6,44],[0,3,52]]; const ringM=new THREE.MeshStandardMaterial({color:0xffc400,emissive:0xffc400,emissiveIntensity:0.9,roughness:0.5}); const doneM=new THREE.MeshStandardMaterial({color:0x8fe08a,emissive:0x8fe08a,emissiveIntensity:1.2,roughness:0.5});
  pts.forEach((p,i)=>{ const r=new THREE.Mesh(new THREE.TorusGeometry(2.2,0.18,10,28),ringM); r.position.set(p[0],p[1],p[2]); const nxt=pts[i+1]||[p[0],p[1],p[2]+8]; r.lookAt(new V3(nxt[0],nxt[1],nxt[2])); g.add(r); COURSE.rings.push({m:r,done:false,doneM,ringM}); });
- textPlane(g,textCanvas(512,260,['#TRAINING RINGS','Short taps on the pack. Do not hold it.','Let the moon do the work.','Six rings, start from the pad.','','If you overshoot, stop pressing.','You will come back down. - Priya'],{bg:'#e6e2d6'}),3.0,1.6,3.5,1.3,3.5,-Math.PI/4,0.1);
- glyphPanel(MOON,g,-3.5,1.3,3.5,Math.PI/4,3.0,1.6,44,2,'moon-plate','Panel by the pad','We taught new starters up here because a fall is only a fall on this rock. Six rings, then the tower, then the real sky. Nobody turns up ready. I did not. Priya did not. Take the time.');
+ textPlane(g,textCanvas(512,260,['#TRAINING RINGS','Short taps on the pack. Do not hold it.','Let the moon do the work.','Six rings, start from the pad.','','If you overshoot, stop pressing.','You will come back down. - Priya'],{bg:'#e6e2d6'}),3.0,1.6,3.6,1.35,3.6,-Math.PI/4,0.16);
+ glyphPanel(MOON,g,-3.6,1.35,3.6,Math.PI/4,3.0,1.6,44,2,'moon-plate','Panel by the pad','We taught new starters up here because a fall is only a fall on this rock. Six rings, then the tower, then the real sky. Nobody turns up ready. I did not. Priya did not. Take the time.');
+ signLamp(g,0,3.2,5.4,0xfff0d0);
  g.updateWorldMatrix(true,true); for(const m of col)registerCollider(MOON,m,'metal'); }
 
 const ENGINE={drum:null};
@@ -725,13 +848,14 @@ function outpost(body,site,yaw,cfg){ const g=siteGroup(body,site,yaw); const col
  add(box(18.6,0.25,0.5,MAT.yellow,0,4.7,-7.1));
  for(const [lx,lz] of [[-5,-3],[5,-3],[0,4]]){ const pl=new THREE.PointLight(cfg.lamp||0xfff0d0,6,18,2); pl.position.set(lx,4.0,lz); g.add(pl); const pnl=new THREE.Mesh(new THREE.PlaneGeometry(1.8,0.9),new THREE.MeshBasicMaterial({color:0xfff6e8})); pnl.rotation.x=Math.PI/2; pnl.position.set(lx,4.3,lz); g.add(pnl); }
  cfg.build&&cfg.build(g,add,col);
- textPlane(g,textCanvas(512,300,cfg.board,{bg:'#e6e2d6'}),3.6,2.1,-4.2,2.4,-6.8,0,0.12);
- glyphPanel(body,g,4.2,2.4,-6.8,0,3.8,2.1,cfg.seed,3,cfg.plateId,cfg.plateTitle,cfg.plateText);
+ textPlane(g,textCanvas(512,300,cfg.board,{bg:'#e6e2d6'}),3.6,2.1,-4.2,2.45,-6.78,0,0.16);
+ glyphPanel(body,g,4.2,2.4,-6.78,0,3.8,2.1,cfg.seed,3,cfg.plateId,cfg.plateTitle,cfg.plateText);
+ signLamp(g,0,3.7,-5.0,cfg.lamp);
  terminal(body,g,0,0.4,2.5,Math.PI,cfg.termId,cfg.termTitle,cfg.termLines,cfg.unlock);
  g.updateWorldMatrix(true,true); for(const m of col)registerCollider(body,m,'metal');
  return g; }
 // ---- a smaller second building: a shed with an open front, its own colliders and something to read
-function hut(body,site,yaw,cfg){ const g=siteGroup(body,site,yaw,0,-(cfg.out||24)); const col=[]; const add=(m,solid)=>{g.add(m);if(solid)col.push(m);return m;};
+function hut(body,site,yaw,cfg){ const g=siteGroup(body,padSite(body,site,yaw,cfg.out||24,Math.max(cfg.w||9,cfg.d||7)*0.85,'metal'),yaw); const col=[]; const add=(m,solid)=>{g.add(m);if(solid)col.push(m);return m;};
  const wallM=new THREE.MeshStandardMaterial({color:cfg.col||0xbfb9a8,roughness:0.9});
  const W=cfg.w||9,D=cfg.d||7,H=3.6;
  add(box(W,0.3,D,MAT.steel,0,0.15,0),true);
@@ -742,17 +866,18 @@ function hut(body,site,yaw,cfg){ const g=siteGroup(body,site,yaw,0,-(cfg.out||24
  const pl=new THREE.PointLight(cfg.lamp||0xfff0d0,5,14,2); pl.position.set(0,H-0.5,0); g.add(pl);
  const pnl=new THREE.Mesh(new THREE.PlaneGeometry(1.6,0.8),new THREE.MeshBasicMaterial({color:0xfff6e8})); pnl.rotation.x=Math.PI/2; pnl.position.set(0,H-0.2,0); g.add(pnl);
  cfg.build&&cfg.build(g,add,col);
- if(cfg.board)textPlane(g,textCanvas(512,300,cfg.board,{bg:cfg.boardBg||'#e8e4d8'}),3.2,1.9,-W*0.22,2.1,-D/2+0.2,0,0.12);
- if(cfg.plateId)glyphPanel(body,g,W*0.26,2.0,-D/2+0.2,0,3.0,1.7,cfg.seed,2,cfg.plateId,cfg.plateTitle,cfg.plateText);
+ if(cfg.board)textPlane(g,textCanvas(512,300,cfg.board,{bg:cfg.boardBg||'#e8e4d8'}),3.2,1.9,-W*0.22,2.15,-D/2+0.22,0,0.16);
+ if(cfg.plateId)glyphPanel(body,g,W*0.26,2.05,-D/2+0.22,0,3.0,1.7,cfg.seed,2,cfg.plateId,cfg.plateTitle,cfg.plateText);
+ signLamp(g,0,3.1,-D/2+1.9,cfg.lamp);
  if(cfg.termId)terminal(body,g,0,0.3,D/2-1.6,Math.PI,cfg.termId,cfg.termTitle,cfg.termLines,cfg.unlock);
  g.updateWorldMatrix(true,true); for(const m of col)registerCollider(body,m,'metal');
  return g; }
 // ---- The Floor: the smoko shed and the repeater hut
-const SMOKO=hut(FLOOR,SITE.store,-1.05,{w:10,d:8,col:0xcfc7b2,seed:61,
+const SMOKO=hut(FLOOR,SITE.store,-1.05,{out:42,w:10,d:8,col:0xcfc7b2,seed:61,
  board:['#SMOKO','Milk is whoever finishes it.','Dev owes the tin $4.','','Marnie: if I am not back by close,','lock up and go home. Do not wait.','I mean it this time.'],
  plateId:'smoko-plate',plateTitle:'Panel above the sink',plateText:'Ten minutes is ten minutes. We ran this room for nine years and the only rule that ever held was that nobody eats alone in here. Somebody sits with you. That is the whole rule.',
- build:(g,add)=>{ add(box(3.4,0.9,1.0,MAT.wall,-2.6,0.6,-2.6),true); add(box(1.2,1.6,0.6,MAT.steel,2.8,1.0,-2.6),true); for(let k2=0;k2<3;k2++)add(box(0.9,1.9,0.7,MAT.steel,-4.0+k2*1.0,1.1,2.6),true); add(box(2.6,0.1,1.4,MAT.wood,1.0,0.95,1.4),true); for(const sx of [-0.9,0.9])add(box(0.12,0.8,0.12,MAT.wood,1.0+sx,0.5,1.4)); }});
-const REPEATER=hut(FLOOR,SITE.tower,2.4,{w:8,d:6,col:0xb6bcc4,lamp:0xbfe4ff,seed:62,
+ build:(g,add)=>{ add(box(1.0,0.9,3.2,MAT.wall,-4.2,0.6,0.4),true); add(box(0.6,1.6,1.2,MAT.steel,4.4,1.0,-0.6),true); for(let k2=0;k2<3;k2++)add(box(0.9,1.9,0.7,MAT.steel,-3.4+k2*1.0,1.1,3.0),true); add(box(2.6,0.1,1.4,MAT.wood,1.2,0.95,1.9),true); for(const sx of [-0.9,0.9])add(box(0.12,0.8,0.12,MAT.wood,1.2+sx,0.5,1.9)); }});
+const REPEATER=hut(FLOOR,SITE.tower,2.4,{out:44,w:8,d:6,col:0xb6bcc4,lamp:0xbfe4ff,seed:62,
  board:['#REPEATER HUT','Node 1 store · Node 2 pad · Node 3 moon','Handset shows bars off the nearest one.','','Dev: the scope picks them up from','further than the handset does. Use','the scope to find things, the handset','to tell if they are still alive.'],
  termId:'repeater-term',termTitle:'repeater log',termLines:['Node 1 (store): up.','Node 2 (pad): up.','Node 3 (moon beacon): up, weak.','Nothing on Ledger, Stack, Deep or Nest.','Old crew put gear on all four. None of it answers.','Somebody has to go and stand next to it.'],unlock:['ledger-pillars','stack-node','deep-hold','nest-post'],
  build:(g,add)=>{ add(box(1.4,2.0,0.8,MAT.steel,-2.4,1.15,-2.0),true); const mast=cyl(0.12,0.16,7,MAT.rust,3.0,3.5,-2.0,6); g.add(mast); const dish=new THREE.Mesh(new THREE.SphereGeometry(0.8,12,8,0,TWO_PI,0,Math.PI/2),new THREE.MeshStandardMaterial({color:0xdfe4ea,roughness:0.7,side:THREE.DoubleSide})); dish.position.set(3.0,6.6,-2.0); dish.rotation.x=-1.1; g.add(dish); }});
@@ -796,18 +921,123 @@ const DEEP_HUT=hut(BY.deep,BY.deep.sites[0],-0.7,{w:8,d:6,col:0xa8c4d4,lamp:0x8f
  board:['#DIVE SHACK','Tanks on the left are full.','Tanks on the right are lying to you.','','Priya: went down to the second hold','on Tuesday and came back up with','nothing except knowing the way.','That counts. Write it down.'],
  plateId:'deep-hut-plate',plateTitle:'Panel inside the shack',plateText:'Piece two is in the vault under the third hold, and I am not sure I will get back down there, so here is what it says. The thing on the horizon is not following us. It sits still and waits to be looked at properly, and the four of us spent every shift turning around to check on each other instead. I would do it that way again.',
  build:(g,add)=>{ for(let k2=0;k2<4;k2++){const tk=cyl(0.28,0.28,1.6,k2<2?MAT.steel:MAT.rust,-3.0+k2*0.8,1.0,-2.2,8); g.add(tk);} add(box(3.0,0.9,1.0,MAT.wood,1.4,0.75,-2.0),true); }});
-// ---- The Nest: the warning post and the last hut
+// the Relay's structure: a ring truss, solar wings, radiators and plating bolted to the hull
+{ const g=STATION.group; const R=STATION.R;
+ const steel=new THREE.MeshStandardMaterial({color:0x8a929c,roughness:0.45,metalness:0.7,flatShading:true});
+ const dark=new THREE.MeshStandardMaterial({color:0x262b33,roughness:0.6,metalness:0.5});
+ const panelM=new THREE.MeshStandardMaterial({color:0x16305c,roughness:0.25,metalness:0.4,emissive:0x0a1730,emissiveIntensity:0.5,side:THREE.DoubleSide});
+ const gold=new THREE.MeshStandardMaterial({color:0xd9b552,roughness:0.35,metalness:0.85});
+ // the ring: a torus round the equator on eight spokes
+ const ring=new THREE.Mesh(new THREE.TorusGeometry(R+16,2.2,10,72),steel); ring.rotation.x=Math.PI/2; g.add(ring);
+ const ring2=new THREE.Mesh(new THREE.TorusGeometry(R+16,0.5,6,72),gold); ring2.rotation.x=Math.PI/2; ring2.position.y=2.6; g.add(ring2);
+ for(let k=0;k<8;k++){ const a=k/8*TWO_PI; const sp=cyl(0.9,1.1,16,steel,Math.cos(a)*(R+8),0,Math.sin(a)*(R+8),8); sp.rotation.z=Math.PI/2; sp.rotation.y=-a; g.add(sp);
+  const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.55,8,6),new THREE.MeshBasicMaterial({color:k%2?0xff6a4a:0xbfe4ff})); lamp.position.set(Math.cos(a)*(R+16),2.0,Math.sin(a)*(R+16)); g.add(lamp); }
+ // solar wings on booms, north and south
+ for(const sy of [1,-1]){ const boom=cyl(0.8,0.9,26,steel,0,sy*(R+13),0,8); g.add(boom);
+  for(const sx of [-1,1]){ const wing=new THREE.Mesh(new THREE.BoxGeometry(22,0.3,9),panelM); wing.position.set(sx*13,sy*(R+24),0); wing.rotation.z=sy*0.12; g.add(wing);
+   for(let q=0;q<5;q++)g.add(box(0.2,0.4,9,steel,sx*(3+q*4.6),sy*(R+24),0));
+   g.add(box(1.0,0.6,9.4,steel,sx*2.2,sy*(R+24),0)); } }
+ // radiator fins and antenna masts round the hull
+ for(let k=0;k<6;k++){ const a=k/6*TWO_PI+0.4; const d=new V3(Math.cos(a)*0.9,0.34,Math.sin(a)*0.9).normalize();
+  const fin=new THREE.Mesh(new THREE.BoxGeometry(0.4,7,12),dark); fin.position.copy(d).multiplyScalar(R+4.5); fin.quaternion.setFromUnitVectors(YUP,d); fin.rotateY(a); g.add(fin); }
+ for(let k=0;k<5;k++){ const a=k/5*TWO_PI+1.1; const d=new V3(Math.cos(a),-0.5,Math.sin(a)).normalize();
+  const mast=cyl(0.2,0.26,9,steel,0,0,0,6); mast.position.copy(d).multiplyScalar(R+4.5); mast.quaternion.setFromUnitVectors(YUP,d); g.add(mast);
+  const tip=new THREE.Mesh(new THREE.SphereGeometry(0.4,8,6),new THREE.MeshBasicMaterial({color:0xff6a4a})); tip.position.copy(d).multiplyScalar(R+9.2); g.add(tip); }
+ // hull plating: instanced panels scattered over the sphere so it reads as built, not grown
+ const n=220; const pg=new THREE.BoxGeometry(5.5,0.7,3.6); const inst=new THREE.InstancedMesh(pg,steel,n); inst.castShadow=true; inst.receiveShadow=true;
+ const r=mulberry(313); const m4=new THREE.Matrix4(),q4=new Q(),d4=new V3(),s4=new V3(); let kk=0;
+ for(let i=0;i<n*4&&kk<n;i++){ d4.set(r()*2-1,r()*2-1,r()*2-1); if(d4.lengthSq()<0.05||d4.lengthSq()>1)continue; d4.normalize();
+  if(STATION.sites.some(st=>Math.acos(clamp(d4.dot(st.dir),-1,1))<st.r1*1.1))continue;
+  const sc=0.7+r()*0.8; s4.set(sc,1,sc*(0.7+r()*0.6)); q4.setFromUnitVectors(YUP,d4).multiply(_q[1].setFromAxisAngle(YUP,r()*TWO_PI));
+  m4.compose(d4.clone().multiplyScalar(STATION.ground(d4)+0.15),q4,s4); inst.setMatrixAt(kk++,m4); }
+ inst.count=kk; inst.instanceMatrix.needsUpdate=true; g.add(inst);
+ // a warm glow inside the ring so it reads at a distance
+ const gl=new THREE.PointLight(0xbfe4ff,12,R*4,2); gl.position.set(0,0,0); g.add(gl);
+}
+// ---- The Relay: a service station on a fast inner orbit, where they first measured the star
+const STATION_SITE=(()=>{ const g=siteGroup(STATION,STATION.sites[0],0.4); const col=[]; const add=(m,solid)=>{g.add(m);if(solid)col.push(m);return m;};
+ const hullM=new THREE.MeshStandardMaterial({color:0xb8bec8,roughness:0.5,metalness:0.55});
+ const deckM=new THREE.MeshStandardMaterial({color:0x7a828c,roughness:0.7,metalness:0.4});
+ // landing apron with a lit ring
+ add(new THREE.Mesh(new THREE.CylinderGeometry(13,13.6,0.5,32),deckM)).position.y=0.25;
+ const padBox=box(24,0.5,24,deckM,0,0.25,0); padBox.visible=false; g.add(padBox); col.push(padBox);
+ const ring=new THREE.Mesh(new THREE.RingGeometry(7.4,8.4,44),new THREE.MeshStandardMaterial({color:0xffc400,emissive:0xffc400,emissiveIntensity:1.1,side:THREE.DoubleSide})); ring.rotation.x=-Math.PI/2; ring.position.y=0.52; g.add(ring);
+ for(let k=0;k<8;k++){ const a=k/8*TWO_PI; const x=Math.cos(a)*12.2, z=Math.sin(a)*12.2;
+  g.add(cyl(0.16,0.2,2.6,MAT.rust,x,1.3,z,6)); const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.22,8,6),new THREE.MeshBasicMaterial({color:0xbfe4ff})); lamp.position.set(x,2.7,z); g.add(lamp);
+  if(k%2===0){ const l=new THREE.PointLight(0xbfe4ff,5,22,2); l.position.set(x,2.9,z); g.add(l); } }
+ // the shack itself: a pressurised box with a window looking at the star
+ const W=12,D=9,H=4.2;
+ add(box(W,0.3,D,hullM,0,0.15,-16),true); add(box(W,H,0.3,hullM,0,H/2,-20.4),true);
+ add(box(0.3,H,D,hullM,-6,H/2,-16),true); add(box(0.3,H,D,hullM,6,H/2,-16),true);
+ add(box(W,0.3,D,hullM,0,H,-16),true);
+ add(box(4.2,H,0.3,hullM,-3.9,H/2,-11.6),true); add(box(4.2,H,0.3,hullM,3.9,H/2,-11.6),true); add(box(W,0.9,0.3,hullM,0,H-0.45,-11.6),true);
+ const glassM=new THREE.MeshStandardMaterial({color:0xbfe6f0,roughness:0.05,metalness:0.05,transparent:true,opacity:0.09,side:THREE.DoubleSide,depthWrite:false});
+ const glass=new THREE.Mesh(new THREE.PlaneGeometry(7.6,1.2),glassM); glass.position.set(0,3.4,-20.24); g.add(glass);
+ const frameM=new THREE.MeshStandardMaterial({color:0x3a3f4a,roughness:0.6,metalness:0.5});
+ for(const sx of [-2.6,0,2.6])g.add(box(0.12,1.3,0.14,frameM,sx,3.4,-20.2));
+ for(const [lx,lz] of [[-3,-14],[3,-18]]){ const l=new THREE.PointLight(0xfff0d0,6,18,2); l.position.set(lx,H-0.6,lz); g.add(l); const pn=new THREE.Mesh(new THREE.PlaneGeometry(2.0,1.0),new THREE.MeshBasicMaterial({color:0xfff6e8})); pn.rotation.x=Math.PI/2; pn.position.set(lx,H-0.25,lz); g.add(pn); }
+ // instruments: a dish on a mast and a row of consoles
+ const mast=cyl(0.18,0.24,9,MAT.rust,-9,4.5,-7,6); g.add(mast);
+ const dish=new THREE.Mesh(new THREE.SphereGeometry(2.4,18,10,0,TWO_PI,0,Math.PI/2.4),new THREE.MeshStandardMaterial({color:0xdfe4ea,roughness:0.6,side:THREE.DoubleSide})); dish.position.set(-9,9.3,-7); dish.rotation.x=-1.0; g.add(dish); STATION.dish=dish;
+ for(let k=0;k<3;k++)add(box(0.9,1.1,2.4,MAT.dark,-5.2,0.85,-18.4+k*2.8),true);   // consoles along the side wall, clear of the signs
+ textPlane(g,textCanvas(512,300,['#RELAY','Dish points at the Exchange, always.','Log is on the console.','','Ruth: we came out here to prove the','star was swelling. It was. Then we','had a cup of tea and went home.'],{bg:'#e4e8ee'}),3.2,1.9,-3.2,2.2,-20.22,0,0.16);
+ glyphPanel(STATION,g,3.4,2.2,-20.22,0,3.0,1.7,58,3,'station-plate','Panel by the window','From out here the Exchange is the only thing you can see properly, and it is beautiful, which is the part nobody says out loud. We measured it for eleven shifts. The numbers never once disagreed with each other and not one of them helped.');
+ signLamp(g,0,3.8,-18.6,0xbfe4ff);
+ terminal(STATION,g,4.6,0.15,-14.6,Math.PI/2,'station-term','relay console',['Dish tracks the Exchange without being told to.','Swell confirmed on shift one. Confirmed again on shift eleven.','Nothing we sent from here was ever answered.','The Vision reads back off this dish when it is nearby.','Somebody should still be watching. That is the whole job.'],['vision','exchange']);
+ g.updateWorldMatrix(true,true); for(const m of col)registerCollider(STATION,m,'metal'); return g; })();
+// a second pad on the far side, with a beacon you can see from a long way out
+const STATION_BEACON=(()=>{ const g=siteGroup(STATION,STATION.sites[1],0); const col=[]; const add=(m,solid)=>{g.add(m);if(solid)col.push(m);return m;};
+ add(new THREE.Mesh(new THREE.CylinderGeometry(9,9.4,0.5,28),new THREE.MeshStandardMaterial({color:0x7a828c,roughness:0.7,metalness:0.4}))).position.y=0.25;
+ const padBox=box(16,0.5,16,MAT.steel,0,0.25,0); padBox.visible=false; g.add(padBox); col.push(padBox);
+ const mast=cyl(0.2,0.28,7,MAT.rust,0,3.5,0,6); g.add(mast);
+ const beacon=new THREE.Mesh(new THREE.OctahedronGeometry(0.8,0),new THREE.MeshStandardMaterial({color:0xffc400,emissive:0xffc400,emissiveIntensity:1.6})); beacon.position.set(0,7.4,0); g.add(beacon); STATION.beacon=beacon;
+ const l=new THREE.PointLight(0xffc400,7,40,2); l.position.set(0,7.6,0); g.add(l);
+ g.updateWorldMatrix(true,true); for(const m of col)registerCollider(STATION,m,'metal'); return g; })();
+// ---- The Nest: the warning post, the last hut, and the pod itself
 const NEST_SITE=(()=>{ const g=siteGroup(BY.nest,BY.nest.sites[0],0); const col=[]; const add=(m,solid)=>{g.add(m);if(solid)col.push(m);return m;};
  add(box(10,0.4,8,new THREE.MeshStandardMaterial({color:0x6b5f55,roughness:0.9}),0,0.2,0),true);
  for(const sx of [-4,4])add(cyl(0.22,0.28,4.5,MAT.rust,sx,2.2,-3,6)); add(box(9,0.3,0.3,MAT.rust,0,4.3,-3));
- textPlane(g,textCanvas(512,300,['#STOP','It hunts by sound.','Your pack is sound. Your ship is sound.','Boots on rock is quiet enough.','','Walk in. Light off. Come straight out.'],{bg:'#f0e0d0'}),3.6,2.1,0,2.4,-3.1,0,0.14);
- glyphPanel(BY.nest,g,0,2.3,3.0,Math.PI,3.4,1.9,55,2,'nest-plate','Panel on the post','We do not bring the ship down here and we do not use the pack. We walk in with the light off and we come out with what we came for. Everything else it keeps, and it has kept plenty.');
+ textPlane(g,textCanvas(512,300,['#STOP','It hunts by sound.','Running is sound. So is the pack.','Walking is quiet enough.','','Walk in, take what you came for, walk out.'],{bg:'#f0e0d0'}),3.6,2.1,0,2.4,-3.08,0,0.18);
+ glyphPanel(BY.nest,g,0,2.3,3.02,Math.PI,3.4,1.9,55,2,'nest-plate','Panel on the post','We do not bring the ship down here and we do not use the pack. We walk in with the light off and we come out with what we came for. Everything else it keeps, and it has kept plenty.');
+ signLamp(g,0,4.0,-1.6,0xffd0a0); signLamp(g,0,4.0,1.6,0xffd0a0);
  terminal(BY.nest,g,3.6,0.4,1.5,Math.PI,'nest-term','warning post log',['Foundation is at the centre, under the last shell.','The seeds sit one inside another. Count them going in.','Sound pulls them. Silence is the only thing that works.','Piece three is down there. Sandy left it.','Whoever goes in: come back out. That part matters more.'],['nest-foundation']);
  g.updateWorldMatrix(true,true); for(const m of col)registerCollider(BY.nest,m,'metal'); return g; })();
 const NEST_HUT=hut(BY.nest,BY.nest.sites[0],2.8,{w:8,d:6,col:0xb9a898,lamp:0xffd0a0,seed:67,
  board:['#LAST HUT','Boots by the door. Packs on the rack.','Leave them. You want to be quiet.','','Four sets of boots went in.','Three sets came back out.'],
  plateId:'nest-hut-plate',plateTitle:'Panel by the rack',plateText:'Ruth went in first because she would not let anyone else go first. That is the whole of it. If you go in, go in quiet, and if you come out, go and tell somebody what you found, because the finding is not worth anything sitting in your head.',
- build:(g,add)=>{ for(let k2=0;k2<4;k2++){add(box(0.35,0.4,0.6,MAT.dark,-2.6+k2*0.7,0.5,-2.2)); } add(box(5.0,0.2,0.5,MAT.rust,0,2.2,-2.3)); for(let k2=0;k2<3;k2++)add(box(0.7,0.9,0.5,MAT.hull,-1.6+k2*1.6,1.6,-2.2)); }});
+ build:(g,add)=>{ for(let k2=0;k2<4;k2++){add(box(0.35,0.4,0.6,MAT.dark,-3.2+k2*0.7,0.5,2.2)); } add(box(0.5,0.2,4.0,MAT.rust,3.4,2.2,0.2)); for(let k2=0;k2<3;k2++)add(box(0.5,0.9,0.7,MAT.hull,3.4,1.6,-1.2+k2*1.4)); }});
+// the pod: three domes, one inside the next, each with a mouth you can walk straight into
+const POD={centre:new V3(),shells:[],escalations:[],noise:0,inside:false,alarm:0};
+{ const site=padSite(BY.nest,BY.nest.sites[0],0.6,40,25,'rock'); const g=siteGroup(BY.nest,site,0); g.updateWorldMatrix(true,true);
+ const centreLocal=new V3(0,0.4,0).applyQuaternion(g.quaternion).add(g.position); POD.centre.copy(centreLocal);
+ const shellSpec=[[21,0.0],[14,2.2],[7.5,4.3]];
+ const shellM=[new THREE.MeshStandardMaterial({color:0x6a5f52,roughness:0.95,flatShading:true,side:THREE.DoubleSide}),
+               new THREE.MeshStandardMaterial({color:0x7d6f5c,roughness:0.9,flatShading:true,side:THREE.DoubleSide}),
+               new THREE.MeshStandardMaterial({color:0x8f8168,roughness:0.85,flatShading:true,side:THREE.DoubleSide})];
+ shellSpec.forEach(([r,ang],k)=>{ const gapHalf=0.34;
+  // a dome sitting on the ground with a wedge cut out of it: the mouth runs from the floor to the top of the opening
+  const m=new THREE.Mesh(new THREE.SphereGeometry(r,34,18,ang+gapHalf,TWO_PI-gapHalf*2,0,Math.PI/2),shellM[k]);
+  m.position.set(0,0.4,0); g.add(m); m.castShadow=true; m.receiveShadow=true;
+  const dirAt=a=>new V3(-Math.cos(a),0,Math.sin(a));            // matches SphereGeometry's phi sweep
+  const gd=dirAt(ang).applyQuaternion(g.quaternion).normalize();
+  BY.nest.shells.push({c:centreLocal.clone(),r,gap:gd,cos:Math.cos(gapHalf*0.92)});
+  POD.shells.push({r,mesh:m,gap:gd});
+  // a lintel and two jambs so the mouth reads as a doorway
+  const jamb=(sgn)=>{ const p=dirAt(ang+sgn*gapHalf).multiplyScalar(r); const c2=cyl(0.35,0.45,4.4,MAT.rust,p.x,0.4+2.2,p.z,6); g.add(c2); };
+  jamb(1); jamb(-1);
+  const lp=dirAt(ang).multiplyScalar(r); const lint=box(r*gapHalf*2.4,0.5,1.2,shellM[k],lp.x,0.4+4.4,lp.z); lint.lookAt(new V3(0,0.4+4.4,0)); g.add(lint);
+  for(let q=0;q<6;q++){ const a=ang+1.0+q*0.8; const rp=dirAt(a).multiplyScalar(r*0.9); const rib=cyl(0.2,0.28,r*0.42,MAT.rust,rp.x,0.4+r*0.4,rp.z,6); rib.lookAt(new V3(0,0.4,0)); g.add(rib); } });
+ // the floor is the ground itself; the foundation sits at the middle under the smallest dome
+ const plinth=cyl(1.6,2.0,1.0,MAT.stone,0,0.9,0); g.add(plinth);
+ terminal(BY.nest,g,0,1.4,0,0,'nest-foundation','foundation terminal',['Piece three. Sandy wrote it out twice in case the first got wet.','"It takes two to run the Engine and there were four of us.','Ruth is gone, so there are three, and three is still enough','if you can get us in the same place at the same time.','We are all still out there. Follow the music." - Sandy'],['handover-four','travellers']);
+ const fl=new THREE.PointLight(0xffd0a0,8,30,2); fl.position.set(0,3.4,0); g.add(fl);
+ signWall(BY.nest,g,3.4,0,'nest-foundation-plate','Panel at the foundation','This was here before the store was here. Whatever the seed is for, it is older than the roster and it will still be going when the roster is ash. That is not comforting. I wrote it down anyway.',56,null,0xffd0a0);
+ POD.group=g; }
+// the things that live in the pod: they cannot see, so they come to noise
+{ const geo=new THREE.IcosahedronGeometry(0.9,0); const mat=new THREE.MeshStandardMaterial({color:0x1a1520,roughness:0.9,emissive:0x40ffc0,emissiveIntensity:0.35,flatShading:true});
+ for(let k=0;k<5;k++){ const m=new THREE.Mesh(geo,mat.clone()); m.castShadow=true; POD.group.add(m);
+  const a=k/5*TWO_PI; const home=new V3(Math.cos(a)*11,17+Math.sin(a*2)*4,Math.sin(a)*11);
+  POD.escalations.push({mesh:m,home,local:home.clone(),vel:new V3(),hunt:0,phase:k*1.7}); m.position.copy(home); } }
 // ---- the launch tower: a modest pad on legs, with a walkable ramp buried into flat ground
 const TOWER={site:siteGroup(FLOOR,SITE.tower,0),padLocal:new V3()};
 { const g=TOWER.site; const r=mulberry(4); const H=6; const pad=box(13,0.5,13,MAT.steel,0,H,0); g.add(pad); const ring=new THREE.Mesh(new THREE.RingGeometry(4.2,4.9,32),MAT.yellow); ring.rotation.x=-Math.PI/2; ring.position.y=H+0.26; g.add(ring);
@@ -821,13 +1051,15 @@ const TOWER={site:siteGroup(FLOOR,SITE.tower,0),padLocal:new V3()};
  g.updateWorldMatrix(true,true); registerCollider(FLOOR,pad,'metal'); registerCollider(FLOOR,ramp,'metal'); TOWER.padLocal.set(0,H+0.26,0).applyMatrix4(g.matrixWorld); }
 // ---- trees on the Floor (instanced)
 { const n=340; const trunkG=new THREE.CylinderGeometry(0.25,0.45,3.6,6); trunkG.translate(0,1.8,0); const canG=new THREE.ConeGeometry(2.2,5.6,7); canG.translate(0,6,0); const trunk=new THREE.InstancedMesh(trunkG,MAT.wood,n); const can=new THREE.InstancedMesh(canG,new THREE.MeshStandardMaterial({color:0x2f6b2c,roughness:0.9,flatShading:true}),n); trunk.castShadow=can.castShadow=true; can.receiveShadow=true; const r=mulberry(55); const m4=new THREE.Matrix4(),q=new Q(),d=new V3(),s=new V3(); let k=0;
- for(let i=0;i<n*6&&k<n;i++){ d.set(r()*2-1,r()*2-1,r()*2-1); if(d.lengthSq()<0.05||d.lengthSq()>1)continue; d.normalize(); if(FLOOR.sites.some(st=>Math.acos(clamp(d.dot(st.dir),-1,1))<st.r1*1.15))continue; const h=FLOOR.terrain(d); const sc=0.7+r()*0.7; s.set(sc,sc*(0.8+r()*0.5),sc); q.setFromUnitVectors(YUP,d).multiply(TQ[0].setFromAxisAngle(YUP,r()*TWO_PI)); m4.compose(d.clone().multiplyScalar(h-0.2),q,s); trunk.setMatrixAt(k,m4); can.setMatrixAt(k,m4); k++; }
+ for(let i=0;i<n*6&&k<n;i++){ d.set(r()*2-1,r()*2-1,r()*2-1); if(d.lengthSq()<0.05||d.lengthSq()>1)continue; d.normalize(); if(FLOOR.sites.some(st=>Math.acos(clamp(d.dot(st.dir),-1,1))<st.r1*1.15))continue; const h=FLOOR.ground(d); const sc=0.7+r()*0.7; s.set(sc,sc*(0.8+r()*0.5),sc); q.setFromUnitVectors(YUP,d).multiply(TQ[0].setFromAxisAngle(YUP,r()*TWO_PI)); m4.compose(d.clone().multiplyScalar(h-0.2),q,s); trunk.setMatrixAt(k,m4); can.setMatrixAt(k,m4); k++; }
  trunk.count=can.count=k; trunk.instanceMatrix.needsUpdate=can.instanceMatrix.needsUpdate=true; FLOOR.group.add(trunk); FLOOR.group.add(can); }
-for(const b of BODIES)if(!b.star)buildTerrain(b);
+bootStep(18,'laying out the system');
+await yieldFrame();
 
+// (the ship is next)
 // ---- the ship: a walk-in cabin behind a glass cockpit. Ship-local frame: Y up, nose -Z.
 const SHIPM={group:new THREE.Group(),flames:[],modules:{},dash:null,dashTex:null,landScreen:null,sparks:{},lights:[]};
-const SHIPB={pos:null,vel:null,quat:null,qinv:new Q(),omega:null,colliders:[],R:6,amp:0,ridge:0,isShip:true,name:'the ship',localUp:new V3(0,1,0),group:null,
+const SHIPB={pos:null,vel:null,quat:null,qinv:new Q(),omega:null,colliders:[],shells:[],R:6,amp:0,ridge:0,isShip:true,name:'the ship',localUp:new V3(0,1,0),group:null,
  height(){return -1e9;},material(){return 'metal';},toLocal(w,out){return out.copy(w).sub(this.pos).applyQuaternion(this.qinv);},toWorld(l,out){return out.copy(l).applyQuaternion(this.quat).add(this.pos);},surfaceVel(w,out){return out.copy(this.omega).cross(_v[4].copy(w).sub(this.pos)).add(this.vel);}};
 const MATG=new THREE.MeshStandardMaterial({color:0xbfe6f0,roughness:0.05,metalness:0.05,transparent:true,opacity:0.07,side:THREE.DoubleSide,depthWrite:false});
 const MATFRAME=new THREE.MeshStandardMaterial({color:0x3a3f4a,roughness:0.6,metalness:0.5});
@@ -900,7 +1132,7 @@ function readInput(){ pollGamepad(); const gp=GP.ok; IN.forward=(down('forward')
 //  GAME STATE, PHYSICS (player + ship), LOOP, CASCADE
 // ======================================================================
 const GAME={started:false,menuOpen:false,loop:0,time:0,dead:false,deathT:0,respawned:false,fade:0,situp:1,shake:0,hints:new Set(),arrivals:{},sub:'',subT:0,repairT:0,whiteT:0,deathCause:'',endtimes:false,cascade:false,silence:false,awe:false};
-const K={looped:false,seenCascade:0,launchedOnce:false,leftFloorGravity:false,visited:{},texts:{},places:{},terminals:{},nodes:{},course:false};
+const K={looped:false,seenCascade:0,launchedOnce:false,leftFloorGravity:false,visited:{},texts:{},places:{},terminals:{},nodes:{},travellers:{},course:false,visionSeen:false,visionRode:false};
 const DBG={open:false,god:false,o2:false,freecam:false,wire:false,perf:false,fcPos:new V3(),fcQuat:new Q(),wires:[]};
 const P={pos:new V3(),prev:new V3(),vel:new V3(),quat:new Q(),up:new V3(0,1,0),pitch:0,grounded:false,coyote:0,jumpT:0,parent:null,local:new V3(),relVel:new V3(),fuel:1,o2:1,health:1,inShip:false,cabin:false,cabinQ:new Q(),cabinVel:new V3(),heat:0,mat:'grass',stepAcc:0,eyeH:1.6,dead:false,lamp:true,seatT:0};
 const S={pos:new V3(),prev:new V3(),vel:new V3(),quat:new Q(),prevQ:new Q(),angVel:new V3(),parent:null,local:new V3(),localQ:new Q(),modules:{engine:true,oxygen:true,gravity:true,gear:true},thrust:[0,0,0,0,0,0],autopilot:false,autoland:false,targetIdx:-1,target:null,heat:0,landCam:true,thrustLevel:0,apMsg:'',mx:0,my:0,look:null};
@@ -1025,18 +1257,18 @@ function sitDown(){ clearPresses(); P.inShip=true; P.cabin=false; P.grounded=fal
 function standUp(){ clearPresses(); P.inShip=false; P.cabin=true; P.local.copy(SHIPM.seatLocal).z+=1.0; P.cabinVel.set(0,0,0); P.grounded=true; P.pitch=0; SHIPB.qinv.copy(S.quat).invert(); SHIPB.toWorld(P.local,P.pos); S.autopilot=false; uiTick(); }
 function lookedAtBody(){ const f=camera.getWorldDirection(T[0]); let best=null,bestA=0.14; for(const b of BODIES){ if(b.star)continue; const to=T[1].copy(b.pos).sub(camera.position); const d=to.length(); to.divideScalar(d); const ang=Math.acos(clamp(f.dot(to),-1,1)); const app=Math.atan2(b.R,d); if(ang-app*0.6<bestA){bestA=ang-app*0.6;best=b;} } return best; }
 function awe(){ if(!AU.ok)return; setLayerLevel('strings',0.45,3.5); setTimeout(()=>{ if(MUS.scene!=='endtimes'&&MUS.scene!=='ending')setLayerLevel('strings',0,7); },24000); }
-function die(cause){ if(GAME.dead)return; GAME.dead=true; P.dead=true; P.cabin=false; S.autoland=false; GAME.deathCause=cause; GAME.deathT=0; GAME.respawned=false; AUD.jet=0; if(cause!=='cascade')impactSound(0.8); S.autopilot=false; }
+function die(cause){ if(GAME.dead)return; if(cause==='escalation')subtitle('It found you by the sound.',4); if(cause==='sand')subtitle('The sand closed over the top of you.',4); GAME.dead=true; P.dead=true; P.cabin=false; S.autoland=false; GAME.deathCause=cause; GAME.deathT=0; GAME.respawned=false; AUD.jet=0; if(cause!=='cascade')impactSound(0.8); S.autopilot=false; }
 function updateDeath(dt){ if(!GAME.dead)return; if(GAME.deathCause==='cascade'&&!GAME.respawned&&GAME.time<598){GAME.fade=0;return;} GAME.deathT+=dt; const t=GAME.deathT;
  if(t<1.2){GAME.fade=t/1.2;} else if(!GAME.respawned){GAME.respawned=true;resetLoop();GAME.fade=1;} else if(t<2.6){GAME.fade=1;} else if(t<4.4){GAME.fade=1-(t-2.6)/1.8;GAME.situp=(t-2.6)/1.8;}
  else{GAME.fade=0;GAME.situp=1;GAME.dead=false;P.dead=false;GAME.respawned=false; if(GAME.loop===2&&!K.looped){K.looped=true;subtitle('You sit up by the fire. Ten minutes ago, again. Nothing came back with you except what you worked out.',8);}} }
-function resetLoop(){ GAME.loop++; logSee('floor','Home. The fire, the store, the Observatory, the pad.'); GAME.time=0; GAME.endtimes=GAME.cascade=GAME.silence=false; GAME.whiteT=0; GAME.arrivals={}; GAME.repairT=0;
+function resetLoop(){ GAME.loop++; GAME.sandT=0; GAME.titleReady=true; GAME.sandWarn=0; GAME.musDead=0; K.sandLesson=K.sandLesson||false; POD.inside=false; POD.alarm=0; for(const e of POD.escalations){e.local.copy(e.home);e.vel.set(0,0,0);e.hunt=0;} for(const t of TRAVELLERS)t.said=0; TRAV.cur=null; logSee('floor','Home. The fire, the store, the Observatory, the pad.'); GAME.time=0; GAME.endtimes=GAME.cascade=GAME.silence=false; GAME.whiteT=0; GAME.arrivals={}; GAME.repairT=0;
  for(const b of BODIES){b.update(0);b.uConsume.value=0;b.consumed=false;b.consumeT=0;} wave.visible=false; sunMat.uniforms.uRed.value=0; sunMat.uniforms.uWhite.value=0; sunMesh.scale.setScalar(1); corona.scale.setScalar(1); finalPass.uniforms.uWhite.value=0; finalPass.uniforms.uChroma.value=0; finalPass.uniforms.uTint.value.setRGB(1,1,1);
  P.inShip=false; P.parent=FLOOR; P.local.copy(CAMP.spawnLocal); FLOOR.toWorld(P.local,P.pos); P.prev.copy(P.pos); P.vel.set(0,0,0); P.relVel.set(0,0,0); P.grounded=true; P.fuel=1;P.o2=1;P.health=1;P.heat=0;P.pitch=0;P.jumpT=0;P.coyote=0; P.up.copy(P.local).normalize().applyQuaternion(FLOOR.quat); P.quat.setFromUnitVectors(YUP,P.up);
  const fw=FLOOR.toWorld(CAMP.fireLocal,T[0]); const d=T[1].copy(fw).sub(P.pos); d.addScaledVector(P.up,-d.dot(P.up)).normalize(); const f=T[2].set(0,0,-1).applyQuaternion(P.quat); const ang=Math.atan2(T[3].copy(f).cross(d).dot(P.up),f.dot(d)); P.quat.premultiply(TQ[0].setFromAxisAngle(P.up,ang)).normalize();
  S.parent=FLOOR; S.local.copy(TOWER.padLocal).addScaledVector(TOWER.upLocal,3.45); S.localQ.copy(TOWER.siteQ); S.modules={engine:true,oxygen:true,gravity:true,gear:true}; S.autopilot=false; S.autoland=false; S.heat=0; S.vel.set(0,0,0); S.angVel.set(0,0,0); S.target=null; S.targetIdx=-1; S.landCam=true; S.apMsg=''; S.look=null; P.cabin=false; P.cabinQ.identity(); P.cabinVel.set(0,0,0); GAME.ctlCardT=0; FLOOR.toWorld(S.local,S.pos); S.quat.copy(FLOOR.quat).multiply(S.localQ); S.prev.copy(S.pos); S.prevQ.copy(S.quat);
  if(AU.ok&&!MUS.jukebox)setScene('campfire',{force:true,restart:true}); }
-function updateCascade(dt){ const t=GAME.time; const red=smooth(T_END,T_CASC,t);
- sunMat.uniforms.uRed.value=red; sunCol.setRGB(1,lerp(0.94,0.4,red),lerp(0.82,0.18,red)); sunLight.color.copy(sunCol); shadowLight.color.copy(sunCol); sunLight.intensity=1.5e6*(1+red*0.9); coronaMat.uniforms.uI.value=0.85+red*1.6; coronaMat.uniforms.uColor.value.setRGB(1,lerp(0.75,0.3,red),lerp(0.38,0.1,red));
+function updateCascade(dt){ if(GAME.ending)return; const t=GAME.time; const red=smooth(T_END,T_CASC,t);
+ sunMat.uniforms.uRed.value=red; sunCol.setRGB(1,lerp(0.94,0.4,red),lerp(0.82,0.18,red)); sunLight.color.copy(sunCol); shadowLight.color.copy(sunCol); if(red>0.01)sunWarm.copy(sunCol); sunLight.intensity=1.5e6*(1+red*0.9); coronaMat.uniforms.uI.value=0.85+red*1.6; coronaMat.uniforms.uColor.value.setRGB(1,lerp(0.75,0.3,red),lerp(0.38,0.1,red));
  const warn=smooth(570,T_CASC,t); let swell=1+red*0.12+warn*0.35; let coronaS=lerp(1,1.35,red)+warn*0.6;
  if(t>=T_END&&!GAME.endtimes){GAME.endtimes=true;if(AU.ok&&!MUS.jukebox)setScene('endtimes',{force:true,restart:true});}
  if(t>=T_CASC){ const c=t-T_CASC; if(!GAME.cascade){GAME.cascade=true;K.seenCascade++;cascadeSound();logSee('exchange','It goes at 9:50, every loop. Nothing you do changes that yet.');} if(c>=2&&!GAME.silence){GAME.silence=true;if(AU.ok&&!MUS.jukebox)setScene('silence');}
@@ -1054,19 +1286,46 @@ function skipCascade(){ if(GAME.time>=T_CASC&&K.seenCascade>=3&&!GAME.menuOpen){
 //  ATMOSPHERE FROM THE INSIDE: sky dome + distance fog + daylight, helmet lamp, headlights, sparks, markers
 // ======================================================================
 scene.fog=new THREE.Fog(0x070A14,30,1e9);
-const skyMat=new THREE.ShaderMaterial({uniforms:{uCol:{value:new THREE.Color(0x8fd08a)},uUp:{value:new V3(0,1,0)},uSun:{value:new V3(0,0,1)},uA:{value:0},uDay:{value:0},uSunCol:{value:sunCol}},
+const skyMat=new THREE.ShaderMaterial({uniforms:{uCol:{value:new THREE.Color(0x8fd08a)},uUp:{value:new V3(0,1,0)},uSun:{value:new V3(0,0,1)},uA:{value:0},uDay:{value:0},uSunCol:{value:sunCol},uElev:{value:0},uRed:{value:0}},
  vertexShader:'varying vec3 vW;void main(){vec4 w=modelMatrix*vec4(position,1.0);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}',
- fragmentShader:`uniform vec3 uCol,uUp,uSun,uSunCol;uniform float uA,uDay;varying vec3 vW;
- void main(){vec3 d=normalize(vW-cameraPosition);float e=dot(d,uUp);vec3 zen=uCol*0.5;vec3 hor=mix(uCol*1.2,vec3(1.0,0.95,0.85),0.25);vec3 day=mix(hor,zen,smoothstep(-0.05,0.55,e));
- float sg=max(dot(d,uSun),0.0);day+=uSunCol*(pow(sg,24.0)*0.8+pow(sg,4.0)*0.12);vec3 night=uCol*0.05+vec3(0.012,0.014,0.03);vec3 c=mix(night,day,uDay);
- float a=uA*mix(0.55,1.0,uDay)*mix(1.0,0.8,smoothstep(0.3,0.9,e));gl_FragColor=vec4(c,a);}`,transparent:true,depthWrite:false,side:THREE.BackSide});
+ fragmentShader:`uniform vec3 uCol,uUp,uSun,uSunCol;uniform float uA,uDay,uElev,uRed;varying vec3 vW;
+ // a cheap stand-in for Rayleigh and Mie: blue up high, warm near the horizon, and a proper red band when the sun is low
+ void main(){
+  vec3 d=normalize(vW-cameraPosition);
+  float e=dot(d,uUp);                       // how high we are looking
+  float sd=dot(d,uSun);                     // how close to the sun we are looking
+  float horizon=exp(-max(e,0.0)*3.2);       // thickness of air along the view
+  float below=smoothstep(0.0,-0.25,e);
+  vec3 tint=normalize(uCol+vec3(0.001));
+  vec3 zenith=mix(vec3(0.09,0.20,0.44),tint*0.42,0.45);
+  vec3 sky=mix(zenith,mix(vec3(0.66,0.78,0.92),tint*1.15,0.5),horizon);
+  // sunset: the low sun reddens the band around it and bruises the opposite side
+  float low=1.0-smoothstep(-0.06,0.34,uElev);
+  float towards=smoothstep(-0.2,1.0,sd);
+  vec3 warm=mix(vec3(1.0,0.45,0.16),vec3(1.0,0.72,0.34),smoothstep(0.0,0.6,e));
+  vec3 away=vec3(0.32,0.22,0.40);
+  sky=mix(sky,mix(away,warm,towards),low*horizon*0.92);
+  sky=mix(sky,sky*vec3(1.06,0.86,0.74),low*0.35);
+  // Mie glow around the sun, and the disc itself bleeding through the air
+  sky+=uSunCol*pow(max(sd,0.0),7.0)*(0.22+0.55*low)*horizon;
+  sky+=uSunCol*pow(max(sd,0.0),260.0)*1.4;
+  vec3 night=tint*0.035+vec3(0.012,0.016,0.034);
+  float daylight=smoothstep(-0.22,0.22,uElev);
+  vec3 c=mix(night,sky,daylight);
+  c=mix(c,c*vec3(1.25,0.55,0.32)+vec3(0.10,0.0,0.0),uRed);
+  float a=uA*mix(0.72,1.0,daylight)*mix(1.0,0.82,smoothstep(0.25,0.95,e))*(1.0+below*0.3);
+  gl_FragColor=vec4(c,clamp(a,0.0,1.0));}`,transparent:true,depthWrite:false,side:THREE.BackSide,toneMapped:false});
 const sky=new THREE.Mesh(new THREE.SphereGeometry(3000,32,20),skyMat); sky.renderOrder=-10; sky.visible=false; sky.frustumCulled=false; scene.add(sky); let skyOn=false;
-const fogCol=new THREE.Color(); const NAVY=new THREE.Color(0x070A14); const atmoTmp=new THREE.Color();
+const fogCol=new THREE.Color(); const NAVY=new THREE.Color(0x070A14); const atmoTmp=new THREE.Color(); const SUNSET=new THREE.Color(0xff7a3c); const sunWarm=new THREE.Color(); const SKY={a:0,day:0,elev:0,dom:null};
 const lamp=new THREE.SpotLight(0xfff0d8,0,60,0.62,0.6,1.5); scene.add(lamp); scene.add(lamp.target); const lampFwd=new V3();
 function updateSky(dt){ const camPos=camera.position; let dom=null,bd=1e12; for(const b of BODIES){ if(!b.atmo)continue; const d=b.pos.distanceToSquared(camPos); if(d<bd){bd=d;dom=b;} }
- let a=0,day=0; if(dom){ const r=T[0].copy(camPos).sub(dom.pos); const d=r.length(); a=(1-smooth(dom.R*1.05,dom.R*1.42,d))*Math.min(1,dom.atmo.i); if(a>0){ const up=r.divideScalar(d); const sd=T[1].copy(camPos).multiplyScalar(-1).normalize(); day=smooth(-0.22,0.3,up.dot(sd)); skyMat.uniforms.uUp.value.copy(up); skyMat.uniforms.uSun.value.copy(sd); skyMat.uniforms.uCol.value.setHex(dom.atmo.col); } }
- skyMat.uniforms.uA.value=a; skyMat.uniforms.uDay.value=day; skyOn=a>0.01; sky.visible=skyOn; sky.position.copy(camPos);
- const fa=a*(0.3+0.7*day); if(fa>0.01){ scene.fog.near=lerp(200,25,fa); scene.fog.far=lerp(6000,dom.R*2.6,smooth(0,1,fa)); atmoTmp.setHex(dom.atmo.col); fogCol.copy(atmoTmp).multiplyScalar(lerp(0.06,0.95,day)); fogCol.lerp(NAVY,1-a); scene.fog.color.copy(fogCol); } else { scene.fog.near=1e8; scene.fog.far=1e9; }
+ let a=0,day=0,elev=0; if(dom){ const r=T[0].copy(camPos).sub(dom.pos); const d=r.length(); a=(1-smooth(dom.R*1.05,dom.R*1.42,d))*Math.min(1,dom.atmo.i); if(a>0){ const up=r.divideScalar(d); const sd=T[1].copy(camPos).multiplyScalar(-1).normalize(); elev=up.dot(sd); day=smooth(-0.22,0.3,elev); skyMat.uniforms.uUp.value.copy(up); skyMat.uniforms.uSun.value.copy(sd); skyMat.uniforms.uCol.value.setHex(dom.atmo.col); } }
+ skyMat.uniforms.uA.value=a; skyMat.uniforms.uDay.value=day; skyMat.uniforms.uElev.value=elev; skyMat.uniforms.uRed.value=smooth(T_END,T_CASC,GAME.time); SKY.a=a; SKY.day=day; SKY.elev=elev; SKY.dom=dom;
+ skyOn=a>0.01; sky.visible=skyOn; sky.position.copy(camPos);
+ const fa=a*(0.3+0.7*day); if(fa>0.01){ scene.fog.near=lerp(200,25,fa); scene.fog.far=lerp(6000,dom.R*2.6,smooth(0,1,fa)); atmoTmp.setHex(dom.atmo.col);
+  const low=1-smooth(-0.06,0.34,elev); fogCol.copy(atmoTmp).multiplyScalar(lerp(0.06,0.95,day)); fogCol.lerp(SUNSET,low*0.55*day); fogCol.lerp(NAVY,1-a); scene.fog.color.copy(fogCol); } else { scene.fog.near=1e8; scene.fog.far=1e9; }
+ // the light itself goes warm and shallow as the local sun sets
+ const low2=1-smooth(-0.04,0.38,elev); const warmK=a*low2*day; sunWarm.copy(sunCol).lerp(SUNSET,warmK*0.75); sunLight.color.copy(sunWarm); shadowLight.color.copy(sunWarm); shadowLight.intensity=0.5+warmK*0.25;
  const starA=1-a*(0.35+0.65*day); starMesh.material.opacity=starA; if(starMesh.dust)starMesh.dust.material.opacity=starA;
  hemi.intensity=0.12+a*(0.2+0.55*day);
  // helmet lamp: only on foot, brightens as the local sun sets
@@ -1197,6 +1456,8 @@ const PLACES=[['smoko',FLOOR,SMOKO,9,'The smoko shed. Somebody left half a cup o
  // training rings
  if(!P.inShip&&!P.cabin&&!K.course&&P.pos.distanceTo(MOON.pos)<MOON.R*3.6){ let n=0; COURSE.rings.forEach((r,i)=>{ if(!r.done&&P.pos.distanceTo(MOON.toWorld(COURSE.ringLocal[i],T[0]))<2.3){ r.done=true; r.m.material=r.doneM; uiTick(); playMotif('ring'); } if(r.done)n++; }); COURSE.done=n; if(n===COURSE.rings.length){K.course=true;logAddFact('moon','Flew all six training rings.');subtitle('Six for six. Priya would have signed that off.',6);} }
  for(const tm of TERMINALS){ tm.light.intensity=tm.read?1.2:(3+Math.sin(perfT*3+tm.local.x)*1.2); }
+ if(STATION.dish){ const toSun=T[2].copy(STATION.pos).multiplyScalar(-1).applyQuaternion(STATION.qinv).normalize(); STATION.dish.quaternion.setFromUnitVectors(YUP,toSun); }
+ if(STATION.beacon){ STATION.beacon.rotation.y+=dt*2.2; STATION.beacon.position.y=7.4+Math.sin(perfT*2.4)*0.12; }
  if(ENGINE.drum)ENGINE.drum.rotation.x+=dt*0.35;
  COURSE.beacon.rotation.y+=dt*1.5; COURSE.beacon.position.y=6.3+Math.sin(perfT*2)*0.15;
  // tools
@@ -1228,6 +1489,199 @@ function updateInterp(dt){ const gph=(TOOL.interpOut&&!GAME.menuOpen&&!P.inShip)
 function finishInterp(gph){ if(!K.texts[gph.id]){ K.texts[gph.id]=gph.title; if(gph.unlock)for(const u of gph.unlock)logUnlock(u); logUnlock(gph.logId||null); playMotif('interp'); subtitle('Read it: '+gph.title,4); } }
 
 // ======================================================================
+//  THE NEST'S TENANTS, THE VISION, AND THE FOUR PEOPLE STILL OUT THERE
+// ======================================================================
+// something stands on the Vision, and it has been there longer than anyone
+bootStep(56,'building the store, the dome and the outposts');
+await yieldFrame();
+const VIS_SITE=(()=>{ const site={dir:dirLL(0.6,0.4),r0:0.25,r1:0.4,h:0.2,mat:'rock'}; VISION.sites.push(site); const g=siteGroup(VISION,site,0); const col=[]; const add=(m,solid)=>{g.add(m);if(solid)col.push(m);return m;};
+ add(box(9,0.3,9,new THREE.MeshStandardMaterial({color:0x4a4460,roughness:1}),0,0.15,0),true);
+ for(let k=0;k<7;k++){ const r=1.8-k*0.2; const st=new THREE.Mesh(new THREE.DodecahedronGeometry(r,0),new THREE.MeshStandardMaterial({color:0x6b6488,roughness:0.95,flatShading:true})); st.position.set(0,0.5+k*1.05,0); st.rotation.set(k,k*1.7,0); g.add(st); }
+ const lightM=new THREE.Mesh(new THREE.OctahedronGeometry(0.6,0),new THREE.MeshStandardMaterial({color:0xd8c8ff,emissive:0xd8c8ff,emissiveIntensity:1.4})); lightM.position.set(0,8.6,0); g.add(lightM); VISION.beacon=lightM;
+ const pl=new THREE.PointLight(0xd8c8ff,6,30,2); pl.position.set(0,8.8,0); g.add(pl);
+ glyphPanel(VISION,g,0,1.8,4.2,0,3.4,1.9,57,3,'vision-plate','Panel at the cairn','Nobody built this and all four of us found it anyway, which is the joke. It is only ever where you are not looking, so the only way to stand on it is to catch it looking back. Ruth said that meant something. I said it meant we should sit down and have lunch. We did both.');
+ terminal(VISION,g,3.4,0.3,2.0,-Math.PI/2,'vision-term','cairn marker',['No power source. No wiring. It still answers.','Every reading says the same thing: you are not the first.','Whoever left the shells at the Nest left this too.','Stay on it and look away. See where it takes you.'],['vision']);
+ g.updateWorldMatrix(true,true); for(const m of col)registerCollider(VISION,m,'rock'); return g; })();
+// a pit: a crater with a ramp down, a floor and something worth the climb
+function pit(body,lat,lon,depth,cfg){ const Rp=cfg.Rp||15;                         // a shaft, not a bowl: sheer walls, one way in
+ const r0=Rp/body.R, r1=r0*1.28;
+ const site={dir:dirLL(lat,lon),r0,r1,h:-depth,mat:cfg.mat||'rock'}; body.sites.push(site);
+ const g=siteGroup(body,site,cfg.yaw||0); const col=[]; const add=(m,solid)=>{g.add(m);if(solid)col.push(m);return m;};
+ const wallM=new THREE.MeshStandardMaterial({color:cfg.wall||0x4a4550,roughness:0.95,flatShading:true});
+ const H=depth+2.6, seg=30, gapFrom=0.0, gapTo=0.40;                               // the doorway the ramp comes through
+ for(let k=0;k<seg;k++){ const a=k/seg*TWO_PI; if(a>gapFrom&&a<gapTo)continue;
+  const w=TWO_PI*Rp/seg+1.9; const m=box(w,H,2.2,wallM,Math.cos(a)*Rp,H/2-depth+depth-1.3,Math.sin(a)*Rp);
+  m.position.set(Math.cos(a)*Rp,H/2-1.3,Math.sin(a)*Rp); m.rotation.y=-a+Math.PI/2; add(m,true);
+  if(k%4===0)g.add(cyl(0.22,0.28,H,MAT.rust,Math.cos(a)*(Rp-0.9),H/2-1.3,Math.sin(a)*(Rp-0.9),6)); }
+ add(box(4.2,1.0,2.0,wallM,Math.cos(gapFrom)*Rp,H-0.8,Math.sin(gapFrom)*Rp),true).rotation.y=-gapFrom+Math.PI/2;
+ // a helix down the inside of the wall from the doorway to the floor
+ const turns=Math.max(1.5,depth/7), N=Math.round(30*Math.max(1.5,depth/7)), rr=Rp-3.1, top=depth+0.1;
+ const P0=new V3(),P1=new V3(),mid=new V3(),dv=new V3(); const pt=k=>{ const t=k/N; const a=gapTo*0.5-t*TWO_PI*turns; const y=lerp(top,0.02,Math.pow(t,0.92)); return new V3(Math.cos(a)*rr,y,Math.sin(a)*rr); };
+ for(let k=0;k<N;k++){ P0.copy(pt(k)); P1.copy(pt(k+1)); mid.addVectors(P0,P1).multiplyScalar(0.5); dv.subVectors(P1,P0); const len=dv.length();
+  const fwd=dv.clone().normalize(); const up=new V3(0,1,0); const right=new V3().crossVectors(fwd,up).normalize(); const basis=new THREE.Matrix4().makeBasis(right,up,fwd.clone().negate()); const q=new Q().setFromRotationMatrix(basis);
+  const plate=box(5.0,0.5,len+2.2,MAT.steel,mid.x,mid.y-0.25,mid.z); plate.quaternion.copy(q); add(plate,true);   // flat tread hung under the walking line, so the bottom step is flush
+  const rail=box(0.14,1.05,len+2.2,MAT.rust,0,0,0); rail.position.copy(mid).add(new V3(-2.3,0.5,0).applyQuaternion(q)); rail.quaternion.copy(q); g.add(rail);
+  if(k%3===0){ const st=box(4.6,0.06,0.4,MAT.yellow,0,0,0); st.position.copy(mid).add(new V3(0,0.02,0).applyQuaternion(q)); st.quaternion.copy(q); g.add(st);
+   const post=cyl(0.1,0.12,1.05,MAT.rust,mid.x,mid.y,mid.z,6); post.position.add(new V3(-2.3,0.25,0).applyQuaternion(q)); g.add(post); } }
+ // floor plate, lights, and the things worth the climb
+ const ring=new THREE.Mesh(new THREE.CircleGeometry(Rp-0.6,40),new THREE.MeshStandardMaterial({color:cfg.deck||0x55505c,roughness:0.95})); ring.rotation.x=-Math.PI/2; ring.position.y=0.05; g.add(ring);
+ for(let k=0;k<4;k++){ const a=k/4*TWO_PI+0.8; const lx=Math.cos(a)*(Rp-3.4), lz=Math.sin(a)*(Rp-3.4);
+  const pl=new THREE.PointLight(cfg.lamp||0xbfe4ff,8,30,2); pl.position.set(lx,4.6,lz); g.add(pl);
+  g.add(cyl(0.12,0.16,4.6,MAT.rust,lx,2.3,lz,6)); const lamp2=new THREE.Mesh(new THREE.SphereGeometry(0.3,8,6),new THREE.MeshBasicMaterial({color:0xfff4e0})); lamp2.position.set(lx,4.7,lz); g.add(lamp2); }
+ cfg.build&&cfg.build(g,add,col);
+ signWall(body,g,Rp*0.42,Math.PI,cfg.plateId,cfg.plateTitle,cfg.plateText,cfg.seed,cfg.board,cfg.lamp);
+ terminal(body,g,-Rp*0.45,0.1,Rp*0.3,Math.PI/2.2,cfg.termId,cfg.termTitle,cfg.termLines,cfg.unlock);
+ g.updateWorldMatrix(true,true); for(const m of col)registerCollider(body,m,'metal');
+ return g; }
+// The Deep: the vault under the third hold, where piece two actually is
+const DEEP_VAULT=pit(BY.deep,-0.95,1.35,12,{seed:71,lamp:0x8fd0ff,yaw:0.6,deck:0x3f4a58,wall:0x3d4a56,Rp:16,mat:'rock',
+ board:['#VAULT','Dry as a bone and twenty metres down.','Priya cut the ramp so you would not','have to swim it. Use it.','','Everything we were sure about is','written on the far wall.'],
+ plateId:'deep-vault-plate',plateTitle:'The far wall',plateText:'Piece two, in full, in Priya\u2019s hand. The thing on the horizon is not chasing us and it is not a warning. It sits still and waits to be looked at properly. We never once all looked at it at the same time, because whenever one of us turned to it, the other three were watching that one instead. I do not think that was a mistake.',
+ termId:'deep-vault-term',termTitle:'vault index',termLines:['Contents: one page, one shelf, no lock.','Priya cut the ramp in on her own over four shifts.','The lit void under the Stack reads the same as this room.','Whoever built the shells built both.','If you have three pieces, the fourth is at the Nest.'],unlock:['deep-vault','stack-void','handover'],
+ build:(g,add)=>{ for(let k=0;k<3;k++)add(box(8,0.2,1.4,MAT.steel,0,0.7+k*1.0,-12.6),true); const page=new THREE.Mesh(new THREE.PlaneGeometry(0.7,0.9),new THREE.MeshStandardMaterial({color:0xf4f1e8,emissive:0xf4f1e8,emissiveIntensity:0.25,roughness:0.9})); page.position.set(-2.4,1.15,-12.5); page.rotation.x=-0.15; g.add(page); }});
+// The Stack: the lit void under the crust
+const STACK_VOID=pit(BY.stack,-0.35,2.15,17,{seed:72,lamp:0x8fe0c0,yaw:-0.9,deck:0x3a4a44,wall:0x3b4a46,Rp:15,
+ board:['#THE VOID','Everything that falls through the crust','ends up down here, and it is lit.','Nobody has found the light source.','','Do not bother looking for a bottom.','This ledge is the bottom we made.'],
+ plateId:'stack-void-plate',plateTitle:'Panel on the ledge',plateText:'We came down expecting a hole and found a room with the light already on. Same stone as the shells at the Nest, same as the cairn. Whatever kept those going kept this going too, long before there was a store, a roster, or any of us to argue about it.',
+ termId:'stack-void-term',termTitle:'void ledge log',termLines:['Light reads steady. No source, no falloff, no flicker.','Same stone as the Nest shells and the cairn on the Vision.','Anything that drops through the crust lands on this ledge.','Sandy has been down here more than she admits.','Tell somebody what you found. That is the whole job.'],unlock:['stack-void','vision'],
+ build:(g,add)=>{ const glowM=new THREE.MeshBasicMaterial({color:0xa8f0d8}); for(let k=0;k<5;k++){ const a=k/5*TWO_PI; const p=new THREE.Mesh(new THREE.PlaneGeometry(3.0,3.0),glowM); p.rotation.x=-Math.PI/2; p.position.set(Math.cos(a)*6,0.1,Math.sin(a)*6); g.add(p); const l=new THREE.PointLight(0x8fe0c0,5,22,2); l.position.set(Math.cos(a)*6,0.9,Math.sin(a)*6); g.add(l); }
+  add(box(10,0.5,0.5,MAT.rust,0,3.2,-12.4)); }});
+bootStep(70,'lighting the fires');
+const TRAVELLERS=[];
+function traveller(id,name,layer,body,site,yaw,out,lines,plateText){ const g=siteGroup(body,padSite(body,site,yaw,out,7,'rock'),yaw); const col=[]; const add=(m,solid)=>{g.add(m);if(solid)col.push(m);return m;};
+ for(let i2=0;i2<3;i2++){const l=cyl(0.14,0.18,2.0,MAT.wood,0,0.2,0); l.rotation.z=Math.PI/2; l.rotation.y=i2*2.1; g.add(l);}
+ for(let i2=0;i2<8;i2++){const a=i2/8*TWO_PI; const st=new THREE.Mesh(new THREE.DodecahedronGeometry(0.28,0),MAT.stone); st.position.set(Math.cos(a)*1.4,0.12,Math.sin(a)*1.4); g.add(st);}
+ const flames=[]; for(let i2=0;i2<3;i2++){const f=new THREE.Mesh(new THREE.ConeGeometry(0.36-i2*0.09,1.1-i2*0.2,6),i2===2?MAT.fire2:MAT.fire); f.position.set((i2-1)*0.2,0.65+i2*0.12,(i2%2)*0.16); g.add(f); flames.push(f);}
+ const light=new THREE.PointLight(0xff9a40,40,24,2); light.position.set(0,1.0,0); g.add(light);
+ const log=cyl(0.3,0.34,2.6,MAT.wood,0,0.3,2.4); log.rotation.z=Math.PI/2; add(log,true);
+ const person=new THREE.Group(); person.position.set(0,0.6,2.35); g.add(person);
+ const cloth=new THREE.MeshStandardMaterial({color:{guitar:0x7a5a3a,banjo:0x3a5a7a,harmonica:0x6a4a5a,whistle:0x4a6a4a,bass:0x5a5a3a}[layer]||0x555,roughness:0.9});
+ person.add(new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.34,0.9,8),cloth)).position.y=0.45;
+ const head=new THREE.Mesh(new THREE.SphereGeometry(0.19,10,8),new THREE.MeshStandardMaterial({color:0xd8b89a,roughness:0.85})); head.position.y=1.05; person.add(head);
+ const hat=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.3,0.16,10),cloth); hat.position.y=1.18; person.add(hat);
+ for(const sx of [-0.3,0.3]){ const arm=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,0.5,6),cloth); arm.position.set(sx,0.6,-0.18); arm.rotation.x=-0.9; arm.rotation.z=sx*0.5; person.add(arm); }
+ const instM=new THREE.MeshStandardMaterial({color:0xc9a227,roughness:0.5,metalness:0.25});
+ if(layer==='guitar'||layer==='banjo'){ const bodyI=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.12,14),instM); bodyI.rotation.x=Math.PI/2; bodyI.position.set(0,0.62,-0.3); person.add(bodyI); const neck=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.06,0.8),instM); neck.position.set(0.3,0.72,-0.32); neck.rotation.z=0.5; person.add(neck); }
+ else if(layer==='bass'){ const bodyI=new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.34,0.2,14),instM); bodyI.rotation.x=Math.PI/2; bodyI.position.set(0.1,0.7,-0.35); person.add(bodyI); const neck=new THREE.Mesh(new THREE.BoxGeometry(0.07,1.3,0.07),instM); neck.position.set(0.1,1.35,-0.35); person.add(neck); }
+ else { const sm=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.07,0.07),instM); sm.position.set(0,0.95,-0.28); person.add(sm); }
+ person.rotation.y=Math.PI;
+ g.updateWorldMatrix(true,true); for(const m of col)registerCollider(body,m,'rock');
+ const local=new V3(); person.getWorldPosition(local);
+ const t={id,name,layer,body,local:new V3(0,0.8,2.35).applyQuaternion(g.quaternion).add(g.position),group:g,flames,light,person,lines,said:0,met:false};
+ TRAVELLERS.push(t); return t; }
+traveller('t-marnie','Marnie','guitar',MOON,SITE.course,1.4,30,
+ ['Look who it is. Sit down, I am not stopping.','I gave up on the Engine about forty loops ago. Now I just play until the light goes.','Dev is out on the water somewhere. Priya went to Ledger. Sandy is nearer the Stack than she should be.']);
+traveller('t-dev','Dev','banjo',BY.deep,BY.deep.sites[0],-2.4,42,
+ ['Eleven times I timed it. Then I stopped counting and it still went.','If you found the dome panel, that one is mine. Took me three shifts to write four lines.','Everyone is still out here. That is the part nobody writes down.']);
+traveller('t-priya','Priya','whistle',BY.ledger,BY.ledger.sites[0],-2.0,40,
+ ['You made it out here. Good. Sit for a bit, the sand is not going anywhere.','I taught half the store to fly and I still land like a dropped esky.','If you are collecting the pieces: mine is in the shack on the water. I could not get back down to the vault.']);
+traveller('t-sandy','Sandy','harmonica',BY.stack,BY.stack.sites[0],2.6,44,
+ ['Careful where you stand. This whole shelf is somebody else\u2019s Tuesday.','I left mine at the foundation. If you got that far, you know more than I do now.','Ruth went in first. She always went in first.']);
+traveller('t-col','Col','bass',BY.backlog,BY.backlog.sites[0],-2.6,40,
+ ['I sat the window out every shift for a year. Nobody ever called the count.','Do not feel bad for me. I liked the sitting. I got good at the low end.','Get the four of us in one place and the Engine is worth a try. That is all I have got.']);
+function updateTravellers(dt){ if(!AU.ok)return; let near=null,bd=26;
+ for(const t of TRAVELLERS){ const wp=t.body.toWorld(t.local,T[0]); const d=P.pos.distanceTo(wp); t.dist=d;
+  const fl=0.75+0.25*Math.sin(perfT*19+t.local.x)*Math.sin(perfT*6); t.light.intensity=36*fl; t.flames.forEach((f,i2)=>{f.scale.y=0.85+0.3*Math.sin(perfT*(10+i2*3)+i2);});
+  t.person.position.y=0.6+Math.sin(perfT*1.6+t.local.z)*0.02;
+  if(d<bd&&!P.inShip){bd=d;near=t;} }
+ if(near&&!near.met){ near.met=true; K.travellers[near.id]=near.layer; logSee(near.id,near.name+' is still out here, playing by a fire.'); logAddFact('travellers',near.name+' ('+near.layer+') found.'); subtitle(near.name+': '+near.lines[0],6); near.said=1; GAME.travSay=7; }
+ else if(near&&near.said<near.lines.length){ GAME.travSay-=dt; if(GAME.travSay<=0){ subtitle(near.name+': '+near.lines[near.said],6); near.said++; GAME.travSay=9; } }
+ if(near!==TRAV.cur){ TRAV.cur=near; if(near){ const mix={}; for(const id in K.travellers)mix[K.travellers[id]]=0.25; mix[near.layer]=0.95; mix.bass=Math.max(mix.bass||0,0.3);
+   const dist={}; for(const n2 in mix)if(n2!==near.layer)dist[n2]=0.7;
+   setScene('traveller',{force:true,layers:mix,dist,song:SONGS[near.body.id]||SONGS.floor,ramp:2.5}); }
+  else if(MUS.scene==='traveller')MUS.scene='none'; }
+ if(Object.keys(K.travellers).length>=4&&!K.nodes['travellers-all']){ logSee('travellers-all','Four of them found, all still playing. Three could run the Engine, if they were ever in one place.'); }
+ checkEnding(dt); }
+function checkEnding(dt){ const pieces=(K.nodes.handover&&K.nodes.handover.facts.length)||0; const found=Object.keys(K.travellers).length;
+ if(!K.endingKnown&&pieces>=4&&found>=5){ K.endingKnown=true; logSee('ending','All four pieces, and all five of them found. Go back to the fire and sit down.'); subtitle('You have all of it now. Go home and sit down.',7); }
+ if(!K.endingKnown||GAME.ending||K.endingDone||P.inShip||P.cabin||GAME.dead)return;
+ const fire=FLOOR.toWorld(CAMP.fireLocal,T[0]); if(P.pos.distanceTo(fire)>7||P.relVel.length()>1.5){GAME.endSit=0;return;}
+ GAME.endSit=(GAME.endSit||0)+dt; if(GAME.endSit<2.5)return; startGathering(); }
+// the five of them at your fire, one for each, each bringing their own layer back into the tune
+const GATHER={group:null,people:[],built:false};
+function buildGathering(){ if(GATHER.built)return; GATHER.built=true; const g=new THREE.Group(); CAMP.site.add(g); GATHER.group=g;
+ const seats=[[-3.2,0.9],[3.2,0.9],[-2.4,-2.9],[2.4,-2.9],[0,3.6]];
+ TRAVELLERS.forEach((t,i2)=>{ const p=t.person.clone(true); p.position.set(seats[i2][0],0.55,seats[i2][1]); p.lookAt(new V3(0,0.7,0)); p.rotateY(Math.PI); g.add(p);
+  const seat=cyl(0.28,0.32,1.9,MAT.wood,seats[i2][0]*1.25,0.28,seats[i2][1]*1.25); seat.rotation.z=Math.PI/2; seat.rotation.y=Math.atan2(seats[i2][0],seats[i2][1]); g.add(seat);
+  GATHER.people.push({mesh:p,layer:t.layer,name:t.name,phase:i2*1.3}); });
+ g.visible=false; }
+function startGathering(){ GAME.ending=true; GAME.endT=0; GAME.endStage=0; GAME.endFade=false; K.endingDone=true; buildGathering(); GATHER.group.visible=true;
+ if(AU.ok){ MUS.jukebox=true; setScene('ending',{force:true,restart:true,song:SONGS.floor,layers:{guitar:0.85},ramp:1.5}); }
+ subtitle('They are already here. Of course they are.',7); }
+const END_LINES=[[9,'Marnie: you found all four. Nobody ever found all four.'],
+ [18,'Dev: I timed that star eleven times and never once thought to come back and sit down.'],
+ [27,'Priya: mine was under the water and I could not get back to it. You did.'],
+ [36,'Sandy: Ruth went in first. She would have liked this.'],
+ [46,'Col: so that is the handover. All of it, in one place, for about four minutes.'],
+ [57,'None of it stops the Exchange. It was never going to.'],
+ [68,'What it does is this. Five people, one fire, ten minutes, and everything any of them worked out still known by somebody.'],
+ [80,'Marnie: play something, then. We have got time for one.']];
+function updateGathering(dt){ if(!GAME.ending)return; GAME.endT+=dt; const t=GAME.endT;
+ for(const p of GATHER.people){ p.mesh.position.y=0.55+Math.sin(perfT*1.5+p.phase)*0.02; p.mesh.rotation.z=Math.sin(perfT*0.9+p.phase)*0.015; }
+ while(GAME.endStage<END_LINES.length&&t>=END_LINES[GAME.endStage][0]){ subtitle(END_LINES[GAME.endStage][1],10); GAME.endStage++; }
+ if(t>92&&!GAME.endFade){ GAME.endFade=true; logAddFact('ending','Read at the fire with all five of them there. It does not stop the star. It was never for that.'); }
+ if(GAME.endFade){ GAME.fade=Math.min(1,(GAME.fade||0)+dt/6); if(GAME.fade>=1&&!GAME.epilogue){ GAME.epilogue=true; if(AU.ok)setScene('epilogue',{force:true,restart:true}); showEpilogue(); } } }
+function showEpilogue(){ const el=$('epilogue'); el.classList.remove('hidden'); GAME.menuOpen=true; if(document.pointerLockElement)document.exitPointerLock();
+ const lines=['The shift ended.','Nothing was saved. Nothing was ever going to be.','What the four of them knew, you know, and you were there when it was said out loud.','That is the whole of the handover, and it was always enough.'];
+ el.innerHTML='<div class="epiwrap"><h1>CLOCK OFF</h1>'+lines.map(l=>'<p>'+l+'</p>').join('')+
+  '<p class="small">Plates read: '+Object.keys(K.texts).length+' &middot; terminals: '+Object.keys(K.terminals).length+' &middot; places known: '+Object.keys(K.nodes).filter(k=>logSeen(k)).length+' &middot; loops: '+GAME.loop+'</p>'+
+  '<button id="epiAgain">Go round again</button></div>';
+ $('epiAgain').onclick=()=>{ el.classList.add('hidden'); GAME.menuOpen=false; GAME.ending=false; GAME.epilogue=false; GAME.endFade=false; GAME.fade=0; if(GATHER.group)GATHER.group.visible=false; MUS.jukebox=false; MUS.scene='none'; resetLoop(); canvas.requestPointerLock(); }; }
+
+const TRAV={cur:null};
+// ---- the Nest's tenants and how much noise you are making
+function playerNoise(){ if(P.inShip||P.cabin)return 1; if(AUD.jet>0.05)return 1;
+ const dom=GRAV.dom; const sv=dom?dom.surfaceVel(P.pos,T[9]):null;
+ const sp=P.grounded?P.relVel.length():(sv?T[8].copy(P.vel).sub(sv).length():P.vel.length());
+ let n=clamp((sp-1.2)/8.5,0,1)*0.86;               // a stroll is quiet, a sprint is not
+ if(P.grounded&&down('crouch'))n*=0.25;
+ if(!P.grounded)n=Math.max(n,0.30);                 // even drifting moves air
+ return Math.max(0.02,n); }
+function updateSand(dt){ const b=(P.inShip||P.cabin)?GRAV.domS:GRAV.dom; if(!b||!b.hasSand){GAME.sandT=0;return;}
+ const ref=(P.inShip||P.cabin)?S.pos:P.pos; const r=T[0].copy(ref).sub(b.pos).length(); const margin=r-b.sandR;
+ if(margin<-0.6){ GAME.sandT=(GAME.sandT||0)+dt; if(GAME.sandT>1.5&&GAME.sandT-dt<=1.5)subtitle('The sand is over the top of you. Move.',4);
+  if(GAME.sandT>4&&!DBG.god){die('sand');return;} if(GAME.sandT>1.5)P.health=Math.max(0,P.health-dt*0.12); return; }
+ GAME.sandT=0;
+ const clear=b.R+0.4-b.sandR;  // positive means the buildings are above the sand
+ if(!P.inShip&&!P.cabin&&P.mat==='sand'&&!K.sandLesson){ K.sandLesson=true; subtitle(b.id==='ledger'?'You are standing on the sand, not on Ledger. It is still coming up.':'You are standing on the sand. It is still going down, and the station is under it.',6); }
+ if(b.id==='backlog'&&clear>-1&&clear<3&&!GAME.sandWarn){GAME.sandWarn=1;subtitle('The station is clear of the sand. You can read it now.',5);}
+ if(b.id==='ledger'&&clear<1&&clear>-3&&!GAME.sandWarn){GAME.sandWarn=1;subtitle('The sand has reached the station. Whatever you did not read is under it now.',5);}
+ if(Math.abs(clear)>6)GAME.sandWarn=0; }
+function updateNest(dt){ const b=BY.nest; const inRange=P.pos.distanceTo(b.pos)<b.R*1.8;
+ POD.noise=inRange?playerNoise():0;
+ if(!inRange){ if(POD.alarm>0){POD.alarm=0;escalationSound(0);} return; }
+ b.toLocal(P.pos,T[1]); const dCentre=T[1].distanceTo(POD.centre); const inside=dCentre<22; 
+ if(inside&&!POD.inside){POD.inside=true;logSee('nest-foundation',null);subtitle('Inside the first shell. Whatever is in here does not need eyes.',5);}
+ if(!inside)POD.inside=false;
+ const heard=POD.noise>0.62?((POD.noise-0.45)*(inside?58:32)):0;  // walking sits well under this; running and the pack do not
+ let closest=99;
+ for(const e of POD.escalations){ const to=T[2].copy(T[1]).sub(e.local); const d=to.length()||1e-6;
+  if(heard>0&&d<heard){ e.hunt=Math.min(1,e.hunt+dt*0.9); } else e.hunt=Math.max(0,e.hunt-dt*0.8);
+  if(e.hunt>0.05){ e.vel.addScaledVector(to.divideScalar(d),dt*8*e.hunt*e.hunt); }
+  else { const wob=T[3].set(Math.sin(perfT*0.6+e.phase),Math.sin(perfT*0.4+e.phase*2)*0.4,Math.cos(perfT*0.5+e.phase)); e.vel.addScaledVector(T[4].copy(e.home).sub(e.local).multiplyScalar(0.5).add(wob),dt*0.7); }
+  e.vel.multiplyScalar(Math.exp(-dt*(1.2+e.hunt))); e.local.addScaledVector(e.vel,dt);
+  const dc=T[5].copy(e.local).sub(POD.centre).length(); if(dc>21){e.local.copy(POD.centre).addScaledVector(T[5].divideScalar(dc),21);e.vel.multiplyScalar(-0.3);}
+  e.mesh.position.copy(e.local).sub(POD.group.position).applyQuaternion(TQ[3].copy(POD.group.quaternion).invert());
+  e.mesh.rotation.x+=dt*(0.4+e.hunt); e.mesh.rotation.y+=dt*(0.6+e.hunt*2); e.mesh.material.emissiveIntensity=0.3+e.hunt*2.2; e.mesh.scale.setScalar(1+e.hunt*0.25);
+  closest=Math.min(closest,d);
+  if(d<1.5&&e.hunt>0.5&&!DBG.god){ die('escalation'); return; } }
+ POD.alarm=lerp(POD.alarm,clamp(1-(closest-3)/14,0,1),0.1); escalationSound(POD.alarm);
+ if(POD.alarm>0.55&&!GAME.hints.has('quiet'))hint('quiet','Something heard that. Walking is fine in here. Running and the pack are not.');
+}
+function escalationSound(a){ if(!AU.ok)return; const ctx=AU.ctx,t=ctx.currentTime; if(!SFX.esc){ const n=ctx.createBufferSource(); n.buffer=AU.noiseBuf; n.loop=true; const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=900; f.Q.value=6; const g=ctx.createGain(); g.gain.value=0; n.connect(f); f.connect(g); g.connect(AU.sfx); n.start(); SFX.esc={n,f,g}; }
+ SFX.esc.g.gain.setTargetAtTime(a*0.06,t,0.25); SFX.esc.f.frequency.setTargetAtTime(600+a*1400,t,0.3); }
+// ---- The Vision: it only moves when nobody is looking at it
+const VIS_ANCHORS=[()=>T[6].copy(FLOOR.pos).add(T[7].set(0,FLOOR.R*2.4,0)),()=>T[6].copy(BY.ledger.pos).add(T[7].set(BY.ledger.R*2.6,0,0)),()=>T[6].copy(BY.stack.pos).add(T[7].set(0,-BY.stack.R*2.2,BY.stack.R*1.6)),()=>T[6].copy(BY.deep.pos).add(T[7].set(0,BY.deep.R*2.1,0)),()=>T[6].copy(BY.nest.pos).add(T[7].set(BY.nest.R*2.4,BY.nest.R,0)),()=>T[6].set(0,-SUN.R*4.2,SUN.R*3.2)];
+function visionObserved(){ const d=T[8].copy(VISION.pos).sub(camera.position); const dist=d.length(); if(dist>9000)return false; d.divideScalar(dist); const f=camera.getWorldDirection(T[9]); const halfFov=THREE.MathUtils.degToRad(camera.fov)*0.5*1.25; return d.dot(f)>Math.cos(halfFov+Math.atan2(VISION.R,dist)); }
+function updateVision(dt){ const seen=visionObserved(); VISION.seenNow=seen;
+ if(VISION.anchorIdx<0){ VISION.anchorIdx=0; VISION.anchor.copy(VIS_ANCHORS[0]()); }
+ if(seen){ VISION.moveT=0; if(!K.visionSeen&&T[8].copy(VISION.pos).sub(camera.position).length()<4000){K.visionSeen=true;logSee('vision','It is there when you look. It is somewhere else when you do not.');} return; }
+ VISION.moveT=(VISION.moveT||0)+dt; if(VISION.moveT<2.5)return; VISION.moveT=0;
+ const riding=P.parent===VISION||S.parent===VISION;
+ const idx=(VISION.anchorIdx+1+Math.floor(Math.random()*(VIS_ANCHORS.length-1)))%VIS_ANCHORS.length; VISION.anchorIdx=idx; VISION.anchor.copy(VIS_ANCHORS[idx]()); VISION.update(GAME.time);
+ if(riding){ if(P.parent===VISION){VISION.toWorld(P.local,P.pos);P.prev.copy(P.pos);VISION.surfaceVel(P.pos,P.vel);} if(S.parent===VISION){VISION.toWorld(S.local,S.pos);S.prev.copy(S.pos);}
+  if(!K.visionRode){K.visionRode=true;logAddFact('vision','Stand on it, look away, and it takes you with it.');subtitle('The ground did not move. Everything else did.',6);} } }
+// ======================================================================
 //  HUD, SUBTITLES, PROMPTS
 // ======================================================================
 const wristC=$('wrist'); wristC.width=480; wristC.height=300; const wctx=wristC.getContext('2d'); let wristT=0;
@@ -1237,7 +1691,8 @@ function drawWrist(){ const c=wctx; c.clearRect(0,0,480,300); c.save(); c.scale(
  gauge(c,46,62,30,P.o2,P.o2<0.25?'#ff6a5a':'#7fd0ff','OXYGEN',Math.round(P.o2*100)+'%'); gauge(c,120,62,30,P.fuel,'#ffc400','JETPACK',Math.round(P.fuel*100)+'%');
  c.fillStyle='rgba(255,255,255,0.1)'; rr(c,170,32,56,9,4); c.fill(); c.fillStyle=P.health<0.35?'#ff6a5a':'#8fe08a'; rr(c,170,32,56*clamp(P.health,0,1),9,4); c.fill(); c.fillStyle='rgba(255,243,208,0.6)'; c.font='10px Georgia,serif'; c.textAlign='left'; c.fillText('SUIT',170,28);
  const heat=P.inShip?S.heat:P.heat; if(heat>0.02){c.fillStyle='rgba(255,255,255,0.1)'; rr(c,170,58,56,9,4); c.fill(); c.fillStyle='#ff8a2a'; rr(c,170,58,56*clamp(heat,0,1),9,4); c.fill(); c.fillStyle='rgba(255,243,208,0.6)'; c.fillText('HEAT',170,54);}
- c.fillStyle='rgba(255,243,208,0.55)'; c.font='10px Georgia,serif'; c.textAlign='left'; c.fillText(GAME.loop>=2?'LOOP '+GAME.loop:'', 12,128); c.textAlign='right'; if(GAME.loop>=2){c.fillStyle='#fff3d0'; c.font='bold 22px Georgia,serif'; c.fillText('T+'+fmt(GAME.time),228,132);} 
+ c.fillStyle='rgba(255,243,208,0.55)'; c.font='10px Georgia,serif'; c.textAlign='left'; c.fillText(GAME.loop>=2?'LOOP '+GAME.loop:'', 12,128);
+ const sb=(P.inShip||P.cabin)?GRAV.domS:GRAV.dom; if(sb&&sb.hasSand){ const clear=sb.R+0.4-sb.sandR; c.fillStyle=clear>0?'#8fe08a':'#ffc400'; c.fillText(sb.name.toUpperCase()+': '+(clear>0?'station clear by '+Math.round(clear)+'m':'station under '+Math.round(-clear)+'m of sand'),12,116); } c.textAlign='right'; if(GAME.loop>=2){c.fillStyle='#fff3d0'; c.font='bold 22px Georgia,serif'; c.fillText('T+'+fmt(GAME.time),228,132);} 
  c.restore(); }
 const dctx=SHIPM.dashCv.getContext('2d'); let dashT=0;
 function drawDash(){ const c=dctx; c.fillStyle='#0b0e18'; c.fillRect(0,0,512,256); c.strokeStyle='rgba(255,196,0,0.5)'; c.lineWidth=3; c.strokeRect(6,6,500,244); c.fillStyle='#ffc400'; c.font='bold 22px Georgia,serif'; c.textAlign='left';
@@ -1250,7 +1705,7 @@ function drawDash(){ const c=dctx; c.fillStyle='#0b0e18'; c.fillRect(0,0,512,256
 const promptEl=$('prompt'),subEl=$('sub'),fadeEl=$('fade'),shipMsgEl=$('shipmsg'),logEl=$('log'),logBadgeEl=$('logbadge'),ctlCardEl=$('ctlcard'),tgtEl=$('tgt'),lookEl=$('look'),shipMarkEl=$('shipmark'); let lastPrompt='';
 function setPrompt(t){ if(t!==lastPrompt){lastPrompt=t;promptEl.textContent=t;promptEl.style.opacity=t?1:0;} }
 function subtitle(text,sec,dialogue){ if(dialogue&&!OPT.subs)return; GAME.sub=text; GAME.subT=sec||5; subEl.textContent=text; subEl.style.opacity=1; }
-function hint(id,text){ if(GAME.hints.has(id))return; GAME.hints.add(id); subtitle(text,8); }
+function hint(id,text){ if(GAME.hints.has(id))return; if(TRAV.cur)return; GAME.hints.add(id); subtitle(text,8); }
 function updateInteract(dt){ let txt=''; if(GAME.dead||GAME.menuOpen||DBG.freecam){setPrompt('');S.look=null;return;}
  if(P.inShip){ P.seatT+=dt; const look=lookedAtBody(); S.look=look;
   pressed('interact'); if(pressed('standup'))standUp(); if(pressed('help')){GAME.ctlCardT=GAME.ctlCardT>0?0:1e9;uiTick();}
@@ -1282,6 +1737,7 @@ const LOG_NODES={
  moon:{x:150,y:-110,r:'The Floor',title:'Training Moon',facts:[]},
  exchange:{x:0,y:200,r:'The Exchange',title:'The Exchange',facts:[]},
  smoko:{x:-290,y:-165,r:'The Floor',title:'The smoko shed',facts:[]},
+ station:{x:-150,y:245,r:'The Relay',title:'The Relay station',facts:[]},
  repeater:{x:270,y:-190,r:'The Floor',title:'The repeater hut',facts:[]},
  'ledger-pillars':{x:-420,y:-60,r:'Ledger',title:'The Sync Pillars',facts:[]},
  'ledger-count':{x:-560,y:-145,r:'Ledger',title:'The counting house',facts:[]},
@@ -1295,18 +1751,29 @@ const LOG_NODES={
  'deep-vault':{x:330,y:330,r:'The Deep',title:'The vault under the third hold',facts:[]},
  'nest-post':{x:-200,y:270,r:'The Nest',title:'The warning post',facts:[]},
  'nest-hut':{x:-100,y:350,r:'The Nest',title:'The last hut',facts:[]},
- 'nest-foundation':{x:-340,y:360,r:'The Nest',title:'The foundation, inside',facts:[]},
- vision:{x:170,y:420,r:'The Deep',title:'The thing on the horizon',facts:[]},
+ 'nest-pod':{x:-260,y:330,r:'The Nest',title:'The pod: three shells',facts:[]},
+ 'nest-foundation':{x:-420,y:410,r:'The Nest',title:'The foundation, inside',facts:[]},
+ vision:{x:170,y:420,r:'Nowhere in particular',title:'The thing on the horizon',facts:[]},
+ ending:{x:120,y:-560,r:'Four people',title:'What the four of them worked out',facts:[]},
  handover:{x:-40,y:-250,r:'Four people',title:'The handover note',facts:[]},
+ travellers:{x:120,y:-330,r:'Four people',title:'Where everyone went',facts:[]},
+ 'travellers-all':{x:300,y:-390,r:'Four people',title:'All four found',facts:[]},
+ 't-marnie':{x:-60,y:-410,r:'Training Moon',title:'Marnie, by a fire',facts:[]},
+ 't-dev':{x:80,y:-470,r:'The Deep',title:'Dev, by a fire',facts:[]},
+ 't-priya':{x:230,y:-470,r:'Ledger',title:'Priya, by a fire',facts:[]},
+ 't-sandy':{x:370,y:-410,r:'The Stack',title:'Sandy, by a fire',facts:[]},
+ 't-col':{x:440,y:-330,r:'Backlog',title:'Col, by a fire',facts:[]},
 };
 const LOG_LINKS=[['floor','store'],['floor','observatory'],['floor','moon'],['floor','smoko'],['floor','repeater'],['store','smoko'],['store','observatory'],
- ['observatory','exchange'],['observatory','handover'],
+ ['observatory','exchange'],['observatory','handover'],['observatory','station'],['station','exchange'],['station','vision'],
  ['repeater','ledger-pillars'],['repeater','stack-node'],['repeater','deep-hold'],['repeater','nest-post'],
  ['ledger-pillars','backlog-engine'],['ledger-pillars','ledger-count'],['backlog-engine','ledger-pillars'],['backlog-engine','backlog-op'],['backlog-engine','nest-foundation'],
  ['stack-node','stack-void'],['stack-node','stack-face'],['stack-node','deep-vault'],
- ['deep-hold','deep-shack'],['deep-hold','deep-vault'],['deep-hold','vision'],
+ ['deep-hold','deep-shack'],['deep-hold','deep-vault'],['deep-vault','stack-void'],['deep-vault','vision'],['stack-void','vision'],['deep-hold','vision'],
  ['nest-post','nest-hut'],['nest-post','nest-foundation'],
- ['handover','observatory'],['handover','ledger-count'],['handover','deep-vault'],['handover','nest-foundation']];
+ ['handover','observatory'],['handover','ledger-count'],['handover','deep-vault'],['handover','nest-foundation'],
+ ['nest-foundation','travellers'],['travellers','t-marnie'],['travellers','t-dev'],['travellers','t-priya'],['travellers','t-sandy'],['travellers','t-col'],['travellers','travellers-all'],
+ ['t-marnie','t-dev'],['t-marnie','t-priya'],['t-sandy','nest-foundation'],['t-dev','vision'],['vision','ending'],['travellers-all','ending'],['handover','ending'],['nest-post','nest-pod'],['nest-pod','nest-foundation']];
 // map ids used by plates/terminals to log nodes, and what each contributes
 const LOG_SOURCE={'store-values':['store','Ruth spent an hour moving a dead woman\u2019s messages onto a new handset. Nobody sold anything that day.'],
  'store-boh':['store','Ruth: write down whatever you work out, or you lose the same morning twice.'],
@@ -1329,9 +1796,22 @@ const LOG_SOURCE={'store-values':['store','Ruth spent an hour moving a dead woma
  'stack-term':['stack-node','There is light under the crust. Anything that drops through comes back to the Node.'],
  'deep-term':['deep-hold','The vault is under the third hold. Something keeps appearing on the horizon out here.'],
  'nest-term':['nest-post','The seeds sit one inside another. Silence is the only thing that works in there.'],
+ 'nest-foundation':['nest-foundation','Piece three: three of them are still alive, and three is enough if you can gather them.'],
+ 'nest-foundation-plate':['nest-foundation','The seed was here before the store was. It will be here after.'],
+ 'travellers':['travellers','Follow the music. They are all still out there.'],
+ 'deep-vault-plate':['deep-vault','Piece two, in full: the thing on the horizon sits still and waits to be looked at properly.'],
+ 'deep-vault-term':['deep-vault','One page, one shelf, no lock. Priya cut the ramp on her own.'],
+ 'stack-void-plate':['stack-void','The room under the crust was already lit. Same stone as the shells and the cairn.'],
+ 'stack-void-term':['stack-void','No source, no falloff, no flicker. Whoever built the shells built this.'],
+ 'station-plate':['station','Eleven shifts of measurements, all agreeing, none of them any help.'],
+ 'station-term':['station','The dish tracks the Exchange on its own. Nothing sent from the Relay was ever answered.'],
+ 'vision-plate':['vision','All four of them found it. It is only ever where you are not looking.'],
+ 'vision-term':['vision','No power, no wiring, and it still answers. Whoever left the shells left this.'],
 };
 function logAddFact(node,text){ const n=LOG_NODES[node]; if(!n)return; K.nodes[node]=K.nodes[node]||{seen:false,facts:[]}; if(!K.nodes[node].facts.includes(text))K.nodes[node].facts.push(text); GAME.logNew=true; }
-const HANDOVER={'obs-plate':['handover','One of four. They could not stop it, so they wrote down what they knew instead.'],
+const HANDOVER={'deep-vault-plate':['handover','Priya\u2019s piece, in full, on the vault wall.'],
+ 'nest-foundation':['handover','Sandy\u2019s piece: Ruth is gone, but three is still enough if you can get them in one place.'],
+ 'obs-plate':['handover','One of four. They could not stop it, so they wrote down what they knew instead.'],
  'ledger-hut-plate':['handover','Ruth\u2019s piece: what the Engine returns takes two people, and there are not two of you.'],
  'deep-hut-plate':['handover','Priya\u2019s piece: the thing on the horizon is waiting to be looked at, not chasing anyone.'],
  'backlog-term':['handover','Sandy\u2019s piece is still at the Nest foundation, unread.']};
@@ -1391,7 +1871,10 @@ function render(alpha,dt){
  if(P.inShip)RP.copy(RS); else if(P.cabin)RP.copy(P.local).applyQuaternion(RQ).add(RS); SHIPM.group.position.copy(RS); SHIPM.group.quaternion.copy(RQ);
  for(let i=0;i<6;i++){const th=SHIPM.thrusters[i],s=S.thrust[i];for(const f of th.flames){f.visible=s>0.03;f.scale.set(0.7+s*0.5,Math.max(0.001,s*(0.75+Math.random()*0.5)),0.7+s*0.5);}}
  for(const n in SHIPM.modules){const m=SHIPM.modules[n].mesh.material;if(S.modules[n]){m.emissive.setHex(SHIPM.modules[n].col);m.emissiveIntensity=1.2;}else{m.emissive.setHex(0xff3030);m.emissiveIntensity=0.6+0.6*Math.round(Math.sin(perfT*9)*0.5+0.5);}}
- if(!GAME.started){const a=perfT*0.06;camera.position.copy(FLOOR.pos).add(T[0].set(Math.cos(a)*200,70,Math.sin(a)*200));camera.lookAt(FLOOR.pos);}else updateCamera(dt);
+ if(!GAME.started){ const fire=FLOOR.toWorld(CAMP.fireLocal,T[0]); const up=T[1].copy(fire).sub(FLOOR.pos).normalize(); const a=perfT*0.035;
+  const east=T[2].set(0,1,0).cross(up); if(east.lengthSq()<1e-4)east.set(1,0,0); east.normalize(); const north=T[3].copy(up).cross(east);
+  camera.position.copy(fire).addScaledVector(up,5.5+Math.sin(a*0.7)*0.6).addScaledVector(east,Math.cos(a)*11).addScaledVector(north,Math.sin(a)*11);
+  camera.lookAt(fire); camera.updateMatrixWorld(); }else updateCamera(dt);
  const dir=T[0].copy(camera.position).normalize(); shadowLight.position.copy(camera.position).addScaledVector(dir,-260); shadowLight.target.position.copy(camera.position); shadowLight.target.updateMatrixWorld();
  starMesh.position.copy(camera.position);
  const dom=P.inShip?GRAV.domS:GRAV.dom; if(dom&&dom.atmo)hemiTarget.setHex(dom.atmo.col).multiplyScalar(0.5);else hemiTarget.setHex(0x30405a); hemi.color.lerp(hemiTarget,0.04);
@@ -1401,8 +1884,8 @@ function render(alpha,dt){
  const lc=P.inShip&&S.landCam; SHIPM.landScreen.visible=lc; landT+=dt; if(lc&&landT>0.05){landT=0;landCam.position.copy(RS).add(T[1].set(0,-1.7,-1.0).applyQuaternion(RQ));landCam.quaternion.copy(RQ).multiply(TQ[0].setFromAxisAngle(XAXIS,-Math.PI/2));sky.visible=false;renderer.setRenderTarget(SHIPM.landRT);renderer.render(scene,landCam);renderer.setRenderTarget(null);sky.visible=skyOn;}
  composer.render(); }
 let landT=0;
-function chooseScene(){ if(!AU.ok||MUS.jukebox)return; const t=GAME.time; let sc,song=null; if(t>=T_CASC+2)sc='silence'; else if(t>=T_END)sc='endtimes'; else if(GAME.dead)return; else{ const dF=(P.inShip||P.cabin)?Infinity:T[0].copy(P.pos).sub(FLOOR.toWorld(CAMP.fireLocal,T[1])).length(); const dom=(P.inShip||P.cabin)?GRAV.domS:GRAV.dom; const near=dom&&T[0].copy(P.pos).sub(dom.pos).length()<dom.R*2.0; let landed=(P.inShip||P.cabin)?!!S.parent:!!P.parent; if(landed&&!dom)landed=false;
-  if(P.cabin){sc='interior';song=(near&&SONGS[dom.id])||SONGS.floor;} else if(!P.inShip&&dF<15){sc='campfire';song=SONGS.floor;} else if((landed||near)&&dom){ song=SONGS[dom.id]; sc=song?'world':(dom.id==='nest'?'nest':'surface'); } else {sc='space';song=SONGS.space;} }
+function chooseScene(){ if(!AU.ok||MUS.jukebox)return; if(TRAV.cur&&GAME.time<T_END)return; const t=GAME.time; let sc,song=null; if(t>=T_CASC+2)sc='silence'; else if(t>=T_END)sc='endtimes'; else if(GAME.dead)return; else{ const dF=(P.inShip||P.cabin)?Infinity:T[0].copy(P.pos).sub(FLOOR.toWorld(CAMP.fireLocal,T[1])).length(); const dom=(P.inShip||P.cabin)?GRAV.domS:GRAV.dom; const near=dom&&T[0].copy(P.pos).sub(dom.pos).length()<dom.R*2.0; let landed=(P.inShip||P.cabin)?!!S.parent:!!P.parent; if(landed&&!dom)landed=false;
+  if(dom===BY.nest&&!P.inShip&&near){sc='nest';song=null;} else if(P.cabin){sc='interior';song=(near&&SONGS[dom.id])||SONGS.floor;} else if(!P.inShip&&dF<15){sc='campfire';song=SONGS.floor;} else if((landed||near)&&dom){ song=SONGS[dom.id]; sc=song?'world':(dom.id==='nest'?'nest':'surface'); } else {sc='space';song=SONGS.space;} }
  if(sc!==MUS.scene||(song&&song!==MUS.song&&song!==MUS.pendingSong))setScene(sc,song?{song}:undefined); }
 function frameUpdate(dt){
  if(!GAME.started)return;
@@ -1410,22 +1893,24 @@ function frameUpdate(dt){
   else if(P.inShip){S.mx+=IN.mx;S.my+=IN.my;} else if(P.cabin){P.cabinQ.premultiply(TQ[0].setFromAxisAngle(YUP,-IN.mx*sens)).normalize();P.pitch=clamp(P.pitch-IN.my*sens*(OPT.invertY?-1:1),-1.5,1.5);} else{P.quat.premultiply(TQ[0].setFromAxisAngle(P.up,-IN.mx*sens)).normalize();P.pitch=clamp(P.pitch-IN.my*sens*(OPT.invertY?-1:1),-1.5,1.5);} }
  IN.mx=0;IN.my=0;
  if(GAME.intro>0){GAME.intro-=dt;GAME.situp=1-Math.max(0,GAME.intro)/1.8;if(GAME.intro<=0){GAME.situp=1;hint('move','WASD to walk · mouse to look · Space to jump · Shift to run');setTimeout(()=>hint('kit','In your pockets: F the Interpreter, V the scope, Q the test handset, L the helmet lamp. Tab opens the log.'),9000);}}
- updateDeath(dt); updateCascade(dt); updateInteract(dt); updateFloorSystems(dt);
+ updateDeath(dt); updateCascade(dt); updateInteract(dt); updateFloorSystems(dt); updateTravellers(dt); updateNest(dt); updateSand(dt); updateVision(dt); updateGathering(dt);
  if(GAME.subT>0){GAME.subT-=dt;if(GAME.subT<=0)subEl.style.opacity=0;}
  if(GAME.ctlCardT>0&&GAME.ctlCardT<1e8)GAME.ctlCardT-=dt; ctlCardEl.classList.toggle('hidden',!(P.inShip&&GAME.ctlCardT>0));
  fadeEl.style.opacity=GAME.fade;
+ if(GAME.ending&&!GAME.endFade)GAME.fade=0;
  for(const b of BODIES){if(b.star)continue;if(!GAME.arrivals[b.id]&&P.pos.distanceToSquared(b.pos)<(b.R*1.6)*(b.R*1.6)){GAME.arrivals[b.id]=GAME.time;K.visited[b.id]=true;const nd=BODY_NODE[b.id];if(nd)logSee(nd.id,nd.fact);}}
  if(!P.inShip&&!P.cabin&&!P.grounded&&!P.parent&&GAME.time>3)hint('jet','Hold Space to fire the jetpack · Shift boosts · X matches the ground\'s motion');
  if(pressed('log'))toggleLog(); logBadgeEl.classList.toggle('hidden',!GAME.logNew||GAME.logOpen);
  wristT+=dt; if(wristT>0.05){wristT=0;drawWrist();} dashT+=dt; if(P.inShip&&dashT>0.1){dashT=0;drawDash();}
  shipMsgEl.textContent=P.inShip?S.apMsg:''; 
  chooseScene();
+ if(AU.ok&&!MUS.jukebox&&!MUS.active&&!GAME.dead&&MUS.scene!=='silence'&&MUS.scene!=='nest'&&MUS.scene!=='none'){ GAME.musDead=(GAME.musDead||0)+dt; if(GAME.musDead>1.2){GAME.musDead=0;const sc=MUS.scene;MUS.scene='none';setScene(sc,{force:true,restart:true,song:MUS.song});} } else GAME.musDead=0;
  if(AU.ok){ const dFire=P.inShip?99:T[0].copy(P.pos).sub(FLOOR.toWorld(CAMP.fireLocal,T[1])).length(); AUD.fire=1/(1+Math.pow(dFire/9,2)); const dShip=(P.inShip||P.cabin)?0:P.pos.distanceTo(S.pos); AUD.thrust=S.thrustLevel*((P.inShip||P.cabin)?1:clamp(1-dShip/80,0,1)); AUD.hum=P.inShip||P.cabin; 
   const dom=P.inShip?GRAV.domS:GRAV.dom; let wind=0; if(dom&&dom.atmo){ let rel; if(P.inShip||P.cabin)rel=T[3].copy(S.vel).sub(dom.surfaceVel(S.pos,T[2])).length(); else if(P.grounded)rel=P.relVel.length(); else rel=T[3].copy(P.vel).sub(dom.surfaceVel(P.pos,T[2])).length();
    const near=T[4].copy(P.pos).sub(dom.pos).length()<dom.R*1.5; wind=near?clamp((rel-6)/45,0,1):0; } AUD.wind=wind;
   const lowO2=!P.inShip&&P.o2<0.25; AUD.heart=lowO2?1-P.o2/0.25:0; AUD.envLP=(P.inShip||P.cabin)?4500:(lowO2?1800:20000); AUD.envHP=lowO2?220:12; sfxUpdate(dt,AUD); setDuck(GAME.menuOpen); }
  if(DBG.open)refreshDebug(dt); if(DBG.perf)refreshPerf(dt); }
-function fixedUpdate(dt){ GAME.time+=dt; for(const b of BODIES)b.update(GAME.time); P.prev.copy(P.pos); S.prev.copy(S.pos); S.prevQ.copy(S.quat); if(!DBG.freecam&&!GAME.dead){stepShip(dt);stepPlayer(dt);} }
+function fixedUpdate(dt){ if(!GAME.ending)GAME.time+=dt; for(const b of BODIES)b.update(GAME.time); P.prev.copy(P.pos); S.prev.copy(S.pos); S.prevQ.copy(S.quat); if(!DBG.freecam&&!GAME.dead){stepShip(dt);stepPlayer(dt);} }
 let last=performance.now(),acc=0;
 function frame(now){ requestAnimationFrame(frame); let dt=Math.min(0.1,(now-last)/1000); last=now; perfT+=dt; frameCount++; fpsT+=dt; if(fpsT>=0.5){fps=frameCount/fpsT;frameCount=0;fpsT=0;} msAvg=lerp(msAvg,dt*1000,0.05);
  readInput(); if(pressed('pause')){ if(GAME.started){ if(GAME.menuOpen)closeMenus(); else openPause(); } } if(pressed('debug'))toggleDebug(); if(pressed('perf')){DBG.perf=!DBG.perf;$('perf').classList.toggle('hidden',!DBG.perf);}
@@ -1449,8 +1934,10 @@ function buildOptions(){ const o=$('optList'); o.innerHTML='';
  slider(o,'Mouse sensitivity',0.2,3,0.05,()=>OPT.sens,v=>OPT.sens=v,v=>v.toFixed(2)); toggle(o,'Invert Y',()=>OPT.invertY,v=>OPT.invertY=v); slider(o,'Field of view',60,110,1,()=>OPT.fov,v=>{OPT.fov=v;resize();},v=>v+'°'); slider(o,'Render scale',0.5,1,0.05,()=>OPT.scale,v=>{OPT.scale=v;resize();},v=>Math.round(v*100)+'%');
  toggle(o,'Landing assist (auto-level near the ground)',()=>OPT.landAssist,v=>OPT.landAssist=v); toggle(o,'Bloom',()=>OPT.bloom,v=>{OPT.bloom=v;bloomPass.enabled=v;}); toggle(o,'Camera shake',()=>OPT.shake,v=>OPT.shake=v); toggle(o,'Reduced motion (no shake, no grain, gentler flashes)',()=>OPT.reduced,v=>OPT.reduced=v); toggle(o,'Subtitles for speech',()=>OPT.subs,v=>OPT.subs=v); slider(o,'Subtitle size',0.8,1.6,0.1,()=>OPT.subSize,v=>{OPT.subSize=v;subEl.style.fontSize=(1.25*v)+'rem';},v=>v.toFixed(1)+'×'); }
 function buildControls(){ const c=$('ctlList'); c.innerHTML=''; for(const a in ACTION_LABEL){ const row=document.createElement('div'); row.className='row'; const sp=document.createElement('span'); sp.textContent=ACTION_LABEL[a]; const b=document.createElement('button'); b.className='key'; b.textContent=remapping===a?'press a key…':MAP[a].replace('Key','').replace('Digit','').replace('Left','').replace('Backquote','`'); b.onclick=()=>{remapping=a;buildControls();}; row.append(sp,b); c.append(row);} }
+bootStep(80,'wiring the panels');
+await yieldFrame();
 buildOptions(); buildControls();
-$('startBtn').onclick=()=>{ audioInit(); sfxInit(); if(GLYPHS.length){ drawHolo(GLYPHS[0],0); drawPhone(0,false); drawPhone(0,true); } if(AU.ctx.state==='suspended')AU.ctx.resume(); resize(); show('title',false); GAME.loop=0; resetLoop(); GAME.started=true; GAME.intro=1.8; GAME.situp=0; playMotif('startup'); canvas.requestPointerLock(); };
+$('startBtn').onclick=()=>{ audioInit(); sfxInit(); if(AU.ctx&&AU.ctx.state==='suspended')AU.ctx.resume(); if(GLYPHS.length){ drawHolo(GLYPHS[0],0); drawPhone(0,false); drawPhone(0,true); } if(AU.ctx.state==='suspended')AU.ctx.resume(); resize(); show('title',false); GAME.loop=0; resetLoop(); GAME.started=true; GAME.intro=1.8; GAME.situp=0; playMotif('startup'); canvas.requestPointerLock(); };
 window.addEventListener('keydown',e=>{ if(GAME.started&&!GAME.menuOpen&&GAME.time>=T_CASC)skipCascade(); });
 
 // ======================================================================
@@ -1464,7 +1951,10 @@ function buildDebug(){ const d=$('debug'); d.innerHTML='<h3>Dev panel <span clas
  const sec=(title)=>{const h=document.createElement('h4');h.textContent=title;d.append(h);const div=document.createElement('div');div.className='sec';d.append(div);return div;};
  const btn=(parent,label,fn)=>{const b=document.createElement('button');b.textContent=label;b.onclick=fn;parent.append(b);return b;};
  const tp=sec('Teleport'); for(const b of BODIES)if(!b.star)btn(tp,b.name,()=>teleportTo(b));
- const lp=sec('Loop'); const sc=document.createElement('input'); sc.type='range'; sc.min=0; sc.max=600; sc.step=1; sc.value=0; sc.style.width='100%'; sc.oninput=()=>{GAME.time=parseFloat(sc.value);GAME.endtimes=GAME.time>=T_END;GAME.cascade=GAME.time>=T_CASC;GAME.silence=GAME.time>=T_CASC+2;if(GAME.time<T_CASC){for(const b of BODIES){b.uConsume.value=0;b.consumed=false;}wave.visible=false;finalPass.uniforms.uWhite.value=0;GAME.whiteT=0;if(AU.ok)MUS.scene='none';}}; lp.append(sc); DBG.scrub=sc; const lbl=document.createElement('div'); lbl.className='small'; lp.append(lbl); DBG.loopLbl=lbl; btn(lp,'Skip to end-times (9:05)',()=>{sc.value=T_END;sc.oninput();}); btn(lp,'Skip to Cascade (9:50)',()=>{sc.value=T_CASC-3;sc.oninput();}); btn(lp,'Restart loop',()=>{die('debug');});
+ const tp2=sec('Teleport to a place'); const spots=[['Campfire',FLOOR,()=>CAMP.spawnLocal],['Store',FLOOR,()=>STORE.local],['Dome',FLOOR,()=>OBS.local],['Launch pad',FLOOR,()=>TOWER.padLocal],['Training pad',MOON,()=>COURSE.beaconLocal],['Nest pod',BY.nest,()=>POD.centre],['Deep vault',BY.deep,()=>_v[6].copy(DEEP_VAULT.position)],['Stack void',BY.stack,()=>_v[6].copy(STACK_VOID.position)]];
+ for(const [nm,b,fn] of spots)btn(tp2,nm,()=>{ P.inShip=false;P.cabin=false;P.parent=b;P.grounded=true;P.local.copy(fn()).multiplyScalar(1); const up=_v[5].copy(P.local).normalize(); P.local.addScaledVector(up,2.2); b.toWorld(P.local,P.pos); P.prev.copy(P.pos); P.vel.set(0,0,0); P.relVel.set(0,0,0); P.up.copy(up).applyQuaternion(b.quat); P.quat.setFromUnitVectors(YUP,P.up); uiTick(); });
+ for(const t of TRAVELLERS)btn(tp2,t.name,()=>{ P.inShip=false;P.cabin=false;P.parent=t.body;P.grounded=true;P.local.copy(t.local); const up=_v[5].copy(P.local).normalize(); P.local.addScaledVector(up,2.0).addScaledVector(_v[4].set(1,0,0).cross(up).normalize(),3); t.body.toWorld(P.local,P.pos); P.prev.copy(P.pos); P.vel.set(0,0,0); P.relVel.set(0,0,0); P.up.copy(up).applyQuaternion(t.body.quat); P.quat.setFromUnitVectors(YUP,P.up); uiTick(); });
+ const lp=sec('Loop'); const sc=document.createElement('input'); sc.type='range'; sc.min=0; sc.max=600; sc.step=1; sc.value=0; sc.style.width='100%'; sc.oninput=()=>{GAME.time=parseFloat(sc.value);GAME.endtimes=GAME.time>=T_END;GAME.cascade=GAME.time>=T_CASC;GAME.silence=GAME.time>=T_CASC+2;if(GAME.time<T_CASC){for(const b of BODIES){b.uConsume.value=0;b.consumed=false;}wave.visible=false;finalPass.uniforms.uWhite.value=0;GAME.whiteT=0;if(AU.ok)MUS.scene='none';}}; lp.append(sc); DBG.scrub=sc; const lbl=document.createElement('div'); lbl.className='small'; lp.append(lbl); DBG.loopLbl=lbl; btn(lp,'Backlog clears (2:50)',()=>{sc.value=175;sc.oninput();}); btn(lp,'Ledger buries (7:20)',()=>{sc.value=435;sc.oninput();}); btn(lp,'Skip to end-times (9:05)',()=>{sc.value=T_END;sc.oninput();}); btn(lp,'Skip to Cascade (9:50)',()=>{sc.value=T_CASC-3;sc.oninput();}); btn(lp,'Restart loop',()=>{die('debug');});
  const tg=sec('Toggles'); toggle(tg,'God mode',()=>DBG.god,v=>DBG.god=v); toggle(tg,'Infinite oxygen',()=>DBG.o2,v=>DBG.o2=v); toggle(tg,'Free camera (WASD/Space/Ctrl, Shift = fast)',()=>DBG.freecam,v=>{DBG.freecam=v;if(v){DBG.fcPos.copy(camera.position);DBG.fcQuat.copy(camera.quaternion);}}); toggle(tg,'Collider wireframes',()=>DBG.wire,setWire); toggle(tg,'Perf overlay (F3)',()=>DBG.perf,v=>{DBG.perf=v;show('perf',v);});
  const kf=sec('Knowledge flags'); for(const k of ['looped','launchedOnce','leftFloorGravity'])toggle(kf,k,()=>K[k],v=>K[k]=v); btn(kf,'Reveal whole Ship Log',()=>{for(const id in LOG_NODES)logSee(id,null);uiTick();}); btn(kf,'Reveal rumours only',()=>{for(const id in LOG_NODES)logUnlock(id);uiTick();}); btn(kf,'Read every plate + terminal',()=>{for(const g of GLYPHS)finishInterp(g);for(const t of TERMINALS){t.read=true;K.terminals[t.id]=t.title;if(t.unlock)for(const u of t.unlock)logUnlock(u);logUnlock(t.id);}uiTick();}); const sl=document.createElement('div'); sl.className='small'; kf.append(sl); DBG.seenLbl=sl;
  const cp=sec('Speedrun checkpoints (target → reached)'); const tbl=document.createElement('table'); cp.append(tbl); DBG.cpTable=tbl;
@@ -1481,7 +1971,43 @@ function refreshDebug(dt){ dbgT+=dt; if(dbgT<0.25)return; dbgT=0; DBG.scrub.valu
  const est=d=>d<385?2*Math.sqrt(d/26):7.7+(d-385)/100; const list=[FLOOR,BY.ledger,BY.stack,BY.deep,BY.nest]; let f='<tr><th></th>'+list.map(b=>'<th>'+b.name.replace('The ','')+'</th>').join('')+'</tr>'; for(const a of list){ f+='<tr><th>'+a.name.replace('The ','')+'</th>'; for(const b of list){ f+='<td>'+(a===b?'·':Math.round(est(a.pos.distanceTo(b.pos)))+'s')+'</td>'; } f+='</tr>'; } DBG.ftTable.innerHTML=f; }
 let perfAcc=0; function refreshPerf(dt){ perfAcc+=dt; if(perfAcc<0.25)return; perfAcc=0; const inf=renderer.info.render; let active=0; for(const b of BODIES)if(b.pos.distanceTo(camera.position)<3000)active++; $('perf').textContent='FPS '+fps.toFixed(0)+'  ·  '+msAvg.toFixed(1)+' ms  ·  draws '+inf.calls+'  ·  tris '+(inf.triangles/1000).toFixed(0)+'k  ·  bodies in range '+active+'  ·  voices '+(AU.ok?AU.voices.length:0)+'  ·  scale '+Math.round(OPT.scale*100)+'%'; }
 // ---- boot
-for(const b of BODIES)b.update(0); resetLoop(); GAME.loop=0; resize(); requestAnimationFrame(frame);
+bootStep(74,'growing terrain');
+await yieldFrame();
+for(const b of BODIES)if(!b.star)buildTerrain(b);   // every site exists by now, so the ground matches what we walk on
+await yieldFrame();
+for(const b of BODIES)b.update(0); resetLoop(); GAME.loop=0; resize();
+bootStep(88,'compiling shaders');
+await yieldFrame();
+// ---- warm every shader, texture and render target before the first real frame, so nothing compiles mid-play
+function warmUp(){
+ const savedScale=OPT.scale; OPT.scale=0.35; resize();
+ // make everything that is normally hidden visible for one pass, so its program compiles now
+ const hidden=[]; const show=(o,v)=>{ if(!o)return; hidden.push([o,o.visible]); o.visible=v; };
+ show(sky,true); show(HOLO.mesh,true); show(HOLO.glowMesh,true); show(HOLO.scanMesh,true); show(PHONE.group,true); show(SHIPM.landScreen,true); show(SHIPM.hatchLabel,true); show(wave,true);
+ for(const m of SHIPM.modules?Object.values(SHIPM.modules):[])show(m.pts,true);
+ for(const th of SHIPM.thrusters)for(const f of th.flames)show(f,true);
+ if(GLYPHS.length){ drawHolo(GLYPHS[0],0.5); drawPhone(0.5,true); }
+ drawWrist(); drawDash();
+ try{ renderer.compile(scene,camera); }catch(e){}
+ // one full pass through the composer compiles the post chain and the shadow programs
+ const camPos=camera.position.clone(), camQ=camera.quaternion.clone();
+ for(const b of BODIES){ camera.position.copy(b.pos).addScaledVector(_v[5].set(0,1,0),b.R*1.6); camera.lookAt(b.pos); camera.updateMatrixWorld(); try{ renderer.compile(scene,camera); }catch(e){} }
+ camera.position.copy(camPos); camera.quaternion.copy(camQ); camera.updateMatrixWorld();
+ try{ composer.render(); }catch(e){}
+ // the landing camera has its own render target
+ try{ renderer.setRenderTarget(SHIPM.landRT); renderer.render(scene,landCam); renderer.setRenderTarget(null); }catch(e){}
+ for(const [o,v] of hidden)o.visible=v;
+ OPT.scale=savedScale; resize();
+}
+warmUp();
+bootStep(96,'warming the audio engine');
+await yieldFrame();
+// build the Karplus-Strong tables now rather than on the first note
+try{ audioInit(); sfxInit(); for(let m=REG.bass.lo;m<=REG.banjo.hi;m++)ksBuffer(INST.banjo,m); for(let m=REG.bass.lo;m<=REG.guitar.hi;m++)ksBuffer(INST.guitar,m); }catch(e){}
+bootStep(100,'ready');
+await yieldFrame();
+if(BOOT.el){ BOOT.el.classList.add('gone'); setTimeout(()=>BOOT.el.remove(),700); }
+requestAnimationFrame(frame);
 </script>
 </body>
 </html>
