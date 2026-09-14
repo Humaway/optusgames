@@ -1,0 +1,62 @@
+# .github/workflows/update-manifest.yml
+#
+# Rebuilds updates.json every time anything is pushed, so the hub page can show
+# real "last updated" times with a single request instead of hammering the
+# GitHub API from every browser on the shop floor.
+
+name: Build updates.json
+
+on:
+  push:
+    branches: [main]          # change if your site branch is something else
+    paths-ignore:
+      - 'updates.json'        # don't re-trigger on our own commit
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # full history, otherwise git log has nothing to read
+
+      - name: Generate updates.json
+        run: |
+          node <<'EOF'
+          const { execSync } = require("node:child_process");
+          const fs = require("node:fs");
+
+          // Every file the hub can link to. Widen the regex if you add folders.
+          const tracked = execSync("git ls-files", { encoding: "utf8" })
+            .split("\n")
+            .filter(f => /^(.*\/)?games\/.+\.html$/i.test(f));
+
+          const files = {};
+          for (const f of tracked) {
+            const raw = execSync(
+              `git log -1 --format=%cI%x00%h%x00%s -- ${JSON.stringify(f)}`,
+              { encoding: "utf8" }
+            ).trim();
+            if (!raw) continue;
+            const [date, sha, message] = raw.split("\0");
+            files[f] = { date, sha, message };
+          }
+
+          fs.writeFileSync(
+            "updates.json",
+            JSON.stringify({ generated: new Date().toISOString(), files }, null, 2) + "\n"
+          );
+          console.log(`Wrote ${Object.keys(files).length} entries.`);
+          EOF
+
+      - name: Commit if anything changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add updates.json
+          git diff --staged --quiet || git commit -m "chore: refresh updates.json [skip ci]"
+          git push
