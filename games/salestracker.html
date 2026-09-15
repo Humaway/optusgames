@@ -676,6 +676,12 @@ code{font-family:var(--mono);font-size:.85em;background:rgba(0,0,0,.06);padding:
     <div id="admBackdate"></div>
   </div>
   <div class="panel">
+    <div class="panelhead"><h2>All sales</h2><span class="note" id="admSalesCount"></span></div>
+    <div id="admSalesFilters"></div>
+    <div id="admSalesBulk"></div>
+    <div id="admSalesList"></div>
+  </div>
+  <div class="panel">
     <h2>Store</h2>
     <div id="admStore"></div>
   </div>
@@ -1115,6 +1121,9 @@ const state = {
   queued:0,
   lastLeaders:{},       // award key -> winner string, for the change animation
   basket:[],
+  salesFilter:{ from:null, to:null, person:"", category:"", status:"live",
+                search:"", limit:50, sort:{ col:"date", dir:-1 } },
+  salesSelection:{},    // sale id -> true, for the manager's bulk actions
   entryDate:null,       // manager back-entry: which business date to log to
   entryPerson:null,     // manager back-entry: whose sale it is
   lastSubmit:null,
@@ -1408,7 +1417,7 @@ function subscribeEod(){
 /* One live listener per month. Equality filters only, so no composite index
    is needed — ordering happens client-side. */
 function ensureMonth(month){
-  if (!month || state.subs[month] || !isActive()) return;
+  if (!db || !month || state.subs[month] || !isActive()) return;
   const storeId = storeId_();
   state.subs[month] = db.collection("sales")
     .where("storeId", "==", storeId)
@@ -1447,19 +1456,26 @@ function salesFor(month){
 function salesForDay(bd){
   return salesFor(monthOf(bd)).filter(s => s.businessDate === bd);
 }
-function salesForRange(from, to){
+/* Every sale in a date range, voided rows included. The manager's review
+   list needs to see them; every rollup uses salesForRange instead. */
+function rawSalesForRange(from, to){
   const out = [];
   let m = monthOf(from);
   const endM = monthOf(to);
   for (let guard = 0; guard < 36; guard++) {
     ensureMonth(m);
-    salesFor(m).forEach(s => { if (s.businessDate >= from && s.businessDate <= to) out.push(s); });
+    (state.sales[m] || []).forEach(s => {
+      if (s.businessDate >= from && s.businessDate <= to) out.push(s);
+    });
     if (m === endM) break;
     const [y, mo] = m.split("-").map(Number);
     const nxt = new Date(Date.UTC(y, mo, 1));
     m = ymd(nxt.getUTCFullYear(), nxt.getUTCMonth() + 1, 1).slice(0, 7);
   }
   return out;
+}
+function salesForRange(from, to){
+  return rawSalesForRange(from, to).filter(s => !s.voided);
 }
 
 /* ---- writes ---- */
@@ -1559,6 +1575,60 @@ async function voidSale(sale){
     voidedAt:firebase.firestore.FieldValue.serverTimestamp()
   });
   await flagIfPosted(sale.businessDate, "voided", sale);
+}
+
+/* Put a voided sale back into the totals. */
+async function unvoidSale(sale){
+  await db.collection("sales").doc(sale.id).update({
+    voided:false,
+    voidedBy:null,
+    voidedAt:null,
+    editedAt:firebase.firestore.FieldValue.serverTimestamp(),
+    editedBy:state.profile.displayName
+  });
+  await flagIfPosted(sale.businessDate, "restored", sale);
+}
+
+/* A real delete. Voiding is the normal path because it keeps the row for
+   audit; this exists for genuine rubbish — test entries, duplicates from a
+   double tap — that nobody wants in the record at all. Managers only, and
+   the Firestore rules enforce that as well as this code. */
+async function deleteSale(sale){
+  await db.collection("sales").doc(sale.id).delete();
+  await flagIfPosted(sale.businessDate, "deleted", sale);
+}
+
+/* Bulk versions, chunked to stay inside Firestore's batch limit. */
+async function bulkSales(sales, action){
+  let done = 0;
+  for (let i = 0; i < sales.length; i += 400) {
+    const batch = db.batch();
+    sales.slice(i, i + 400).forEach(s => {
+      const ref = db.collection("sales").doc(s.id);
+      if (action === "delete") batch.delete(ref);
+      else if (action === "void") batch.update(ref, {
+        voided:true,
+        voidedBy:state.profile.displayName,
+        voidedAt:firebase.firestore.FieldValue.serverTimestamp()
+      });
+      else if (action === "restore") batch.update(ref, {
+        voided:false, voidedBy:null, voidedAt:null,
+        editedAt:firebase.firestore.FieldValue.serverTimestamp(),
+        editedBy:state.profile.displayName
+      });
+      done++;
+    });
+    await batch.commit();
+  }
+  // One discrepancy note per affected day that was already posted.
+  const days = {};
+  sales.forEach(s => { days[s.businessDate] = num(days[s.businessDate]) + num(s.points); });
+  for (const bd of Object.keys(days)) {
+    if (state.eodPosts[bd]) {
+      await flagIfPosted(bd, action + "d in bulk", { id:"(bulk)", points:days[bd] });
+    }
+  }
+  return done;
 }
 
 /* Voiding or editing a sale that's already inside a posted EOD doesn't rewrite
@@ -3297,6 +3367,7 @@ function renderAdmin(){
   renderAdminPending();
   renderAdminUsers();
   renderAdminBackdate();
+  renderAdminSales();
   renderAdminStore();
   renderAdminPoints();
   renderAdminMetrics();
@@ -3458,6 +3529,297 @@ function renderAdminBackdate(){
     if (state.entryDate) ensureMonth(monthOf(state.entryDate));
     location.hash = "#/enter";
   };
+}
+
+/* ---------------------------------------------------------------------------
+   All sales — the manager's review list. Every submitted sale in a date
+   range, filterable, with edit / void / restore / delete per row and in bulk.
+   --------------------------------------------------------------------------- */
+
+const SALE_SORTS = {
+  date:   s => String(s.businessDate) + " " + String(s.createdAt && s.createdAt.toMillis ? s.createdAt.toMillis() : 0),
+  person: s => String(s.displayName || "").toLowerCase(),
+  points: s => num(s.points),
+  value:  s => rollup([Object.assign({}, s, { voided:false })]).totalValue
+};
+
+function salesFilterDefaults(){
+  const f = state.salesFilter;
+  const m = state.monthSel || thisMonth();
+  if (!f.from) f.from = m + "-01";
+  if (!f.to) f.to = (m === thisMonth()) ? todayBD() : m + "-" + pad2(daysInMonth(m));
+  return f;
+}
+
+function filteredSales(){
+  const f = salesFilterDefaults();
+  const lo = f.from <= f.to ? f.from : f.to;
+  const hi = f.from <= f.to ? f.to : f.from;
+  const q = String(f.search || "").trim().toLowerCase();
+
+  let list = rawSalesForRange(lo, hi).filter(s => {
+    if (f.status === "live" && s.voided) return false;
+    if (f.status === "voided" && !s.voided) return false;
+    if (f.person && s.uid !== f.person) return false;
+    if (f.category && s.category !== f.category) return false;
+    if (q) {
+      const hay = [s.displayName, s.notes, s.device && s.device.model,
+                   s.outright && s.outright.description, s.enteredBy,
+                   saleSummary(s), s.businessDate].join(" ").toLowerCase();
+      if (hay.indexOf(q) === -1) return false;
+    }
+    return true;
+  });
+
+  const get = SALE_SORTS[f.sort.col] || SALE_SORTS.date;
+  list.sort((a, b) => {
+    const av = get(a), bv = get(b);
+    if (typeof av === "string") return av.localeCompare(bv) * f.sort.dir;
+    return (av - bv) * f.sort.dir;
+  });
+  return list;
+}
+
+function renderAdminSales(){
+  const f = salesFilterDefaults();
+  const people = state.users.slice().sort((a, b) => String(a.displayName).localeCompare(String(b.displayName)));
+
+  $("#admSalesFilters").innerHTML =
+    '<div class="row" style="align-items:flex-end">' +
+      '<div><label for="fsFrom">From</label><input id="fsFrom" type="date" value="' + esc(f.from) + '"></div>' +
+      '<div><label for="fsTo">To</label><input id="fsTo" type="date" value="' + esc(f.to) + '"></div>' +
+      '<div><label for="fsPerson">Person</label><select id="fsPerson"><option value="">Everyone</option>' +
+        people.map(u => {
+          const uid = u.uid || u.id;
+          return '<option value="' + esc(uid) + '"' + (f.person === uid ? " selected" : "") + ">" + esc(u.displayName) + "</option>";
+        }).join("") + "</select></div>" +
+      '<div><label for="fsCat">Service</label><select id="fsCat"><option value="">All</option>' +
+        SALE_CATEGORIES.map(c => '<option value="' + c.key + '"' + (f.category === c.key ? " selected" : "") +
+          ">" + esc(c.label) + "</option>").join("") + "</select></div>" +
+      '<div><label for="fsStatus">Status</label><select id="fsStatus">' +
+        [["live", "Live only"], ["voided", "Voided only"], ["all", "Live and voided"]].map(o =>
+          '<option value="' + o[0] + '"' + (f.status === o[0] ? " selected" : "") + ">" + o[1] + "</option>").join("") +
+        "</select></div>" +
+      '<div class="grow" style="min-width:160px"><label for="fsSearch">Search</label>' +
+        '<input id="fsSearch" value="' + esc(f.search) + '" placeholder="name, model, note"></div>' +
+    "</div>" +
+    '<div class="row" style="margin-top:8px">' +
+      '<button id="fsToday" class="btn-sm">Today</button>' +
+      '<button id="fsWeek" class="btn-sm">Last 7 days</button>' +
+      '<button id="fsMonth" class="btn-sm">This month</button>' +
+      '<button id="fsReset" class="btn-sm">Clear filters</button>' +
+    "</div>";
+
+  const list = filteredSales();
+
+  // forget selections for rows that are no longer on screen
+  const visible = {};
+  list.forEach(s => { visible[s.id] = true; });
+  Object.keys(state.salesSelection).forEach(id => { if (!visible[id]) delete state.salesSelection[id]; });
+
+  const shown = list.slice(0, f.limit);
+  const totals = rollup(list.filter(s => !s.voided));
+  $("#admSalesCount").textContent =
+    list.length + " sale" + (list.length === 1 ? "" : "s") + " · " +
+    int(totals.points) + " points · " + money(totals.totalValue) +
+    (list.length > shown.length ? " (showing " + shown.length + ")" : "");
+
+  renderSalesBulkBar();
+
+  if (!list.length) {
+    $("#admSalesList").innerHTML = '<div class="emptystate">No sales match those filters.</div>';
+    return;
+  }
+
+  const th = (key, label, cls) =>
+    '<th data-ssort="' + key + '"' + (cls ? ' class="' + cls + '"' : "") +
+    (f.sort.col === key ? ' aria-sort="' + (f.sort.dir === 1 ? "ascending" : "descending") + '"' : "") +
+    ">" + esc(label) + "</th>";
+
+  let h = '<div class="tablescroll" style="overflow-x:auto"><table class="data"><thead><tr>' +
+    '<th style="width:34px"><input type="checkbox" id="fsAll" aria-label="Select all shown"></th>' +
+    th("date", "Date") + th("person", "Person") + "<th>Sale</th>" +
+    th("value", "Value", "num") + th("points", "Points", "num") +
+    "<th>Status</th><th></th></tr></thead><tbody>";
+
+  shown.forEach(s => {
+    const val = rollup([Object.assign({}, s, { voided:false })]).totalValue;
+    const locked = monthLocked(s.month);
+    h += '<tr class="' + (s.voided ? "voidrow" : "") + '">' +
+      '<td data-label=""><input type="checkbox" data-pick="' + esc(s.id) + '"' +
+        (state.salesSelection[s.id] ? " checked" : "") + (locked ? " disabled" : "") +
+        ' aria-label="Select this sale"></td>' +
+      '<td data-label="Date">' + esc(dmy(s.businessDate)) +
+        '<br><span class="small muted">' + esc(tsToLocal(s.createdAt)) + "</span></td>" +
+      '<td data-label="Person">' + esc(s.displayName || "?") +
+        (s.enteredBy ? '<br><span class="small muted">added by ' + esc(s.enteredBy) + "</span>" : "") + "</td>" +
+      '<td data-label="Sale">' + esc(saleSummary(s)) +
+        (s.notes ? '<br><span class="small muted">' + esc(s.notes) + "</span>" : "") + "</td>" +
+      '<td data-label="Value" class="num">' + money(val) + "</td>" +
+      '<td data-label="Points" class="num">' + int(s.points) + "</td>" +
+      '<td data-label="Status">' +
+        (s.voided ? '<span class="pill susp">Void</span>' : '<span class="pill user">Live</span>') +
+        (s.editedAt ? ' <span class="pill">edited</span>' : "") +
+        (locked ? ' <span class="pill">locked</span>' : "") +
+        (state.eodPosts[s.businessDate] ? ' <span class="pill">posted</span>' : "") + "</td>" +
+      '<td data-label="" class="num nowrap">' + (locked
+        ? '<span class="small muted">month locked</span>'
+        : '<button class="btn-sm" data-sedit="' + esc(s.id) + '">Edit</button> ' +
+          (s.voided
+            ? '<button class="btn-sm" data-srestore="' + esc(s.id) + '">Restore</button> '
+            : '<button class="btn-sm" data-svoid="' + esc(s.id) + '">Void</button> ') +
+          '<button class="btn-sm btn-danger" data-sdel="' + esc(s.id) + '">Delete</button>') +
+      "</td></tr>";
+  });
+  h += "</tbody></table></div>";
+  if (list.length > shown.length) {
+    h += '<button id="fsMore" class="btn-sm btn-block" style="margin-top:10px">Show ' +
+         Math.min(50, list.length - shown.length) + " more of " + list.length + "</button>";
+  }
+  $("#admSalesList").innerHTML = h;
+  wireAdminSales(shown);
+}
+
+function renderSalesBulkBar(){
+  const n = Object.keys(state.salesSelection).length;
+  $("#admSalesBulk").innerHTML = n
+    ? '<div class="row" style="margin:10px 0;padding:10px;border:1px solid var(--line-strong);border-radius:var(--r)">' +
+        "<strong>" + n + " selected</strong>" +
+        '<button id="bulkVoid" class="btn-sm">Void selected</button>' +
+        '<button id="bulkRestore" class="btn-sm">Restore selected</button>' +
+        '<button id="bulkDel" class="btn-sm btn-danger">Delete selected</button>' +
+        '<button id="bulkClear" class="btn-sm">Clear</button>' +
+      "</div>"
+    : "";
+  if (!n) return;
+  const picked = () => Object.keys(state.salesSelection).map(findSale).filter(Boolean);
+  $("#bulkClear").onclick = () => { state.salesSelection = {}; renderAdminSales(); };
+  $("#bulkVoid").onclick = () => runBulk(picked(), "void");
+  $("#bulkRestore").onclick = () => runBulk(picked(), "restore");
+  $("#bulkDel").onclick = () => runBulk(picked(), "delete");
+}
+
+async function runBulk(sales, action){
+  if (!sales.length) return;
+  const locked = sales.filter(s => monthLocked(s.month));
+  if (locked.length) return toast(locked.length + " of those are in a locked month.", "bad");
+  const pts = sales.reduce((a, s) => a + num(s.points), 0);
+  const verb = action === "delete" ? "Delete" : action === "void" ? "Void" : "Restore";
+
+  const ok = await askConfirm(verb + " " + sales.length + " sale" + (sales.length === 1 ? "" : "s") + "?",
+    "<p>" + int(pts) + " points across " + Object.keys(sales.reduce((a, s) => (a[s.businessDate] = 1, a), {})).length +
+    " day(s).</p>" +
+    (action === "delete"
+      ? '<p class="small" style="color:var(--bad);font-weight:700">Deleting removes the rows from the database for good. ' +
+        "Voiding takes them out of every total but keeps them for audit — that's usually what you want.</p>"
+      : ""),
+    verb + " them", action === "delete");
+  if (!ok) return;
+
+  try {
+    const n = await bulkSales(sales, action);
+    state.salesSelection = {};
+    toast(verb + "d " + n + " sale" + (n === 1 ? "" : "s"));
+    renderAdminSales();
+  } catch (e) { toast(friendlyAuthError(e), "bad"); }
+}
+
+function wireAdminSales(shown){
+  const f = state.salesFilter;
+  const redraw = () => renderAdminSales();
+
+  const setDates = (from, to) => { f.from = from; f.to = to; f.limit = 50; redraw(); };
+  $("#fsFrom").onchange = () => setDates($("#fsFrom").value, f.to);
+  $("#fsTo").onchange = () => setDates(f.from, $("#fsTo").value);
+  $("#fsPerson").onchange = () => { f.person = $("#fsPerson").value; redraw(); };
+  $("#fsCat").onchange = () => { f.category = $("#fsCat").value; redraw(); };
+  $("#fsStatus").onchange = () => { f.status = $("#fsStatus").value; redraw(); };
+  $("#fsSearch").oninput = () => {
+    f.search = $("#fsSearch").value;
+    clearTimeout(state._searchTimer);
+    state._searchTimer = setTimeout(() => {
+      redraw();
+      const box = $("#fsSearch");
+      if (box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+    }, 250);
+  };
+  $("#fsToday").onclick = () => setDates(todayBD(), todayBD());
+  $("#fsWeek").onclick = () => setDates(addDays(todayBD(), -6), todayBD());
+  $("#fsMonth").onclick = () => setDates(thisMonth() + "-01", todayBD());
+  $("#fsReset").onclick = () => {
+    state.salesFilter = { from:null, to:null, person:"", category:"", status:"live",
+                          search:"", limit:50, sort:{ col:"date", dir:-1 } };
+    state.salesSelection = {};
+    redraw();
+  };
+  if ($("#fsMore")) $("#fsMore").onclick = () => { f.limit += 50; redraw(); };
+
+  $$("[data-ssort]", $("#admSalesList")).forEach(th => th.onclick = () => {
+    const k = th.getAttribute("data-ssort");
+    if (f.sort.col === k) f.sort.dir *= -1;
+    else f.sort = { col:k, dir:k === "person" ? 1 : -1 };
+    redraw();
+  });
+
+  // selection doesn't redraw the table — that would lose your scroll position
+  $$("[data-pick]", $("#admSalesList")).forEach(cb => cb.onchange = () => {
+    const id = cb.getAttribute("data-pick");
+    if (cb.checked) state.salesSelection[id] = true;
+    else delete state.salesSelection[id];
+    renderSalesBulkBar();
+  });
+  if ($("#fsAll")) $("#fsAll").onchange = () => {
+    const on = $("#fsAll").checked;
+    shown.forEach(s => {
+      if (monthLocked(s.month)) return;
+      if (on) state.salesSelection[s.id] = true;
+      else delete state.salesSelection[s.id];
+    });
+    $$("[data-pick]", $("#admSalesList")).forEach(cb => {
+      if (!cb.disabled) cb.checked = on;
+    });
+    renderSalesBulkBar();
+  };
+
+  $$("[data-sedit]", $("#admSalesList")).forEach(b =>
+    b.onclick = () => openEditSale(b.getAttribute("data-sedit")));
+
+  $$("[data-svoid]", $("#admSalesList")).forEach(b => b.onclick = async () => {
+    const s = findSale(b.getAttribute("data-svoid"));
+    if (!s) return;
+    const ok = await askConfirm("Void this sale?",
+      "<p>" + esc(s.displayName) + " — " + esc(saleSummary(s)) + ", " + int(s.points) + " points on " +
+      esc(dmy(s.businessDate)) + ".</p>" +
+      '<p class="small muted">It drops out of every total but stays in the database so the month still audits.</p>',
+      "Void it", true);
+    if (!ok) return;
+    try { await voidSale(s); toast("Sale voided"); } catch (e) { toast(friendlyAuthError(e), "bad"); }
+  });
+
+  $$("[data-srestore]", $("#admSalesList")).forEach(b => b.onclick = async () => {
+    const s = findSale(b.getAttribute("data-srestore"));
+    if (!s) return;
+    const ok = await askConfirm("Put this sale back?",
+      "<p>" + esc(saleSummary(s)) + " returns to the totals with " + int(s.points) + " points.</p>",
+      "Restore it");
+    if (!ok) return;
+    try { await unvoidSale(s); toast("Sale restored"); } catch (e) { toast(friendlyAuthError(e), "bad"); }
+  });
+
+  $$("[data-sdel]", $("#admSalesList")).forEach(b => b.onclick = async () => {
+    const s = findSale(b.getAttribute("data-sdel"));
+    if (!s) return;
+    const ok = await askConfirm("Delete this sale for good?",
+      "<p>" + esc(s.displayName) + " — " + esc(saleSummary(s)) + ", " + int(s.points) + " points on " +
+      esc(dmy(s.businessDate)) + ".</p>" +
+      '<p class="small" style="color:var(--bad);font-weight:700">This removes the row from the database permanently. ' +
+      "It can't be undone and it won't appear in any export or audit afterwards.</p>" +
+      '<p class="small muted">If you only want it out of the totals, void it instead.</p>',
+      "Delete permanently", true);
+    if (!ok) return;
+    try { await deleteSale(s); toast("Sale deleted"); renderAdminSales(); }
+    catch (e) { toast(friendlyAuthError(e), "bad"); }
+  });
 }
 
 function renderAdminStore(){
@@ -4162,7 +4524,8 @@ if (document.readyState !== "loading") boot();
          nothing else; the access-code hash is readable by nobody
        - a locked month (archives/{YYYY-MM}) is read-only for everyone
        - a posted EOD is immutable apart from appended discrepancy flags
-       - sales are never hard-deleted; voiding is an update
+       - staff never delete a sale; voiding is an update, and only a manager
+         can delete outright, only in an unlocked month
 
 rules_version = '2';
 service cloud.firestore {
@@ -4258,8 +4621,10 @@ service cloud.firestore {
                  && request.time < resource.data.createdAt + duration.value(24, 'h'))
            );
 
-      // Never hard-delete: voiding sets voided = true so the month still audits.
-      allow delete: if false;
+      // Voiding (an update setting voided = true) is the normal path and keeps
+      // the row for audit. A manager can still delete outright from
+      // Admin > All sales, but never in a locked month, and staff never can.
+      allow delete: if isMod() && monthOpen(resource.data.month);
     }
 
     // ------------------------------------------------------------------ eod
