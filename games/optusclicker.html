@@ -2,687 +2,1489 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Optus Data Clicker - The Rebalance Update</title>
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@900&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Optus Clicker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --optus-teal: #00a3a6;
-    --optus-teal-glow: rgba(0, 163, 166, 0.4);
-    --optus-yellow: #ffcc00;
-    --bg-color: #e6f7f8;
-    --text-dark: #333333;
-    --cost-red: #d9381e;
-    --rebirth-red: #d9381e;
-  }
+:root{
+  --teal:#00c8cd;
+  --teal-2:#19f0dc;
+  --teal-dim:rgba(0,200,205,.16);
+  --yellow:#ffd84d;
+  --violet:#a97bff;
+  --coral:#ff6b52;
+  --bg-0:#03121a;
+  --bg-1:#062330;
+  --ink:#e9fbfc;
+  --muted:#84aab4;
+  --line:rgba(0,200,205,.18);
+  --glass:linear-gradient(165deg,rgba(255,255,255,.07),rgba(255,255,255,.015));
+  --r-lg:20px; --r-md:14px; --r-sm:10px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:Inter,'Segoe UI',system-ui,sans-serif;
+  color:var(--ink);
+  background:var(--bg-0);
+  overflow-x:hidden;
+  -webkit-tap-highlight-color:transparent;
+}
+#bg{position:fixed;inset:0;z-index:0;display:block}
+#glow{
+  position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:
+    radial-gradient(900px 600px at 18% 12%,rgba(0,200,205,.18),transparent 60%),
+    radial-gradient(700px 500px at 85% 80%,rgba(169,123,255,.12),transparent 60%),
+    radial-gradient(1200px 800px at 50% 120%,rgba(255,216,77,.07),transparent 60%);
+}
+#scanlines{
+  position:fixed;inset:0;z-index:2;pointer-events:none;opacity:.35;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.03) 0 1px,transparent 1px 3px);
+  mix-blend-mode:overlay;
+}
+.wrap{position:relative;z-index:3;max-width:1220px;margin:0 auto;padding:18px 16px 110px}
 
-  body {
-    margin: 0;
-    padding: 0;
-    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    color: var(--text-dark);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-height: 100vh;
-    overflow-x: hidden;
-    
-    /* Cool Scrolling Background */
-    background: repeating-linear-gradient(
-      45deg,
-      #e6f7f8,
-      #e6f7f8 20px,
-      #d4f1f4 20px,
-      #d4f1f4 40px
-    );
-    background-size: 56px 56px;
-    animation: scrollBg 3s linear infinite;
-  }
+/* ---------- header ---------- */
+header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.mark{display:flex;align-items:baseline;gap:10px}
+.mark b{
+  font-family:Nunito,sans-serif;font-weight:900;font-size:clamp(26px,4.2vw,40px);
+  letter-spacing:-.035em;line-height:1;
+  background:linear-gradient(100deg,var(--teal-2),var(--teal) 45%,var(--yellow));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.mark span{font-size:12px;color:var(--muted);letter-spacing:.02em}
+.hdr-space{flex:1}
+.hdr-btns{display:flex;gap:8px;flex-wrap:wrap}
+.chip{
+  border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--ink);
+  border-radius:999px;padding:8px 14px;font:inherit;font-size:13px;font-weight:600;
+  cursor:pointer;transition:background .15s,border-color .15s,transform .1s;
+  display:inline-flex;align-items:center;gap:7px;
+}
+.chip:hover{background:rgba(0,200,205,.12);border-color:var(--teal)}
+.chip:active{transform:translateY(1px)}
+.chip.off{opacity:.45}
+.chip.danger:hover{background:rgba(255,107,82,.16);border-color:var(--coral)}
 
-  @keyframes scrollBg {
-    0% { background-position: 0 0; }
-    100% { background-position: -56px 56px; }
-  }
+/* ---------- layout ---------- */
+main{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:20px;align-items:start}
+@media(max-width:900px){main{grid-template-columns:1fr}}
 
-  /* Screen Shake Animation */
-  .shake {
-    animation: screenShake 0.5s cubic-bezier(.36,.07,.19,.97) both;
-  }
+.card{
+  background:var(--glass);border:1px solid var(--line);border-radius:var(--r-lg);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  box-shadow:0 20px 50px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.06);
+}
 
-  @keyframes screenShake {
-    10%, 90% { transform: translate3d(-4px, 0, 0); }
-    20%, 80% { transform: translate3d(6px, 0, 0); }
-    30%, 50%, 70% { transform: translate3d(-10px, 0, 0); }
-    40%, 60% { transform: translate3d(10px, 0, 0); }
-  }
+/* ---------- console (left) ---------- */
+.console{padding:22px 20px 24px;text-align:center;position:sticky;top:18px}
+@media(max-width:900px){.console{position:static}}
+.readout-label{font-size:12px;color:var(--muted);letter-spacing:.04em}
+.score{
+  font-family:Nunito,sans-serif;font-weight:900;letter-spacing:-.04em;
+  font-size:clamp(38px,7vw,56px);line-height:1.05;margin:2px 0 0;
+  font-variant-numeric:tabular-nums;
+  text-shadow:0 0 34px rgba(0,200,205,.45);
+}
+.score .u{font-size:.42em;color:var(--teal);margin-left:6px;letter-spacing:0}
+.rate{font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:4px;transition:color .2s}
+.rate b{color:var(--ink);font-weight:700}
+.rate.hot b,.rate.hot{color:var(--teal-2)}
 
-  /* Redundancy Dramatic Overlay */
-  #redundancy-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(217, 56, 30, 0.95);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Nunito', sans-serif;
-    font-size: 4em;
-    font-weight: 900;
-    text-align: center;
-    z-index: 9999;
-    opacity: 0;
-    pointer-events: none;
-    text-shadow: 0 5px 15px rgba(0,0,0,0.5);
-  }
+.mults{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:12px;min-height:26px}
+.mult{
+  font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:999px;
+  border:1px solid var(--line);background:rgba(0,200,205,.09);color:var(--teal-2);
+  font-variant-numeric:tabular-nums;
+}
+.mult.v{border-color:rgba(169,123,255,.4);background:rgba(169,123,255,.12);color:#cbb0ff}
+.mult.y{border-color:rgba(255,216,77,.4);background:rgba(255,216,77,.12);color:var(--yellow)}
+.mult.buff{animation:buffPulse 1.1s ease-in-out infinite}
+@keyframes buffPulse{50%{box-shadow:0 0 0 5px rgba(255,216,77,0)}0%,100%{box-shadow:0 0 0 0 rgba(255,216,77,.35)}}
 
-  .animate-redundancy {
-    animation: dramaticFade 3s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-  }
+.orb-wrap{position:relative;width:min(280px,72vw);height:min(280px,72vw);margin:18px auto 6px;cursor:pointer;touch-action:manipulation}
+.orb-wrap:focus-visible{outline:3px solid var(--yellow);outline-offset:8px;border-radius:50%}
+.orb{width:100%;height:100%;display:block;transition:transform .09s cubic-bezier(.2,.9,.3,1.4);will-change:transform}
+.orb-wrap.press .orb{transform:scale(.9)}
+.orb-img{width:100%;height:100%;object-fit:contain;display:none;user-select:none;-webkit-user-drag:none}
+.ring{position:absolute;inset:0;border-radius:50%;border:2px solid var(--teal);opacity:0;pointer-events:none}
+.ring.go{animation:ringOut .7s ease-out forwards}
+@keyframes ringOut{0%{opacity:.8;transform:scale(.72)}100%{opacity:0;transform:scale(1.5)}}
 
-  @keyframes dramaticFade {
-    0% { opacity: 0; transform: scale(0.5); }
-    15% { opacity: 1; transform: scale(1.1); }
-    85% { opacity: 1; transform: scale(1); }
-    100% { opacity: 0; transform: scale(1.5); }
-  }
+.heat{margin:14px auto 0;max-width:290px}
+.heat-bar{height:9px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden;border:1px solid var(--line)}
+.heat-fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,var(--teal),var(--teal-2) 55%,var(--yellow));transition:width .12s linear;box-shadow:0 0 14px rgba(0,200,205,.6)}
+.heat-cap{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:6px;font-variant-numeric:tabular-nums}
+.per-click{margin-top:14px;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.per-click b{color:var(--yellow);font-weight:800}
 
-  header {
-    width: 100%;
-    background-color: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(5px);
-    padding: 20px 0;
-    box-shadow: 0 4px 15px rgba(0, 163, 166, 0.2);
-    text-align: center;
-    margin-bottom: 30px;
-    position: relative;
-    z-index: 10;
-  }
+/* ---------- panel (right) ---------- */
+.tabs{display:flex;gap:6px;padding:10px 10px 0;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  flex:0 0 auto;border:1px solid transparent;background:transparent;color:var(--muted);
+  font:inherit;font-size:13.5px;font-weight:600;padding:10px 14px;border-radius:var(--r-sm) var(--r-sm) 0 0;
+  cursor:pointer;position:relative;white-space:nowrap;display:flex;align-items:center;gap:7px;
+}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink);background:rgba(0,200,205,.1);border-color:var(--line);border-bottom-color:transparent}
+.tab .dot{width:7px;height:7px;border-radius:50%;background:var(--yellow);box-shadow:0 0 8px var(--yellow);display:none}
+.tab.alert .dot{display:block;animation:buffPulse 1.4s infinite}
+.panel-body{padding:14px;border-top:1px solid var(--line);max-height:min(72vh,860px);overflow-y:auto;scrollbar-width:thin}
+.panel-body::-webkit-scrollbar{width:8px}
+.panel-body::-webkit-scrollbar-thumb{background:rgba(0,200,205,.3);border-radius:8px}
+.view{display:none}
+.view.on{display:block}
+.hint{font-size:13px;color:var(--muted);line-height:1.55;margin:0 0 12px}
 
-  .text-logo {
-    font-family: 'Nunito', sans-serif;
-    font-weight: 900;
-    color: var(--optus-teal);
-    font-size: 3.5em;
-    letter-spacing: -2px;
-    margin: 0;
-    text-transform: uppercase;
-    text-shadow: 2px 2px 0px rgba(0,0,0,0.1);
-    animation: floatLogo 4s ease-in-out infinite;
-  }
+.buyrow{display:flex;gap:6px;align-items:center;margin-bottom:12px}
+.buyrow span{font-size:12px;color:var(--muted);margin-right:2px}
+.buy-opt{
+  border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--muted);
+  border-radius:var(--r-sm);padding:6px 12px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;
+}
+.buy-opt.on{background:rgba(0,200,205,.16);border-color:var(--teal);color:var(--ink)}
 
-  @keyframes floatLogo {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
-  }
+/* rows */
+.row{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025);
+  border-radius:var(--r-md);padding:12px 14px;margin-bottom:9px;color:var(--ink);
+  font:inherit;cursor:pointer;position:relative;overflow:hidden;
+  transition:border-color .16s,background .16s,transform .09s,box-shadow .16s;
+}
+.row:disabled{cursor:default}
+.row .ic{font-size:26px;width:42px;text-align:center;flex:0 0 42px;filter:grayscale(1) opacity(.45);transition:filter .2s,transform .2s}
+.row .meta{flex:1;min-width:0}
+.row .nm{font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:8px}
+.row .sub{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4}
+.row .rt{text-align:right;flex:0 0 auto;min-width:92px}
+.row .price{font-weight:800;font-size:13.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.row .own{font-size:11.5px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums}
+.row .own b{color:var(--ink);font-size:15px;font-weight:800}
+.row.can{background:rgba(0,200,205,.07);border-color:rgba(0,200,205,.42)}
+.row.can .ic{filter:none;transform:scale(1.06)}
+.row.can .price{color:var(--yellow)}
+.row.can:hover{background:rgba(0,200,205,.13);box-shadow:0 8px 24px rgba(0,200,205,.16)}
+.row.can:active{transform:scale(.99)}
+.row.owned{border-color:rgba(255,255,255,.05);opacity:.55}
+.row .bar{position:absolute;left:0;bottom:0;height:2px;background:linear-gradient(90deg,var(--teal),var(--yellow));width:0;opacity:.7}
+.row.nope{animation:nope .3s}
+@keyframes nope{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.tag{font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;background:rgba(255,216,77,.16);color:var(--yellow);letter-spacing:.02em}
+.tag.t{background:var(--teal-dim);color:var(--teal-2)}
+.tag.v{background:rgba(169,123,255,.18);color:#cbb0ff}
+.mini{font-size:11.5px;color:var(--teal-2);font-weight:700;margin-top:3px}
 
-  main {
-    display: flex;
-    gap: 40px;
-    max-width: 1000px;
-    width: 90%;
-    justify-content: center;
-    flex-wrap: wrap;
-    padding-bottom: 20px;
-    position: relative;
-    z-index: 5;
-  }
+.row.tech{border-color:rgba(255,216,77,.22)}
+.row.tech.can{background:rgba(255,216,77,.08);border-color:rgba(255,216,77,.5)}
+.row.tech.can:hover{background:rgba(255,216,77,.14);box-shadow:0 8px 24px rgba(255,216,77,.14)}
+.row.perk.can{background:rgba(169,123,255,.08);border-color:rgba(169,123,255,.5)}
+.row.perk.can:hover{background:rgba(169,123,255,.15)}
 
-  .click-section, .upgrade-section {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 20px;
-    padding: 30px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
-    flex: 1;
-    min-width: 340px;
-    text-align: center;
-    border-top: 6px solid var(--optus-teal);
-    backdrop-filter: blur(10px);
-  }
+.section-head{display:flex;align-items:baseline;gap:10px;margin:18px 0 10px}
+.section-head h3{font-family:Nunito,sans-serif;font-size:16px;margin:0;font-weight:800;letter-spacing:-.01em}
+.section-head p{margin:0;font-size:12px;color:var(--muted)}
+.section-head:first-child{margin-top:0}
 
-  h1, h2 { color: var(--optus-teal); }
-  h1 { font-size: 3.5em; margin: 10px 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.05); }
+/* restructure */
+.prestige-hero{
+  border-radius:var(--r-md);padding:18px;text-align:center;margin-bottom:14px;
+  background:linear-gradient(160deg,rgba(169,123,255,.18),rgba(255,107,82,.1));
+  border:1px solid rgba(169,123,255,.35);
+}
+.prestige-hero .big{font-family:Nunito,sans-serif;font-weight:900;font-size:40px;line-height:1;color:#cbb0ff;font-variant-numeric:tabular-nums;text-shadow:0 0 28px rgba(169,123,255,.5)}
+.prestige-hero p{margin:8px 0 0;font-size:13px;color:var(--muted);line-height:1.5}
+.btn-big{
+  margin-top:14px;width:100%;border:none;border-radius:var(--r-md);padding:14px;font:inherit;font-weight:800;font-size:15px;
+  background:rgba(255,255,255,.06);color:var(--muted);cursor:not-allowed;
+}
+.btn-big.ready{background:linear-gradient(100deg,var(--violet),var(--coral));color:#fff;cursor:pointer;box-shadow:0 10px 30px rgba(169,123,255,.35);animation:readyPulse 2.2s infinite}
+@keyframes readyPulse{0%,100%{box-shadow:0 10px 30px rgba(169,123,255,.3)}50%{box-shadow:0 10px 44px rgba(169,123,255,.6)}}
 
-  .bps-display {
-    color: #555;
-    font-size: 1.4em;
-    margin-bottom: 5px;
-    font-weight: 700;
-    transition: color 0.2s;
-  }
-  
-  .bps-live {
-    color: var(--optus-teal);
-  }
+/* achievements + stats */
+.ach-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:9px}
+.ach{
+  border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.02);border-radius:var(--r-sm);
+  padding:11px;font-size:12px;opacity:.5;
+}
+.ach .t{font-weight:700;font-size:12.5px;display:flex;gap:7px;align-items:center}
+.ach .d{color:var(--muted);margin-top:4px;line-height:1.4;font-size:11.5px}
+.ach.got{opacity:1;border-color:rgba(255,216,77,.42);background:rgba(255,216,77,.08)}
+.stat{display:flex;justify-content:space-between;gap:12px;padding:10px 2px;border-bottom:1px dashed rgba(255,255,255,.08);font-size:13.5px}
+.stat b{font-variant-numeric:tabular-nums;font-weight:700}
+.stat:last-child{border-bottom:none}
 
-  .multiplier-display {
-    color: var(--rebirth-red);
-    font-size: 1.1em;
-    margin-bottom: 25px;
-    font-weight: bold;
-    display: none;
-    background: rgba(217, 56, 30, 0.1);
-    padding: 5px 15px;
-    border-radius: 20px;
-    display: inline-block;
-  }
+/* floating stuff */
+.pop{
+  position:fixed;pointer-events:none;z-index:60;font-family:Nunito,sans-serif;font-weight:900;
+  font-size:22px;color:var(--teal-2);text-shadow:0 2px 12px rgba(0,0,0,.8);
+  animation:popUp .85s cubic-bezier(.2,.7,.3,1) forwards;font-variant-numeric:tabular-nums;
+}
+.pop.crit{color:var(--yellow);font-size:30px}
+@keyframes popUp{0%{opacity:1;transform:translate(-50%,0) scale(.7)}18%{transform:translate(-50%,-14px) scale(1.12)}100%{opacity:0;transform:translate(-50%,-92px) scale(1)}}
 
-  .clicker-container {
-    position: relative;
-    width: 240px;
-    height: 240px;
-    margin: 20px auto;
-    cursor: pointer;
-    animation: pulseIdle 3s infinite ease-in-out; 
-  }
+#golden{
+  position:fixed;z-index:70;width:84px;height:84px;display:none;cursor:pointer;
+  filter:drop-shadow(0 0 22px rgba(255,216,77,.85));animation:goldFloat 3s ease-in-out infinite;
+}
+@keyframes goldFloat{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-16px) rotate(6deg)}}
 
-  @keyframes pulseIdle {
-    0% { transform: scale(1); filter: drop-shadow(0 10px 15px rgba(0,163,166,0.2)); }
-    50% { transform: scale(1.04); filter: drop-shadow(0 15px 25px rgba(0,163,166,0.4)); }
-    100% { transform: scale(1); filter: drop-shadow(0 10px 15px rgba(0,163,166,0.2)); }
-  }
+#toasts{position:fixed;right:16px;top:16px;z-index:90;display:flex;flex-direction:column;gap:9px;max-width:330px;pointer-events:none}
+.toast{
+  background:rgba(6,35,48,.94);border:1px solid var(--line);border-left:3px solid var(--teal);
+  border-radius:var(--r-sm);padding:11px 14px;font-size:13px;line-height:1.45;
+  box-shadow:0 14px 34px rgba(0,0,0,.5);animation:toastIn .35s cubic-bezier(.2,.9,.3,1.2);
+}
+.toast b{display:block;font-size:13.5px;margin-bottom:2px}
+.toast.gold{border-left-color:var(--yellow)}
+.toast.gold b{color:var(--yellow)}
+.toast.violet{border-left-color:var(--violet)}
+.toast.violet b{color:#cbb0ff}
+.toast.bad{border-left-color:var(--coral)}
+.toast.bad b{color:var(--coral)}
+.toast.out{animation:toastOut .3s forwards}
+@keyframes toastIn{from{opacity:0;transform:translateX(40px)}}
+@keyframes toastOut{to{opacity:0;transform:translateX(40px)}}
 
-  .clicker-btn {
-    width: 100%;
-    height: 100%;
-    transition: transform 0.05s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.1s ease;
-    user-select: none;
-    -webkit-user-drag: none;
-  }
+#ticker{
+  position:fixed;left:0;right:0;bottom:0;z-index:50;height:38px;display:flex;align-items:center;
+  background:rgba(3,18,26,.92);border-top:1px solid var(--line);backdrop-filter:blur(10px);
+  font-size:13px;color:var(--muted);overflow:hidden;
+}
+#ticker .lbl{flex:0 0 auto;padding:0 14px;height:100%;display:flex;align-items:center;background:var(--teal-dim);color:var(--teal-2);font-weight:800;font-size:11.5px;border-right:1px solid var(--line)}
+#ticker .run{white-space:nowrap;padding-left:100%;animation:tick 34s linear infinite}
+@keyframes tick{to{transform:translateX(-100%)}}
 
-  .clicker-container:active .clicker-btn {
-    transform: scale(0.85);
-    filter: brightness(1.2);
-  }
+#outage{
+  position:fixed;left:50%;transform:translateX(-50%);top:16px;z-index:88;display:none;
+  background:rgba(40,8,4,.95);border:1px solid var(--coral);border-radius:var(--r-md);
+  padding:12px 16px;align-items:center;gap:14px;box-shadow:0 0 40px rgba(255,107,82,.4);
+}
+#outage.on{display:flex;animation:buffPulse 1s infinite}
+#outage .t{font-weight:800;font-size:14px;color:var(--coral)}
+#outage .s{font-size:12px;color:var(--muted)}
+#outage button{border:none;background:var(--coral);color:#fff;font:inherit;font-weight:800;padding:9px 16px;border-radius:var(--r-sm);cursor:pointer}
 
-  .particle {
-    position: absolute;
-    pointer-events: none;
-    color: var(--optus-teal);
-    font-weight: 900;
-    font-size: 2em;
-    text-shadow: 2px 2px 0px white, -1px -1px 0px white;
-    animation: floatUp 0.8s ease-out forwards;
-    z-index: 100;
-  }
+/* overlays */
+.modal{position:fixed;inset:0;z-index:120;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(2,10,14,.82);backdrop-filter:blur(6px)}
+.modal.on{display:flex}
+.modal .box{max-width:460px;width:100%;background:linear-gradient(165deg,#07242f,#041820);border:1px solid var(--line);border-radius:var(--r-lg);padding:26px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.modal h2{font-family:Nunito,sans-serif;margin:0 0 10px;font-size:24px;letter-spacing:-.02em}
+.modal p{font-size:14px;line-height:1.6;color:var(--muted);margin:0 0 10px}
+.modal .acts{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.modal .acts button{flex:1;min-width:120px;border:none;border-radius:var(--r-sm);padding:12px;font:inherit;font-weight:700;cursor:pointer}
+.modal .acts .go{background:linear-gradient(100deg,var(--teal),var(--teal-2));color:#04222a}
+.modal .acts .no{background:rgba(255,255,255,.06);color:var(--ink)}
+.modal textarea{width:100%;height:110px;background:rgba(0,0,0,.35);color:var(--ink);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px;font-family:ui-monospace,monospace;font-size:11px;resize:vertical}
 
-  @keyframes floatUp {
-    0% { opacity: 1; transform: translateY(0) scale(1) rotate((Math.random() - 0.5) * 20deg); }
-    100% { opacity: 0; transform: translateY(-100px) scale(1.5); }
-  }
+#cut{
+  position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
+  background:rgba(169,123,255,.93);opacity:0;pointer-events:none;text-align:center;padding:20px;
+}
+#cut div{font-family:Nunito,sans-serif;font-weight:900;font-size:clamp(30px,8vw,72px);line-height:1.05;color:#fff;text-shadow:0 8px 30px rgba(0,0,0,.4)}
+#cut small{display:block;font-size:.3em;font-weight:800;opacity:.85;margin-top:14px;letter-spacing:.02em}
+#cut.go{animation:cutIn 2.8s cubic-bezier(.2,.7,.3,1) forwards}
+@keyframes cutIn{0%{opacity:0;transform:scale(.6)}12%{opacity:1;transform:scale(1.06)}80%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.7)}}
 
-  .upgrade-emoji {
-    font-size: 2.5em;
-    margin-right: 15px;
-    width: 60px;
-    text-align: center;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
-  }
+.shake{animation:shk .5s cubic-bezier(.36,.07,.19,.97)}
+@keyframes shk{10%,90%{transform:translate3d(-4px,0,0)}20%,80%{transform:translate3d(6px,0,0)}30%,50%,70%{transform:translate3d(-9px,0,0)}40%,60%{transform:translate3d(9px,0,0)}}
 
-  .upgrade-btn {
-    background-color: #f8f9fa;
-    border: 2px solid #e9ecef;
-    border-radius: 12px;
-    padding: 12px 15px;
-    width: 100%;
-    margin-bottom: 15px;
-    cursor: pointer;
-    color: var(--text-dark);
-    transition: all 0.2s ease;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    text-align: left;
-    position: relative;
-    overflow: hidden;
-  }
+.confetti{position:fixed;width:9px;height:14px;z-index:95;pointer-events:none;border-radius:2px;animation:fall 2.2s linear forwards}
+@keyframes fall{to{transform:translateY(105vh) rotate(720deg);opacity:0}}
 
-  /* Animated glow for affordable buttons */
-  .upgrade-btn.affordable {
-    background-color: white;
-    border-color: var(--optus-yellow);
-    box-shadow: 0 4px 10px rgba(255, 204, 0, 0.2);
-  }
+.foot{text-align:center;font-size:11.5px;color:rgba(132,170,180,.6);margin-top:26px;line-height:1.6}
 
-  .upgrade-btn.affordable:hover {
-    background-color: #fff9e6;
-    transform: translateY(-3px);
-    box-shadow: 0 6px 15px rgba(255, 204, 0, 0.4);
-  }
-
-  .upgrade-btn:disabled {
-    background-color: #f1f3f5;
-    color: #adb5bd;
-    cursor: not-allowed;
-    border-color: #e9ecef;
-  }
-  
-  .upgrade-btn:disabled .upgrade-emoji {
-    opacity: 0.3;
-    filter: grayscale(100%);
-  }
-
-  .click-upgrade.affordable {
-    border-color: var(--optus-teal);
-    box-shadow: 0 4px 10px var(--optus-teal-glow);
-  }
-  .click-upgrade.affordable:hover {
-    background-color: #f0fbfc;
-    box-shadow: 0 6px 15px var(--optus-teal-glow);
-  }
-
-  .rebirth-btn {
-    background: #fff0f0;
-    border: 2px solid var(--rebirth-red);
-    margin-top: 30px;
-  }
-  
-  .rebirth-btn.affordable {
-    background: linear-gradient(135deg, #d9381e, #c0392b);
-    color: white;
-    box-shadow: 0 0 15px rgba(217, 56, 30, 0.5);
-    animation: pulseRed 2s infinite;
-  }
-
-  @keyframes pulseRed {
-    0% { box-shadow: 0 0 0 0 rgba(217, 56, 30, 0.7); }
-    70% { box-shadow: 0 0 0 15px rgba(217, 56, 30, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(217, 56, 30, 0); }
-  }
-
-  .rebirth-btn.affordable .upgrade-effect, 
-  .rebirth-btn.affordable .upgrade-title { color: white; }
-  .rebirth-btn.affordable .cost { color: #ffeb3b; }
-
-  .upgrade-info { flex-grow: 1; display: flex; flex-direction: column; z-index: 2; }
-  .upgrade-title { font-weight: 800; font-size: 1.1em; }
-  .upgrade-effect { font-size: 0.85em; color: #666; margin-top: 2px; }
-  .upgrade-stats { display: flex; flex-direction: column; text-align: right; font-size: 0.9em; min-width: 90px; z-index: 2; }
-  .cost { color: var(--cost-red); font-weight: 900; font-size: 1.1em; }
-  .count-badge { background: #eee; padding: 2px 8px; border-radius: 10px; font-size: 0.85em; margin-top: 4px; font-weight: bold; color: #555; }
-
-  .reset-btn {
-    background: white;
-    color: #999;
-    border: 2px solid #ccc;
-    border-radius: 8px;
-    padding: 10px 20px;
-    cursor: pointer;
-    margin: 20px 0 40px 0;
-    font-weight: bold;
-    transition: all 0.2s ease;
-    z-index: 5;
-  }
-  .reset-btn:hover { color: white; border-color: var(--cost-red); background: var(--cost-red); }
-
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
 </style>
 </head>
 <body>
+<canvas id="bg"></canvas>
+<div id="glow"></div>
+<div id="scanlines"></div>
 
-<!-- Dramatic Fullscreen Overlay -->
-<div id="redundancy-overlay">STAFF REDUCED BY 50%</div>
-
-<header>
-  <div class="text-logo">OPTUS CLICKER</div>
-</header>
-
-<main>
-  <!-- Left Side: The Clicker -->
-  <div class="click-section">
-    <h2>Total Data Mined</h2>
-    <h1 id="score-display">0 GB</h1>
-    <div class="bps-display" id="bps-wrapper"><span id="bps-display">0</span> GB / sec</div>
-    <div class="multiplier-display" id="multiplier-display">Efficiency Boost: 1x</div>
-    
-    <div class="clicker-container" id="main-clicker">
-      <img src="moa_icon_1.webp" class="clicker-btn" alt="Yes Button" draggable="false">
+<div class="wrap">
+  <header>
+    <div class="mark">
+      <b>Optus Clicker</b>
+      <span>Total Coverage edition</span>
     </div>
-  </div>
+    <div class="hdr-space"></div>
+    <div class="hdr-btns">
+      <button class="chip" id="sfxBtn" title="Sound effects">🔊 Sound</button>
+      <button class="chip off" id="musBtn" title="Ambient loop">🎧 Ambience</button>
+      <button class="chip danger" id="wipeBtn">Wipe save</button>
+    </div>
+  </header>
 
-  <!-- Right Side: Upgrades -->
-  <div class="upgrade-section">
-    <h2>Upgrades</h2>
+  <main>
+    <!-- LEFT: console -->
+    <section class="card console">
+      <div class="readout-label">Data mined</div>
+      <h1 class="score"><span id="score">0</span><span class="u" id="unit">GB</span></h1>
+      <div class="rate" id="rate"><b id="bps">0</b> GB/s</div>
+      <div class="mults" id="mults"></div>
 
-    <button class="upgrade-btn click-upgrade" id="btn-clickup" onclick="buyClickUpgrade()">
-      <div class="upgrade-emoji">🖱️</div>
-      <div class="upgrade-info">
-        <span class="upgrade-title">Click Optimization</span>
-        <span class="upgrade-effect">+1 GB per click</span>
+      <div class="orb-wrap" id="orb" role="button" tabindex="0" aria-label="Mine data">
+        <img class="orb-img" id="orbImg" src="moa_icon_1.webp" alt="" draggable="false">
+        <svg class="orb" id="orbSvg" viewBox="0 0 200 200" aria-hidden="true">
+          <defs>
+            <radialGradient id="gBody" cx="38%" cy="30%">
+              <stop offset="0%" stop-color="#4dfbe8"/>
+              <stop offset="55%" stop-color="#00c8cd"/>
+              <stop offset="100%" stop-color="#016a76"/>
+            </radialGradient>
+            <linearGradient id="gShine" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#ffffff" stop-opacity=".55"/>
+              <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+            </linearGradient>
+            <filter id="fGlow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          </defs>
+          <circle cx="100" cy="104" r="88" fill="none" stroke="rgba(0,200,205,.3)" stroke-width="1.5" stroke-dasharray="5 9">
+            <animateTransform attributeName="transform" type="rotate" from="0 100 104" to="360 100 104" dur="26s" repeatCount="indefinite"/>
+          </circle>
+          <circle cx="100" cy="104" r="78" fill="none" stroke="rgba(255,216,77,.28)" stroke-width="1" stroke-dasharray="2 12">
+            <animateTransform attributeName="transform" type="rotate" from="360 100 104" to="0 100 104" dur="17s" repeatCount="indefinite"/>
+          </circle>
+          <g filter="url(#fGlow)">
+            <circle cx="100" cy="106" r="62" fill="url(#gBody)"/>
+            <ellipse cx="100" cy="74" rx="46" ry="30" fill="url(#gShine)"/>
+            <g id="face">
+              <ellipse cx="82" cy="100" rx="9" ry="11" fill="#04222a"/>
+              <ellipse cx="118" cy="100" rx="9" ry="11" fill="#04222a"/>
+              <circle cx="85" cy="96" r="3.2" fill="#fff"/>
+              <circle cx="121" cy="96" r="3.2" fill="#fff"/>
+              <path d="M78 124 Q100 144 122 124" fill="none" stroke="#04222a" stroke-width="7" stroke-linecap="round"/>
+            </g>
+            <path d="M100 44 L100 24" stroke="#ffd84d" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="100" cy="20" r="7" fill="#ffd84d"/>
+            <path d="M118 22 Q130 34 130 50" fill="none" stroke="#ffd84d" stroke-width="3.5" stroke-linecap="round" opacity=".8">
+              <animate attributeName="opacity" values=".15;1;.15" dur="1.6s" repeatCount="indefinite"/>
+            </path>
+            <path d="M82 22 Q70 34 70 50" fill="none" stroke="#ffd84d" stroke-width="3.5" stroke-linecap="round" opacity=".8">
+              <animate attributeName="opacity" values="1;.15;1" dur="1.6s" repeatCount="indefinite"/>
+            </path>
+          </g>
+        </svg>
+        <div class="ring" id="ring1"></div>
+        <div class="ring" id="ring2" style="border-color:var(--yellow)"></div>
       </div>
-      <span class="upgrade-stats">
-        <span class="cost" id="clickup-cost">50 GB</span>
-        <span class="count-badge" id="clickup-count">Lvl 0</span>
-      </span>
-    </button>
-    
-    <button class="upgrade-btn" id="btn-sales" onclick="buyUpgrade('sales')">
-      <div class="upgrade-emoji">👨‍💼</div>
-      <div class="upgrade-info">
-        <span class="upgrade-title">Hire a Sales Rep</span>
-        <span class="upgrade-effect">+1 GB/s</span>
-      </div>
-      <span class="upgrade-stats">
-        <span class="cost" id="sales-cost">15 GB</span>
-        <span class="count-badge" id="sales-count">0</span>
-      </span>
-    </button>
 
-    <button class="upgrade-btn" id="btn-5g" onclick="buyUpgrade('fiveG')">
-      <div class="upgrade-emoji">⚡</div>
-      <div class="upgrade-info">
-        <span class="upgrade-title">Increase 5G Speeds</span>
-        <span class="upgrade-effect">+10 GB/s</span>
-      </div>
-      <span class="upgrade-stats">
-        <span class="cost" id="fiveG-cost">200 GB</span>
-        <span class="count-badge" id="fiveG-count">0</span>
-      </span>
-    </button>
-    
-    <button class="upgrade-btn" id="btn-satellite" onclick="buyUpgrade('satellite')">
-      <div class="upgrade-emoji">🛰️</div>
-      <div class="upgrade-info">
-        <span class="upgrade-title">Deploy Satellite</span>
-        <span class="upgrade-effect">+50 GB/s</span>
-      </div>
-      <span class="upgrade-stats">
-        <span class="cost" id="satellite-cost">1,200 GB</span>
-        <span class="count-badge" id="satellite-count">0</span>
-      </span>
-    </button>
+      <div class="per-click"><b id="cpc">1</b> GB per click</div>
 
-    <button class="upgrade-btn" id="btn-datacenter" onclick="buyUpgrade('datacenter')">
-      <div class="upgrade-emoji">🏢</div>
-      <div class="upgrade-info">
-        <span class="upgrade-title">Optus AI Data Centre</span>
-        <span class="upgrade-effect">+250 GB/s</span>
+      <div class="heat">
+        <div class="heat-bar"><div class="heat-fill" id="heatFill"></div></div>
+        <div class="heat-cap"><span>Signal heat</span><span id="heatTxt">×1.00</span></div>
       </div>
-      <span class="upgrade-stats">
-        <span class="cost" id="datacenter-cost">7,500 GB</span>
-        <span class="count-badge" id="datacenter-count">0</span>
-      </span>
-    </button>
+    </section>
 
-    <button class="upgrade-btn" id="btn-overlord" onclick="buyUpgrade('overlord')">
-      <div class="upgrade-emoji">🤖</div>
-      <div class="upgrade-info">
-        <span class="upgrade-title">AI Overlord Network</span>
-        <span class="upgrade-effect">+1,500 GB/s</span>
+    <!-- RIGHT: panel -->
+    <section class="card">
+      <div class="tabs">
+        <button class="tab on" data-view="staff">🏗️ Network <span class="dot"></span></button>
+        <button class="tab" data-view="tech">⚙️ Research <span class="dot"></span></button>
+        <button class="tab" data-view="restructure">✂️ Restructure <span class="dot"></span></button>
+        <button class="tab" data-view="ach">🏆 Awards <span class="dot"></span></button>
+        <button class="tab" data-view="stats">📊 Stats</button>
       </div>
-      <span class="upgrade-stats">
-        <span class="cost" id="overlord-cost">50,000 GB</span>
-        <span class="count-badge" id="overlord-count">0</span>
-      </span>
-    </button>
+      <div class="panel-body">
+        <div class="view on" id="v-staff">
+          <div class="buyrow"><span>Buy</span>
+            <button class="buy-opt on" data-buy="1">×1</button>
+            <button class="buy-opt" data-buy="10">×10</button>
+            <button class="buy-opt" data-buy="100">×100</button>
+            <button class="buy-opt" data-buy="max">Max</button>
+          </div>
+          <div id="clickList"></div>
+          <div class="section-head"><h3>Payroll</h3><p>Every 10, 25, 50, 100, 150 and 200 hires doubles that line's output.</p></div>
+          <div id="genList"></div>
+        </div>
 
-    <!-- Redundancy Button -->
-    <button class="upgrade-btn rebirth-btn" id="btn-rebirth" onclick="triggerRebirth()">
-      <div class="upgrade-emoji">✂️</div>
-      <div class="upgrade-info">
-        <span class="upgrade-title">Make Half your Staff Redundant</span>
-        <span class="upgrade-effect">Reset progress for +100% Global Boost</span>
+        <div class="view" id="v-tech">
+          <p class="hint">One-off purchases. They stay bought until you restructure.</p>
+          <div id="techList"></div>
+          <div id="techEmpty" class="hint" style="display:none">Nothing in the pipeline yet. Hire more staff and research unlocks itself.</div>
+          <div class="section-head"><h3>Signed off</h3><p id="techDoneCount"></p></div>
+          <div id="techDone"></div>
+        </div>
+
+        <div class="view" id="v-restructure">
+          <div class="prestige-hero">
+            <div class="readout-label">Restructure points waiting</div>
+            <div class="big" id="rpGain">0</div>
+            <p id="rpBlurb">Restructuring wipes your data, staff and research. You keep restructure points, the perks you buy with them, and every award.</p>
+            <button class="btn-big" id="doPrestige">Not enough scale yet</button>
+          </div>
+          <div class="section-head"><h3>Perks</h3><p id="rpBank">0 points banked</p></div>
+          <div id="perkList"></div>
+        </div>
+
+        <div class="view" id="v-ach">
+          <p class="hint" id="achHint"></p>
+          <div class="ach-grid" id="achList"></div>
+        </div>
+
+        <div class="view" id="v-stats">
+          <div id="statList"></div>
+          <div class="section-head"><h3>Save file</h3><p>Back it up or move it to another device.</p></div>
+          <div class="buyrow">
+            <button class="chip" id="expBtn">Export save</button>
+            <button class="chip" id="impBtn">Import save</button>
+          </div>
+        </div>
       </div>
-      <span class="upgrade-stats">
-        <span class="cost" id="rebirth-cost">100,000 GB</span>
-      </span>
-    </button>
-  </div>
-</main>
+    </section>
+  </main>
 
-<button class="reset-btn" onclick="resetSave()">Hard Reset (Wipe Save)</button>
+  <p class="foot">A fan-made parody. Not affiliated with, endorsed by, or connected to Optus or Singtel.<br>All trademarks belong to their owners.</p>
+</div>
+
+<img id="golden" alt="Golden Ollie" src="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'&gt;&lt;defs&gt;&lt;radialGradient id='g' cx='36%25' cy='30%25'&gt;&lt;stop offset='0%25' stop-color='%23fff6c9'/&gt;&lt;stop offset='55%25' stop-color='%23ffd84d'/&gt;&lt;stop offset='100%25' stop-color='%23c79300'/&gt;&lt;/radialGradient&gt;&lt;/defs&gt;&lt;circle cx='50' cy='54' r='38' fill='url(%23g)'/&gt;&lt;ellipse cx='40' cy='50' rx='5' ry='6' fill='%23533c00'/&gt;&lt;ellipse cx='60' cy='50' rx='5' ry='6' fill='%23533c00'/&gt;&lt;path d='M38 64 Q50 76 62 64' fill='none' stroke='%23533c00' stroke-width='4' stroke-linecap='round'/&gt;&lt;path d='M50 16 L50 8' stroke='%23fff' stroke-width='4' stroke-linecap='round'/&gt;&lt;circle cx='50' cy='7' r='5' fill='%23fff'/&gt;&lt;/svg&gt;">
+
+<div id="outage">
+  <div><div class="t">Network outage in progress</div><div class="s">Output halved until someone restores it.</div></div>
+  <button id="fixBtn">Restore now</button>
+</div>
+
+<div id="toasts"></div>
+
+<div id="ticker"><div class="lbl">YES NEWS</div><div class="run" id="tickRun"></div></div>
+
+<div class="modal" id="modal"><div class="box" id="modalBox"></div></div>
+<div id="cut"><div id="cutTxt"></div></div>
 
 <script>
-  let score = 0;
-  let baseBps = 0; 
-  let rebirthCount = 0;
-  
-  // Array to track timestamps of clicks for live GB/s calculation
-  let clickHistory = [];
+"use strict";
 
-  // Click Upgrade scaling
-  let clickUpgrade = { level: 0, cost: 50, baseCost: 50 };
+/* ============================================================
+   STORAGE — with in-memory fallback so it never hard-fails
+   ============================================================ */
+const KEY = 'optusClicker_totalCoverage_v6';
+const LEGACY = ['optusClickerSave','optusClickerSaveV2','optusClickerSaveV3','optusClickerSaveV4','optusClickerSaveV5'];
+const mem = {};
+const Store = {
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return mem[k] ?? null; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){ mem[k]=v; } },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){ delete mem[k]; } }
+};
 
-  // Rebalanced Passive Upgrades (Lower tiers are highly cost effective initially)
-  const upgrades = {
-    sales: { baseCost: 15, cost: 15, count: 0, bps: 1, costId: 'sales-cost', countId: 'sales-count', btnId: 'btn-sales' },
-    fiveG: { baseCost: 200, cost: 200, count: 0, bps: 10, costId: 'fiveG-cost', countId: 'fiveG-count', btnId: 'btn-5g' },
-    satellite: { baseCost: 1200, cost: 1200, count: 0, bps: 50, costId: 'satellite-cost', countId: 'satellite-count', btnId: 'btn-satellite' },
-    datacenter: { baseCost: 7500, cost: 7500, count: 0, bps: 250, costId: 'datacenter-cost', countId: 'datacenter-count', btnId: 'btn-datacenter' },
-    overlord: { baseCost: 50000, cost: 50000, count: 0, bps: 1500, costId: 'overlord-cost', countId: 'overlord-count', btnId: 'btn-overlord' }
-  };
+/* ============================================================
+   CONTENT
+   ============================================================ */
+const GENS = [
+  {id:'rep',   name:'Sales rep',            icon:'🧑‍💼', base:15,      rate:0.5,     blurb:'Works the floor. Says yes a lot.'},
+  {id:'kiosk', name:'Centre kiosk',         icon:'🏪',   base:120,     rate:4,       blurb:'Ambushes shoppers between the bakery and the escalator.'},
+  {id:'tower', name:'5G tower',             icon:'📡',   base:1100,    rate:24,      blurb:'Three bars where there used to be one.'},
+  {id:'fibre', name:'Fibre crew',           icon:'🚧',   base:12000,   rate:140,     blurb:'Digs up your street. Then digs it up again.'},
+  {id:'sat',   name:'Low-orbit satellite',  icon:'🛰️',  base:130000,  rate:800,     blurb:'Coverage for the paddock, the reef and the Nullarbor.'},
+  {id:'dc',    name:'Data centre',          icon:'🏢',   base:1.4e6,   rate:4400,    blurb:'Hums at 19 degrees and never sleeps.'},
+  {id:'ai',    name:'AI overlord',          icon:'🤖',   base:2e7,     rate:26000,   blurb:'Rewrote the roster. Nobody asked it to.'},
+  {id:'quant', name:'Quantum exchange',     icon:'🧊',   base:3.3e8,   rate:160000,  blurb:'Delivers the download before you request it.'},
+  {id:'mesh',  name:'Orbital mesh',         icon:'🌏',   base:5.1e9,   rate:1.0e6,   blurb:'Wraps the planet in bars.'},
+  {id:'core',  name:'Singularity core',     icon:'🕳️',  base:7.5e10,  rate:6.5e6,   blurb:'Converts spare spacetime into spare data.'}
+];
+const MILESTONES = [10,25,50,100,150,200];
 
-  const scoreDisplay = document.getElementById('score-display');
-  const bpsDisplay = document.getElementById('bps-display');
-  const bpsWrapper = document.getElementById('bps-wrapper');
-  const mainClicker = document.getElementById('main-clicker');
-  const multDisplay = document.getElementById('multiplier-display');
+const TIERS = [
+  {req:5,  mul:10,    label:'Onboarding',      note:'Doubles output'},
+  {req:15, mul:120,   label:'Enterprise kit',  note:'Doubles output again'},
+  {req:40, mul:1600,  label:'Automation',      note:'Doubles output again'},
+  {req:90, mul:22000, label:'Skunkworks',      note:'Doubles output again'},
+  {req:160,mul:320000,label:'Black project',   note:'Triples output'}
+];
 
-  // Math Helpers
-  function getMultiplier() { return 1 + rebirthCount; }
-  function getEffectiveClickPower() { return (1 + clickUpgrade.level) * getMultiplier(); }
-  function getEffectiveBps() { return baseBps * getMultiplier(); }
-  
-  // Format numbers nicely (e.g. 1,000,000)
-  function formatNumber(num) { 
-    return Math.floor(num).toLocaleString('en-US'); 
-  }
+const TECH = [];
+GENS.forEach(g=>{
+  TIERS.forEach((t,i)=>{
+    TECH.push({
+      id:g.id+'_t'+i, kind:'gen', gen:g.id, icon:g.icon,
+      name:g.name+': '+t.label,
+      desc:t.note+'. Needs '+t.req+' '+g.name.toLowerCase()+'.',
+      mult:i===4?3:2, cost:Math.ceil(g.base*t.mul),
+      req:s=>s.gens[g.id].count>=t.req
+    });
+  });
+});
+const CLICK_TECH = [
+  {id:'c1',icon:'🖱️',name:'Ergonomic mouse',    desc:'Doubles click power.',           mult:2,   cost:250,    req:s=>s.clicks>=25},
+  {id:'c2',icon:'⌨️',name:'Mechanical switches',desc:'Doubles click power.',           mult:2,   cost:1.5e4,  req:s=>s.clicks>=200},
+  {id:'c3',icon:'🧤',name:'Gel wrist rest',     desc:'Doubles click power.',           mult:2,   cost:2e6,    req:s=>s.clicks>=800},
+  {id:'c4',icon:'🧠',name:'Neural finger link', desc:'Triples click power.',           mult:3,   cost:5e8,    req:s=>s.clicks>=2500},
+  {id:'c5',icon:'⚡',name:'Thumb of thunder',   desc:'Triples click power.',           mult:3,   cost:2e11,   req:s=>s.clicks>=6000},
+  {id:'c6',icon:'🔌',name:'Fibre fingertips',   desc:'Clicks also earn 1% of your GB/s.',flat:0.01,cost:1e5,  req:s=>s.gens.tower.count>=5},
+  {id:'c7',icon:'🪢',name:'Copper cortex',      desc:'Raises that to 5% of your GB/s.',  flat:0.04,cost:5e8,  req:s=>s.gens.dc.count>=5},
+  {id:'c8',icon:'🧬',name:'Quantum digits',     desc:'Raises that to 15% of your GB/s.', flat:0.10,cost:4e12, req:s=>s.gens.quant.count>=5}
+];
+const GLOBAL_TECH = [
+  {id:'g1',icon:'☕',name:'Decent coffee machine',desc:'Everything produces 5% more.',  glob:0.05,cost:3e4,   req:s=>s.gens.kiosk.count>=5},
+  {id:'g2',icon:'🙌',name:'Yes culture',         desc:'Everything produces 10% more.',  glob:0.10,cost:2e6,   req:s=>s.achs.length>=5},
+  {id:'g3',icon:'🏝️',name:'Synergy offsite',     desc:'Everything produces 15% more.',  glob:0.15,cost:9e8,   req:s=>s.achs.length>=12},
+  {id:'g4',icon:'📈',name:'Restructure playbook',desc:'Everything produces 25% more.',  glob:0.25,cost:6e11,  req:s=>s.rpTotal>=25},
+  {id:'g5',icon:'🌟',name:'Morale programme',    desc:'Each award counts double.',      moral:true,cost:4e9,  req:s=>s.achs.length>=18},
+  {id:'g6',icon:'🎯',name:'Golden signal boost', desc:'Golden Ollie shows up 30% more often.',gold:true,cost:5e7,req:s=>s.goldens>=3}
+];
+TECH.push(...CLICK_TECH.map(t=>({...t,kind:'click'})), ...GLOBAL_TECH.map(t=>({...t,kind:'global'})));
 
-  // Calculate Exponential Rebirth Cost
-  function getRebirthCost() {
-    // Base 100k, multiplies by 5 for every rebirth level
-    return 100000 * Math.pow(5, rebirthCount); 
-  }
+const PERKS = [
+  {id:'offline', icon:'🌙', name:'Overnight roster', max:5,  cost:l=>3+l*4,
+   desc:l=>l?`Earns ${10+l*10}% of your rate while closed, up to ${2+l*2}h.`:'Earns 20% of your rate while the tab is closed, up to 4h.'},
+  {id:'auto',    icon:'🔁', name:'Auto-dialler',     max:10, cost:l=>4+l*5,
+   desc:l=>l?`${l} automatic clicks per second.`:'1 automatic click per second.'},
+  {id:'tongue',  icon:'🗣️', name:'Silver tongue',    max:8,  cost:l=>2+l*3,
+   desc:l=>l?`+${25*l}% click power.`:'+25% click power.'},
+  {id:'golden',  icon:'✨', name:'Golden signal',    max:3,  cost:l=>6+l*9,
+   desc:l=>l?`Golden Ollie is ${25*l}% more frequent and lingers ${2*l}s longer.`:'Golden Ollie turns up more often and lingers longer.'},
+  {id:'head',    icon:'🚀', name:'Head start',       max:5,  cost:l=>5+l*7,
+   desc:l=>l?`Every restructure begins with ${10*l} reps, ${5*l} kiosks and ${2*l} towers.`:'Begin each restructure with a small crew already hired.'},
+  {id:'synergy', icon:'🧩', name:'Synergy',          max:5,  cost:l=>10+l*14,
+   desc:l=>l?`+${10*l}% to absolutely everything.`:'+10% to absolutely everything.'}
+];
 
-  // --- SAVE & LOAD SYSTEM (V4) ---
-  function saveGame() {
-    const gameState = {
-      score: score,
-      baseBps: baseBps,
-      rebirthCount: rebirthCount,
-      clickUpgrade: { level: clickUpgrade.level, cost: clickUpgrade.cost },
-      savedUpgrades: {}
-    };
-    for (const key in upgrades) {
-      gameState.savedUpgrades[key] = { count: upgrades[key].count, cost: upgrades[key].cost };
+const ACHS = [
+  {id:'a1', i:'🌱', n:'First byte',        d:'Mine your first GB.',                c:s=>s.lifetime>=1},
+  {id:'a2', i:'📦', n:'Thousand club',     d:'Mine 1,000 GB.',                     c:s=>s.lifetime>=1e3},
+  {id:'a3', i:'💾', n:'Petabyte pusher',   d:'Mine 1,000,000 GB.',                 c:s=>s.lifetime>=1e6},
+  {id:'a4', i:'🗄️',n:'Warehouse scale',   d:'Mine 1 billion GB.',                 c:s=>s.lifetime>=1e9},
+  {id:'a5', i:'🌐', n:'Continental',       d:'Mine 1 trillion GB.',                c:s=>s.lifetime>=1e12},
+  {id:'a6', i:'☄️',n:'Astronomical',      d:'Mine 1 quadrillion GB.',             c:s=>s.lifetime>=1e15},
+  {id:'a7', i:'🕳️',n:'Absurd',           d:'Mine 1 quintillion GB.',             c:s=>s.lifetime>=1e18},
+  {id:'a8', i:'👆', n:'Warm up',           d:'Click 100 times.',                   c:s=>s.clicks>=100},
+  {id:'a9', i:'✊', n:'Repetitive strain', d:'Click 2,500 times.',                 c:s=>s.clicks>=2500},
+  {id:'a10',i:'🦾', n:'Machine hands',     d:'Click 25,000 times.',                c:s=>s.clicks>=25000},
+  {id:'a11',i:'🔥', n:'Red hot',           d:'Max out signal heat.',               c:s=>s.maxHeat>=99},
+  {id:'a12',i:'🧑‍💼',n:'Staffed up',      d:'Hire 25 sales reps.',                c:s=>s.gens.rep.count>=25},
+  {id:'a13',i:'🏪', n:'Retail footprint',  d:'Own 25 kiosks.',                     c:s=>s.gens.kiosk.count>=25},
+  {id:'a14',i:'📡', n:'Three bars',        d:'Own 25 towers.',                     c:s=>s.gens.tower.count>=25},
+  {id:'a15',i:'🛰️',n:'Sky high',          d:'Own 25 satellites.',                 c:s=>s.gens.sat.count>=25},
+  {id:'a16',i:'🤖', n:'Who approved this', d:'Own 25 AI overlords.',               c:s=>s.gens.ai.count>=25},
+  {id:'a17',i:'🧊', n:'Superposition',     d:'Own 10 quantum exchanges.',          c:s=>s.gens.quant.count>=10},
+  {id:'a18',i:'🌏', n:'Full coverage',     d:'Own at least one of every line.',    c:s=>GENS.every(g=>s.gens[g.id].count>0)},
+  {id:'a19',i:'💯', n:'Ten of everything', d:'Own ten of every line.',             c:s=>GENS.every(g=>s.gens[g.id].count>=10)},
+  {id:'a20',i:'⚙️',n:'R and D',           d:'Buy 5 research items.',              c:s=>s.tech.length>=5},
+  {id:'a21',i:'🔬', n:'Whole department',  d:'Buy 25 research items.',             c:s=>s.tech.length>=25},
+  {id:'a22',i:'✂️',n:'Tough call',        d:'Restructure once.',                  c:s=>s.prestiges>=1},
+  {id:'a23',i:'🩸', n:'Serial restructurer',d:'Restructure 5 times.',              c:s=>s.prestiges>=5},
+  {id:'a24',i:'👔', n:'Consultant brain',  d:'Restructure 20 times.',              c:s=>s.prestiges>=20},
+  {id:'a25',i:'✨', n:'Lucky',             d:'Catch a golden Ollie.',              c:s=>s.goldens>=1},
+  {id:'a26',i:'🍀', n:'Very lucky',        d:'Catch 25 golden Ollies.',            c:s=>s.goldens>=25},
+  {id:'a27',i:'🎰', n:'Suspiciously lucky',d:'Catch 100 golden Ollies.',           c:s=>s.goldens>=100},
+  {id:'a28',i:'🔧', n:'On call',           d:'Fix an outage.',                     c:s=>s.fixes>=1},
+  {id:'a29',i:'🚒', n:'Incident veteran',  d:'Fix 15 outages.',                    c:s=>s.fixes>=15},
+  {id:'a30',i:'⏱️',n:'Committed',         d:'Play for one hour.',                 c:s=>s.playtime>=3600},
+  {id:'a31',i:'🚄', n:'Gigabit',           d:'Reach 1,000 GB/s.',                  c:s=>s.bestBps>=1e3},
+  {id:'a32',i:'🌊', n:'Flood',             d:'Reach 1,000,000 GB/s.',              c:s=>s.bestBps>=1e6},
+  {id:'a33',i:'🌀', n:'Firehose',          d:'Reach 1 billion GB/s.',              c:s=>s.bestBps>=1e9},
+  {id:'a34',i:'💜', n:'Well perked',       d:'Buy 10 perk levels.',                c:s=>PERKS.reduce((a,p)=>a+(s.perks[p.id]||0),0)>=10}
+];
+
+const HEADLINES = [
+  'Store in Chermside hits target by 9.15am, manager weeps openly.',
+  'Fibre crew digs up the same street for the fourth time this quarter, calls it "iterative".',
+  'Customer asks for a plan with no data. Rep hired on the spot to talk them out of it.',
+  'AI overlord reschedules everyone to a shift that does not exist.',
+  'Satellite achieves full coverage of one specific paddock near Roma.',
+  'Yes Crew wins award for saying yes 400,000 times without blinking.',
+  'New tower installed. Three seagulls immediately claim tenancy.',
+  'Data centre cooling failure averted by a bloke named Dave and a box fan.',
+  'Quantum exchange delivers download before customer opens the app, refund requested.',
+  'Head office announces synergy offsite. Nobody returns.',
+  'Kiosk staff perfect the art of eye contact from eleven metres away.',
+  'Singularity core briefly ends time, recovers, apologises via SMS.',
+  'Outage blamed on a possum. Possum unavailable for comment.',
+  'Restructure consultant restructures the restructure team.',
+  'Customer connects toaster to the network. Toaster now has better coverage than Wagga.',
+  'Golden Ollie sighted near the Redcliffe store, escapes into the food court.',
+  'Coverage map updated. Somehow now includes part of New Zealand.',
+  'Sales rep upgrades a nan to 500GB. Nan uses 40MB, sends a lovely thank-you card.'
+];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+function freshGens(){ const o={}; GENS.forEach(g=>o[g.id]={count:0}); return o; }
+let S = {
+  gb:0, runGb:0, lifetime:0, clicks:0, clickLvl:0,
+  gens:freshGens(), tech:[], achs:[], perks:{},
+  rp:0, rpTotal:0, prestiges:0,
+  goldens:0, fixes:0, maxHeat:0, bestBps:0, playtime:0,
+  started:Date.now(), lastSeen:Date.now(),
+  sfx:true, music:false, buyAmt:1
+};
+
+let heat=0, buffs=[], outage=null, autoAcc=0, shownScore=0;
+let goldenTimer=0, outageTimer=0;
+const $ = id => document.getElementById(id);
+
+/* ============================================================
+   NUMBER FORMATTING
+   ============================================================ */
+const SUF=['','K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc','Ud','Dd'];
+function fmt(n){
+  if(!isFinite(n)) return '∞';
+  n=Math.floor(n);
+  if(n<1000) return n.toLocaleString('en-AU');
+  let t=0;
+  while(n>=1000 && t<SUF.length-1){ n/=1000; t++; }
+  return (n<10?n.toFixed(2):n<100?n.toFixed(1):n.toFixed(0))+SUF[t];
+}
+function fmtR(n){
+  if(n<10 && n>0) return n.toFixed(1);
+  return fmt(n);
+}
+function fmtTime(sec){
+  sec=Math.floor(sec);
+  const h=Math.floor(sec/3600), m=Math.floor(sec%3600/60), s=sec%60;
+  return (h?h+'h ':'')+(h||m?m+'m ':'')+s+'s';
+}
+
+/* ============================================================
+   AUDIO — everything synthesised, no files
+   ============================================================ */
+const Snd = {
+  ctx:null, master:null, musicGain:null, musicTimer:null,
+  init(){
+    if(this.ctx) return;
+    try{
+      this.ctx = new (window.AudioContext||window.webkitAudioContext)();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0.32;
+      const comp = this.ctx.createDynamicsCompressor();
+      this.master.connect(comp); comp.connect(this.ctx.destination);
+      this.musicGain = this.ctx.createGain();
+      this.musicGain.gain.value = 0;
+      this.musicGain.connect(this.master);
+    }catch(e){}
+  },
+  tone({f=440,f2=null,d=.09,type='sine',g=.25,delay=0,attack=.005}){
+    if(!S.sfx||!this.ctx) return;
+    const t = this.ctx.currentTime+delay;
+    const o = this.ctx.createOscillator(), gn = this.ctx.createGain();
+    o.type=type; o.frequency.setValueAtTime(f,t);
+    if(f2) o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t+d);
+    gn.gain.setValueAtTime(0.0001,t);
+    gn.gain.exponentialRampToValueAtTime(g,t+attack);
+    gn.gain.exponentialRampToValueAtTime(0.0001,t+d);
+    o.connect(gn); gn.connect(this.master);
+    o.start(t); o.stop(t+d+.05);
+  },
+  noise({d=.25,g=.2,hp=600,delay=0}){
+    if(!S.sfx||!this.ctx) return;
+    const t=this.ctx.currentTime+delay;
+    const len=Math.floor(this.ctx.sampleRate*d);
+    const buf=this.ctx.createBuffer(1,len,this.ctx.sampleRate);
+    const ch=buf.getChannelData(0);
+    for(let i=0;i<len;i++) ch[i]=(Math.random()*2-1)*(1-i/len);
+    const src=this.ctx.createBufferSource(); src.buffer=buf;
+    const f=this.ctx.createBiquadFilter(); f.type='highpass'; f.frequency.value=hp;
+    const gn=this.ctx.createGain(); gn.gain.value=g;
+    src.connect(f); f.connect(gn); gn.connect(this.master);
+    src.start(t);
+  },
+  click(h){
+    const p = 380 + h*5.2 + Math.random()*22;
+    this.tone({f:p,f2:p*1.7,d:.07,type:'triangle',g:.16});
+    this.tone({f:p*2,d:.04,type:'sine',g:.05});
+  },
+  buy(){ [523,659,784].forEach((f,i)=>this.tone({f,d:.12,type:'triangle',g:.14,delay:i*.045})); },
+  tech(){ [659,880,1046,1318].forEach((f,i)=>this.tone({f,d:.16,type:'sine',g:.13,delay:i*.05})); },
+  deny(){ this.tone({f:150,f2:90,d:.14,type:'sawtooth',g:.1}); },
+  goldSpawn(){ [1318,1568,2093].forEach((f,i)=>this.tone({f,d:.5,type:'sine',g:.09,delay:i*.09})); },
+  goldGet(){
+    [784,988,1175,1568,2093].forEach((f,i)=>this.tone({f,d:.3,type:'triangle',g:.16,delay:i*.06}));
+    this.noise({d:.5,g:.08,hp:2500});
+  },
+  ach(){ [1046,1318,1568,2093].forEach((f,i)=>this.tone({f,d:.35,type:'sine',g:.15,delay:i*.08})); },
+  outage(){ this.tone({f:220,f2:110,d:.7,type:'sawtooth',g:.13}); this.noise({d:.7,g:.07,hp:300}); },
+  fixed(){ [392,523,659,784].forEach((f,i)=>this.tone({f,d:.25,type:'square',g:.1,delay:i*.07})); },
+  prestige(){
+    this.noise({d:1.4,g:.16,hp:180});
+    [130,98,65].forEach((f,i)=>this.tone({f,f2:f*.5,d:1.6,type:'sawtooth',g:.14,delay:i*.12}));
+    [523,659,784,1046].forEach((f,i)=>this.tone({f,d:.9,type:'sine',g:.1,delay:.7+i*.12}));
+  },
+  toggleMusic(on){
+    this.init();
+    if(!this.ctx) return;
+    if(on){
+      this.musicGain.gain.linearRampToValueAtTime(.16,this.ctx.currentTime+1.2);
+      if(this.musicTimer) return;
+      const scale=[196,233,261,311,349,392,466,523];
+      let i=0;
+      const step=()=>{
+        if(!S.music||!this.ctx) return;
+        const t=this.ctx.currentTime;
+        const f=scale[(i*3)%scale.length]*(i%8<4?1:2);
+        const o=this.ctx.createOscillator(), g=this.ctx.createGain(), lp=this.ctx.createBiquadFilter();
+        lp.type='lowpass'; lp.frequency.value=1200;
+        o.type='sine'; o.frequency.value=f;
+        g.gain.setValueAtTime(.0001,t);
+        g.gain.exponentialRampToValueAtTime(.5,t+.4);
+        g.gain.exponentialRampToValueAtTime(.0001,t+2.4);
+        o.connect(lp); lp.connect(g); g.connect(this.musicGain);
+        o.start(t); o.stop(t+2.6);
+        i++;
+      };
+      step();
+      this.musicTimer=setInterval(step,1500);
+    }else{
+      this.musicGain.gain.linearRampToValueAtTime(0,this.ctx.currentTime+.6);
+      clearInterval(this.musicTimer); this.musicTimer=null;
     }
-    localStorage.setItem('optusClickerSaveV4', JSON.stringify(gameState));
   }
+};
 
-  function loadGame() {
-    const savedData = localStorage.getItem('optusClickerSaveV4');
-    if (savedData) {
-      const gameState = JSON.parse(savedData);
-      score = gameState.score || 0;
-      baseBps = gameState.baseBps || 0;
-      rebirthCount = gameState.rebirthCount || 0;
-      
-      if(gameState.clickUpgrade) {
-        clickUpgrade.level = gameState.clickUpgrade.level;
-        clickUpgrade.cost = gameState.clickUpgrade.cost;
-      }
-      if(gameState.savedUpgrades) {
-        for (const key in gameState.savedUpgrades) {
-          if (upgrades[key]) {
-            upgrades[key].count = gameState.savedUpgrades[key].count;
-            upgrades[key].cost = gameState.savedUpgrades[key].cost;
-          }
-        }
-      }
+/* ============================================================
+   MATHS
+   ============================================================ */
+function genMult(g){
+  const c = S.gens[g.id].count;
+  let m = 1;
+  MILESTONES.forEach(ms=>{ if(c>=ms) m*=2; });
+  TECH.forEach(t=>{ if(t.kind==='gen' && t.gen===g.id && S.tech.includes(t.id)) m*=t.mult; });
+  return m;
+}
+function genRate(g){ return g.rate * S.gens[g.id].count * genMult(g); }
+function baseBps(){ let t=0; GENS.forEach(g=>t+=genRate(g)); return t; }
+
+function achMult(){
+  const doubled = S.tech.includes('g5') ? 2 : 1;
+  return 1 + S.achs.length * 0.01 * doubled;
+}
+function globalMult(includeBuffs=true){
+  let m = 1;
+  m *= 1 + S.rpTotal * 0.02;
+  m *= achMult();
+  m *= 1 + (S.perks.synergy||0)*0.10;
+  TECH.forEach(t=>{ if(t.glob && S.tech.includes(t.id)) m*=1+t.glob; });
+  if(includeBuffs) buffs.forEach(b=>{ if(b.kind==='prod') m*=b.mult; });
+  if(outage) m *= 0.5;
+  return m;
+}
+function bps(){ return baseBps()*globalMult(); }
+
+function heatMult(){ return 1 + (heat/100)*2; }
+function clickBase(){
+  let v = 1 + S.clickLvl;
+  TECH.forEach(t=>{ if(t.kind==='click' && t.mult && S.tech.includes(t.id)) v*=t.mult; });
+  v *= 1 + (S.perks.tongue||0)*0.25;
+  let flat = 0;
+  TECH.forEach(t=>{ if(t.flat && S.tech.includes(t.id)) flat=Math.max(flat,t.flat); });
+  v += bps()*flat;
+  return v;
+}
+function clickPower(){
+  let v = clickBase()*globalMult()*heatMult();
+  buffs.forEach(b=>{ if(b.kind==='click') v*=b.mult; });
+  return v;
+}
+const clickCost = lvl => Math.ceil(60*Math.pow(1.34,lvl));
+function genCost(g,n=1){
+  const c=S.gens[g.id].count;
+  return Math.ceil(g.base*Math.pow(1.15,c)*(Math.pow(1.15,n)-1)/0.15);
+}
+function maxAfford(g){
+  const c=S.gens[g.id].count, p=g.base*Math.pow(1.15,c);
+  const n=Math.floor(Math.log(S.gb*0.15/p+1)/Math.log(1.15));
+  return Math.max(0,Math.min(n,5000));
+}
+function buyQty(g){
+  if(S.buyAmt==='max') return Math.max(1,maxAfford(g));
+  return S.buyAmt;
+}
+function rpFor(total){ return Math.floor(Math.cbrt(Math.max(0,total)/1e9)); }
+function rpPending(){ return Math.max(0, rpFor(S.lifetime) - S.rpTotal); }
+
+/* ============================================================
+   ACTIONS
+   ============================================================ */
+function earn(n){ S.gb+=n; S.runGb+=n; S.lifetime+=n; }
+
+function doClick(x,y,auto){
+  const p = clickPower();
+  earn(p);
+  S.clicks++;
+  heat = Math.min(100, heat + (auto?2:7));
+  S.maxHeat = Math.max(S.maxHeat, heat);
+  if(!auto){
+    Snd.click(heat);
+    const r = heat>=99 ? $('ring2') : $('ring1');
+    r.classList.remove('go'); void r.offsetWidth; r.classList.add('go');
+    $('orb').classList.add('press');
+    setTimeout(()=>$('orb').classList.remove('press'),90);
+    pop(x,y,'+'+fmt(p), heat>=85);
+  }
+}
+function pop(x,y,txt,crit){
+  const d=document.createElement('div');
+  d.className='pop'+(crit?' crit':'');
+  d.textContent=txt;
+  d.style.left=(x+(Math.random()-0.5)*44)+'px';
+  d.style.top=(y-26)+'px';
+  document.body.appendChild(d);
+  setTimeout(()=>d.remove(),880);
+}
+
+function buyClickLvl(){
+  const c=clickCost(S.clickLvl);
+  if(S.gb<c) return false;
+  S.gb-=c; S.clickLvl++; Snd.buy(); return true;
+}
+function buyGen(g){
+  const n=buyQty(g), c=genCost(g,n);
+  if(S.gb<c||n<1) return false;
+  S.gb-=c; S.gens[g.id].count+=n; Snd.buy();
+  return true;
+}
+function buyTech(t){
+  if(S.gb<t.cost||S.tech.includes(t.id)) return false;
+  S.gb-=t.cost; S.tech.push(t.id); Snd.tech();
+  toast('gold','Research complete',t.name);
+  return true;
+}
+function buyPerk(p){
+  const lvl=S.perks[p.id]||0;
+  if(lvl>=p.max) return false;
+  const c=p.cost(lvl);
+  if(S.rp<c) return false;
+  S.rp-=c; S.perks[p.id]=lvl+1; Snd.tech();
+  toast('violet','Perk upgraded',p.name+' is now level '+(lvl+1)+'.');
+  return true;
+}
+
+function applyHeadStart(){
+  const l=S.perks.head||0;
+  if(!l) return;
+  S.gens.rep.count=10*l; S.gens.kiosk.count=5*l; S.gens.tower.count=2*l;
+}
+function prestige(){
+  const gain=rpPending();
+  if(gain<1) return;
+  confirmBox(
+    'Make half the staff redundant?',
+    `You will bank <b>${gain}</b> restructure point${gain===1?'':'s'} and lose all data, staff and research. Points, perks and awards stay with you forever.`,
+    ()=>{
+      S.rp+=gain; S.rpTotal+=gain; S.prestiges++;
+      S.gb=0; S.runGb=0; S.clickLvl=0; S.gens=freshGens(); S.tech=[];
+      heat=0; buffs=[]; outage=null; $('outage').classList.remove('on');
+      applyHeadStart();
+      Snd.prestige();
+      document.body.classList.add('shake');
+      setTimeout(()=>document.body.classList.remove('shake'),520);
+      const cut=$('cut');
+      $('cutTxt').innerHTML='STAFF REDUCED BY 50%<small>+'+gain+' restructure point'+(gain===1?'':'s')+'</small>';
+      cut.classList.remove('go'); void cut.offsetWidth; cut.classList.add('go');
+      setTimeout(()=>cut.classList.remove('go'),2900);
+      confetti(60,['#a97bff','#ff6b52','#ffd84d']);
+      buildAll(); save();
     }
-    updateDisplay();
-  }
+  );
+}
 
-  function resetSave() {
-    if(confirm("Are you sure you want to wipe all data?")) {
-      localStorage.removeItem('optusClickerSaveV4');
-      location.reload(); 
+/* ============================================================
+   BUFFS, GOLDEN OLLIE, OUTAGES
+   ============================================================ */
+function addBuff(name,kind,mult,secs,icon){
+  buffs=buffs.filter(b=>b.name!==name);
+  buffs.push({name,kind,mult,ends:Date.now()+secs*1000,icon});
+}
+function scheduleGolden(){
+  const lvl=S.perks.golden||0;
+  let base = 75 + Math.random()*90;
+  base /= (1 + lvl*0.25 + (S.tech.includes('g6')?0.3:0));
+  goldenTimer = base;
+}
+function spawnGolden(){
+  const el=$('golden');
+  const pad=110;
+  el.style.left = (pad + Math.random()*(window.innerWidth-pad*2)) + 'px';
+  el.style.top  = (pad + Math.random()*(window.innerHeight-pad*2-60)) + 'px';
+  el.style.display='block';
+  Snd.goldSpawn();
+  const life = (11 + (S.perks.golden||0)*2)*1000;
+  el._expire = setTimeout(()=>{ el.style.display='none'; scheduleGolden(); }, life);
+}
+function catchGolden(){
+  const el=$('golden');
+  clearTimeout(el._expire);
+  el.style.display='none';
+  S.goldens++;
+  Snd.goldGet();
+  confetti(34,['#ffd84d','#fff2b8','#00c8cd']);
+  const roll=Math.random();
+  if(roll<0.36){
+    addBuff('Network frenzy','prod',7,20,'⚡');
+    toast('gold','Network frenzy','Everything produces 7× for 20 seconds.');
+  }else if(roll<0.62){
+    addBuff('Click storm','click',120,13,'💥');
+    toast('gold','Click storm','Clicks are worth 120× for 13 seconds.');
+  }else if(roll<0.80){
+    const amt=Math.min(S.runGb*0.15, bps()*60*12)+13*clickPower();
+    earn(amt);
+    toast('gold','Data dump','+'+fmt(amt)+' GB landed in the pool.');
+  }else if(roll<0.93){
+    addBuff('Lucky port','prod',3,45,'🍀');
+    toast('gold','Lucky port','Everything produces 3× for 45 seconds.');
+  }else{
+    addBuff('Full send','prod',25,9,'🚀');
+    addBuff('Click storm','click',25,9,'🚀');
+    toast('gold','Full send','25× everything for 9 seconds. Go.');
+    document.body.classList.add('shake');
+    setTimeout(()=>document.body.classList.remove('shake'),520);
+  }
+  scheduleGolden();
+  checkAchs();
+}
+function scheduleOutage(){ outageTimer = 150 + Math.random()*180; }
+function startOutage(){
+  outage = {ends:Date.now()+18000};
+  $('outage').classList.add('on');
+  Snd.outage();
+  toast('bad','Outage','Output halved until someone restores the network.');
+}
+function endOutage(fixed){
+  outage=null;
+  $('outage').classList.remove('on');
+  if(fixed){
+    S.fixes++;
+    addBuff('Recovery bonus','prod',3,30,'🔧');
+    Snd.fixed();
+    toast('','Network restored','Recovery bonus: 3× output for 30 seconds.');
+    checkAchs();
+  }
+  scheduleOutage();
+}
+
+/* ============================================================
+   ACHIEVEMENTS + TOASTS + CONFETTI
+   ============================================================ */
+function checkAchs(){
+  ACHS.forEach(a=>{
+    if(S.achs.includes(a.id)) return;
+    let ok=false;
+    try{ ok=a.c(S); }catch(e){}
+    if(ok){
+      S.achs.push(a.id);
+      Snd.ach();
+      toast('gold','Award unlocked',a.i+' '+a.n+' — everything produces 1% more.');
+      confetti(20,['#ffd84d','#00c8cd','#fff']);
+      flagTab('ach');
     }
+  });
+}
+function toast(cls,title,body){
+  const d=document.createElement('div');
+  d.className='toast '+cls;
+  d.innerHTML='<b>'+title+'</b>'+body;
+  $('toasts').appendChild(d);
+  setTimeout(()=>{ d.classList.add('out'); setTimeout(()=>d.remove(),320); },4200);
+}
+function confetti(n,colors){
+  for(let i=0;i<n;i++){
+    const c=document.createElement('div');
+    c.className='confetti';
+    c.style.left=Math.random()*100+'vw';
+    c.style.top='-20px';
+    c.style.background=colors[i%colors.length];
+    c.style.animationDelay=(Math.random()*.4)+'s';
+    c.style.animationDuration=(1.6+Math.random()*1.2)+'s';
+    document.body.appendChild(c);
+    setTimeout(()=>c.remove(),3200);
   }
+}
+function flagTab(v){
+  const t=document.querySelector('.tab[data-view="'+v+'"]');
+  if(t && !t.classList.contains('on')) t.classList.add('alert');
+}
 
-  // --- REDUNDANCY SYSTEM ---
-  function triggerRebirth() {
-    const currentRebirthCost = getRebirthCost();
-    if (score >= currentRebirthCost) {
-      if(confirm(`Make cuts to the team?\n\nYou will lose ${formatNumber(score)} GB and all upgrades, but gain +100% Efficiency Global Boost!\n\nNext threshold will be much higher.`)) {
-        
-        const overlay = document.getElementById('redundancy-overlay');
-        document.body.classList.add('shake');
-        overlay.classList.add('animate-redundancy');
+/* ============================================================
+   UI BUILD
+   ============================================================ */
+const el = {};
+function rowHTML(icon,name,sub,right,extra){
+  return `<div class="ic">${icon}</div>
+    <div class="meta"><div class="nm">${name}</div><div class="sub">${sub}</div>${extra||''}</div>
+    <div class="rt">${right}</div><div class="bar"></div>`;
+}
+function buildClick(){
+  const host=$('clickList'); host.innerHTML='';
+  const b=document.createElement('button');
+  b.className='row';
+  b.innerHTML=rowHTML('👆','Click optimisation <span class="tag t">click</span>','Each level adds 1 GB to your base click.',
+    '<div class="price" id="clickPrice"></div><div class="own">Level <b id="clickLvl">0</b></div>');
+  b.onclick=()=>{ if(!buyClickLvl()) nope(b); render(); save(); };
+  host.appendChild(b);
+  el.clickBtn=b;
+}
+function buildGens(){
+  const host=$('genList'); host.innerHTML=''; el.gens={};
+  GENS.forEach(g=>{
+    const b=document.createElement('button');
+    b.className='row';
+    b.innerHTML=rowHTML(g.icon,g.name,g.blurb,
+      `<div class="price"></div><div class="own">Owned <b>0</b></div>`,
+      `<div class="mini"></div>`);
+    b.onclick=()=>{ if(!buyGen(g)) nope(b); render(); save(); checkAchs(); };
+    host.appendChild(b);
+    el.gens[g.id]={btn:b, price:b.querySelector('.price'), own:b.querySelector('.own b'),
+                   mini:b.querySelector('.mini'), bar:b.querySelector('.bar'), sub:b.querySelector('.sub')};
+  });
+}
+function nope(b){ b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope'); Snd.deny(); }
 
-        setTimeout(() => {
-          document.body.classList.remove('shake');
-          overlay.classList.remove('animate-redundancy');
-        }, 3000);
+let techSig='';
+function buildTech(){
+  const avail = TECH.filter(t=>!S.tech.includes(t.id) && t.req(S));
+  const sig = avail.map(t=>t.id).join('|')+'#'+S.tech.length;
+  if(sig===techSig) return;
+  techSig=sig;
+  const host=$('techList'); host.innerHTML=''; el.tech={};
+  avail.sort((a,b)=>a.cost-b.cost).forEach(t=>{
+    const b=document.createElement('button');
+    b.className='row tech';
+    const tag = t.kind==='click'?'<span class="tag t">click</span>':t.kind==='global'?'<span class="tag v">global</span>':'<span class="tag">line</span>';
+    b.innerHTML=rowHTML(t.icon,t.name+' '+tag,t.desc,`<div class="price">${fmt(t.cost)}</div>`);
+    b.onclick=()=>{ if(!buyTech(t)) nope(b); else { techSig=''; buildTech(); flagTab('tech'); } render(); save(); checkAchs(); };
+    host.appendChild(b);
+    el.tech[t.id]={btn:b,cost:t.cost};
+  });
+  $('techEmpty').style.display = avail.length?'none':'block';
+  const done=$('techDone'); done.innerHTML='';
+  $('techDoneCount').textContent = S.tech.length+' of '+TECH.length+' researched this run';
+  TECH.filter(t=>S.tech.includes(t.id)).forEach(t=>{
+    const d=document.createElement('div');
+    d.className='row owned'; d.style.cursor='default';
+    d.innerHTML=rowHTML(t.icon,t.name,t.desc,'<div class="own">done</div>');
+    done.appendChild(d);
+  });
+}
+function buildPerks(){
+  const host=$('perkList'); host.innerHTML=''; el.perks={};
+  PERKS.forEach(p=>{
+    const b=document.createElement('button');
+    b.className='row perk';
+    b.innerHTML=rowHTML(p.icon,p.name,'',`<div class="price"></div><div class="own">Lvl <b>0</b>/${p.max}</div>`);
+    b.onclick=()=>{ if(!buyPerk(p)) nope(b); render(); save(); checkAchs(); };
+    host.appendChild(b);
+    el.perks[p.id]={btn:b,price:b.querySelector('.price'),own:b.querySelector('.own b'),sub:b.querySelector('.sub'),def:p};
+  });
+}
+function buildAchs(){
+  const host=$('achList'); host.innerHTML=''; el.achs={};
+  ACHS.forEach(a=>{
+    const d=document.createElement('div');
+    d.className='ach';
+    d.innerHTML=`<div class="t"><span>${a.i}</span>${a.n}</div><div class="d">${a.d}</div>`;
+    host.appendChild(d);
+    el.achs[a.id]=d;
+  });
+}
+function buildAll(){ buildClick(); buildGens(); techSig=''; buildTech(); buildPerks(); buildAchs(); render(); }
 
-        rebirthCount++;
-        score = 0;
-        baseBps = 0;
-        clickHistory = [];
-        
-        clickUpgrade.level = 0;
-        clickUpgrade.cost = clickUpgrade.baseCost;
+/* ============================================================
+   RENDER
+   ============================================================ */
+function render(){
+  // score with a smoothing tween
+  const target=S.gb;
+  shownScore += (target-shownScore)*0.35;
+  if(Math.abs(target-shownScore)<1) shownScore=target;
+  $('score').textContent = fmt(shownScore);
 
-        for (const key in upgrades) {
-          upgrades[key].count = 0;
-          upgrades[key].cost = upgrades[key].baseCost;
-        }
+  const live = bps();
+  S.bestBps = Math.max(S.bestBps, live);
+  const heatActive = heat>1;
+  $('bps').textContent = fmtR(live);
+  $('rate').classList.toggle('hot', heatActive);
+  $('cpc').textContent = fmt(clickPower());
 
-        saveGame();
-        updateDisplay();
-      }
-    }
-  }
+  $('heatFill').style.width = heat+'%';
+  $('heatTxt').textContent = '×'+heatMult().toFixed(2);
 
-  // --- INTERACTION ---
-  function createParticle(x, y) {
-    const particle = document.createElement('div');
-    particle.classList.add('particle');
-    particle.innerText = `+${formatNumber(getEffectiveClickPower())}`;
-    
-    // Add slight random rotation to particles
-    const rot = (Math.random() - 0.5) * 30;
-    particle.style.transform = `rotate(${rot}deg)`;
-    
-    const offsetX = (Math.random() - 0.5) * 60; 
-    particle.style.left = `${x + offsetX}px`;
-    particle.style.top = `${y - 40}px`;
-    
-    document.body.appendChild(particle);
-    setTimeout(() => { particle.remove(); }, 800);
-  }
+  // multiplier chips
+  const chips=[];
+  if(S.rpTotal) chips.push(`<span class="mult v">${S.rpTotal} RP · ×${(1+S.rpTotal*0.02).toFixed(2)}</span>`);
+  if(S.achs.length) chips.push(`<span class="mult y">${S.achs.length} awards · ×${achMult().toFixed(2)}</span>`);
+  buffs.forEach(b=>{
+    const left=Math.max(0,(b.ends-Date.now())/1000);
+    chips.push(`<span class="mult buff">${b.icon} ${b.name} ${left.toFixed(0)}s</span>`);
+  });
+  if(outage) chips.push('<span class="mult" style="border-color:var(--coral);color:var(--coral);background:rgba(255,107,82,.12)">⚠ Outage ×0.5</span>');
+  $('mults').innerHTML = chips.join('');
 
-  mainClicker.addEventListener('click', (e) => {
-    score += getEffectiveClickPower();
-    // Track click timestamp for live GB/s
-    clickHistory.push(Date.now());
-    
-    updateDisplay();
-    createParticle(e.clientX, e.clientY);
+  // click upgrade
+  const cc=clickCost(S.clickLvl);
+  $('clickPrice').textContent=fmt(cc)+' GB';
+  $('clickLvl').textContent=S.clickLvl;
+  el.clickBtn.classList.toggle('can', S.gb>=cc);
+  el.clickBtn.querySelector('.bar').style.width=Math.min(100,S.gb/cc*100)+'%';
+
+  // generators
+  GENS.forEach(g=>{
+    const e=el.gens[g.id], st=S.gens[g.id];
+    const revealed = st.count>0 || S.lifetime>=g.base*0.4;
+    e.btn.style.display = revealed?'':'none';
+    if(!revealed) return;
+    const n=buyQty(g), c=genCost(g,n);
+    e.price.textContent = fmt(c)+' GB'+(n>1?' ×'+n:'');
+    e.own.textContent = st.count;
+    e.btn.classList.toggle('can', S.gb>=c && (S.buyAmt!=='max'?true:maxAfford(g)>0));
+    e.bar.style.width=Math.min(100,S.gb/c*100)+'%';
+    if(st.count>0){
+      const next=MILESTONES.find(m=>m>st.count);
+      e.mini.textContent = fmtR(genRate(g)*globalMult(false))+' GB/s · ×'+genMult(g)+' bonus'+(next?' · '+(next-st.count)+' to next double':'');
+    } else e.mini.textContent = '';
   });
 
-  function buyClickUpgrade() {
-    if (score >= clickUpgrade.cost) {
-      score -= clickUpgrade.cost;
-      clickUpgrade.level++;
-      clickUpgrade.cost = Math.ceil(clickUpgrade.cost * 1.5); // Steep scaling for clicks
-      updateDisplay();
-      saveGame();
+  // tech affordability
+  for(const id in el.tech){
+    const t=el.tech[id];
+    t.btn.classList.toggle('can', S.gb>=t.cost);
+    t.btn.querySelector('.bar').style.width=Math.min(100,S.gb/t.cost*100)+'%';
+  }
+
+  // restructure
+  const gain=rpPending();
+  $('rpGain').textContent=gain;
+  $('rpBank').textContent=S.rp+' point'+(S.rp===1?'':'s')+' banked · '+S.rpTotal+' earned all time';
+  const pb=$('doPrestige');
+  if(gain>=1){
+    pb.classList.add('ready');
+    pb.textContent='Restructure for '+gain+' point'+(gain===1?'':'s');
+  }else{
+    pb.classList.remove('ready');
+    const need=Math.pow(S.rpTotal+1,3)*1e9;
+    pb.textContent='Next point at '+fmt(need)+' GB mined all time';
+  }
+  PERKS.forEach(p=>{
+    const e=el.perks[p.id], lvl=S.perks[p.id]||0;
+    e.own.textContent=lvl;
+    e.sub.textContent=p.desc(lvl);
+    if(lvl>=p.max){ e.price.textContent='Maxed'; e.btn.classList.remove('can'); e.btn.classList.add('owned'); }
+    else{
+      const c=p.cost(lvl);
+      e.price.textContent=c+' RP';
+      e.btn.classList.toggle('can', S.rp>=c);
+    }
+  });
+
+  // achievements
+  ACHS.forEach(a=>{ el.achs[a.id].classList.toggle('got', S.achs.includes(a.id)); });
+  $('achHint').textContent = S.achs.length+' of '+ACHS.length+' unlocked. Each one permanently lifts everything by 1%'+(S.tech.includes('g5')?' — doubled to 2% by your morale programme.':'.');
+
+  // stats (only while that tab is open)
+  if(!$('v-stats').classList.contains('on')) return;
+  const rows=[
+    ['Data in the pool',fmt(S.gb)+' GB'],
+    ['Mined this run',fmt(S.runGb)+' GB'],
+    ['Mined all time',fmt(S.lifetime)+' GB'],
+    ['Current rate',fmtR(bps())+' GB/s'],
+    ['Best rate',fmtR(S.bestBps)+' GB/s'],
+    ['Per click',fmt(clickPower())+' GB'],
+    ['Clicks',S.clicks.toLocaleString('en-AU')],
+    ['Staff and hardware',GENS.reduce((a,g)=>a+S.gens[g.id].count,0).toLocaleString('en-AU')],
+    ['Research bought',S.tech.length+' / '+TECH.length],
+    ['Restructures',S.prestiges],
+    ['Restructure points',S.rp+' banked, '+S.rpTotal+' earned'],
+    ['Golden Ollies caught',S.goldens],
+    ['Outages fixed',S.fixes],
+    ['Awards',S.achs.length+' / '+ACHS.length],
+    ['Time played',fmtTime(S.playtime)],
+    ['Total multiplier','×'+globalMult(false).toFixed(2)]
+  ];
+  $('statList').innerHTML = rows.map(r=>`<div class="stat"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('');
+}
+
+/* ============================================================
+   LOOPS
+   ============================================================ */
+let lastTick=performance.now();
+function tick(){
+  const now=performance.now();
+  const dt=Math.min(0.5,(now-lastTick)/1000);
+  lastTick=now;
+
+  earn(bps()*dt);
+  S.playtime+=dt;
+
+  heat=Math.max(0,heat-18*dt);
+
+  const auto=S.perks.auto||0;
+  if(auto>0){
+    autoAcc+=dt*auto;
+    while(autoAcc>=1){ autoAcc-=1; doClick(0,0,true); }
+  }
+
+  buffs=buffs.filter(b=>b.ends>Date.now());
+
+  goldenTimer-=dt;
+  if(goldenTimer<=0 && $('golden').style.display!=='block'){ spawnGolden(); }
+
+  if(S.lifetime>5000){
+    if(outage){
+      if(Date.now()>outage.ends) endOutage(false);
+    }else{
+      outageTimer-=dt;
+      if(outageTimer<=0) startOutage();
     }
   }
 
-  function buyUpgrade(type) {
-    const upgrade = upgrades[type];
-    if (score >= upgrade.cost) {
-      score -= upgrade.cost;
-      upgrade.count++;
-      baseBps += upgrade.bps;
-      upgrade.cost = Math.ceil(upgrade.cost * 1.15); // Standard idle scaling
-      updateDisplay();
-      saveGame();
+  checkAchs();
+}
+setInterval(tick,50);
+setInterval(()=>{ render(); buildTech(); },90);
+setInterval(save,4000);
+
+/* ============================================================
+   SAVE / LOAD
+   ============================================================ */
+function save(){
+  S.lastSeen=Date.now();
+  const out={v:6,S:{...S, gens:Object.fromEntries(GENS.map(g=>[g.id,S.gens[g.id].count]))}};
+  try{ Store.set(KEY, JSON.stringify(out)); }catch(e){}
+}
+function load(){
+  let wiped=false;
+  LEGACY.forEach(k=>{ if(Store.get(k)!==null){ Store.del(k); wiped=true; } });
+
+  const raw=Store.get(KEY);
+  if(raw){
+    try{
+      const d=JSON.parse(raw);
+      const o=d.S||{};
+      const gens=freshGens();
+      if(o.gens) for(const k in o.gens){ if(gens[k]) gens[k].count=o.gens[k]||0; }
+      S={...S,...o,gens};
+      S.tech=(S.tech||[]).filter(id=>TECH.some(t=>t.id===id));
+      S.achs=(S.achs||[]).filter(id=>ACHS.some(a=>a.id===id));
+      S.perks=S.perks||{};
+      offlineCatchUp();
+    }catch(e){ console.warn('Save unreadable, starting fresh.',e); }
+  }
+  shownScore=S.gb;
+  if(wiped) setTimeout(()=>welcomeWipe(),400);
+}
+function offlineCatchUp(){
+  const away=(Date.now()-(S.lastSeen||Date.now()))/1000;
+  if(away<60) return;
+  const lvl=S.perks.offline||0;
+  if(lvl<1) return;
+  const capped=Math.min(away,(2+lvl*2)*3600);
+  const gained=bps()*capped*(0.10+lvl*0.10);
+  if(gained<1) return;
+  earn(gained);
+  setTimeout(()=>{
+    infoBox('While you were away',
+      `Your network ran for ${fmtTime(capped)} and banked <b>${fmt(gained)} GB</b>.<br><br>Upgrade the overnight roster perk to bank more of it.`);
+  },600);
+}
+function wipe(){
+  confirmBox('Wipe this save?','Everything goes: data, staff, research, restructure points, perks and awards. There is no undo.',()=>{
+    Store.del(KEY);
+    LEGACY.forEach(k=>Store.del(k));
+    location.reload();
+  });
+}
+
+/* ============================================================
+   MODALS
+   ============================================================ */
+function closeModal(){ $('modal').classList.remove('on'); }
+function confirmBox(title,body,onYes){
+  $('modalBox').innerHTML=`<h2>${title}</h2><p>${body}</p>
+    <div class="acts"><button class="no" id="mNo">Cancel</button><button class="go" id="mYes">Do it</button></div>`;
+  $('modal').classList.add('on');
+  $('mNo').onclick=closeModal;
+  $('mYes').onclick=()=>{ closeModal(); onYes(); };
+}
+function infoBox(title,body){
+  $('modalBox').innerHTML=`<h2>${title}</h2><p>${body}</p>
+    <div class="acts"><button class="go" id="mOk">Got it</button></div>`;
+  $('modal').classList.add('on');
+  $('mOk').onclick=closeModal;
+}
+function welcomeWipe(){
+  infoBox('Fresh start for everyone',
+    'The Total Coverage update rebalanced every number in the game, so all old progress has been cleared. Restructure points, perks, research and awards are new this version — there is a lot more to chase now.');
+}
+function exportSave(){
+  save();
+  const data=btoa(unescape(encodeURIComponent(Store.get(KEY)||'')));
+  $('modalBox').innerHTML=`<h2>Export save</h2><p>Copy this text and keep it somewhere safe.</p>
+    <textarea id="expArea" readonly>${data}</textarea>
+    <div class="acts"><button class="no" id="mNo">Close</button><button class="go" id="mCopy">Copy</button></div>`;
+  $('modal').classList.add('on');
+  $('mNo').onclick=closeModal;
+  $('mCopy').onclick=()=>{
+    const a=$('expArea'); a.select();
+    try{ document.execCommand('copy'); toast('','Copied','Save code is on your clipboard.'); }catch(e){}
+  };
+}
+function importSave(){
+  $('modalBox').innerHTML=`<h2>Import save</h2><p>Paste a save code. This replaces your current progress.</p>
+    <textarea id="impArea" placeholder="Paste here"></textarea>
+    <div class="acts"><button class="no" id="mNo">Cancel</button><button class="go" id="mGo">Load it</button></div>`;
+  $('modal').classList.add('on');
+  $('mNo').onclick=closeModal;
+  $('mGo').onclick=()=>{
+    try{
+      const txt=decodeURIComponent(escape(atob($('impArea').value.trim())));
+      JSON.parse(txt);
+      Store.set(KEY,txt);
+      location.reload();
+    }catch(e){ toast('bad','Import failed','That code could not be read. Check you copied all of it.'); }
+  };
+}
+
+/* ============================================================
+   BACKGROUND CANVAS — drifting signal mesh
+   ============================================================ */
+(function(){
+  const cv=$('bg'), ctx=cv.getContext && cv.getContext('2d');
+  if(!ctx){ cv.style.display='none'; return; }
+  let w,h,nodes=[],packets=[];
+  function size(){
+    w=cv.width=window.innerWidth; h=cv.height=window.innerHeight;
+    const target=Math.min(70,Math.floor(w*h/22000));
+    nodes=[];
+    for(let i=0;i<target;i++){
+      nodes.push({x:Math.random()*w,y:Math.random()*h,vx:(Math.random()-.5)*.22,vy:(Math.random()-.5)*.22,r:Math.random()*1.8+.8});
     }
   }
+  size();
+  window.addEventListener('resize',size);
 
-  // --- RENDER LOOP ---
-  function updateDisplay() {
-    scoreDisplay.innerText = formatNumber(score) + " GB";
+  function draw(){
+    ctx.clearRect(0,0,w,h);
+    const g=ctx.createLinearGradient(0,0,w,h);
+    g.addColorStop(0,'#03121a'); g.addColorStop(.55,'#052029'); g.addColorStop(1,'#03161f');
+    ctx.fillStyle=g; ctx.fillRect(0,0,w,h);
 
-    // Calculate Live CPS (Clicks per second from the last 1000ms)
-    const now = Date.now();
-    clickHistory = clickHistory.filter(timestamp => now - timestamp < 1000);
-    const activeClickBps = clickHistory.length * getEffectiveClickPower();
-    const totalLiveBps = getEffectiveBps() + activeClickBps;
-    
-    bpsDisplay.innerText = formatNumber(totalLiveBps);
-    
-    // Turn GB/s Teal if you are actively clicking
-    if(activeClickBps > 0) {
-      bpsWrapper.classList.add('bps-live');
-    } else {
-      bpsWrapper.classList.remove('bps-live');
+    const busy=Math.min(1,Math.log10(Math.max(1,bps()))/9);
+    for(const n of nodes){
+      n.x+=n.vx; n.y+=n.vy;
+      if(n.x<0||n.x>w) n.vx*=-1;
+      if(n.y<0||n.y>h) n.vy*=-1;
     }
-
-    if (rebirthCount > 0) {
-      multDisplay.style.display = 'inline-block';
-      multDisplay.innerText = `Efficiency Boost: ${getMultiplier()}x`;
-    }
-
-    // Update Click Upgrade UI
-    const clickBtn = document.getElementById('btn-clickup');
-    document.getElementById('clickup-cost').innerText = formatNumber(clickUpgrade.cost) + " GB";
-    document.getElementById('clickup-count').innerText = "Lvl " + clickUpgrade.level;
-    if (score >= clickUpgrade.cost) {
-      clickBtn.disabled = false;
-      clickBtn.classList.add('affordable');
-    } else {
-      clickBtn.disabled = true;
-      clickBtn.classList.remove('affordable');
-    }
-
-    // Update Passive Upgrade UI
-    for (const key in upgrades) {
-      const u = upgrades[key];
-      const btn = document.getElementById(u.btnId);
-      document.getElementById(u.costId).innerText = formatNumber(u.cost) + " GB";
-      document.getElementById(u.countId).innerText = u.count;
-      
-      if (score >= u.cost) {
-        btn.disabled = false;
-        btn.classList.add('affordable');
-      } else {
-        btn.disabled = true;
-        btn.classList.remove('affordable');
+    ctx.lineWidth=1;
+    for(let i=0;i<nodes.length;i++){
+      for(let j=i+1;j<nodes.length;j++){
+        const a=nodes[i],b=nodes[j];
+        const dx=a.x-b.x, dy=a.y-b.y, d2=dx*dx+dy*dy;
+        if(d2<24000){
+          const al=(1-d2/24000)*(0.09+busy*0.16);
+          ctx.strokeStyle='rgba(0,200,205,'+al.toFixed(3)+')';
+          ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+        }
       }
     }
-
-    // Update Rebirth UI
-    const rebirthBtn = document.getElementById('btn-rebirth');
-    const currentRebirthCost = getRebirthCost();
-    document.getElementById('rebirth-cost').innerText = formatNumber(currentRebirthCost) + " GB";
-    
-    if(score >= currentRebirthCost) {
-      rebirthBtn.disabled = false;
-      rebirthBtn.classList.add('affordable');
-    } else {
-      rebirthBtn.disabled = true;
-      rebirthBtn.classList.remove('affordable');
+    for(const n of nodes){
+      ctx.fillStyle='rgba(0,220,215,'+(0.18+busy*0.35)+')';
+      ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,6.3); ctx.fill();
     }
+
+    if(packets.length<6+busy*22 && Math.random()<0.12+busy*0.3 && nodes.length>2){
+      const a=nodes[(Math.random()*nodes.length)|0], b=nodes[(Math.random()*nodes.length)|0];
+      if(a!==b) packets.push({a,b,t:0,sp:0.006+Math.random()*0.012});
+    }
+    packets=packets.filter(p=>{
+      p.t+=p.sp;
+      if(p.t>=1) return false;
+      const x=p.a.x+(p.b.x-p.a.x)*p.t, y=p.a.y+(p.b.y-p.a.y)*p.t;
+      ctx.fillStyle=buffs.length?'rgba(255,216,77,.85)':'rgba(25,240,220,.75)';
+      ctx.beginPath(); ctx.arc(x,y,2.1,0,6.3); ctx.fill();
+      return true;
+    });
+    requestAnimationFrame(draw);
   }
+  draw();
+})();
 
-  // Idle Game Generation Loop (10x a second)
-  setInterval(() => {
-    score += getEffectiveBps() / 10;
-    updateDisplay();
-  }, 100);
+/* ============================================================
+   WIRING
+   ============================================================ */
+$('orb').addEventListener('pointerdown',e=>{
+  Snd.init();
+  doClick(e.clientX,e.clientY,false);
+  render();
+});
+$('orb').addEventListener('keydown',e=>{
+  if(e.key===' '||e.key==='Enter'){
+    e.preventDefault();
+    Snd.init();
+    const r=$('orb').getBoundingClientRect();
+    doClick(r.left+r.width/2,r.top+r.height/2,false);
+    render();
+  }
+});
+$('orbImg').addEventListener('load',()=>{
+  $('orbImg').style.display='block';
+  $('orbSvg').style.display='none';
+});
 
-  // Auto-Save Loop (1x a second)
-  setInterval(() => {
-    saveGame();
-  }, 1000);
+document.querySelectorAll('.tab').forEach(t=>{
+  t.onclick=()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.view').forEach(x=>x.classList.remove('on'));
+    t.classList.add('on'); t.classList.remove('alert');
+    $('v-'+t.dataset.view).classList.add('on');
+    Snd.tone({f:660,d:.05,type:'sine',g:.07});
+  };
+});
+document.querySelectorAll('.buy-opt').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('.buy-opt').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    S.buyAmt = b.dataset.buy==='max'?'max':parseInt(b.dataset.buy,10);
+    render();
+  };
+});
+$('doPrestige').onclick=()=>{ if(rpPending()>=1) prestige(); else Snd.deny(); };
+$('golden').onclick=catchGolden;
+$('fixBtn').onclick=()=>endOutage(true);
+$('wipeBtn').onclick=wipe;
+$('expBtn').onclick=exportSave;
+$('impBtn').onclick=importSave;
+$('sfxBtn').onclick=()=>{
+  S.sfx=!S.sfx; $('sfxBtn').classList.toggle('off',!S.sfx);
+  $('sfxBtn').textContent=(S.sfx?'🔊':'🔇')+' Sound';
+  if(S.sfx){ Snd.init(); Snd.tone({f:880,d:.08,type:'sine',g:.14}); }
+  save();
+};
+$('musBtn').onclick=()=>{
+  S.music=!S.music; $('musBtn').classList.toggle('off',!S.music);
+  Snd.toggleMusic(S.music); save();
+};
+$('modal').onclick=e=>{ if(e.target===$('modal')) closeModal(); };
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+window.addEventListener('beforeunload',save);
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) save(); });
 
-  loadGame();
+/* ticker */
+(function(){
+  const run=$('tickRun');
+  const shuffled=[...HEADLINES].sort(()=>Math.random()-.5);
+  run.textContent = shuffled.join('   •   ')+'   •   ';
+})();
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+load();
+buildAll();
+scheduleGolden();
+scheduleOutage();
+document.querySelectorAll('.buy-opt').forEach(b=>b.classList.toggle('on', b.dataset.buy===String(S.buyAmt)));
+$('sfxBtn').classList.toggle('off',!S.sfx);
+$('sfxBtn').textContent=(S.sfx?'🔊':'🔇')+' Sound';
+$('musBtn').classList.toggle('off',!S.music);
+if(S.music) setTimeout(()=>Snd.toggleMusic(true),800);
+render();
 </script>
-
 </body>
 </html>
