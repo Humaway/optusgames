@@ -819,8 +819,8 @@ const APP_NAME = "BARS";
 
 // Versions (leave these alone). APP_VERSION lets open tabs notice a newer bars.html is live;
 // RULES_VERSION must match the "rules-vN" probe in the security rules at the bottom of this file.
-const APP_VERSION = "2026.09.16-4";
-const RULES_VERSION = 4;
+const APP_VERSION = "2026.09.16-5";
+const RULES_VERSION = 5;
 
 // Tweakables
 const HUB_URL = "../index.html";          // "← Optus Games" link
@@ -867,6 +867,7 @@ const state = {
   followingUid: null,
   followInFlight: new Set(),
   segTab: 'hot',
+  clockSkew: 0,                            // device clock minus server clock (ms), measured when needed
   seen: new Set(),                        // meme ids rendered this session (Rising inserts skip these)
   meterScores: null,
   wallScroll: {},
@@ -2009,8 +2010,22 @@ function normLayer(l = {}) {
   };
 }
 function makeLayer(p = {}) { return normLayer({ text: '', x: 0.5, y: 0.5, anchor: 'middle', w: 0.9, size: 0, font: 'impact', color: '#FFFFFF', stroke: '#000000', sw: 0.12, bg: '', bga: 0.85, align: 'center', rot: 0, caps: true, ...p }); }
+// Posted memes store styling as one JSON string (design); drafts and older posts carry layers/frame/filter directly.
+const designCache = new Map();
+function designOf(m) {
+  if (typeof m?.design !== 'string') return m || {};
+  let d = designCache.get(m.design);
+  if (!d) {
+    try { d = JSON.parse(m.design); } catch { d = null; }
+    if (!d || typeof d !== 'object' || Array.isArray(d)) d = {};
+    if (designCache.size > 500) designCache.clear();
+    designCache.set(m.design, d);
+  }
+  return d;
+}
+function filterOf(m) { const f = designOf(m).filter; return FILTERS[f] ? f : 'none'; }
 function frameOf(m) {
-  const f = m.frame || {};
+  const f = designOf(m).frame || {};
   return { top: num(f.top, 0, 0.6, 0), bottom: num(f.bottom, 0, 0.6, 0), color: HEX_RX.test(f.color || '') ? f.color.toUpperCase() : '#FFFFFF' };
 }
 function mediaAspectOf(gif) { const g = gif || {}; return clamp((+g.height || 360) / (+g.width || 480), 0.3, 1.5); }
@@ -2019,7 +2034,8 @@ function dimsOf(m) {
   return { ma, top: f.top, bottom: f.bottom, H: ma + f.top + f.bottom, color: f.color };
 }
 function layersOf(m) {
-  if (Array.isArray(m.layers)) return m.layers.slice(0, MAX_LAYERS).map(normLayer);
+  const src = designOf(m);
+  if (Array.isArray(src.layers)) return src.layers.slice(0, MAX_LAYERS).filter(l => l && typeof l === 'object').map(normLayer);
   const ma = mediaAspectOf(m.gif), out = [];
   const base = { w: 0.92, font: 'impact', color: m.textColor === 'yellow' ? '#FFCD00' : '#FFFFFF', stroke: '#000000', sw: 0.12, caps: m.allCaps !== false, size: m.fontScale > 0 ? 10 * m.fontScale : 0 };
   if (m.topText) out.push(makeLayer({ ...base, text: m.topText, anchor: 'top', y: 0.03 / ma }));
@@ -2027,6 +2043,8 @@ function layersOf(m) {
   return out;
 }
 function memeText(m) {
+  if (typeof m.caption === 'string' && m.caption) return m.caption;
+  if (Array.isArray(designOf(m).layers)) return layersOf(m).map(l => l.text.trim()).filter(Boolean).join(' / ');
   if (Array.isArray(m.layers)) return m.caption || m.layers.map(l => String(l.text || '').trim()).filter(Boolean).join(' / ');
   return [m.topText, m.bottomText].filter(Boolean).join(' / ');
 }
@@ -2097,7 +2115,7 @@ function memeBoxAttrs(dm, extraStyle = '') {
   return `style="aspect-ratio:1 / ${dm.H.toFixed(4)};${bg}${extraStyle}" data-h="${dm.H.toFixed(4)}" data-t="${dm.top}" data-b="${dm.bottom}"`;
 }
 function memeInnerHtml(m, mode, dm = dimsOf(m)) {
-  const fcss = FILTERS[m.filter]?.css || '';
+  const fcss = FILTERS[filterOf(m)].css;
   const layers = layersOf(m);
   ensureFonts(layers.map(l => l.font));
   return `<span class="meme-media" style="top:${pct(dm.top / dm.H)};height:${pct(dm.ma / dm.H)}${fcss ? `;filter:${fcss}` : ''}">${mediaInner(m, mode)}</span>${layers.map(l => layerHtml(l, dm)).join('')}`;
@@ -2554,7 +2572,7 @@ async function renderMemeCanvas(m, videoEl) {
   const mx = 0, my = Math.round(W * dm.top), mw = W, mh = Math.round(W * dm.ma);
   const drawCover = (src, sw, sh) => {
     const scale = Math.max(mw / sw, mh / sh), cw = mw / scale, chh = mh / scale;
-    ctx.save(); ctx.filter = FILTERS[m.filter]?.css || 'none';
+    ctx.save(); ctx.filter = FILTERS[filterOf(m)].css || 'none';
     ctx.drawImage(src, (sw - cw) / 2, (sh - chh) / 2, cw, chh, mx, my, mw, mh);
     ctx.restore();
   };
@@ -3073,7 +3091,7 @@ async function openCreator(q) {
       if (!m) { try { const s = await F.getDoc(F.doc(db(), 'memes', q.remix)); if (s.exists()) m = memeFromDoc(s); } catch { } }
       if (m) {
         const gif = cleanGif(m.gif), look = presetLook('classic', [], gif);
-        draft = migrateDraft({ ...newDraft(), gif, layers: look.layers, remixOf: m.id, remixAuthor: m.authorName, step: 2, remixLook: { layers: layersOf(m), frame: frameOf(m), filter: FILTERS[m.filter] ? m.filter : 'none' } });
+        draft = migrateDraft({ ...newDraft(), gif, layers: look.layers, remixOf: m.id, remixAuthor: m.authorName, step: 2, remixLook: { layers: layersOf(m), frame: frameOf(m), filter: filterOf(m) } });
       } else toast("Couldn't load that meme to remix.");
     }
   }
@@ -3777,6 +3795,14 @@ function bumpMemeCount(delta) {
   b.update(F.doc(db(), 'users', state.user.uid), { memeCount: F.increment(delta) });
   b.commit().catch(e => console.warn('[BARS] meme counter', e.code || e));
 }
+function buildPostData(meme, { title = '', remixOf = null } = {}) {
+  return {
+    authorId: state.user.uid, authorName: state.profile.username, gif: cleanGif(meme.gif), title,
+    design: JSON.stringify({ v: 1, layers: meme.layers, frame: meme.frame, filter: meme.filter }),
+    caption: meme.caption, remixOf, upvotes: 0, downvotes: 0, score: 0,
+    hotScore: hotScore(0, (Date.now() - state.clockSkew) / 1000), reportCount: 0, hidden: false, createdAt: F.serverTimestamp(),
+  };
+}
 async function postMeme(btn) {
   const el = creator.el, d = creator.draft; if (!el || btn.classList.contains('is-loading')) return;
   const err = el.querySelector('.c-error'); err.textContent = '';
@@ -3791,24 +3817,24 @@ async function postMeme(btn) {
   btn.classList.add('is-loading'); btn.textContent = 'Posting';
   const uid = state.user.uid;
   const ref = F.doc(F.collection(db(), 'memes'));
-  const data = {
-    authorId: uid, authorName: state.profile.username, gif: cleanGif(d.gif), title,
-    layers: meme.layers, frame: meme.frame, filter: meme.filter, caption: meme.caption,
-    remixOf: d.remixOf || null, upvotes: 0, downvotes: 0, score: 0,
-    hotScore: hotScore(0, Date.now() / 1000), reportCount: 0, hidden: false, createdAt: F.serverTimestamp(),
-  };
+  let data = buildPostData(meme, { title, remixOf: d.remixOf || null });
   const write = () => { const b = F.writeBatch(db()); b.set(ref, data); return b.commit(); };
   try {
     try { await write(); }
     catch (e) {
       if (e.code !== 'permission-denied') throw e;
-      // The rules require the post to carry your current username. If it changed on another device, refresh it and retry once.
+      // The rules require your current username. If it changed on another device, refresh it and retry once.
       const fresh = await (F.getDocFromServer || F.getDoc)(F.doc(db(), 'users', uid)).catch(() => null);
       if (fresh?.exists() && fresh.data().username && fresh.data().username !== data.authorName) {
         state.profile = normalizeProfile(uid, fresh.data()); cacheAuthor(uid, state.profile); renderAuthSlot();
-        data.authorName = state.profile.username;
+        data = buildPostData(meme, { title, remixOf: d.remixOf || null });
         await write();
-      } else { e.fresh = fresh; throw e; }
+      } else {
+        err.textContent = 'Checking what went wrong…';
+        const why = await explainPostRejection(meme, { title, remixOf: d.remixOf || null }, fresh);
+        if (why.retry) { data = buildPostData(meme, { title, remixOf: d.remixOf || null }); await write(); }
+        else { e.why = why; throw e; }
+      }
     }
     store.set('bars:lastPost', Date.now());
     bumpMemeCount(1);
@@ -3820,54 +3846,78 @@ async function postMeme(btn) {
     closeCreatorDom();
     replaceRoute(`#/m/${ref.id}?new=1`);
   } catch (e) {
-    console.warn('[BARS] post', e.code || e);
+    console.warn('[BARS] post', e.code || e, e.why?.detail || '');
+    if (!creator.el) return;
     if (e.code === 'permission-denied') {
-      err.textContent = 'Checking what went wrong…';
-      const why = await explainPostRejection(data, e.fresh);
-      if (!creator.el) return;
-      err.innerHTML = `${esc(why.msg)}${why.action === 'refresh' ? ' <button type="button" class="link-btn" data-post-fix="refresh">Refresh now</button>' : why.action === 'setup' ? ' <button type="button" class="link-btn" data-post-fix="setup">Finish setup</button>' : why.action === 'avatar' ? ' <button type="button" class="link-btn" data-post-fix="profile">Edit profile</button>' : ''}`;
+      const why = e.why || { msg: 'Firestore refused the post. Try again in a moment.' };
+      const fixBtn = { refresh: 'Refresh now', setup: 'Finish setup', check: 'Open setup check' }[why.action];
+      err.innerHTML = `${esc(why.msg)}${fixBtn ? ` <button type="button" class="link-btn" data-post-fix="${why.action}">${fixBtn}</button>` : ''}`;
       err.querySelector('[data-post-fix]')?.addEventListener('click', ev => {
         const f = ev.currentTarget.dataset.postFix;
-        if (f === 'refresh') hardRefresh(); else if (f === 'setup') openOnboarding(); else openEditProfile();
+        if (f === 'refresh') hardRefresh(); else if (f === 'setup') openOnboarding(); else { saveDraft.flush(); closeCreatorDom(); go('#/setup-check'); }
       });
     } else err.textContent = errorMessage(e);
     btn.classList.remove('is-loading'); btn.textContent = 'Post';
   }
 }
 
-// ---- Why did Firestore refuse this post? Checks, in order of likelihood. ----
+// ---- Why did Firestore refuse this post? ----
 const GIPHY_URL_RX = /^https:\/\/([a-z0-9-]+\.)*giphy\.com\/.*/;
-const HEX6 = /^#[0-9A-Fa-f]{6}$/;
-function findPostProblem(m) {
-  const g = m.gif || {};
-  if (!g.id || [g.mp4Url, g.webpUrl, g.stillUrl].some(u => u && (!GIPHY_URL_RX.test(u) || u.length >= 1000)) || (!g.mp4Url && !g.webpUrl)) return 'That GIF has an unusual link BARS can\'t save. Pick a different GIF.';
-  if (!Number.isInteger(g.width) || !Number.isInteger(g.height)) return 'That GIF is missing its size. Pick a different GIF.';
-  if (!Array.isArray(m.layers) || !m.layers.length || m.layers.length > MAX_LAYERS) return 'Add at least one text box (8 at most).';
-  for (const [i, l] of m.layers.entries()) {
-    const n = i + 1;
-    if (!l.text || l.text.length > MAX_LAYER_TEXT) return `Text box ${n} is empty or too long.`;
-    if (!(l.x >= 0 && l.x <= 1 && l.y >= 0 && l.y <= 1)) return `Text box ${n} is off the edge of the meme. Drag it back on.`;
-    if (!(l.w >= 0.15 && l.w <= 1 && l.size >= 0 && l.size <= 30 && l.sw >= 0 && l.sw <= 0.3 && l.bga >= 0.1 && l.bga <= 1 && l.rot >= -180 && l.rot <= 180)) return `Text box ${n} has a setting out of range. Nudge its size or rotation and try again.`;
-    if (!FONTS[l.font] || !HEX6.test(l.color) || !HEX6.test(l.stroke) || (l.bg && !HEX6.test(l.bg))) return `Text box ${n} has a font or colour BARS can't save.`;
-  }
-  const f = m.frame || {};
-  if (!(f.top >= 0 && f.top <= 0.6 && f.bottom >= 0 && f.bottom <= 0.6 && HEX6.test(f.color || ''))) return 'The frame settings are out of range. Adjust the frame and try again.';
-  if (!FILTERS[m.filter]) return 'Pick a filter from the Frame tab.';
-  if ((m.title || '').length > MAX_TITLE) return 'The title is too long.';
+function findPostProblem(meme, title) {
+  const g = meme.gif || {};
+  if (!g.id || [g.mp4Url, g.webpUrl, g.stillUrl].some(u => u && (!GIPHY_URL_RX.test(u) || u.length >= 1000)) || (!g.mp4Url && !g.webpUrl)) return "That GIF has an unusual link BARS can't save. Pick a different GIF.";
+  if ((title || '').length > MAX_TITLE) return 'The title is too long.';
+  if (!meme.caption) return 'Add some text first.';
+  if (JSON.stringify({ v: 1, layers: meme.layers, frame: meme.frame, filter: meme.filter }).length > 6000) return 'This meme has too much styling data. Remove a text box or two.';
   return '';
 }
 async function rulesUpToDate() {
   try { await (F.getDocFromServer || F.getDoc)(F.doc(db(), 'meta', `rules-v${RULES_VERSION}`)); return true; }
   catch (e) { return e.code === 'permission-denied' ? false : null; }
 }
-async function explainPostRejection(data, fresh) {
+// Test writes to postTests/{uid}: validated by exactly the same rule as a real post, but never shown and deleted straight away.
+async function postTest(payload) {
+  const ref = F.doc(db(), 'postTests', state.user.uid);
+  try { const b = F.writeBatch(db()); b.delete(ref); await b.commit(); } catch { }
+  try {
+    const b = F.writeBatch(db()); b.set(ref, payload); await b.commit();
+    let serverMs = null;
+    try { const s = await (F.getDocFromServer || F.getDoc)(ref); const at = s.data()?.at || s.data()?.meme?.createdAt; if (at?.toMillis) serverMs = at.toMillis(); } catch { }
+    const del = F.writeBatch(db()); del.delete(ref); del.commit().catch(() => { });
+    return { ok: true, serverMs };
+  } catch (e) { return { ok: false, code: e.code }; }
+}
+async function explainPostRejection(meme, opts, fresh) {
   if (await checkForUpdate({ force: true, notify: false })) return { msg: 'BARS has been updated since this page was opened. Refresh, then post again.', action: 'refresh' };
-  if ((await rulesUpToDate()) === false) return { msg: "The security rules in Firebase are older than this version of BARS. The site owner needs to re-publish the rules from the bottom of bars.html." };
+  const rules = await rulesUpToDate();
+  if (rules === false) return { msg: 'The security rules in Firebase are older than this version of BARS. The site owner needs to re-publish the rules from the bottom of bars.html.', action: 'check' };
   if (fresh && !fresh.exists()) return { msg: "Your profile didn't finish saving. Finish setting it up, then post again.", action: 'setup' };
-  const problem = findPostProblem(data);
-  if (problem) return { msg: problem };
-  if (fresh?.exists() && fresh.data().username !== data.authorName) return { msg: 'Your username changed on another device. Refresh, then post again.', action: 'refresh' };
-  return { msg: "Firestore still refused the post. Check this device's date and time are set automatically, then try again." };
+  const local = findPostProblem(meme, opts.title);
+  if (local) return { msg: local };
+
+  // 1. Measure this device's clock against Firebase's, and correct future posts for it.
+  const t0 = Date.now();
+  const clock = await postTest({ at: F.serverTimestamp() });
+  if (!clock.ok) return { msg: "Firebase rejected even a basic test write. Re-publish the security rules from the bottom of bars.html, then try again.", action: 'check', detail: `clock probe ${clock.code}` };
+  if (clock.serverMs) {
+    const skew = Math.round((t0 + Date.now()) / 2 - clock.serverMs);
+    const wasOff = Math.abs(skew - state.clockSkew) > 60 * 1000;
+    state.clockSkew = Math.abs(skew) > 30 * 1000 ? skew : 0;
+    if (wasOff && Math.abs(skew) > 70 * 60 * 1000) {
+      // Big clock error: try the exact post again with the corrected time.
+      const retry = await postTest({ meme: buildPostData(meme, opts) });
+      if (retry.ok) return { retry: true };
+    }
+  }
+  // 2. Test the exact post, then simpler versions, to find the part Firebase objects to.
+  if ((await postTest({ meme: buildPostData(meme, opts) })).ok) return { retry: true };
+  const simple = { ...meme, layers: [makeLayer({ text: 'test', anchor: 'top', y: 0.05 })], frame: { top: 0, bottom: 0, color: '#FFFFFF' }, filter: 'none', caption: 'test' };
+  if ((await postTest({ meme: buildPostData(meme, { ...opts, title: '' }) })).ok) return { msg: 'Firebase rejected the title. Try a shorter or simpler title.', detail: 'title' };
+  if ((await postTest({ meme: buildPostData(simple, opts) })).ok) return { msg: "Firebase rejected this meme's text or styling. Try removing a text box, then post again.", detail: 'design' };
+  if (opts.remixOf && (await postTest({ meme: buildPostData(meme, { ...opts, remixOf: null }) })).ok) return { msg: "Firebase rejected the link to the original meme. Tap Clear and start a fresh meme instead of a remix.", detail: 'remixOf' };
+  const gifOk = await postTest({ meme: buildPostData({ ...simple, gif: { id: 'setup-check', title: '', mp4Url: '', webpUrl: 'https://media.giphy.com/media/setup-check/giphy.webp', stillUrl: '', width: 480, height: 270 } }, { title: '', remixOf: null }) });
+  if (gifOk.ok) return { msg: 'Firebase rejected this GIF. Pick a different GIF and try again.', detail: 'gif' };
+  return { msg: 'Firebase rejected every test post, so the security rules published in Firebase don\'t match this version. Re-publish the rules from the bottom of bars.html.', action: 'check', detail: 'all' };
 }
 
 function gifBrowser(root, onPick) {
@@ -4377,6 +4427,7 @@ async function renderSetupCheck() {
     { label: 'Profiles (New), Following feed, More from @user', idx: 'memes: authorId ↑, hidden ↑, createdAt ↓', q: () => baseQuery(F.where('authorId', '==', 'setup-check'), F.orderBy('createdAt', 'desc'), F.limit(1)) },
     { label: 'Profiles (Top), best meme', idx: 'memes: authorId ↑, hidden ↑, score ↓', q: () => baseQuery(F.where('authorId', '==', 'setup-check'), F.orderBy('score', 'desc'), F.limit(1)) },
     { label: 'Security rules are the latest version', idx: 'No index needed. Checks the rules from the bottom of bars.html are published.', rulesProbe: true },
+    { label: 'Test post', idx: 'Sends a hidden test post through the security rules, then deletes it. Needs you to be signed in.', postProbe: true },
   ];
   host.innerHTML = `<section class="setup"><div class="setup-card">
     ${BARS_MARK}
@@ -4397,6 +4448,15 @@ async function renderSetupCheck() {
       row.querySelector('.idx-act').innerHTML = act;
     };
     try {
+      if (c.postProbe) {
+        await Promise.race([authReadyP, sleep(3000)]);
+        if (!state.user || !state.profile) { set('checking', 'wait', 'Sign in to run'); return; }
+        const gif = { id: 'setup-check', title: '', mp4Url: '', webpUrl: 'https://media.giphy.com/media/setup-check/giphy.webp', stillUrl: '', width: 480, height: 270 };
+        const res = await postTest({ meme: buildPostData({ gif, layers: [makeLayer({ text: 'test', anchor: 'top', y: 0.05 })], frame: { top: 0, bottom: 0, color: '#FFFFFF' }, filter: 'none', caption: 'test' }) });
+        if (res.ok) set('ok', 'ok', 'Posting works');
+        else { blocked++; set('bad', 'bad', 'Rejected'); }
+        return;
+      }
       if (c.rulesProbe) await (F.getDocFromServer || F.getDoc)(F.doc(db(), 'meta', `rules-v${RULES_VERSION}`));
       else await getServer(c.q());
       set('ok', 'ok', c.rulesProbe ? 'Up to date' : 'Ready');
@@ -4814,6 +4874,43 @@ service cloud.firestore {
       );
     }
 
+    // (createdAtSeconds - EPOCH) / 45000, EPOCH = 1767225600 (2026-01-01 UTC). Must match HOT_EPOCH in the app.
+    function hotBase(t) { return (t.toMillis() / 1000.0 - 1767225600.0) / 45000.0; }
+    function giphyUrl(u) {
+      return u is string && (u == '' || (u.size() < 1000 && u.matches('^https://([a-z0-9-]+[.])*giphy[.]com/.*')));
+    }
+    function validGif(g) {
+      return g is map
+        && g.keys().hasOnly(['id', 'title', 'mp4Url', 'webpUrl', 'stillUrl', 'width', 'height'])
+        && g.keys().hasAll(['id', 'mp4Url', 'webpUrl', 'stillUrl', 'width', 'height'])
+        && g.id is string && g.id.size() > 0 && g.id.size() < 64
+        && (!('title' in g) || (g.title is string && g.title.size() <= 200))
+        && giphyUrl(g.mp4Url) && giphyUrl(g.webpUrl) && giphyUrl(g.stillUrl)
+        && (g.mp4Url != '' || g.webpUrl != '')
+        && g.width is int && g.height is int;
+    }
+    // A new meme. Styling (text boxes, frame, filter) is one compact JSON string that the app sanitises
+    // before display, so this rule costs the same no matter how many text boxes a meme has. (Firestore stops
+    // evaluating after ~1,000 steps per request, so validating every text box field by field is too expensive.)
+    function validNewMeme(d) {
+      return d.keys().hasOnly(['authorId', 'authorName', 'gif', 'title', 'design', 'caption', 'remixOf', 'upvotes', 'downvotes', 'score', 'hotScore', 'reportCount', 'hidden', 'createdAt'])
+        && d.keys().hasAll(['authorId', 'authorName', 'gif', 'title', 'design', 'caption', 'remixOf', 'upvotes', 'downvotes', 'score', 'hotScore', 'reportCount', 'hidden', 'createdAt'])
+        && d.authorId == request.auth.uid
+        && d.authorName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username
+        && validGif(d.gif)
+        && d.title is string && d.title.size() <= 100
+        && d.design is string && d.design.size() >= 10 && d.design.size() <= 6000
+        && d.caption is string && d.caption.size() > 0 && d.caption.size() <= 1000
+        && (d.remixOf == null || (d.remixOf is string && d.remixOf.size() < 64))
+        && d.upvotes == 0 && d.downvotes == 0 && d.score == 0 && d.reportCount == 0
+        && d.hidden == false
+        && d.createdAt == request.time
+        && d.hotScore is number
+        // A device clock up to 75 min fast or a day slow is accepted (the app also corrects for it).
+        && d.hotScore <= hotBase(request.time) + 0.1
+        && d.hotScore >= hotBase(request.time) - 2;
+    }
+
     // ---------- users ----------
     match /users/{uid} {
       allow read: if true;
@@ -4887,27 +4984,12 @@ service cloud.firestore {
         return math.abs(s) < 10 ? 0 : math.abs(s) < 100 ? 1 : math.abs(s) < 1000 ? 2
           : math.abs(s) < 10000 ? 3 : math.abs(s) < 100000 ? 4 : math.abs(s) < 1000000 ? 5 : 6;
       }
-      // (createdAtSeconds - EPOCH) / 45000, EPOCH = 1767225600 (2026-01-01 UTC). Must match HOT_EPOCH in the app.
-      function hotBase(t) { return (t.toMillis() / 1000.0 - 1767225600.0) / 45000.0; }
       function hotOk(h, s, t) {
         return h is number && (
           s == 0 ? math.abs(h - hotBase(t)) < 0.001
           : s > 0 ? (h - hotBase(t) > band(s) - 0.001 && h - hotBase(t) < band(s) + 1.001)
           : (hotBase(t) - h > band(s) - 0.001 && hotBase(t) - h < band(s) + 1.001)
         );
-      }
-      function giphyUrl(u) {
-        return u is string && (u == '' || (u.size() < 1000 && u.matches('^https://([a-z0-9-]+[.])*giphy[.]com/.*')));
-      }
-      function validGif(g) {
-        return g is map
-          && g.keys().hasOnly(['id', 'title', 'mp4Url', 'webpUrl', 'stillUrl', 'width', 'height'])
-          && g.keys().hasAll(['id', 'mp4Url', 'webpUrl', 'stillUrl', 'width', 'height'])
-          && g.id is string && g.id.size() > 0 && g.id.size() < 64
-          && (!('title' in g) || (g.title is string && g.title.size() <= 200))
-          && giphyUrl(g.mp4Url) && giphyUrl(g.webpUrl) && giphyUrl(g.stillUrl)
-          && (g.mp4Url != '' || g.webpUrl != '')
-          && g.width is int && g.height is int;
       }
       function votingUpdate(b, a) {
         return resource.data.authorId != request.auth.uid
@@ -4934,66 +5016,11 @@ service cloud.firestore {
           && request.resource.data.authorName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username;
       }
 
-      // Text layers: up to 8, each fully validated. (Rules can't loop, so each index is checked explicitly.)
-      function hexColor(c) { return c is string && c.matches('^#[0-9A-Fa-f]{6}$'); }
-      function validLayer(l) {
-        return l is map
-          && l.keys().hasOnly(['text', 'x', 'y', 'anchor', 'w', 'size', 'font', 'color', 'stroke', 'sw', 'bg', 'bga', 'align', 'rot', 'caps'])
-          && l.keys().hasAll(['text', 'x', 'y', 'anchor', 'w', 'size', 'font', 'color', 'stroke', 'sw', 'bg', 'bga', 'align', 'rot', 'caps'])
-          && l.text is string && l.text.size() > 0 && l.text.size() <= 120
-          && l.x is number && l.x >= 0 && l.x <= 1
-          && l.y is number && l.y >= 0 && l.y <= 1
-          && l.anchor in ['top', 'middle', 'bottom']
-          && l.w is number && l.w >= 0.15 && l.w <= 1
-          && l.size is number && l.size >= 0 && l.size <= 30
-          && l.font in ['impact', 'pow', 'marker', 'comic', 'clean', 'serif', 'mono']
-          && hexColor(l.color) && hexColor(l.stroke)
-          && l.sw is number && l.sw >= 0 && l.sw <= 0.3
-          && (l.bg == '' || hexColor(l.bg))
-          && l.bga is number && l.bga >= 0.1 && l.bga <= 1
-          && l.align in ['left', 'center', 'right']
-          && l.rot is number && l.rot >= -180 && l.rot <= 180
-          && l.caps is bool;
-      }
-      function layerOk(ls, i) { return ls.size() <= i || validLayer(ls[i]); }
-      function validLayers(ls) {
-        return ls is list && ls.size() >= 1 && ls.size() <= 8
-          && layerOk(ls, 0) && layerOk(ls, 1) && layerOk(ls, 2) && layerOk(ls, 3)
-          && layerOk(ls, 4) && layerOk(ls, 5) && layerOk(ls, 6) && layerOk(ls, 7);
-      }
-      function validFrame(f) {
-        return f is map && f.keys().hasOnly(['top', 'bottom', 'color']) && f.keys().hasAll(['top', 'bottom', 'color'])
-          && f.top is number && f.top >= 0 && f.top <= 0.6
-          && f.bottom is number && f.bottom >= 0 && f.bottom <= 0.6
-          && hexColor(f.color);
-      }
-
       // Guests can browse. Hidden memes are visible only to their author.
       allow read: if resource.data.hidden == false
         || (signedIn() && resource.data.authorId == request.auth.uid);
 
-      allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['authorId', 'authorName', 'gif', 'title', 'layers', 'frame', 'filter', 'caption', 'remixOf', 'upvotes', 'downvotes', 'score', 'hotScore', 'reportCount', 'hidden', 'createdAt'])
-        && request.resource.data.keys().hasAll(['authorId', 'authorName', 'gif', 'title', 'layers', 'frame', 'filter', 'caption', 'remixOf', 'upvotes', 'downvotes', 'score', 'hotScore', 'reportCount', 'hidden', 'createdAt'])
-        && request.resource.data.authorId == request.auth.uid
-        && request.resource.data.authorName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username
-        && validGif(request.resource.data.gif)
-        && request.resource.data.title is string && request.resource.data.title.size() <= 100
-        && validLayers(request.resource.data.layers)
-        && validFrame(request.resource.data.frame)
-        && request.resource.data.filter in ['none', 'fried', 'mono', 'faded', 'warm', 'cool', 'moody']
-        && request.resource.data.caption is string && request.resource.data.caption.size() > 0 && request.resource.data.caption.size() <= 1000
-        && (request.resource.data.remixOf == null || (request.resource.data.remixOf is string && request.resource.data.remixOf.size() < 64))
-        && request.resource.data.upvotes == 0
-        && request.resource.data.downvotes == 0
-        && request.resource.data.score == 0
-        && request.resource.data.reportCount == 0
-        && request.resource.data.hidden == false
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.hotScore is number
-        // A device clock up to 75 min fast, or up to a day slow, is accepted (a slow clock only lowers your own ranking).
-        && request.resource.data.hotScore <= hotBase(request.time) + 0.1
-        && request.resource.data.hotScore >= hotBase(request.time) - 2;
+      allow create: if signedIn() && validNewMeme(request.resource.data);
 
       allow update: if signedIn() && (
         votingUpdate(voteBefore(), voteAfter())
@@ -5036,11 +5063,22 @@ service cloud.firestore {
     }
 
     // ---------- rules version probe ----------
-    // The app reads meta/rules-v4 (it never exists). Allowed means these rules are published;
+    // The app reads meta/rules-v5 (it never exists). Allowed means these rules are published;
     // denied means Firebase still has older rules. Keep the number in sync with RULES_VERSION.
     match /meta/{docId} {
-      allow get: if docId == 'rules-v4';
+      allow get: if docId == 'rules-v5';
       allow list, write: if false;
+    }
+
+    // ---------- post tests ----------
+    // When a post is rejected, the app writes test versions here (never shown anywhere, deleted straight away)
+    // to find out exactly which part Firebase objects to, and reads back the server time to check the device clock.
+    match /postTests/{uid} {
+      allow get, delete: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid && (
+        (request.resource.data.keys().hasOnly(['meme']) && validNewMeme(request.resource.data.meme))
+        || (request.resource.data.keys().hasOnly(['at']) && request.resource.data.at == request.time)
+      );
     }
 
     // ---------- follows: one doc per follow, id = {followerUid}_{targetUid} ----------
