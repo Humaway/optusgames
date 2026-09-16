@@ -491,6 +491,7 @@ code{font-family:var(--mono);font-size:.85em;background:rgba(0,0,0,.06);padding:
       <div class="row" id="mtdModTools"></div>
     </div>
     <p id="mtdLockNote" class="small hidden" style="margin:10px 0 0"></p>
+    <p id="mtdScoreNote" class="small hidden" style="margin:10px 0 0"></p>
   </div>
 
   <div id="mtdKpis"></div>
@@ -1611,6 +1612,9 @@ async function bulkSales(sales, action){
         voidedBy:state.profile.displayName,
         voidedAt:firebase.firestore.FieldValue.serverTimestamp()
       });
+      else if (action === "rescore") batch.update(ref, {
+        points:computePoints(s, pointsConfig())
+      });
       else if (action === "restore") batch.update(ref, {
         voided:false, voidedBy:null, voidedAt:null,
         editedAt:firebase.firestore.FieldValue.serverTimestamp(),
@@ -1756,6 +1760,20 @@ function computePoints(s, W){
   }
 
   return round1(p);
+}
+
+/* Points live on the sale doc, written when the sale was saved. If the weights
+   change afterwards, untouched sales keep their old score while any sale that
+   gets edited is rescored on save — so two identical sales can sit on the
+   board with different points. These find that drift so it can be shown and
+   fixed rather than quietly disagreeing with itself. */
+function scoreDrift(sale, W){
+  const now = computePoints(sale, W || pointsConfig());
+  return now === round1(num(sale.points)) ? null : now;
+}
+function staleScores(sales, W){
+  W = W || pointsConfig();
+  return (sales || []).filter(s => scoreDrift(s, W) !== null);
 }
 
 /* Human-readable version of the live weights, shown in Admin. */
@@ -2564,6 +2582,17 @@ function renderMTD(){
       "It's read-only — no sales can be added, edited or voided in it.";
   } else if (m !== thisMonth()) {
     note.innerHTML = "Viewing " + esc(monthLabel(m)) + ". Past months are read-only for staff.";
+  }
+
+  // Scores that no longer match the weights table, for managers only.
+  const scoreNote = $("#mtdScoreNote");
+  const stale = isMod() && !locked ? staleScores(state.sales[m] || []) : [];
+  scoreNote.classList.toggle("hidden", !stale.length);
+  if (stale.length) {
+    scoreNote.innerHTML = "<strong>" + stale.length + " sale" + (stale.length === 1 ? "" : "s") +
+      " on this board " + (stale.length === 1 ? "was" : "were") + " scored under older points weights.</strong> " +
+      'Identical sales can show different points until they\'re brought into line — ' +
+      '<a href="#/admin">rescore the month in Admin</a>.';
   }
 
   renderMtdTools(m, locked);
@@ -3642,9 +3671,11 @@ function renderAdminSales(){
     th("value", "Value", "num") + th("points", "Points", "num") +
     "<th>Status</th><th></th></tr></thead><tbody>";
 
+  const W = pointsConfig();
   shown.forEach(s => {
     const val = rollup([Object.assign({}, s, { voided:false })]).totalValue;
     const locked = monthLocked(s.month);
+    const drift = scoreDrift(s, W);
     h += '<tr class="' + (s.voided ? "voidrow" : "") + '">' +
       '<td data-label=""><input type="checkbox" data-pick="' + esc(s.id) + '"' +
         (state.salesSelection[s.id] ? " checked" : "") + (locked ? " disabled" : "") +
@@ -3656,7 +3687,11 @@ function renderAdminSales(){
       '<td data-label="Sale">' + esc(saleSummary(s)) +
         (s.notes ? '<br><span class="small muted">' + esc(s.notes) + "</span>" : "") + "</td>" +
       '<td data-label="Value" class="num">' + money(val) + "</td>" +
-      '<td data-label="Points" class="num">' + int(s.points) + "</td>" +
+      '<td data-label="Points" class="num">' + int(s.points) +
+        (drift !== null
+          ? ' <span class="pill pending" title="Scored under older weights. The current table gives ' +
+            int(drift) + '.">&rarr; ' + int(drift) + "</span>"
+          : "") + "</td>" +
       '<td data-label="Status">' +
         (s.voided ? '<span class="pill susp">Void</span>' : '<span class="pill user">Live</span>') +
         (s.editedAt ? ' <span class="pill">edited</span>' : "") +
@@ -3685,6 +3720,7 @@ function renderSalesBulkBar(){
   $("#admSalesBulk").innerHTML = n
     ? '<div class="row" style="margin:10px 0;padding:10px;border:1px solid var(--line-strong);border-radius:var(--r)">' +
         "<strong>" + n + " selected</strong>" +
+        '<button id="bulkRescore" class="btn-sm">Rescore selected</button>' +
         '<button id="bulkVoid" class="btn-sm">Void selected</button>' +
         '<button id="bulkRestore" class="btn-sm">Restore selected</button>' +
         '<button id="bulkDel" class="btn-sm btn-danger">Delete selected</button>' +
@@ -3694,6 +3730,7 @@ function renderSalesBulkBar(){
   if (!n) return;
   const picked = () => Object.keys(state.salesSelection).map(findSale).filter(Boolean);
   $("#bulkClear").onclick = () => { state.salesSelection = {}; renderAdminSales(); };
+  $("#bulkRescore").onclick = () => runBulk(picked(), "rescore");
   $("#bulkVoid").onclick = () => runBulk(picked(), "void");
   $("#bulkRestore").onclick = () => runBulk(picked(), "restore");
   $("#bulkDel").onclick = () => runBulk(picked(), "delete");
@@ -3704,14 +3741,21 @@ async function runBulk(sales, action){
   const locked = sales.filter(s => monthLocked(s.month));
   if (locked.length) return toast(locked.length + " of those are in a locked month.", "bad");
   const pts = sales.reduce((a, s) => a + num(s.points), 0);
-  const verb = action === "delete" ? "Delete" : action === "void" ? "Void" : "Restore";
+  const verb = action === "delete" ? "Delete" : action === "void" ? "Void"
+             : action === "rescore" ? "Rescore" : "Restore";
+  const after = action === "rescore"
+    ? sales.reduce((a, s) => a + computePoints(s, pointsConfig()), 0)
+    : 0;
 
   const ok = await askConfirm(verb + " " + sales.length + " sale" + (sales.length === 1 ? "" : "s") + "?",
     "<p>" + int(pts) + " points across " + Object.keys(sales.reduce((a, s) => (a[s.businessDate] = 1, a), {})).length +
-    " day(s).</p>" +
+    " day(s)." + (action === "rescore" ? " They'd become <strong>" + int(after) + "</strong> under the current weights." : "") + "</p>" +
     (action === "delete"
       ? '<p class="small" style="color:var(--bad);font-weight:700">Deleting removes the rows from the database for good. ' +
         "Voiding takes them out of every total but keeps them for audit — that's usually what you want.</p>"
+      : "") +
+    (action === "rescore"
+      ? '<p class="small muted">Historical scores will change. A day already posted as EOD keeps its posted figure and gets a discrepancy note.</p>'
       : ""),
     verb + " them", action === "delete");
   if (!ok) return;
@@ -3858,7 +3902,18 @@ function renderAdminStore(){
 
 function renderAdminPoints(){
   const W = pointsConfig();
-  $("#admPoints").innerHTML =
+  const m = state.monthSel || thisMonth();
+  const stale = staleScores(state.sales[m] || [], W);
+  const driftNote = stale.length
+    ? '<p class="banner" style="border-radius:8px;margin:0 0 12px;text-align:left">' +
+      "<strong>" + stale.length + " sale" + (stale.length === 1 ? "" : "s") + " in " + esc(monthLabel(m)) +
+      " " + (stale.length === 1 ? "was" : "were") + " scored under different weights</strong> and " +
+      (stale.length === 1 ? "doesn't" : "don't") + " match the table below. " +
+      "That happens when weights change after sales are logged: an edited sale is rescored on save, an untouched one keeps its old points. " +
+      "Rescore the month to bring them all into line.</p>"
+    : "";
+
+  $("#admPoints").innerHTML = driftNote +
     '<p class="small muted">"x plan cost" multiplies the plan price (or the recharge amount, for prepaid). "Flat" awards the same points every time.</p>' +
     '<table class="data"><thead><tr><th>Event</th><th>How it scores</th><th class="num">Value</th></tr></thead><tbody>' +
     Object.keys(W).map(k =>
@@ -3871,7 +3926,8 @@ function renderAdminPoints(){
     ).join("") + "</tbody></table>" +
     '<div class="row" style="margin-top:12px"><button id="btnSavePoints" class="btn-primary">Save points</button>' +
     '<button id="btnResetPoints" class="btn-sm">Reset to built-in defaults</button>' +
-    '<button id="btnRecompute" class="btn-sm btn-danger">Recompute this month</button></div>' +
+    '<button id="btnRecompute" class="btn-sm ' + (stale.length ? "btn-go" : "btn-danger") + '">Rescore ' +
+      esc(monthLabel(m)) + (stale.length ? " (" + stale.length + ")" : "") + "</button></div>" +
     "<h3 style=\"margin-top:16px\">Live formula</h3><div class=\"formula\">" + esc(formulaText(W)) + "</div>";
 
   $("#btnSavePoints").onclick = async () => {
@@ -3887,7 +3943,10 @@ function renderAdminPoints(){
       await db.collection("config").doc("points").set({ weights:weights,
         updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
         updatedBy:state.profile.displayName }, { merge:true });
-      toast("Points saved. New sales score the new way.");
+      toast("Points saved");
+      // Don't let the change diverge quietly: offer the rescore right away.
+      const drifted = staleScores(state.sales[state.monthSel || thisMonth()] || [], pointsConfig());
+      if (drifted.length) await recomputeMonth(state.monthSel || thisMonth());
     } catch (e) { toast(friendlyAuthError(e), "bad"); }
   };
   $("#btnResetPoints").onclick = async () => {
@@ -3898,7 +3957,7 @@ function renderAdminPoints(){
       toast("Points reset");
     } catch (e) { toast(friendlyAuthError(e), "bad"); }
   };
-  $("#btnRecompute").onclick = () => recomputeMonth(state.monthSel || thisMonth());
+  $("#btnRecompute").onclick = () => recomputeMonth(m);
 }
 
 async function recomputeMonth(m){
