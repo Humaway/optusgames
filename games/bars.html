@@ -281,13 +281,13 @@ body.setup-mode .sidebar,body.setup-mode .bottom-nav,body.setup-mode .top-action
    MEME MEDIA + CAPTIONS
    ============================================================ */
 .meme{position:relative;display:block;width:100%;background:#000;container-type:inline-size;overflow:hidden;color:#fff;text-decoration:none !important;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.meme-media{position:absolute;left:0;right:0;top:0;height:100%;overflow:hidden}
 .meme .media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.cap{position:absolute;left:0;right:0;margin:0;padding:0 4cqw;text-align:center;font-family:var(--font-meme);font-weight:400;font-size:calc(var(--k,9) * 1cqw);line-height:1.08;color:#fff;-webkit-text-stroke:.12em #000;paint-order:stroke fill;text-shadow:0 0 .04em #000;overflow-wrap:anywhere;pointer-events:none;white-space:pre-wrap}
-.cap-top{top:3cqw}
-.cap-bottom{bottom:3cqw}
-.cap.is-yellow{color:#FFCD00}
-.cap.is-ph{opacity:.32}
-@supports not (container-type:inline-size){ .cap{font-size:calc(var(--k,9) * 5.8px);padding:0 4%} .cap-top{top:12px} .cap-bottom{bottom:12px} }
+.layer{position:absolute;margin:0;font-size:calc(var(--k,9) * 1cqw);-webkit-text-stroke:calc(var(--sw,.12) * 1em) var(--st,#000);paint-order:stroke fill;overflow-wrap:anywhere;word-break:normal;white-space:pre-wrap;pointer-events:none;transform-origin:50% 50%;font-synthesis:none}
+.layer .lt{background:var(--bg,transparent);-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.layer.has-bg .lt{padding:.06em .28em;border-radius:.16em}
+.layer.is-ph{opacity:.42}
+@supports not (container-type:inline-size){ .layer{font-size:calc(var(--k,9) * 3.8px)} }
 .meme .rm-play{position:absolute;right:10px;bottom:10px;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:none;place-items:center}
 .reduce-motion .card .meme .rm-play{display:grid}
 .play-toggle{position:absolute;right:10px;top:10px;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;display:grid;place-items:center;z-index:2}
@@ -499,15 +499,81 @@ body.setup-mode .sidebar,body.setup-mode .bottom-nav,body.setup-mode .top-action
 .gif-sk{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .gif-sk .sk{border-radius:10px;height:110px}
 .gif-sk .sk:nth-child(3n+2){height:150px}
-.c-edit{display:grid;gap:18px}
-@media (min-width:820px){ .c-edit{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:start;padding-top:24px} .c-preview-col{position:sticky;top:0} }
-.c-preview-col .meme{border-radius:var(--r-card)}
-.c-remix-note{font-size:13.5px;color:var(--text-muted);margin-bottom:8px}
-.c-under{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
-.ctrl-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--border)}
-.ctrl-row .field-label{margin:0;font-size:14px;color:var(--text)}
-.size-row{display:flex;align-items:center;gap:10px;flex:1;justify-content:flex-end}
-.size-row input{flex:1;max-width:220px;accent-color:var(--yellow)}
+.c-under{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+
+/* Meme editor */
+.ed{display:grid;gap:12px;max-width:1100px;margin:0 auto;padding:0 12px 28px}
+.ed-stage{position:sticky;top:0;z-index:6;background:var(--bg);padding:8px 0 10px;--edmax:38dvh;box-shadow:0 10px 12px -12px rgba(0,0,0,.5)}
+@media (min-width:900px){
+  .ed{grid-template-columns:minmax(0,1.25fr) minmax(340px,1fr);align-items:start;gap:28px;padding:16px 24px 32px}
+  .ed-stage{--edmax:calc(100dvh - 270px);box-shadow:none}
+}
+.ed-toolbar{display:flex;align-items:center;gap:4px;margin-bottom:4px}
+.ed-toolbar .icon-btn[disabled]{opacity:.35;pointer-events:none}
+.ed-canvas-wrap{position:relative;margin:16px auto 14px;width:min(100%, calc(var(--edmax) * var(--ar,1.5)))}
+.ed-canvas.meme{border-radius:12px;touch-action:none;outline:none;box-shadow:0 0 0 1px var(--border-strong);cursor:default}
+.ed-canvas.meme:focus-visible{box-shadow:0 0 0 2px var(--focus)}
+.ed-layers{position:absolute;inset:0}
+.ed-canvas .layer{pointer-events:auto;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.ed-canvas .layer:active{cursor:grabbing}
+.ed-chrome{position:absolute;z-index:4;pointer-events:none;border:1.5px dashed #fff;border-radius:5px;box-shadow:0 0 0 1px rgba(0,0,0,.55),inset 0 0 0 1px rgba(0,0,0,.35)}
+.ed-h{position:absolute;width:26px;height:26px;border-radius:50%;background:#fff;color:#0B1416;display:grid;place-items:center;pointer-events:auto;touch-action:none;box-shadow:0 1px 5px rgba(0,0,0,.45),0 0 0 2px var(--teal)}
+.ed-h::before{content:"";position:absolute;inset:-9px;border-radius:50%}
+.ed-h-rot{left:-14px;top:-14px;cursor:grab}
+.ed-h-del{right:-14px;top:-14px;color:#B92D20}
+.ed-h-scale{right:-14px;bottom:-14px;cursor:nwse-resize}
+.ed-guide{position:absolute;z-index:3;pointer-events:none;background:#FF2D95}
+.ed-guide-v{top:0;bottom:0;left:50%;width:1px}
+.ed-guide-h{left:0;right:0;top:50%;height:1px}
+.ed-panel{display:flex;flex-direction:column;gap:12px;min-width:0}
+.ed-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:10px 12px 12px}
+.ed-remix{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13.5px;color:var(--text-muted)}
+.ed-remix p{display:flex;align-items:center;gap:6px}
+.ed-tip{display:flex;align-items:flex-start;gap:12px;font-size:13px;color:var(--text-muted);background:var(--surface);border:1px dashed var(--border-strong);border-radius:12px;padding:10px 12px}
+.ed-tip span{flex:1}
+.ed-list{display:flex;flex-direction:column;gap:4px}
+.ed-lrow{display:flex;align-items:flex-start;gap:8px;padding:5px;border-radius:12px;border:1.5px solid transparent}
+.ed-lrow[aria-current="true"]{border-color:var(--yellow);background:var(--surface-2)}
+.ed-lnum{width:24px;height:24px;border-radius:50%;background:var(--surface-3);display:grid;place-items:center;font-size:12px;font-weight:750;flex:none;margin-top:10px}
+.ed-lrow[aria-current="true"] .ed-lnum{background:var(--yellow);color:var(--on-yellow)}
+.ed-lrow textarea{flex:1;min-width:0;resize:none;border:1px solid var(--border-strong);background:var(--bg);color:var(--text);border-radius:10px;padding:10px 12px;font:inherit;font-size:16px;line-height:1.3;min-height:44px;overflow:hidden}
+.ed-lrow textarea:focus{outline:none;border-color:var(--teal-text);box-shadow:0 0 0 3px rgba(0,124,128,.3)}
+.ed-lrow .icon-btn{margin-top:2px;flex:none}
+.ed-add{display:flex;align-items:center;justify-content:center;gap:6px;height:42px;margin-top:4px;border-radius:12px;border:1.5px dashed var(--border-strong);color:var(--text-muted);font-weight:650;font-size:14px}
+.ed-add:hover{color:var(--text);border-color:var(--yellow)}
+.ed-note{font-size:13px;color:var(--text-muted);text-align:center;padding:8px}
+.ed-tabs{margin-bottom:6px}
+.ed-group{padding:12px 0;border-top:1px solid var(--border)}
+.ed-group:first-child{border-top:0}
+.ed-label{display:block;font-size:13px;font-weight:650;color:var(--text-muted);margin-bottom:8px}
+.ed-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.ed-val{font-size:12.5px;font-weight:650;color:var(--text);font-variant-numeric:tabular-nums}
+.ed-inline{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ed-inline .ed-label{margin:0}
+.ed-slider{display:flex;align-items:center;gap:10px}
+.ed-slider input[type=range]{flex:1;min-width:0;accent-color:var(--yellow);height:28px}
+.ed-empty{text-align:center;color:var(--text-muted);font-size:14px;padding:18px 8px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.font-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.font-chip{height:46px;border-radius:10px;background:var(--surface-2);border:1.5px solid transparent;font-size:16px;color:var(--text);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 4px}
+.font-chip:hover{background:var(--surface-3)}
+.font-chip[aria-checked="true"]{border-color:var(--yellow);background:var(--surface-3)}
+.swatches.wrap{flex-wrap:wrap;gap:9px}
+.swatches.wrap .swatch{width:30px;height:30px}
+.sw-none{background:linear-gradient(135deg,transparent 46%,var(--danger) 46% 54%,transparent 54%),var(--surface-2) !important}
+.sw-custom{background:conic-gradient(#FF3B30,#FFCD00,#34C759,#0A84FF,#AF52DE,#FF3B30);cursor:pointer;display:block}
+.sw-custom.is-on{background:var(--c)}
+.sw-custom.is-on::after{content:"";position:absolute;inset:-4px;border-radius:50%;box-shadow:0 0 0 2px var(--text)}
+.sw-custom input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
+.sw-custom:focus-within{outline:2px solid var(--focus);outline-offset:3px}
+.icon-seg{display:flex;gap:2px;background:var(--surface-2);border-radius:10px;padding:3px}
+.icon-seg button{width:42px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--text-muted)}
+.icon-seg button[aria-checked="true"]{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.btn-row{display:flex;flex-wrap:wrap;gap:6px}
+.filter-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.filter-chip{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--text-muted)}
+.filter-chip img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;border:2px solid transparent;background:#000}
+.filter-chip[aria-checked="true"]{color:var(--text)}
+.filter-chip[aria-checked="true"] img{border-color:var(--yellow)}
 .switch{width:46px;height:28px;border-radius:999px;background:var(--surface-3);position:relative;transition:background-color .2s;flex:none}
 .switch i{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .2s var(--ease);box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .switch[aria-checked="true"]{background:var(--teal)}
@@ -549,12 +615,12 @@ body.setup-mode .sidebar,body.setup-mode .bottom-nav,body.setup-mode .top-action
 /* Tiles (profile grid + rows) */
 .tile{position:relative;display:block;border-radius:12px;overflow:hidden;background:var(--surface);border:1px solid var(--border);color:var(--text);text-decoration:none !important;content-visibility:auto;contain-intrinsic-size:auto 240px;transition:transform .15s var(--ease)}
 .tile:hover{transform:translateY(-2px)}
-.tile .meme{aspect-ratio:1}
 .tile-score{display:flex;align-items:center;gap:4px;height:32px;padding:0 10px;font-size:13px;font-weight:750;font-variant-numeric:tabular-nums}
 .tile-score .i{color:var(--yellow)}
 :root[data-theme="light"] .tile-score .i{color:var(--teal-text)}
 .tile-score .i path{fill:currentColor}
-.tile .cap{-webkit-text-stroke:.1em #000}
+.tile-box{display:flex;align-items:center;justify-content:center;aspect-ratio:1;background:#000;overflow:hidden}
+.tile .tile-box .meme{flex:none}
 .sk-tile{aspect-ratio:1/1.16;border-radius:12px}
 
 /* ============================================================
@@ -994,6 +1060,21 @@ const ICONS = {
   signalOff: '<path d="M4 20v-2M9 20v-5M14 20v-9M19 20V6" /><path d="M3 3l18 18"/>',
   rising: '<path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/>',
   users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/>',
+  undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>',
+  layout: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 7.5h10M7 16.5h10"/>',
+  barTop: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18"/><path d="M8 6h8"/>',
+  barBottom: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 15h18"/><path d="M8 18h8"/>',
+  label: '<rect x="3" y="3" width="18" height="18" rx="3"/><rect x="6" y="13" width="12" height="4" rx="1.5" fill="currentColor" stroke="none"/>',
+  text: '<path d="M5 6V4h14v2"/><path d="M12 4v16"/><path d="M9 20h6"/>',
+  rotate: '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/>',
+  resize: '<path d="M14 4h6v6"/><path d="M10 20H4v-6"/><path d="M20 4l-7 7M4 20l7-7"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  arrowUp: '<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>',
+  arrowDown: '<path d="M12 5v14"/><path d="M6 13l6 6 6-6"/>',
+  alignLeft: '<path d="M4 6h16M4 10h10M4 14h16M4 18h10"/>',
+  alignCenter: '<path d="M4 6h16M7 10h10M4 14h16M7 18h10"/>',
+  alignRight: '<path d="M4 6h16M10 10h10M4 14h16M10 18h10"/>',
   wall: '<rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/>',
 };
 function icon(name, size = 20, cls = '') {
@@ -1857,63 +1938,177 @@ function cleanGif(g) {
 // ============================================================
 const fitCtx = document.createElement('canvas').getContext('2d');
 let fitCache = new Map();
-const clampAspect = a => clamp(a || 0.75, 0.3, 1.5);
-// Returns caption size as a percentage of meme width (used as cqw), so the layout is identical at every width.
-function fitK(text, aspect) {
+
+// ---- Text layer model ----
+// A meme is: the GIF, an optional coloured frame (space above/below), a filter, and up to 8 text layers.
+// Positions are fractions of the whole frame; sizes are % of frame width (cqw), so memes render
+// identically at any size. Memes posted before layers existed (topText/bottomText) convert on the fly.
+const MAX_LAYERS = 8, MAX_LAYER_TEXT = 120;
+const HEX_RX = /^#[0-9a-f]{6}$/i;
+const FONTS = {
+  impact: { label: 'Impact', stack: "Anton, Impact, 'Arial Black', sans-serif", weight: 400, lh: 1.08, face: 'Anton' },
+  pow: { label: 'Pow!', stack: "Bangers, Impact, 'Arial Black', sans-serif", weight: 400, lh: 1.05, face: 'Bangers' },
+  marker: { label: 'Marker', stack: "'Permanent Marker', 'Comic Sans MS', cursive", weight: 400, lh: 1.2, face: 'Permanent Marker' },
+  comic: { label: 'Comic', stack: "'Comic Neue', 'Comic Sans MS', 'Chalkboard SE', sans-serif", weight: 700, lh: 1.15, face: 'Comic Neue' },
+  clean: { label: 'Clean', stack: "system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif", weight: 800, lh: 1.16 },
+  serif: { label: 'Serif', stack: "Georgia, 'Times New Roman', serif", weight: 700, lh: 1.16 },
+  mono: { label: 'Mono', stack: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace", weight: 700, lh: 1.16 },
+};
+const FILTERS = {
+  none: { label: 'None', css: '' },
+  fried: { label: 'Deep fried', css: 'saturate(3.2) contrast(1.7) brightness(1.08) hue-rotate(-12deg)' },
+  mono: { label: 'Mono', css: 'grayscale(1) contrast(1.12)' },
+  faded: { label: 'Faded', css: 'saturate(.55) contrast(.85) brightness(1.1)' },
+  warm: { label: 'Warm', css: 'sepia(.45) saturate(1.35)' },
+  cool: { label: 'Cool', css: 'saturate(1.15) hue-rotate(20deg) brightness(1.03)' },
+  moody: { label: 'Moody', css: 'brightness(.72) contrast(1.25) saturate(.9)' },
+};
+const PALETTE = ['#FFFFFF', '#000000', '#FFCD00', '#007C80', '#FF3B30', '#FF8A00', '#34C759', '#0A84FF', '#AF52DE', '#FF2D95'];
+const COLOR_NAMES = { '#FFFFFF': 'White', '#000000': 'Black', '#FFCD00': 'Optus yellow', '#007C80': 'Teal', '#FF3B30': 'Red', '#FF8A00': 'Orange', '#34C759': 'Green', '#0A84FF': 'Blue', '#AF52DE': 'Purple', '#FF2D95': 'Pink' };
+const WEB_FONT_URL = 'https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@700&family=Permanent+Marker&display=swap';
+const pct = v => `${(v * 100).toFixed(3)}%`;
+const hexA = (hex, a) => `rgba(${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)},${a})`;
+const num = (v, a, b, d) => { v = +v; return Number.isFinite(v) ? clamp(v, a, b) : d; };
+
+let extraFontsP = null;
+const refitSoon = debounce(() => refitAllCaptions(), 80);
+function ensureFonts(keys) {
+  const need = [...new Set(keys)].filter(k => FONTS[k]?.face && k !== 'impact');
+  if (!need.length || !document.fonts) return Promise.resolve();
+  if (!extraFontsP) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet'; link.href = WEB_FONT_URL;
+    extraFontsP = new Promise(r => { link.onload = r; link.onerror = r; setTimeout(r, 4000); });
+    document.head.append(link);
+  }
+  return extraFontsP
+    .then(() => Promise.all(need.map(k => document.fonts.load(`${FONTS[k].weight} 40px '${FONTS[k].face}'`).catch(() => []))))
+    .then(res => { if (res.some(f => f && f.length)) refitSoon(); });
+}
+
+function normLayer(l = {}) {
+  return {
+    text: String(l.text ?? '').slice(0, MAX_LAYER_TEXT),
+    x: num(l.x, 0, 1, 0.5), y: num(l.y, 0, 1, 0.5),
+    anchor: ['top', 'middle', 'bottom'].includes(l.anchor) ? l.anchor : 'middle',
+    w: num(l.w, 0.15, 1, 0.9), size: num(l.size, 0, 30, 0),
+    font: FONTS[l.font] ? l.font : 'impact',
+    color: HEX_RX.test(l.color || '') ? l.color.toUpperCase() : '#FFFFFF',
+    stroke: HEX_RX.test(l.stroke || '') ? l.stroke.toUpperCase() : '#000000',
+    sw: num(l.sw, 0, 0.3, 0.12),
+    bg: HEX_RX.test(l.bg || '') ? l.bg.toUpperCase() : '',
+    bga: num(l.bga, 0.1, 1, 0.85),
+    align: ['left', 'center', 'right'].includes(l.align) ? l.align : 'center',
+    rot: num(l.rot, -180, 180, 0),
+    caps: l.caps !== false,
+  };
+}
+function makeLayer(p = {}) { return normLayer({ text: '', x: 0.5, y: 0.5, anchor: 'middle', w: 0.9, size: 0, font: 'impact', color: '#FFFFFF', stroke: '#000000', sw: 0.12, bg: '', bga: 0.85, align: 'center', rot: 0, caps: true, ...p }); }
+function frameOf(m) {
+  const f = m.frame || {};
+  return { top: num(f.top, 0, 0.6, 0), bottom: num(f.bottom, 0, 0.6, 0), color: HEX_RX.test(f.color || '') ? f.color.toUpperCase() : '#FFFFFF' };
+}
+function mediaAspectOf(gif) { const g = gif || {}; return clamp((+g.height || 360) / (+g.width || 480), 0.3, 1.5); }
+function dimsOf(m) {
+  const ma = mediaAspectOf(m.gif), f = frameOf(m);
+  return { ma, top: f.top, bottom: f.bottom, H: ma + f.top + f.bottom, color: f.color };
+}
+function layersOf(m) {
+  if (Array.isArray(m.layers)) return m.layers.slice(0, MAX_LAYERS).map(normLayer);
+  const ma = mediaAspectOf(m.gif), out = [];
+  const base = { w: 0.92, font: 'impact', color: m.textColor === 'yellow' ? '#FFCD00' : '#FFFFFF', stroke: '#000000', sw: 0.12, caps: m.allCaps !== false, size: m.fontScale > 0 ? 10 * m.fontScale : 0 };
+  if (m.topText) out.push(makeLayer({ ...base, text: m.topText, anchor: 'top', y: 0.03 / ma }));
+  if (m.bottomText) out.push(makeLayer({ ...base, text: m.bottomText, anchor: 'bottom', y: 1 - 0.03 / ma }));
+  return out;
+}
+function memeText(m) {
+  if (Array.isArray(m.layers)) return m.caption || m.layers.map(l => String(l.text || '').trim()).filter(Boolean).join(' / ');
+  return [m.topText, m.bottomText].filter(Boolean).join(' / ');
+}
+function memeAria(m) { return [m.gif?.title, memeText(m)].filter(Boolean).join('. ') || 'Meme'; }
+function layerText(l, ph = '') { const t = l.text.trim() ? l.text : ph; return t ? (l.caps ? t.toUpperCase() : t) : ''; }
+
+// Largest size (as % of width) where the text fits the layer's box in ~2 to 3 lines within a height budget.
+// budget is in width units: normally 42% of the frame height, or the frame bar the text sits in.
+function fitK(text, fontKey, w, budget, hasBg = false) {
   if (!text) return 0;
-  const key = text + '|' + aspect.toFixed(3);
+  const f = FONTS[fontKey] || FONTS.impact;
+  const key = `${text}|${fontKey}|${w.toFixed(3)}|${budget.toFixed(3)}|${hasBg ? 1 : 0}`;
   if (fitCache.has(key)) return fitCache.get(key);
-  const REF = 1000, avail = REF * 0.92, maxH = REF * aspect * 0.42, LH = 1.08;
-  const words = text.split(/\s+/).filter(Boolean);
+  const REF = 1000, maxH = REF * budget, paras = text.split('\n');
   const lines = size => {
-    fitCtx.font = `${size}px ${MEME_FONT}`;
+    fitCtx.font = `${f.weight} ${size}px ${f.stack}`;
+    const avail = REF * w - (hasBg ? 0.56 * size : 0) - 0.12 * size;
     const space = fitCtx.measureText(' ').width;
-    let n = 1, cur = 0;
-    for (const w of words) {
-      const ww = fitCtx.measureText(w).width;
-      if (ww > avail) return 99;
-      if (cur === 0) cur = ww; else if (cur + space + ww <= avail) cur += space + ww; else { n++; cur = ww; }
+    let n = 0;
+    for (const para of paras) {
+      const words = para.split(/\s+/).filter(Boolean);
+      n++;
+      let cur = 0;
+      for (const word of words) {
+        const ww = fitCtx.measureText(word).width;
+        if (ww > avail) return 99;
+        if (cur === 0) cur = ww; else if (cur + space + ww <= avail) cur += space + ww; else { n++; cur = ww; }
+      }
     }
     return n;
   };
-  const ok = (size, maxLines) => { const n = lines(size); return n <= maxLines && n * size * LH <= maxH; };
+  const ok = (size, maxLines) => { const n = lines(size); return n <= maxLines && n * size * f.lh <= maxH; };
   const search = (maxLines, lo, hi) => {
     if (!ok(lo, maxLines)) return 0;
     if (ok(hi, maxLines)) return hi;
     for (let i = 0; i < 11; i++) { const mid = (lo + hi) / 2; if (ok(mid, maxLines)) lo = mid; else hi = mid; }
     return lo;
   };
-  let s = search(2, 36, 130);
-  if (s < 70) s = Math.max(s, search(3, 36, 130));
-  if (!s) s = 36;
+  const minLines = paras.length;
+  let s = search(Math.max(2, minLines), 36, 130);
+  if (s < 70) s = Math.max(s, search(Math.max(3, minLines), 24, 130));
+  if (!s) s = 24;
   const k = s / 10;
   fitCache.set(key, k);
   return k;
 }
-function captionText(m, raw) { return m.allCaps !== false ? String(raw).toUpperCase() : String(raw); }
-function captionHtml(m, aspect, { placeholders = false } = {}) {
-  const yellow = m.textColor === 'yellow' ? ' is-yellow' : '';
-  let out = '';
-  for (const [pos, raw, ph] of [['top', m.topText, 'Top text'], ['bottom', m.bottomText, 'Bottom text']]) {
-    const empty = !raw || !String(raw).trim();
-    if (empty && !placeholders) continue;
-    const t = captionText(m, empty ? ph : raw);
-    const k = m.fontScale > 0 ? 10 * m.fontScale : fitK(t, aspect);
-    out += `<p class="cap cap-${pos}${yellow}${empty ? ' is-ph' : ''}" style="--k:${k.toFixed(2)}" aria-hidden="true">${esc(t)}</p>`;
-  }
-  return out;
+function layerAutoK(l, text, dm) {
+  const cy = l.y * dm.H;
+  let budget = dm.H * 0.42;
+  if (dm.top > 0 && cy <= dm.top) budget = dm.top * 0.86;
+  else if (dm.bottom > 0 && cy >= dm.H - dm.bottom) budget = dm.bottom * 0.86;
+  return fitK(text, l.font, l.w, Math.max(budget, 0.04), !!l.bg);
+}
+function layerK(l, text, dm) { return l.size > 0 ? l.size : layerAutoK(l, text, dm); }
+function layerStyle(l, k) {
+  const f = FONTS[l.font], ty = l.anchor === 'top' ? '0' : l.anchor === 'bottom' ? '-100%' : '-50%';
+  return `left:${pct(l.x)};top:${pct(l.y)};width:${pct(l.w)};--k:${k.toFixed(2)};--sw:${l.sw};--st:${l.stroke};--bg:${l.bg ? hexA(l.bg, l.bga) : 'transparent'};color:${l.color};font-family:${f.stack};font-weight:${f.weight};line-height:${f.lh};text-align:${l.align};transform:translate(-50%,${ty}) rotate(${l.rot}deg)`;
+}
+function layerHtml(l, dm, { ph = '', lid = null } = {}) {
+  const t = layerText(l, ph);
+  if (!t) return '';
+  const k = layerK(l, t, dm);
+  const cls = `layer${l.bg ? ' has-bg' : ''}${ph && !l.text.trim() ? ' is-ph' : ''}`;
+  return `<div class="${cls}"${lid != null ? ` data-lid="${lid}"` : ''}${l.size > 0 ? '' : ' data-auto="1"'} data-font="${l.font}" data-w="${l.w}" data-y="${l.y}" style="${layerStyle(l, k)}" aria-hidden="true"><span class="lt">${esc(t)}</span></div>`;
+}
+function memeBoxAttrs(dm, extraStyle = '') {
+  const bg = dm.top || dm.bottom ? `background:${dm.color};` : '';
+  return `style="aspect-ratio:1 / ${dm.H.toFixed(4)};${bg}${extraStyle}" data-h="${dm.H.toFixed(4)}" data-t="${dm.top}" data-b="${dm.bottom}"`;
+}
+function memeInnerHtml(m, mode, dm = dimsOf(m)) {
+  const fcss = FILTERS[m.filter]?.css || '';
+  const layers = layersOf(m);
+  ensureFonts(layers.map(l => l.font));
+  return `<span class="meme-media" style="top:${pct(dm.top / dm.H)};height:${pct(dm.ma / dm.H)}${fcss ? `;filter:${fcss}` : ''}">${mediaInner(m, mode)}</span>${layers.map(l => layerHtml(l, dm)).join('')}`;
 }
 function refitAllCaptions() {
   fitCache = new Map();
   requestAnimationFrame(() => {
-    $$('.meme[data-aspect]').forEach(el => {
-      if (el.dataset.manual) return;
-      const a = +el.dataset.aspect;
-      el.querySelectorAll('.cap').forEach(c => c.style.setProperty('--k', fitK(c.textContent, a).toFixed(2)));
+    $$('.layer[data-auto]').forEach(el => {
+      const box = el.closest('.meme'); if (!box) return;
+      const dm = { H: +box.dataset.h || 0.75, top: +box.dataset.t || 0, bottom: +box.dataset.b || 0 };
+      const l = { y: +el.dataset.y, font: el.dataset.font, w: +el.dataset.w, bg: el.classList.contains('has-bg') ? '#000000' : '' };
+      el.style.setProperty('--k', layerAutoK(l, el.querySelector('.lt')?.textContent || '', dm).toFixed(2));
     });
+    if (creator.el) edSyncChrome();
   });
 }
-function memeAria(m) { return [m.gif?.title, m.topText, m.bottomText].filter(Boolean).join('. ') || 'Meme'; }
 function mediaInner(m, mode = 'feed') {
   const g = m.gif || {};
   if (mode === 'tile' || !g.mp4Url) {
@@ -1957,8 +2152,7 @@ function remixLine(m) {
   return `<p class="remix-of" data-remix-of="${esc(m.remixOf)}">${icon('remix', 13, 'i-inline')} Remixed from ${name ? `<a href="#/u/${encodeURIComponent(name)}">@${esc(name)}</a>` : '<span>another meme</span>'}</p>`;
 }
 function cardHtml(m, { risingBadge = false, preview = false } = {}) {
-  const g = m.gif || {};
-  const w = +g.width || 480, h = +g.height || 360, aspect = clampAspect(h / w);
+  const dm = dimsOf(m);
   const name = m.authorName || 'unknown';
   const idAttr = preview ? 'data-preview="1"' : `data-meme-id="${esc(m.id)}"`;
   return `<article class="card${risingBadge ? ' is-rising-insert' : ''}" ${idAttr} aria-label="Meme by @${esc(name)}">
@@ -1968,8 +2162,8 @@ function cardHtml(m, { risingBadge = false, preview = false } = {}) {
       ${risingBadge ? '<span class="badge badge-rising">📈 Rising</span>' : ''}
     </header>
     ${m.remixOf ? remixLine(m) : ''}
-    <a class="meme" href="#/m/${esc(m.id || '')}" data-action="media" aria-label="${esc('Open meme: ' + memeAria(m))}" style="aspect-ratio:${(1 / aspect).toFixed(4)}" data-aspect="${aspect.toFixed(4)}"${m.fontScale > 0 ? ' data-manual="1"' : ''}>
-      ${mediaInner(m, preview ? 'preview' : 'feed')}${captionHtml(m, aspect)}
+    <a class="meme" href="#/m/${esc(m.id || '')}" data-action="media" aria-label="${esc('Open meme: ' + memeAria(m))}" ${memeBoxAttrs(dm)}>
+      ${memeInnerHtml(m, preview ? 'preview' : 'feed', dm)}
       ${preview ? '' : `<span class="rm-play" aria-hidden="true">${icon('play', 16)}</span>`}
     </a>
     ${actionsHtml(m)}
@@ -1977,7 +2171,7 @@ function cardHtml(m, { risingBadge = false, preview = false } = {}) {
 }
 function tileHtml(m) {
   return `<a class="tile" href="#/m/${esc(m.id)}" data-meme-id="${esc(m.id)}" aria-label="${esc(`Meme by @${m.authorName}: ${memeAria(m)}. ${m.score} bars`)}">
-    <span class="meme" data-aspect="1"${m.fontScale > 0 ? ' data-manual="1"' : ''}>${mediaInner(m, 'tile')}${captionHtml(m, 1)}</span>
+    <span class="tile-box"><span class="meme" ${memeBoxAttrs(dimsOf(m), `width:${pct(Math.min(1, 1 / dimsOf(m).H))}`)}>${memeInnerHtml(m, 'tile')}</span></span>
     <span class="tile-score">${icon('up', 13)}<span class="tile-score-n">${fmtCount(m.score)}</span></span>
   </a>`;
 }
@@ -2222,7 +2416,7 @@ function togglePlayback(mediaEl) {
 // ============================================================
 async function shareMeme(id) {
   const m = state.memes.get(id); const url = appUrl(`#/m/${id}`);
-  const text = m ? [m.topText, m.bottomText].filter(Boolean).join(' / ') : 'A meme on BARS';
+  const text = m ? (memeText(m) || 'A meme on BARS') : 'A meme on BARS';
   if (navigator.share) {
     try { await navigator.share({ title: `${APP_NAME}: meme by @${m?.authorName || ''}`, text, url }); return; }
     catch (e) { if (e.name === 'AbortError') return; }
@@ -2328,48 +2522,88 @@ function removeMemeEverywhere(id, { keepDetail = false } = {}) {
   state.risingPool.items = state.risingPool.items.filter(x => x.id !== id);
   if (!keepDetail) state.memes.delete(id);
 }
-async function downloadMeme(id, videoEl) {
-  const m = state.memes.get(id); if (!m) return;
-  const g = m.gif || {};
-  const W = videoEl?.videoWidth || g.width || 480, H = videoEl?.videoHeight || g.height || 360;
-  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+function wrapLines(ctx, text, avail) {
+  const out = [];
+  for (const para of text.split('\n')) {
+    let cur = '';
+    for (let word of para.split(/\s+/).filter(Boolean)) {
+      while (ctx.measureText(word).width > avail && word.length > 1) {        // overflow-wrap: anywhere
+        let n = word.length - 1;
+        while (n > 1 && ctx.measureText((cur ? cur + ' ' : '') + word.slice(0, n)).width > avail) n--;
+        if (cur && ctx.measureText(cur + ' ' + word.slice(0, n)).width > avail) { out.push(cur); cur = ''; continue; }
+        out.push((cur ? cur + ' ' : '') + word.slice(0, n)); cur = ''; word = word.slice(n);
+      }
+      const test = cur ? `${cur} ${word}` : word;
+      if (!cur || ctx.measureText(test).width <= avail) cur = test; else { out.push(cur); cur = word; }
+    }
+    out.push(cur);
+  }
+  return out;
+}
+async function renderMemeCanvas(m, videoEl) {
+  const g = m.gif || {}, dm = dimsOf(m);
+  const natural = videoEl?.videoWidth || +g.width || 480;
+  const W = clamp(Math.round(natural), 640, 1080), CH = Math.round(W * dm.H);
+  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = CH;
   const ctx = canvas.getContext('2d');
+  ctx.fillStyle = dm.top || dm.bottom ? dm.color : '#000'; ctx.fillRect(0, 0, W, CH);
+  const mx = 0, my = Math.round(W * dm.top), mw = W, mh = Math.round(W * dm.ma);
+  const drawCover = (src, sw, sh) => {
+    const scale = Math.max(mw / sw, mh / sh), cw = mw / scale, chh = mh / scale;
+    ctx.save(); ctx.filter = FILTERS[m.filter]?.css || 'none';
+    ctx.drawImage(src, (sw - cw) / 2, (sh - chh) / 2, cw, chh, mx, my, mw, mh);
+    ctx.restore();
+  };
   let drawn = false;
   if (videoEl && videoEl.readyState >= 2 && !videoEl.dataset.nocors && videoEl.hasAttribute('crossorigin')) {
-    try { ctx.drawImage(videoEl, 0, 0, W, H); ctx.getImageData(0, 0, 1, 1); drawn = true; } catch { ctx.clearRect(0, 0, W, H); }
+    try { drawCover(videoEl, videoEl.videoWidth, videoEl.videoHeight); ctx.getImageData(0, my, 1, 1); drawn = true; } catch { }
   }
   if (!drawn) {
     for (const src of [g.stillUrl, g.webpUrl]) {
       if (!src) continue;
       try {
-        const blob = await (await fetch(src, { mode: 'cors' })).blob();
-        const bmp = await createImageBitmap(blob);
-        ctx.drawImage(bmp, 0, 0, W, H); drawn = true; break;
+        const bmp = await createImageBitmap(await (await fetch(src, { mode: 'cors' })).blob());
+        drawCover(bmp, bmp.width, bmp.height); drawn = true; break;
       } catch { }
     }
   }
-  if (!drawn) { toast("Couldn't grab that frame. Try again.", { tone: 'error' }); return; }
-  try { await document.fonts.load(`${Math.round(W * 0.1)}px Anton`); } catch { }
-  const aspect = H / W;
-  const drawCap = (raw, pos) => {
-    if (!raw) return;
-    const t = captionText(m, raw);
-    const k = m.fontScale > 0 ? 10 * m.fontScale : fitK(t, clampAspect(aspect));
-    const size = (k / 100) * W, avail = W * 0.92, lh = size * 1.08;
-    ctx.font = `${size}px ${MEME_FONT}`;
-    const lines = []; let cur = '';
-    for (const w of t.split(/\s+/).filter(Boolean)) {
-      const test = cur ? `${cur} ${w}` : w;
-      if (ctx.measureText(test).width <= avail || !cur) cur = test; else { lines.push(cur); cur = w; }
-    }
-    if (cur) lines.push(cur);
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round'; ctx.miterLimit = 2;
-    ctx.lineWidth = size * 0.12; ctx.strokeStyle = '#000'; ctx.fillStyle = m.textColor === 'yellow' ? '#FFCD00' : '#fff';
-    const pad = W * 0.03;
-    const y0 = pos === 'top' ? pad : H - pad - lines.length * lh;
-    lines.forEach((ln, i) => { const y = y0 + i * lh + lh / 2; ctx.strokeText(ln, W / 2, y); ctx.fillText(ln, W / 2, y); });
-  };
-  drawCap(m.topText, 'top'); drawCap(m.bottomText, 'bottom');
+  if (!drawn) return null;
+  const layers = layersOf(m);
+  await ensureFonts(layers.map(l => l.font));
+  await Promise.all(layers.map(l => document.fonts?.load(`${FONTS[l.font].weight} 40px ${FONTS[l.font].stack}`).catch(() => { })));
+  for (const l of layers) {
+    const t = layerText(l); if (!t) continue;
+    const f = FONTS[l.font], size = layerK(l, t, dm) / 100 * W, lh = size * f.lh;
+    const padX = l.bg ? 0.28 * size : 0, padY = l.bg ? 0.06 * size : 0, boxW = l.w * W;
+    ctx.font = `${f.weight} ${size}px ${f.stack}`;
+    const lines = wrapLines(ctx, t, boxW - 2 * padX);
+    const blockH = lines.length * lh;
+    let top = l.y * CH;
+    if (l.anchor === 'middle') top -= blockH / 2; else if (l.anchor === 'bottom') top -= blockH;
+    ctx.save();
+    ctx.translate(l.x * W, top + blockH / 2);
+    ctx.rotate(l.rot * Math.PI / 180);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round'; ctx.miterLimit = 2;
+    lines.forEach((ln, i) => {
+      if (!ln) return;
+      const tw = ctx.measureText(ln).width, y = -blockH / 2 + i * lh + lh / 2;
+      const x = l.align === 'left' ? -boxW / 2 + padX : l.align === 'right' ? boxW / 2 - padX - tw : -tw / 2;
+      if (l.bg) {
+        ctx.fillStyle = hexA(l.bg, l.bga);
+        const rx = x - padX, ry = y - size * 0.62 - padY, rw = tw + 2 * padX, rh = size * 1.24 + 2 * padY;
+        ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(rx, ry, rw, rh, size * 0.16); else ctx.rect(rx, ry, rw, rh); ctx.fill();
+      }
+      if (l.sw > 0) { ctx.lineWidth = l.sw * size; ctx.strokeStyle = l.stroke; ctx.strokeText(ln, x, y); }
+      ctx.fillStyle = l.color; ctx.fillText(ln, x, y);
+    });
+    ctx.restore();
+  }
+  return canvas;
+}
+async function downloadMeme(id, videoEl) {
+  const m = state.memes.get(id); if (!m) return;
+  const canvas = await renderMemeCanvas(m, videoEl);
+  if (!canvas) { toast("Couldn't grab that frame. Try again.", { tone: 'error' }); return; }
   canvas.toBlob(blob => {
     if (!blob) { toast("Couldn't save the image.", { tone: 'error' }); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `bars-${id}.png`;
@@ -2769,11 +3003,53 @@ function initPullToRefresh() {
 
 // ============================================================
 // 9. CREATOR
+// Step 1 pick a GIF, step 2 edit (layer editor), step 3 preview and post.
 // ============================================================
-const creator = { el: null, draft: null, gb: null, hintTimer: null };
-const newDraft = () => ({ step: 1, gif: null, topText: '', bottomText: '', textColor: 'white', fontScale: 0, allCaps: true, title: '', remixOf: null, remixAuthor: null });
+const creator = { el: null, draft: null, gb: null, mediaGid: null, hist: { stack: [], i: -1 } };
 const saveDraft = debounce(() => { if (creator.draft) session.set('bars:draft', creator.draft); }, 250);
-const STEP_LABELS = ['Choose a GIF', 'Add text', 'Preview and post'];
+const STEP_LABELS = ['Choose a GIF', 'Edit your meme', 'Preview and post'];
+const ED_TABS = [['style', 'Style'], ['colour', 'Colour'], ['position', 'Position'], ['frame', 'Frame']];
+const LAYER_PH = ['Top text', 'Bottom text'];
+
+// ---- Layouts ----
+function presetLook(name, texts = [], gif = null, prevColor = '#FFFFFF') {
+  const ma = mediaAspectOf(gif);
+  const t = i => texts[i] || '';
+  const rest = from => texts.slice(from).map((tx, j) => makeLayer({ text: tx, y: clamp(0.5 + j * 0.12, 0.1, 0.9), w: 0.8 }));
+  if (name === 'above' || name === 'below') {
+    const pad = 0.3, H = ma + pad, above = name === 'above';
+    const frame = { top: above ? pad : 0, bottom: above ? 0 : pad, color: prevColor === '#000000' ? '#000000' : '#FFFFFF' };
+    const ink = frame.color === '#000000' ? '#FFFFFF' : '#000000';
+    const cap = makeLayer({ text: texts.join('\n'), anchor: 'middle', x: 0.5, y: above ? (pad / 2) / H : 1 - (pad / 2) / H, w: 0.9, font: 'clean', color: ink, sw: 0, caps: false });
+    return { frame, layers: [cap] };
+  }
+  if (name === 'label') {
+    return { frame: { top: 0, bottom: 0, color: prevColor }, layers: [makeLayer({ text: texts.join('\n'), anchor: 'bottom', y: 1 - 0.06 / ma, w: 0.86, font: 'clean', color: '#FFFFFF', sw: 0, bg: '#000000', bga: 0.78, caps: false })] };
+  }
+  if (name === 'center') {
+    return { frame: { top: 0, bottom: 0, color: prevColor }, layers: [makeLayer({ text: texts.join('\n'), anchor: 'middle', y: 0.5, w: 0.9 })] };
+  }
+  return {                                                            // classic top & bottom
+    frame: { top: 0, bottom: 0, color: prevColor },
+    layers: [makeLayer({ text: t(0), anchor: 'top', y: 0.03 / ma, w: 0.92 }), makeLayer({ text: t(1), anchor: 'bottom', y: 1 - 0.03 / ma, w: 0.92 }), ...rest(2)],
+  };
+}
+const newDraft = () => { const p = presetLook('classic'); return { step: 1, gif: null, layers: p.layers, frame: p.frame, filter: 'none', title: '', remixOf: null, remixAuthor: null, remixLook: null, sel: 0, tab: 'style' }; };
+function migrateDraft(s) {
+  const d = { ...newDraft(), ...(s && typeof s === 'object' ? s : {}) };
+  if (!Array.isArray(s?.layers)) {
+    const conv = layersOf({ gif: s?.gif, topText: s?.topText, bottomText: s?.bottomText, textColor: s?.textColor, fontScale: s?.fontScale, allCaps: s?.allCaps });
+    d.layers = conv.length ? conv : presetLook('classic', [], s?.gif).layers;
+  }
+  ['topText', 'bottomText', 'textColor', 'fontScale', 'allCaps'].forEach(k => delete d[k]);
+  d.layers = d.layers.slice(0, MAX_LAYERS).map(normLayer);
+  d.frame = frameOf(d);
+  d.filter = FILTERS[d.filter] ? d.filter : 'none';
+  d.sel = clamp(Number.isInteger(d.sel) ? d.sel : 0, -1, d.layers.length - 1);
+  if (!ED_TABS.some(([k]) => k === d.tab)) d.tab = 'style';
+  return d;
+}
+const draftHasText = d => d.layers.some(l => l.text.trim());
 
 async function openCreator(q) {
   await Promise.race([authReadyP, sleep(4000)]);
@@ -2787,15 +3063,17 @@ async function openCreator(q) {
   let draft = null;
   const saved = session.get('bars:draft');
   if (q.remix) {
-    if (saved && saved.remixOf === q.remix) draft = { ...newDraft(), ...saved };
+    if (saved && saved.remixOf === q.remix) draft = migrateDraft(saved);
     else {
       let m = state.memes.get(q.remix);
       if (!m) { try { const s = await F.getDoc(F.doc(db(), 'memes', q.remix)); if (s.exists()) m = memeFromDoc(s); } catch { } }
-      if (m) { draft = newDraft(); Object.assign(draft, { gif: cleanGif(m.gif), remixOf: m.id, remixAuthor: m.authorName, step: 2 }); }
-      else toast("Couldn't load that meme to remix.");
+      if (m) {
+        const gif = cleanGif(m.gif), look = presetLook('classic', [], gif);
+        draft = migrateDraft({ ...newDraft(), gif, layers: look.layers, remixOf: m.id, remixAuthor: m.authorName, step: 2, remixLook: { layers: layersOf(m), frame: frameOf(m), filter: FILTERS[m.filter] ? m.filter : 'none' } });
+      } else toast("Couldn't load that meme to remix.");
     }
   }
-  if (!draft) draft = saved && typeof saved === 'object' && !q.remix ? { ...newDraft(), ...saved } : newDraft();
+  if (!draft) draft = saved && !q.remix ? migrateDraft(saved) : newDraft();
   if (!draft.gif) draft.step = 1;
   if (state.route.name !== 'create') return;
   creator.draft = draft; saveDraft();
@@ -2804,18 +3082,22 @@ async function openCreator(q) {
 }
 function closeCreatorDom() {
   if (!creator.el) return;
+  edCommitSoon.cancel();
   creator.gb?.destroy(); creator.gb = null;
-  disposeMedia(creator.el); creator.el.remove(); creator.el = null;
+  creator.ro?.disconnect(); creator.ro = null;
+  closeMenu();
+  disposeMedia(creator.el); creator.el.remove(); creator.el = null; creator.mediaGid = null;
   document.body.classList.remove('creator-open');
 }
 function exitCreator() {
-  saveDraft.flush();
+  edCommitSoon.flush(); saveDraft.flush();
   closeCreatorDom();
   if (state.hasHistory) history.back(); else replaceRoute('#/');
 }
 function buildCreator() {
   closeCreatorDom();
   const d = creator.draft;
+  creator.hist = { stack: [], i: -1 };
   const el = document.createElement('div');
   el.className = 'creator'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-labelledby', 'creatorStepLabel');
   el.innerHTML = `
@@ -2833,25 +3115,41 @@ function buildCreator() {
         <div class="gif-status" aria-live="polite"></div>
         <div class="gif-sentinel" style="height:1px"></div>
       </div></section>
-      <section class="c-step" data-step="2" hidden><div class="c-wrap c-edit">
-        <div class="c-preview-col">
-          <p class="c-remix-note" hidden></p>
-          <div class="meme meme-preview" role="img"></div>
+      <section class="c-step" data-step="2" hidden><div class="ed">
+        <div class="ed-stage">
+          <div class="ed-toolbar" role="toolbar" aria-label="Editor">
+            <button type="button" class="icon-btn" data-e="undo" aria-label="Undo" title="Undo (Ctrl+Z)">${icon('undo', 20)}</button>
+            <button type="button" class="icon-btn" data-e="redo" aria-label="Redo" title="Redo (Ctrl+Shift+Z)">${icon('redo', 20)}</button>
+            <span class="grow"></span>
+            <button type="button" class="btn btn-ghost btn-sm" data-e="layouts" aria-haspopup="menu" aria-expanded="false">${icon('layout', 16)}Layouts</button>
+            <button type="button" class="btn btn-yellow btn-sm" data-e="add">${icon('plus', 16)}Text</button>
+          </div>
+          <div class="ed-canvas-wrap">
+            <div class="meme ed-canvas" tabindex="0" role="application" aria-roledescription="meme canvas" aria-label="Meme canvas. Arrow keys move the selected text, Shift for bigger steps. Delete removes it. Enter edits its words." aria-describedby="edLive">
+              <span class="meme-media"></span>
+              <div class="ed-layers"></div>
+            </div>
+            <i class="ed-guide ed-guide-v" hidden></i><i class="ed-guide ed-guide-h" hidden></i>
+            <div class="ed-chrome" hidden>
+              <button type="button" class="ed-h ed-h-rot" data-handle="rot" aria-label="Rotate" tabindex="-1">${icon('rotate', 14)}</button>
+              <button type="button" class="ed-h ed-h-del" data-handle="del" aria-label="Delete text" tabindex="-1">${icon('close', 13)}</button>
+              <button type="button" class="ed-h ed-h-scale" data-handle="scale" aria-label="Resize" tabindex="-1">${icon('resize', 13)}</button>
+            </div>
+          </div>
+          <p class="sr-only" id="edLive" aria-live="polite"></p>
           <div class="c-under"><button type="button" class="link-btn" data-c="change-gif">Change GIF</button><span class="giphy-attr" style="margin:0">Powered by GIPHY</span></div>
         </div>
-        <div class="c-controls">
-          <label class="field"><span class="field-label">Top text <span class="counter" data-count="topText">0/${MAX_CAPTION}</span></span>
-            <input type="text" data-f="topText" maxlength="${MAX_CAPTION}" placeholder="When the bill finally arrives" enterkeyhint="next" autocomplete="off"></label>
-          <label class="field"><span class="field-label">Bottom text <span class="counter" data-count="bottomText">0/${MAX_CAPTION}</span></span>
-            <input type="text" data-f="bottomText" maxlength="${MAX_CAPTION}" placeholder="And it's exactly what they quoted" enterkeyhint="done" autocomplete="off"></label>
-          <div class="ctrl-row"><span class="field-label" id="sizeLbl">Text size</span>
-            <div class="size-row"><input type="range" min="0.5" max="1.6" step="0.05" data-f="fontScale" aria-labelledby="sizeLbl"><button type="button" class="chip" data-c="auto" aria-pressed="true">Auto</button></div></div>
-          <div class="ctrl-row"><span class="field-label" id="capsLbl">All caps</span><button type="button" class="switch" role="switch" data-c="caps" aria-labelledby="capsLbl"><i></i></button></div>
-          <div class="ctrl-row"><span class="field-label" id="colLbl">Text colour</span>
-            <div class="swatches" role="radiogroup" aria-labelledby="colLbl">
-              <button type="button" class="swatch" role="radio" data-color="white" aria-label="White" style="background:#fff"></button>
-              <button type="button" class="swatch" role="radio" data-color="yellow" aria-label="Optus yellow" style="background:#FFCD00"></button>
-            </div></div>
+        <div class="ed-panel">
+          <div class="ed-remix" hidden></div>
+          <div class="ed-tip" ${store.get('bars:edTip') ? 'hidden' : ''}><span>Drag text to move it. Pinch or use the corner handles to resize and rotate. Double-tap text to edit the words.</span><button type="button" class="link-btn" data-e="tip-ok">Got it</button></div>
+          <section class="ed-card" aria-label="Text boxes"><div class="ed-list"></div></section>
+          <section class="ed-card">
+            <div class="seg ed-tabs" role="tablist" aria-label="Edit options" style="--n:${ED_TABS.length}">
+              ${ED_TABS.map(([k, label]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="false" aria-controls="edTab">${label}</button>`).join('')}
+              <span class="seg-ind" aria-hidden="true"></span>
+            </div>
+            <div class="ed-tab" id="edTab" role="tabpanel"></div>
+          </section>
         </div>
       </div></section>
       <section class="c-step" data-step="3" hidden><div class="c-wrap c-final">
@@ -2870,132 +3168,102 @@ function buildCreator() {
   document.body.classList.add('creator-open');
   creator.el = el;
 
-  $$('[data-f]', el).forEach(input => {
-    if (input.type === 'range') input.value = d.fontScale > 0 ? d.fontScale : 1;
-    else input.value = d[input.dataset.f] || '';
-    input.addEventListener('input', () => {
-      const f = input.dataset.f;
-      if (f === 'fontScale') d.fontScale = +input.value;
-      else d[f] = input.value.slice(0, f === 'title' ? MAX_TITLE : MAX_CAPTION);
-      syncCreatorControls(); if (f !== 'title') updatePreview(); saveDraft();
-    });
-    input.addEventListener('keydown', e => {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-      if (input.dataset.f === 'topText') el.querySelector('[data-f=bottomText]').focus();
-      else if (input.dataset.f === 'bottomText') goCreatorStep(3);
-      else if (input.dataset.f === 'title') postMeme(el.querySelector('[data-c=next]'));
-    });
-  });
+  const title = el.querySelector('[data-f=title]');
+  title.value = d.title || '';
+  title.addEventListener('input', () => { d.title = title.value.slice(0, MAX_TITLE); syncTitleCount(); saveDraft(); });
+  title.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); postMeme(el.querySelector('[data-c=next]')); } });
+
   el.addEventListener('click', e => {
     const chip = e.target.closest('[data-chip]');
     if (chip) { const input = el.querySelector('.gif-search input'); input.value = chip.dataset.chip; creator.gb?.search(chip.dataset.chip); return; }
-    const sw = e.target.closest('[data-color]');
-    if (sw) { d.textColor = sw.dataset.color; syncCreatorControls(); updatePreview(); saveDraft(); return; }
     const b = e.target.closest('[data-c]'); if (!b) return;
     const c = b.dataset.c;
     if (c === 'close') exitCreator();
     else if (c === 'reset') resetDraft();
-    else if (c === 'back') goCreatorStep(Math.max(1, d.step - 1));
+    else if (c === 'back') goCreatorStep(Math.max(1, creator.draft.step - 1));
     else if (c === 'change-gif') goCreatorStep(1);
-    else if (c === 'next') { if (d.step === 3) postMeme(b); else goCreatorStep(d.step + 1); }
-    else if (c === 'auto') { d.fontScale = d.fontScale > 0 ? 0 : 1; if (d.fontScale) el.querySelector('[data-f=fontScale]').value = 1; syncCreatorControls(); updatePreview(); saveDraft(); }
-    else if (c === 'caps') { d.allCaps = !d.allCaps; syncCreatorControls(); updatePreview(); saveDraft(); }
+    else if (c === 'next') { if (creator.draft.step === 3) postMeme(b); else goCreatorStep(creator.draft.step + 1); }
   });
   el.addEventListener('keydown', e => {
-    if (modalStack.length) return;
-    if (e.key === 'Escape') { e.preventDefault(); exitCreator(); }
-    else if (e.key === 'Tab') trapTab(e, el);
-    else if (['ArrowLeft', 'ArrowRight'].includes(e.key) && e.target.closest('.swatches')) {
-      e.preventDefault(); d.textColor = d.textColor === 'white' ? 'yellow' : 'white'; syncCreatorControls(); updatePreview(); saveDraft();
-      el.querySelector(`[data-color="${d.textColor}"]`).focus();
+    if (modalStack.length || menuApi) return;
+    const typing = /^(TEXTAREA|INPUT)$/.test(e.target.tagName) && e.target.type !== 'range' && e.target.type !== 'color';
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (typing && creator.draft.step === 2) { e.target.blur(); return; }
+      exitCreator();
+    } else if (e.key === 'Tab') trapTab(e, el);
+    else if (creator.draft.step === 2 && !typing && (e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'z' || e.key.toLowerCase() === 'y')) {
+      e.preventDefault();
+      edUndo(e.key.toLowerCase() === 'y' || e.shiftKey ? 1 : -1);
     }
   });
+  edWire(el);
 }
 async function resetDraft() {
   const d = creator.draft;
-  if ((d.gif || d.topText || d.bottomText) && !(await confirmDialog({ title: 'Clear this draft?', body: 'Your GIF and text will be removed.', confirmLabel: 'Clear draft', danger: true }))) return;
-  saveDraft.cancel(); session.del('bars:draft');
+  if ((d.gif || draftHasText(d)) && !(await confirmDialog({ title: 'Clear this draft?', body: 'Your GIF, text and styling will be removed.', confirmLabel: 'Clear draft', danger: true }))) return;
+  saveDraft.cancel(); edCommitSoon.cancel(); session.del('bars:draft');
   creator.draft = newDraft();
   if (state.route.q?.remix) replaceRoute('#/create', { silent: true });
   buildCreator(); goCreatorStep(1);
 }
-function syncCreatorControls() {
-  const el = creator.el, d = creator.draft; if (!el) return;
-  ['topText', 'bottomText', 'title'].forEach(f => {
-    const c = el.querySelector(`[data-count="${f}"]`); if (!c) return;
-    const max = f === 'title' ? MAX_TITLE : MAX_CAPTION; const n = (d[f] || '').length;
-    c.textContent = `${n}/${max}`; c.classList.toggle('is-near', n >= max - 10);
-  });
-  const auto = el.querySelector('[data-c=auto]'); auto.setAttribute('aria-pressed', String(!(d.fontScale > 0)));
-  const range = el.querySelector('[data-f=fontScale]'); range.style.opacity = d.fontScale > 0 ? '1' : '.45';
-  el.querySelector('[data-c=caps]').setAttribute('aria-checked', String(!!d.allCaps));
-  $$('[data-color]', el).forEach(s => { const on = s.dataset.color === d.textColor; s.setAttribute('aria-checked', String(on)); s.tabIndex = on ? 0 : -1; });
-  const note = el.querySelector('.c-remix-note');
-  note.hidden = !d.remixOf; if (d.remixOf) note.textContent = `Remixing @${d.remixAuthor || 'someone'}'s meme`;
-  updateCreatorFoot();
+function syncTitleCount() {
+  const c = creator.el?.querySelector('[data-count="title"]'); if (!c) return;
+  const n = (creator.draft.title || '').length;
+  c.textContent = `${n}/${MAX_TITLE}`; c.classList.toggle('is-near', n >= MAX_TITLE - 10);
 }
 function updateCreatorFoot() {
   const el = creator.el, d = creator.draft; if (!el) return;
   const back = el.querySelector('[data-c=back]'), next = el.querySelector('[data-c=next]'), hint = el.querySelector('.c-hint');
   back.style.visibility = d.step === 1 ? 'hidden' : 'visible';
-  const hasText = !!(d.topText.trim() || d.bottomText.trim());
+  const hasText = draftHasText(d);
   next.textContent = d.step === 3 ? 'Post' : 'Next';
   const disabled = (d.step === 1 && !d.gif) || (d.step >= 2 && !hasText);
   next.setAttribute('aria-disabled', String(disabled));
-  next.disabled = false;
   next.style.opacity = disabled ? '.45' : '1';
-  hint.textContent = d.step === 1 ? (d.gif ? '' : 'Pick a GIF to start') : (!hasText ? 'Add top or bottom text' : '');
+  hint.textContent = d.step === 1 ? (d.gif ? '' : 'Pick a GIF to start') : (!hasText ? 'Add some text' : '');
 }
 function goCreatorStep(n) {
   const el = creator.el, d = creator.draft; if (!el) return;
   if (n >= 2 && !d.gif) n = 1;
-  if (n === 3 && !(d.topText.trim() || d.bottomText.trim())) {
+  if (n === 3 && !draftHasText(d)) {
     n = 2;
-    if (d.step === 2) { const h = el.querySelector('.c-hint'); h.textContent = 'Add top or bottom text first'; el.querySelector('[data-f=topText]').focus(); }
+    if (d.step === 2) { el.querySelector('.c-hint').textContent = 'Add some text first'; const i = Math.max(0, d.sel); el.querySelector(`[data-lt="${i}"]`)?.focus(); }
   }
+  if (d.step === 2 && n !== 2) edCommitSoon.flush();
   d.step = n; saveDraft();
   $$('.c-step', el).forEach(s => { s.hidden = +s.dataset.step !== n; });
   $$('.steps-track i', el).forEach((i, idx) => i.classList.toggle('on', idx < n));
   el.querySelector('.steps-label').textContent = `Step ${n} of 3: ${STEP_LABELS[n - 1]}`;
   el.querySelector('.creator-body').scrollTop = 0;
-  $$('.meme-preview video, .c-final-card video', el).forEach(v => { if (!v.closest('.c-step:not([hidden])')) v.pause(); });
+  $$('.c-step video', el).forEach(v => { if (v.closest('.c-step[hidden]')) v.pause(); });
   if (n === 1) {
     if (!creator.gb) creator.gb = gifBrowser(el.querySelector('[data-step="1"]'), g => {
       const changed = !d.gif || d.gif.id !== g.id;
       d.gif = cleanGif(g);
-      if (changed && d.remixOf) { d.remixOf = null; d.remixAuthor = null; }
+      if (changed && d.remixOf) { d.remixOf = null; d.remixAuthor = null; d.remixLook = null; }
       goCreatorStep(2);
     });
     if (mqDesktop.matches) el.querySelector('.gif-search input').focus();
   } else if (n === 2) {
-    updatePreview();
-    el.querySelector('.meme-preview video')?.play().catch(() => { });
-    if (mqDesktop.matches) el.querySelector('[data-f=topText]').focus();
+    edMount();
+    el.querySelector('.ed-canvas video')?.play().catch(() => { });
   } else if (n === 3) {
+    syncTitleCount();
     renderFinalCard();
   }
-  syncCreatorControls();
+  updateCreatorFoot();
+}
+function cleanLayerForSave(l) {
+  const r = (v, p) => Math.round(v * 10 ** p) / 10 ** p;
+  const n = normLayer(l);
+  return { ...n, text: n.text.trim(), x: r(n.x, 4), y: r(n.y, 4), w: r(n.w, 4), size: r(n.size, 2), sw: r(n.sw, 3), bga: r(n.bga, 2), rot: r(n.rot, 1) };
 }
 function draftAsMeme() {
   const d = creator.draft, p = state.profile;
-  return { id: 'preview', authorId: state.user.uid, authorName: p.username, gif: d.gif, title: d.title, topText: d.topText.trim(), bottomText: d.bottomText.trim(), textColor: d.textColor, fontScale: d.fontScale, allCaps: d.allCaps, remixOf: null, upvotes: 0, downvotes: 0, score: 0, createdAtMs: Date.now() };
-}
-function updatePreview() {
-  const el = creator.el, d = creator.draft; if (!el || !d.gif) return;
-  const pv = el.querySelector('.meme-preview');
-  const aspect = clampAspect(d.gif.height / d.gif.width);
-  pv.style.aspectRatio = (1 / aspect).toFixed(4);
-  pv.dataset.aspect = aspect.toFixed(4);
-  if (pv.dataset.gid !== d.gif.id) {
-    pv.dataset.gid = d.gif.id;
-    disposeMedia(pv);
-    pv.innerHTML = mediaInner({ gif: d.gif }, 'preview');
-  }
-  pv.querySelectorAll('.cap').forEach(c => c.remove());
-  const m = { ...d, topText: d.topText, bottomText: d.bottomText };
-  pv.insertAdjacentHTML('beforeend', captionHtml(m, aspect, { placeholders: true }));
-  pv.setAttribute('aria-label', `Preview: ${memeAria({ gif: d.gif, topText: d.topText, bottomText: d.bottomText })}`);
+  const layers = d.layers.filter(l => l.text.trim()).map(cleanLayerForSave);
+  const f = frameOf(d);
+  return { id: 'preview', authorId: state.user.uid, authorName: p.username, gif: d.gif, title: d.title, layers, frame: { top: Math.round(f.top * 1e4) / 1e4, bottom: Math.round(f.bottom * 1e4) / 1e4, color: f.color }, filter: d.filter, caption: layers.map(l => l.text).join(' / ').slice(0, 1000), remixOf: null, upvotes: 0, downvotes: 0, score: 0, createdAtMs: Date.now() };
 }
 function renderFinalCard() {
   const host = creator.el.querySelector('.c-final-card');
@@ -3004,6 +3272,539 @@ function renderFinalCard() {
   host.querySelector('video')?.play().catch(() => { });
   host.querySelectorAll('.author, .meme').forEach(a => a.removeAttribute('href'));
 }
+
+// ============================================================
+// 9b. MEME EDITOR (step 2)
+// ============================================================
+const edQ = sel => creator.el?.querySelector(sel);
+const edDims = () => dimsOf(creator.draft);
+const edLayerEl = i => edQ(`.ed-layers [data-lid="${i}"]`);
+const normRot = a => { a = ((a + 180) % 360 + 360) % 360 - 180; return Math.round(a * 10) / 10; };
+const snapRot = a => { for (const s of [-180, -90, 0, 90, 180]) if (Math.abs(a - s) < 4) return s === -180 ? 180 : s; return a; };
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const angle = (a, b) => Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+
+function edSay(msg) { const p = edQ('#edLive'); if (p) { p.textContent = ''; setTimeout(() => { p.textContent = msg; }, 20); } }
+function edMount() {
+  ensureFonts(Object.keys(FONTS));
+  if (creator.hist.i < 0) edCommit();
+  edRenderMedia(); edRenderCanvas(); edRenderList(); edRenderTab(); edSyncUndo(); edRenderRemix();
+}
+function edRenderAll() { edRenderMedia(); edRenderCanvas(); edRenderList(); edRenderTab(); edSyncUndo(); updateCreatorFoot(); }
+
+// ---- History ----
+function edSnapshot() { const d = creator.draft; return JSON.stringify({ layers: d.layers, frame: d.frame, filter: d.filter }); }
+function edCommit() {
+  const d = creator.draft, h = creator.hist; if (!d) return;
+  const snap = edSnapshot();
+  if (h.stack[h.i] !== snap) {
+    h.stack.length = h.i + 1; h.stack.push(snap);
+    if (h.stack.length > 80) h.stack.shift();
+    h.i = h.stack.length - 1;
+  }
+  edSyncUndo(); saveDraft();
+}
+const edCommitSoon = debounce(edCommit, 420);
+function edUndo(dir) {
+  edCommitSoon.flush();
+  const h = creator.hist, n = h.i + dir;
+  if (n < 0 || n >= h.stack.length) return;
+  h.i = n;
+  Object.assign(creator.draft, JSON.parse(h.stack[n]));
+  const d = creator.draft;
+  d.sel = clamp(d.sel, -1, d.layers.length - 1);
+  if (d.sel < 0 && d.layers.length) d.sel = 0;
+  edRenderAll(); saveDraft();
+  edSay(dir < 0 ? 'Undone' : 'Redone');
+}
+function edSyncUndo() {
+  const h = creator.hist;
+  const u = edQ('[data-e=undo]'), r = edQ('[data-e=redo]');
+  if (u) u.disabled = h.i <= 0;
+  if (r) r.disabled = h.i >= h.stack.length - 1;
+}
+
+// ---- Rendering ----
+function edRenderMedia() {
+  const d = creator.draft, dm = edDims(), wrap = edQ('.ed-canvas-wrap'), cv = edQ('.ed-canvas');
+  if (!cv || !d.gif) return;
+  wrap.style.setProperty('--ar', (1 / dm.H).toFixed(4));
+  cv.style.aspectRatio = `1 / ${dm.H.toFixed(4)}`;
+  cv.style.background = dm.top || dm.bottom ? dm.color : '#000';
+  Object.assign(cv.dataset, { h: dm.H.toFixed(4), t: dm.top, b: dm.bottom });
+  const media = cv.querySelector('.meme-media');
+  media.style.top = pct(dm.top / dm.H); media.style.height = pct(dm.ma / dm.H);
+  media.style.filter = FILTERS[d.filter]?.css || '';
+  if (creator.mediaGid !== d.gif.id) {
+    creator.mediaGid = d.gif.id;
+    disposeMedia(media);
+    media.innerHTML = mediaInner({ gif: d.gif }, 'preview');
+    media.querySelector('video')?.play().catch(() => { });
+  }
+}
+function edRenderCanvas() {
+  const d = creator.draft, dm = edDims(), host = edQ('.ed-layers'); if (!host) return;
+  host.innerHTML = d.layers.map((l, i) => layerHtml(l, dm, { ph: LAYER_PH[i] || `Text ${i + 1}`, lid: i })).join('');
+  host.querySelector(`[data-lid="${d.sel}"]`)?.classList.add('is-sel');
+  edSyncChrome();
+}
+let edPaintRaf = 0, edPaintSet = new Set();
+function edPaintLayer(i, now = false) {
+  edPaintSet.add(i);
+  if (now) { cancelAnimationFrame(edPaintRaf); edPaintRaf = 0; edFlushPaint(); return; }
+  if (!edPaintRaf) edPaintRaf = requestAnimationFrame(() => { edPaintRaf = 0; edFlushPaint(); });
+}
+function edFlushPaint() {
+  const d = creator.draft, dm = edDims(), host = edQ('.ed-layers'); if (!host || !d) { edPaintSet.clear(); return; }
+  for (const i of edPaintSet) {
+    const l = d.layers[i]; if (!l) continue;
+    const cur = host.querySelector(`[data-lid="${i}"]`);
+    const tmp = makeHtml(layerHtml(l, dm, { ph: LAYER_PH[i] || `Text ${i + 1}`, lid: i })).firstElementChild;
+    if (i === d.sel) tmp.classList.add('is-sel');
+    if (cur) cur.replaceWith(tmp); else host.append(tmp);
+  }
+  edPaintSet.clear();
+  edSyncChrome();
+}
+function edSyncChrome() {
+  const d = creator.draft, chrome = edQ('.ed-chrome'); if (!chrome || !d) return;
+  const le = d.sel >= 0 && edLayerEl(d.sel), l = d.layers[d.sel];
+  if (!le || !l) { chrome.hidden = true; return; }
+  const w = le.offsetWidth, h = le.offsetHeight;
+  const ty = l.anchor === 'top' ? 0 : l.anchor === 'bottom' ? -1 : -0.5;
+  chrome.hidden = false;
+  chrome.style.left = `${le.offsetLeft}px`;
+  chrome.style.top = `${le.offsetTop + ty * h + h / 2}px`;
+  chrome.style.width = `${w + 10}px`;
+  chrome.style.height = `${h + 10}px`;
+  chrome.style.transform = `translate(-50%,-50%) rotate(${l.rot}deg)`;
+}
+function edRenderList() {
+  const d = creator.draft, list = edQ('.ed-list'); if (!list) return;
+  const rows = d.layers.map((l, i) => `<div class="ed-lrow" data-row="${i}" aria-current="${i === d.sel}">
+      <span class="ed-lnum" aria-hidden="true">${i + 1}</span>
+      <textarea rows="1" maxlength="${MAX_LAYER_TEXT}" data-lt="${i}" placeholder="${esc(LAYER_PH[i] || `Text ${i + 1}`)}" aria-label="Text box ${i + 1}" spellcheck="true">${esc(l.text)}</textarea>
+      <button type="button" class="icon-btn" data-e="row-more" data-i="${i}" aria-label="More options for text box ${i + 1}" aria-haspopup="menu" aria-expanded="false">${icon('more', 18)}</button>
+    </div>`).join('');
+  const add = d.layers.length < MAX_LAYERS
+    ? `<button type="button" class="ed-add" data-e="add">${icon('plus', 18)}Add text box</button>`
+    : `<p class="ed-note">That's the max of ${MAX_LAYERS} text boxes.</p>`;
+  list.innerHTML = (rows || `<p class="ed-note">No text yet.</p>`) + add;
+  list.querySelectorAll('textarea').forEach(autoGrow);
+}
+function autoGrow(ta) { ta.style.height = 'auto'; ta.style.height = `${Math.min(ta.scrollHeight + 2, 150)}px`; }
+function edSelect(i, { focusText = false } = {}) {
+  const d = creator.draft;
+  i = clamp(i, -1, d.layers.length - 1);
+  const changed = d.sel !== i;
+  d.sel = i;
+  edQ('.ed-layers .is-sel')?.classList.remove('is-sel');
+  if (i >= 0) edLayerEl(i)?.classList.add('is-sel');
+  $$('.ed-lrow', creator.el).forEach(r => r.setAttribute('aria-current', String(+r.dataset.row === i)));
+  edSyncChrome();
+  if (changed) { edRenderTab(); saveDraft(); if (i >= 0) edSay(`Text box ${i + 1} selected`); }
+  if (focusText && i >= 0) { const ta = edQ(`[data-lt="${i}"]`); ta?.focus(); ta?.select?.(); }
+}
+
+// ---- Style panel ----
+const swatchHtml = (prop, c, on) => `<button type="button" class="swatch" role="radio" aria-checked="${on}" data-p="${prop}" data-v="${c}" style="background:${c}" aria-label="${COLOR_NAMES[c] || c}"></button>`;
+function colorFieldHtml(label, prop, value, { none = false } = {}) {
+  const custom = value && !PALETTE.includes(value);
+  return `<div class="ed-group"><span class="ed-label" id="edl-${prop}">${label}</span>
+    <div class="swatches wrap" role="radiogroup" aria-labelledby="edl-${prop}">
+      ${none ? `<button type="button" class="swatch sw-none" role="radio" aria-checked="${!value}" data-p="${prop}" data-v="" aria-label="None"></button>` : ''}
+      ${PALETTE.map(c => swatchHtml(prop, c, value === c)).join('')}
+      <label class="swatch sw-custom${custom ? ' is-on' : ''}" data-custom="${prop}" style="${custom ? `--c:${value}` : ''}" title="Custom colour"><input type="color" data-p="${prop}" value="${(value || '#ffffff').toLowerCase()}" aria-label="Custom ${label.toLowerCase()}"></label>
+    </div></div>`;
+}
+const sliderHtml = (label, prop, min, max, step, value, valText, extra = '') => `<div class="ed-group">
+  <div class="ed-head"><label class="ed-label" for="eds-${prop}">${label}</label><span class="ed-val" data-val="${prop}">${valText}</span></div>
+  <div class="ed-slider"><input type="range" id="eds-${prop}" data-p="${prop}" min="${min}" max="${max}" step="${step}" value="${value}">${extra}</div></div>`;
+function edTabHtml(tab, l, i) {
+  const d = creator.draft, dm = edDims();
+  if (tab === 'frame') {
+    return `${sliderHtml('Space above', 'frameTop', 0, 60, 1, Math.round(d.frame.top * 100), `${Math.round(d.frame.top * 100)}%`)}
+      ${sliderHtml('Space below', 'frameBottom', 0, 60, 1, Math.round(d.frame.bottom * 100), `${Math.round(d.frame.bottom * 100)}%`)}
+      ${colorFieldHtml('Frame colour', 'frameColor', d.frame.color)}
+      <div class="ed-group"><span class="ed-label" id="edl-filter">GIF filter</span>
+        <div class="filter-grid" role="radiogroup" aria-labelledby="edl-filter">${Object.entries(FILTERS).map(([k, f]) => `<button type="button" class="filter-chip" role="radio" aria-checked="${d.filter === k}" data-p="filter" data-v="${k}"><img src="${esc(d.gif.stillUrl || d.gif.webpUrl)}" alt="" loading="lazy" style="${f.css ? `filter:${f.css}` : ''}"><span>${f.label}</span></button>`).join('')}</div></div>`;
+  }
+  if (!l) return `<div class="ed-empty"><p>Tap text on the meme, or a text box above, to style it.</p>${d.layers.length < MAX_LAYERS ? `<button type="button" class="btn btn-yellow btn-sm" data-e="add">${icon('plus', 16)}Add text box</button>` : ''}</div>`;
+  const k = parseFloat(edLayerEl(i)?.style.getPropertyValue('--k')) || layerK(l, layerText(l, 'Text'), dm);
+  if (tab === 'style') {
+    return `<div class="ed-group"><span class="ed-label" id="edl-font">Font</span>
+        <div class="font-grid" role="radiogroup" aria-labelledby="edl-font">${Object.entries(FONTS).map(([key, f]) => `<button type="button" class="font-chip" role="radio" aria-checked="${l.font === key}" data-p="font" data-v="${key}" style="font-family:${f.stack};font-weight:${f.weight}">${f.label}</button>`).join('')}</div></div>
+      ${sliderHtml('Size', 'size', 2, 30, 0.1, k.toFixed(1), l.size > 0 ? k.toFixed(1) : 'Auto', `<button type="button" class="chip" data-p="auto" aria-pressed="${!(l.size > 0)}">Auto</button>`)}
+      <div class="ed-group ed-inline"><span class="ed-label" id="edl-caps">ALL CAPS</span><button type="button" class="switch" role="switch" data-p="caps" aria-checked="${l.caps}" aria-labelledby="edl-caps"><i></i></button></div>
+      <div class="ed-group ed-inline"><span class="ed-label" id="edl-align">Align</span>
+        <div class="icon-seg" role="radiogroup" aria-labelledby="edl-align">${[['left', 'alignLeft', 'Left'], ['center', 'alignCenter', 'Centre'], ['right', 'alignRight', 'Right']].map(([v, ic, lab]) => `<button type="button" role="radio" aria-checked="${l.align === v}" data-p="align" data-v="${v}" aria-label="${lab}">${icon(ic, 18)}</button>`).join('')}</div></div>`;
+  }
+  if (tab === 'colour') {
+    return `${colorFieldHtml('Text colour', 'color', l.color)}
+      ${colorFieldHtml('Outline colour', 'stroke', l.stroke)}
+      ${sliderHtml('Outline thickness', 'sw', 0, 30, 1, Math.round(l.sw * 100), l.sw > 0 ? `${Math.round(l.sw * 100)}` : 'None')}
+      ${colorFieldHtml('Highlight behind text', 'bg', l.bg, { none: true })}
+      ${l.bg ? sliderHtml('Highlight opacity', 'bga', 10, 100, 1, Math.round(l.bga * 100), `${Math.round(l.bga * 100)}%`) : ''}`;
+  }
+  return `<div class="ed-group"><span class="ed-label">Quick place</span>
+      <div class="btn-row">
+        <button type="button" class="btn btn-ghost btn-sm" data-e="place" data-v="top">Top</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-e="place" data-v="middle">Middle</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-e="place" data-v="bottom">Bottom</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-e="hcenter">Centre across</button>
+      </div></div>
+    ${sliderHtml('Across', 'x', 0, 100, 0.5, (l.x * 100).toFixed(1), `${Math.round(l.x * 100)}%`)}
+    ${sliderHtml('Down', 'y', 0, 100, 0.5, (l.y * 100).toFixed(1), `${Math.round(l.y * 100)}%`)}
+    ${sliderHtml('Box width', 'w', 15, 100, 1, Math.round(l.w * 100), `${Math.round(l.w * 100)}%`)}
+    ${sliderHtml('Rotation', 'rot', -180, 180, 1, Math.round(l.rot), `${Math.round(l.rot)}°`, `<button type="button" class="chip" data-e="rot-reset">Reset</button>`)}`;
+}
+function edRenderTab() {
+  const d = creator.draft, host = edQ('.ed-tab'); if (!host) return;
+  const tabs = $$('.ed-tabs [data-tab]', creator.el);
+  let idx = 0;
+  tabs.forEach((b, j) => { const on = b.dataset.tab === d.tab; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; if (on) idx = j; });
+  edQ('.ed-tabs .seg-ind').style.transform = `translateX(${idx * 100}%)`;
+  host.innerHTML = edTabHtml(d.tab, d.layers[d.sel], d.sel);
+}
+// Update values in the open panel without rebuilding it (keeps slider focus while dragging).
+function edSyncTab() {
+  const d = creator.draft, host = edQ('.ed-tab'); if (!host) return;
+  const l = d.layers[d.sel];
+  if (d.tab !== 'frame' && !l) return edRenderTab();
+  if (d.tab === 'colour' && !!host.querySelector('[data-p=bga]') !== !!l.bg) return edRenderTab();
+  const get = p => p === 'frameColor' ? d.frame.color : p === 'filter' ? d.filter : l?.[p];
+  host.querySelectorAll('[data-p][data-v]').forEach(b => b.setAttribute('aria-checked', String(get(b.dataset.p) === b.dataset.v)));
+  host.querySelectorAll('[data-custom]').forEach(lab => {
+    const v = get(lab.dataset.custom), custom = !!v && !PALETTE.includes(v);
+    lab.classList.toggle('is-on', custom); lab.style.setProperty('--c', custom ? v : '');
+    const input = lab.querySelector('input'); if (input !== document.activeElement && v) input.value = v.toLowerCase();
+  });
+  const k = l ? (parseFloat(edLayerEl(d.sel)?.style.getPropertyValue('--k')) || 9) : 0;
+  const vals = l ? { size: [k.toFixed(1), l.size > 0 ? k.toFixed(1) : 'Auto'], sw: [Math.round(l.sw * 100), l.sw > 0 ? `${Math.round(l.sw * 100)}` : 'None'], bga: [Math.round(l.bga * 100), `${Math.round(l.bga * 100)}%`], x: [(l.x * 100).toFixed(1), `${Math.round(l.x * 100)}%`], y: [(l.y * 100).toFixed(1), `${Math.round(l.y * 100)}%`], w: [Math.round(l.w * 100), `${Math.round(l.w * 100)}%`], rot: [Math.round(l.rot), `${Math.round(l.rot)}°`] } : {};
+  Object.assign(vals, { frameTop: [Math.round(d.frame.top * 100), `${Math.round(d.frame.top * 100)}%`], frameBottom: [Math.round(d.frame.bottom * 100), `${Math.round(d.frame.bottom * 100)}%`] });
+  for (const [p, [v, text]] of Object.entries(vals)) {
+    const input = host.querySelector(`input[type=range][data-p="${p}"]`);
+    if (input && input !== document.activeElement) input.value = v;
+    const label = host.querySelector(`[data-val="${p}"]`); if (label) label.textContent = text;
+  }
+  host.querySelector('[data-p=auto]')?.setAttribute('aria-pressed', String(!(l?.size > 0)));
+  host.querySelector('[data-p=caps]')?.setAttribute('aria-checked', String(!!l?.caps));
+}
+
+// ---- Mutations ----
+function edSetLayer(patch, { commit = 'soon', i = creator.draft.sel } = {}) {
+  const d = creator.draft, l = d.layers[i]; if (!l) return;
+  d.layers[i] = normLayer({ ...l, ...patch });
+  edPaintLayer(i, true);
+  edSyncTab();
+  if (commit === 'now') edCommit(); else if (commit === 'soon') edCommitSoon();
+  saveDraft();
+}
+function edSetFrame(patch) {
+  const d = creator.draft, before = dimsOf(d);
+  d.frame = frameOf({ frame: { ...d.frame, ...patch } });
+  const after = dimsOf(d);
+  if (before.H !== after.H || before.top !== after.top) {
+    d.layers = d.layers.map(l => normLayer({ ...l, y: clamp((l.y * before.H + (after.top - before.top)) / after.H, 0, 1) }));
+  }
+  edRenderMedia(); edRenderCanvas(); edSyncTab(); edCommitSoon(); saveDraft();
+}
+function edAdd() {
+  const d = creator.draft;
+  if (d.layers.length >= MAX_LAYERS) { toast(`That's the max of ${MAX_LAYERS} text boxes.`); return; }
+  const base = d.layers[d.sel] || d.layers[d.layers.length - 1];
+  const n = d.layers.length;
+  const l = makeLayer({ anchor: 'middle', x: 0.5, y: clamp(0.5 + ((n % 3) - 1) * 0.12, 0.1, 0.9), w: 0.8, ...(base ? { font: base.font, color: base.color, stroke: base.stroke, sw: base.sw, bg: base.bg, bga: base.bga, caps: base.caps } : {}) });
+  d.layers.push(l);
+  d.sel = d.layers.length - 1;
+  edRenderCanvas(); edRenderList(); edRenderTab(); edCommit(); updateCreatorFoot();
+  const ta = edQ(`[data-lt="${d.sel}"]`); ta?.focus({ preventScroll: !mqDesktop.matches }); if (!mqDesktop.matches) ta?.scrollIntoView({ block: 'nearest' });
+  edSay(`Text box ${d.sel + 1} added`);
+}
+function edDelete(i) {
+  const d = creator.draft; if (!d.layers[i]) return;
+  d.layers.splice(i, 1);
+  if (d.sel >= d.layers.length) d.sel = d.layers.length - 1;
+  else if (d.sel > i) d.sel--;
+  edRenderCanvas(); edRenderList(); edRenderTab(); edCommit(); updateCreatorFoot();
+  toast('Text box deleted', { actionLabel: 'Undo', onAction: () => edUndo(-1) });
+  edQ('.ed-canvas')?.focus({ preventScroll: true });
+}
+function edDuplicate(i) {
+  const d = creator.draft, l = d.layers[i]; if (!l) return;
+  if (d.layers.length >= MAX_LAYERS) { toast(`That's the max of ${MAX_LAYERS} text boxes.`); return; }
+  d.layers.splice(i + 1, 0, normLayer({ ...l, x: clamp(l.x + 0.04, 0, 1), y: clamp(l.y + 0.05, 0, 1) }));
+  d.sel = i + 1;
+  edRenderCanvas(); edRenderList(); edRenderTab(); edCommit();
+}
+function edReorder(i, dir) {
+  const d = creator.draft, j = i + dir;
+  if (j < 0 || j >= d.layers.length) return;
+  [d.layers[i], d.layers[j]] = [d.layers[j], d.layers[i]];
+  d.sel = j;
+  edRenderCanvas(); edRenderList(); edRenderTab(); edCommit();
+  edSay(dir > 0 ? 'Brought forward' : 'Sent backward');
+}
+function edApplyLook(look) {
+  const d = creator.draft;
+  d.layers = look.layers.slice(0, MAX_LAYERS).map(normLayer);
+  d.frame = frameOf(look);
+  if (look.filter !== undefined) d.filter = FILTERS[look.filter] ? look.filter : 'none';
+  d.sel = d.layers.length ? 0 : -1;
+  edRenderAll(); edCommit();
+}
+function edOpenLayouts(anchor) {
+  const d = creator.draft;
+  const texts = d.layers.map(l => l.text.trim()).filter(Boolean);
+  const apply = name => { edApplyLook(presetLook(name, texts, d.gif, d.frame.color)); edSay('Layout applied'); };
+  openMenu(anchor, [
+    { label: 'Classic top and bottom', icon: 'layout', onSelect: () => apply('classic') },
+    { label: 'Caption bar above', icon: 'barTop', onSelect: () => apply('above') },
+    { label: 'Caption bar below', icon: 'barBottom', onSelect: () => apply('below') },
+    { label: 'Label on the GIF', icon: 'label', onSelect: () => apply('label') },
+    { label: 'Big text in the middle', icon: 'text', onSelect: () => apply('center') },
+    { sep: true },
+    { label: 'Remove all text', icon: 'trash', danger: true, onSelect: () => { edApplyLook({ layers: [], frame: d.frame }); } },
+  ]);
+}
+function edRenderRemix() {
+  const d = creator.draft, box = edQ('.ed-remix'); if (!box) return;
+  box.hidden = !d.remixOf;
+  if (!d.remixOf) return;
+  box.innerHTML = `<p>${icon('remix', 16)} Remixing @${esc(d.remixAuthor || 'someone')}'s meme</p>${d.remixLook?.layers?.length ? '<button type="button" class="btn btn-ghost btn-sm" data-e="remix-look">Start from their text and style</button>' : ''}`;
+}
+
+// ---- Events ----
+function edWire(el) {
+  const stage = el.querySelector('[data-step="2"]');
+  const wrap = el.querySelector('.ed-canvas-wrap'), cv = el.querySelector('.ed-canvas');
+  const guideV = el.querySelector('.ed-guide-v'), guideH = el.querySelector('.ed-guide-h');
+
+  stage.addEventListener('click', e => {
+    const d = creator.draft;
+    const t = e.target.closest('[data-e],[data-tab],[data-p]');
+    if (!t || !stage.contains(t)) return;
+    if (t.dataset.tab) { d.tab = t.dataset.tab; edRenderTab(); saveDraft(); return; }
+    if (t.dataset.p && t.tagName !== 'INPUT') {
+      const p = t.dataset.p, v = t.dataset.v;
+      if (p === 'frameColor') { edSetFrame({ color: v }); edCommit(); }
+      else if (p === 'filter') { d.filter = v; edRenderMedia(); edSyncTab(); edCommit(); saveDraft(); }
+      else if (p === 'auto') { const l = d.layers[d.sel]; if (!l) return; const k = parseFloat(edLayerEl(d.sel)?.style.getPropertyValue('--k')) || 9; edSetLayer({ size: l.size > 0 ? 0 : Math.round(k * 10) / 10 }, { commit: 'now' }); }
+      else if (p === 'caps') { const l = d.layers[d.sel]; if (l) edSetLayer({ caps: !l.caps }, { commit: 'now' }); }
+      else if (v !== undefined) {
+        edSetLayer({ [p]: v }, { commit: 'now' });
+        if (p === 'bg') edRenderTab();
+        if (p === 'font') ensureFonts([v]);
+      }
+      return;
+    }
+    const a = t.dataset.e, l = d.layers[d.sel], dm = edDims();
+    if (a === 'undo') edUndo(-1);
+    else if (a === 'redo') edUndo(1);
+    else if (a === 'add') edAdd();
+    else if (a === 'layouts') edOpenLayouts(t);
+    else if (a === 'tip-ok') { store.set('bars:edTip', 1); el.querySelector('.ed-tip').hidden = true; }
+    else if (a === 'remix-look' && d.remixLook) { edApplyLook(d.remixLook); edSay(`Loaded @${d.remixAuthor}'s text`); }
+    else if (a === 'row-more') {
+      const i = +t.dataset.i; edSelect(i);
+      openMenu(t, [
+        { label: 'Duplicate', icon: 'copy', onSelect: () => edDuplicate(i) },
+        { label: 'Bring forward', icon: 'arrowUp', onSelect: () => edReorder(i, 1) },
+        { label: 'Send backward', icon: 'arrowDown', onSelect: () => edReorder(i, -1) },
+        { sep: true },
+        { label: 'Delete', icon: 'trash', danger: true, onSelect: () => edDelete(i) },
+      ]);
+    }
+    else if (a === 'place' && l) {
+      const v = t.dataset.v, edge = 0.03 / dm.H;
+      edSetLayer(v === 'top' ? { anchor: 'top', y: edge, x: 0.5 } : v === 'bottom' ? { anchor: 'bottom', y: 1 - edge, x: 0.5 } : { anchor: 'middle', y: 0.5, x: 0.5 }, { commit: 'now' });
+    }
+    else if (a === 'hcenter' && l) edSetLayer({ x: 0.5 }, { commit: 'now' });
+    else if (a === 'rot-reset' && l) edSetLayer({ rot: 0 }, { commit: 'now' });
+  });
+  stage.addEventListener('input', e => {
+    const d = creator.draft, t = e.target;
+    if (t.dataset.lt !== undefined) {
+      const i = +t.dataset.lt;
+      if (d.sel !== i) edSelect(i);
+      d.layers[i].text = t.value.slice(0, MAX_LAYER_TEXT);
+      autoGrow(t); edPaintLayer(i, true); edCommitSoon(); saveDraft(); updateCreatorFoot();
+      return;
+    }
+    const p = t.dataset.p; if (!p) return;
+    if (t.type === 'color') {
+      const v = t.value.toUpperCase();
+      if (p === 'frameColor') edSetFrame({ color: v }); else { edSetLayer({ [p]: v }); if (p === 'bg' && !edQ('[data-p=bga]')) edRenderTab(); }
+      return;
+    }
+    if (t.type !== 'range') return;
+    const v = +t.value;
+    if (p === 'frameTop') edSetFrame({ top: v / 100 });
+    else if (p === 'frameBottom') edSetFrame({ bottom: v / 100 });
+    else if (p === 'size') edSetLayer({ size: v });
+    else if (['sw', 'bga', 'x', 'y', 'w'].includes(p)) edSetLayer({ [p]: v / 100 });
+    else if (p === 'rot') edSetLayer({ rot: snapRot(v) });
+  });
+  stage.addEventListener('change', e => { if (e.target.type === 'range' || e.target.type === 'color') edCommit(); });
+  stage.addEventListener('focusin', e => { const t = e.target; if (t.dataset?.lt !== undefined && creator.draft.sel !== +t.dataset.lt) edSelect(+t.dataset.lt); });
+  stage.addEventListener('keydown', e => {
+    const t = e.target.closest('.ed-tabs [role=tab]'); if (!t || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+    e.preventDefault();
+    const i = ED_TABS.findIndex(([k]) => k === creator.draft.tab), n = (i + (e.key === 'ArrowRight' ? 1 : -1) + ED_TABS.length) % ED_TABS.length;
+    creator.draft.tab = ED_TABS[n][0]; edRenderTab(); el.querySelector(`.ed-tabs [data-tab="${ED_TABS[n][0]}"]`).focus();
+  });
+
+  // Direct manipulation: drag to move, corner handles to rotate/resize, two fingers to pinch-scale and rotate.
+  const pts = new Map();
+  let g = null, lastTap = { i: -1, t: 0 };
+  const kOf = i => parseFloat(edLayerEl(i)?.style.getPropertyValue('--k')) || 9;
+  const centreOf = i => { const b = edLayerEl(i).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; };
+  const showGuides = (v, h) => { guideV.hidden = !v; guideH.hidden = !h; };
+  wrap.addEventListener('pointerdown', e => {
+    if (e.button > 0) return;
+    const d = creator.draft;
+    const handle = e.target.closest('[data-handle]'), le = e.target.closest('.ed-layers .layer');
+    if (!handle && !e.target.closest('.ed-canvas')) return;
+    if (e.isPrimary) { pts.clear(); if (g?.changed) edCommit(); g = null; }   // a new gesture: drop any finger we never saw lift
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    try { wrap.setPointerCapture(e.pointerId); } catch { }
+    e.preventDefault();
+    if (pts.size === 2 && d.layers[d.sel]) {
+      if (g?.changed) edCommit();
+      const [a, b] = [...pts.values()];
+      g = { mode: 'pinch', i: d.sel, d0: dist(a, b) || 1, a0: angle(a, b), k0: kOf(d.sel), rot0: d.layers[d.sel].rot, changed: false };
+      return;
+    }
+    if (pts.size > 1) return;
+    cv.focus({ preventScroll: true });
+    if (handle) {
+      const i = d.sel; if (!d.layers[i]) return;
+      if (handle.dataset.handle === 'del') { g = { mode: 'del', i }; return; }
+      const c = centreOf(i), p = { x: e.clientX, y: e.clientY };
+      g = { mode: handle.dataset.handle, i, c, d0: dist(c, p) || 1, a0: angle(c, p), k0: kOf(i), rot0: d.layers[i].rot, changed: false };
+    } else if (le) {
+      const i = +le.dataset.lid;
+      if (d.sel !== i) edSelect(i);
+      const l = d.layers[i];
+      g = { mode: 'move', i, sx: e.clientX, sy: e.clientY, x0: l.x, y0: l.y, changed: false };
+    } else g = { mode: 'none' };
+  });
+  wrap.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId) || !g) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const d = creator.draft, l = d.layers[g.i]; if (!l) return;
+    if (g.mode === 'pinch') {
+      if (pts.size < 2) return;
+      const [a, b] = [...pts.values()];
+      l.size = Math.round(clamp(g.k0 * dist(a, b) / g.d0, 2, 30) * 10) / 10;
+      l.rot = snapRot(normRot(g.rot0 + angle(a, b) - g.a0));
+      g.changed = true; edPaintLayer(g.i);
+    } else if (g.mode === 'move') {
+      if (!g.changed && Math.hypot(e.clientX - g.sx, e.clientY - g.sy) < 4) return;
+      g.changed = true;
+      const r = cv.getBoundingClientRect();
+      let x = clamp(g.x0 + (e.clientX - g.sx) / r.width, 0, 1), y = clamp(g.y0 + (e.clientY - g.sy) / r.height, 0, 1);
+      const hf = (edLayerEl(g.i)?.offsetHeight || 0) / r.height;
+      const off = l.anchor === 'top' ? hf / 2 : l.anchor === 'bottom' ? -hf / 2 : 0;
+      const sx = Math.abs(x - 0.5) < 0.015, sy = Math.abs(y + off - 0.5) < 0.015;
+      if (sx) x = 0.5;
+      if (sy) y = clamp(0.5 - off, 0, 1);
+      showGuides(sx, sy);
+      l.x = x; l.y = y; edPaintLayer(g.i);
+    } else if (g.mode === 'scale') {
+      l.size = Math.round(clamp(g.k0 * dist(g.c, { x: e.clientX, y: e.clientY }) / g.d0, 2, 30) * 10) / 10;
+      g.changed = true; edPaintLayer(g.i);
+    } else if (g.mode === 'rot') {
+      l.rot = snapRot(normRot(g.rot0 + angle(g.c, { x: e.clientX, y: e.clientY }) - g.a0));
+      g.changed = true; edPaintLayer(g.i);
+    }
+  });
+  const end = e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.delete(e.pointerId);
+    const d = creator.draft;
+    if (g?.mode === 'pinch') { if (!pts.size) { if (g.changed) { edCommit(); edSyncTab(); } g = null; } return; }
+    if (pts.size) return;
+    showGuides(false, false);
+    if (!g) return;
+    if (e.type === 'pointercancel') { if (g.changed) { edCommit(); edSyncTab(); } g = null; return; }
+    if (g.mode === 'del') edDelete(g.i);
+    else if (g.changed) { edPaintLayer(g.i, true); edCommit(); edSyncTab(); saveDraft(); }
+    else if (g.mode === 'none') { if (d.sel >= 0) edSelect(-1); }
+    else if (g.mode === 'move') {
+      const now = Date.now();
+      if (lastTap.i === g.i && now - lastTap.t < 380) { edSelect(g.i, { focusText: true }); lastTap = { i: -1, t: 0 }; }
+      else lastTap = { i: g.i, t: now };
+    }
+    g = null;
+  };
+  wrap.addEventListener('pointerup', end);
+  wrap.addEventListener('pointercancel', end);
+  wrap.addEventListener('lostpointercapture', e => { if (pts.has(e.pointerId)) end({ pointerId: e.pointerId, type: 'pointercancel' }); });
+  // Trackpad pinch (ctrl + wheel) or Alt + wheel resizes the selected text.
+  cv.addEventListener('wheel', e => {
+    const d = creator.draft, l = d.layers[d.sel];
+    if (!l || !(e.ctrlKey || e.altKey)) return;
+    e.preventDefault();
+    l.size = Math.round(clamp(kOf(d.sel) * Math.exp(-e.deltaY * 0.01), 2, 30) * 10) / 10;
+    edPaintLayer(d.sel); edSyncTab(); edCommitSoon(); saveDraft();
+  }, { passive: false });
+  cv.addEventListener('keydown', e => {
+    const d = creator.draft, l = d.layers[d.sel];
+    const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    if (arrows[e.key] && l) {
+      e.preventDefault(); e.stopPropagation();
+      const s = e.shiftKey ? 0.05 : 0.005, [dx, dy] = arrows[e.key];
+      edSetLayer({ x: l.x + dx * s, y: l.y + dy * s });
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && l) { e.preventDefault(); edDelete(d.sel); }
+    else if (e.key === 'Enter' && l) { e.preventDefault(); edSelect(d.sel, { focusText: true }); }
+    else if (e.key === 'Escape' && d.sel >= 0) { e.preventDefault(); e.stopPropagation(); edSelect(-1); }
+    else if ((e.key === ']' || e.key === '[') && d.layers.length) { e.preventDefault(); edSelect((Math.max(0, d.sel) + (e.key === ']' ? 1 : -1) + d.layers.length) % d.layers.length); }
+  });
+  creator.ro = new ResizeObserver(() => edSyncChrome());
+  creator.ro.observe(wrap);
+}
+
+async function postMeme(btn) {
+  const el = creator.el, d = creator.draft; if (!el || btn.classList.contains('is-loading')) return;
+  const err = el.querySelector('.c-error'); err.textContent = '';
+  if (!d.gif) return goCreatorStep(1);
+  if (!draftHasText(d)) return goCreatorStep(2);
+  const meme = draftAsMeme();
+  const title = d.title.trim();
+  if ([...meme.layers.map(l => l.text), title].some(hasBlockedTerms)) { err.textContent = "Your text includes words BARS doesn't allow. Edit it and try again."; return; }
+  const wait = POST_COOLDOWN_MS - (Date.now() - store.get('bars:lastPost', 0));
+  if (wait > 0) { err.textContent = `Slow down. You can post again in ${Math.ceil(wait / 1000)}s.`; return; }
+  if (!navigator.onLine) { err.textContent = "You're in a blackspot. Connect to post."; return; }
+  btn.classList.add('is-loading'); btn.textContent = 'Posting';
+  try {
+    const uid = state.user.uid;
+    const ref = F.doc(F.collection(db(), 'memes'));
+    const data = {
+      authorId: uid, authorName: state.profile.username, gif: cleanGif(d.gif), title,
+      layers: meme.layers, frame: meme.frame, filter: meme.filter, caption: meme.caption,
+      remixOf: d.remixOf || null, upvotes: 0, downvotes: 0, score: 0,
+      hotScore: hotScore(0, Date.now() / 1000), reportCount: 0, hidden: false, createdAt: F.serverTimestamp(),
+    };
+    const batch = F.writeBatch(db());
+    batch.set(ref, data);
+    batch.update(F.doc(db(), 'users', uid), { memeCount: F.increment(1) });
+    await batch.commit();
+    store.set('bars:lastPost', Date.now());
+    saveDraft.cancel(); edCommitSoon.cancel(); session.del('bars:draft'); creator.draft = newDraft();
+    state.memes.set(ref.id, { ...data, id: ref.id, createdAt: null, createdAtMs: Date.now() });
+    if (state.profile) state.profile.memeCount++;
+    for (const f of wall.feeds.values()) if (['fresh', 'hot', 'top-today', 'top-week', 'rising', 'following'].includes(f.key)) f.needsReload = true;
+    await celebrate();
+    closeCreatorDom();
+    replaceRoute(`#/m/${ref.id}?new=1`);
+  } catch (e) {
+    console.warn('[BARS] post', e);
+    err.textContent = e.code === 'permission-denied' ? 'Firestore rejected the post. Publish the updated security rules from the bottom of bars.html.' : errorMessage(e);
+    btn.classList.remove('is-loading'); btn.textContent = 'Post';
+  }
+}
+
 function gifBrowser(root, onPick) {
   const grid = root.querySelector('.gif-grid'), status = root.querySelector('.gif-status'), sentinel = root.querySelector('.gif-sentinel');
   const input = root.querySelector('.gif-search input');
@@ -3068,45 +3869,6 @@ function gifBrowser(root, onPick) {
     destroy() { io.disconnect(); ro.disconnect(); debounced.cancel(); st.token++; },
   };
 }
-async function postMeme(btn) {
-  const el = creator.el, d = creator.draft; if (!el || btn.classList.contains('is-loading')) return;
-  const err = el.querySelector('.c-error'); err.textContent = '';
-  const top = d.topText.trim(), bottom = d.bottomText.trim(), title = d.title.trim();
-  if (!d.gif) return goCreatorStep(1);
-  if (!top && !bottom) return goCreatorStep(2);
-  if ([top, bottom, title].some(hasBlockedTerms)) { err.textContent = "Your text includes words BARS doesn't allow. Edit it and try again."; return; }
-  const wait = POST_COOLDOWN_MS - (Date.now() - store.get('bars:lastPost', 0));
-  if (wait > 0) { err.textContent = `Slow down. You can post again in ${Math.ceil(wait / 1000)}s.`; return; }
-  if (!navigator.onLine) { err.textContent = "You're in a blackspot. Connect to post."; return; }
-  btn.classList.add('is-loading'); btn.textContent = 'Posting';
-  try {
-    const uid = state.user.uid;
-    const ref = F.doc(F.collection(db(), 'memes'));
-    const data = {
-      authorId: uid, authorName: state.profile.username, gif: cleanGif(d.gif), title,
-      topText: top, bottomText: bottom, textColor: d.textColor === 'yellow' ? 'yellow' : 'white',
-      fontScale: d.fontScale > 0 ? Math.round(d.fontScale * 100) / 100 : 0, allCaps: !!d.allCaps,
-      remixOf: d.remixOf || null, upvotes: 0, downvotes: 0, score: 0,
-      hotScore: hotScore(0, Date.now() / 1000), reportCount: 0, hidden: false, createdAt: F.serverTimestamp(),
-    };
-    const batch = F.writeBatch(db());
-    batch.set(ref, data);
-    batch.update(F.doc(db(), 'users', uid), { memeCount: F.increment(1) });
-    await batch.commit();
-    store.set('bars:lastPost', Date.now());
-    saveDraft.cancel(); session.del('bars:draft'); creator.draft = newDraft();
-    state.memes.set(ref.id, { ...data, id: ref.id, createdAt: null, createdAtMs: Date.now() });
-    if (state.profile) state.profile.memeCount++;
-    for (const f of wall.feeds.values()) if (['fresh', 'hot', 'top-today', 'top-week', 'rising'].includes(f.key)) f.needsReload = true;
-    await celebrate();
-    closeCreatorDom();
-    replaceRoute(`#/m/${ref.id}?new=1`);
-  } catch (e) {
-    console.warn('[BARS] post', e);
-    err.textContent = e.code === 'permission-denied' ? 'Firestore rejected the post. Check the security rules are published.' : errorMessage(e);
-    btn.classList.remove('is-loading'); btn.textContent = 'Post';
-  }
-}
 function celebrate() {
   return new Promise(res => {
     const layer = document.createElement('div');
@@ -3152,7 +3914,7 @@ async function renderMemeView(r) {
       return;
     }
   }
-  const g = m.gif || {}, aspect = clampAspect((+g.height || 360) / (+g.width || 480));
+  const g = m.gif || {}, dm = dimsOf(m);
   document.title = `Meme by @${m.authorName}: ${APP_NAME}`;
   const own = state.user && m.authorId === state.user.uid;
   host.innerHTML = `<div class="detail">
@@ -3168,8 +3930,8 @@ async function renderMemeView(r) {
       </header>
       ${m.remixOf ? remixLine(m) : ''}
       ${m.title ? `<h1 class="detail-title" id="dt-${esc(m.id)}">${esc(m.title)}</h1>` : `<h1 class="sr-only" id="dt-${esc(m.id)}">Meme by @${esc(m.authorName)}</h1>`}
-      <div class="meme meme-detail" role="img" data-action="media" aria-label="${esc(memeAria(m))}" style="aspect-ratio:${(1 / aspect).toFixed(4)}" data-aspect="${aspect.toFixed(4)}"${m.fontScale > 0 ? ' data-manual="1"' : ''}>
-        ${mediaInner(m, 'detail')}${captionHtml(m, aspect)}
+      <div class="meme meme-detail" role="img" data-action="media" aria-label="${esc(memeAria(m))}" ${memeBoxAttrs(dm)}>
+        ${memeInnerHtml(m, 'detail', dm)}
         ${g.mp4Url ? `<button class="play-toggle" data-action="play-toggle" aria-label="${reducedMotion.matches ? 'Play GIF' : 'Pause GIF'}">${icon(reducedMotion.matches ? 'play' : 'pause', 18)}</button>` : ''}
       </div>
       ${actionsHtml(m, { detail: true })}
@@ -3676,7 +4438,7 @@ async function loadSidebar(force = false) {
       if (e.code !== 'invalid-argument') throw e;
       memes = (await F.getDocs(baseQuery(F.where('createdAt', '>=', since), F.orderBy('createdAt', 'desc'), F.limit(60)))).docs.map(memeFromDoc).sort((a, b) => b.score - a.score).slice(0, 5);
     }
-    topEl.innerHTML = memes.length ? memes.map(m => `<a class="sb-item" href="#/m/${esc(m.id)}"><img class="sb-thumb" src="${esc(m.gif.stillUrl || m.gif.webpUrl)}" alt="" loading="lazy" decoding="async" width="48" height="48"><span class="sb-txt"><span class="sb-cap">${esc(m.title || m.topText || m.bottomText || 'Untitled')}</span><span class="sb-meta">@${esc(m.authorName)}, ${fmtCount(m.score)} bars</span></span></a>`).join('')
+    topEl.innerHTML = memes.length ? memes.map(m => `<a class="sb-item" href="#/m/${esc(m.id)}"><img class="sb-thumb" src="${esc(m.gif.stillUrl || m.gif.webpUrl)}" alt="" loading="lazy" decoding="async" width="48" height="48"><span class="sb-txt"><span class="sb-cap">${esc(m.title || memeText(m) || 'Untitled')}</span><span class="sb-meta">@${esc(m.authorName)}, ${fmtCount(m.score)} bars</span></span></a>`).join('')
       : '<p class="sb-empty">No memes today yet. Post the first one.</p>';
   } catch (e) { topEl.innerHTML = `<p class="sb-empty">${esc(errorMessage(e))}</p>`; }
   try {
@@ -4079,24 +4841,55 @@ service cloud.firestore {
           && request.resource.data.authorName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username;
       }
 
+      // Text layers: up to 8, each fully validated. (Rules can't loop, so each index is checked explicitly.)
+      function hexColor(c) { return c is string && c.matches('^#[0-9A-Fa-f]{6}$'); }
+      function validLayer(l) {
+        return l is map
+          && l.keys().hasOnly(['text', 'x', 'y', 'anchor', 'w', 'size', 'font', 'color', 'stroke', 'sw', 'bg', 'bga', 'align', 'rot', 'caps'])
+          && l.keys().hasAll(['text', 'x', 'y', 'anchor', 'w', 'size', 'font', 'color', 'stroke', 'sw', 'bg', 'bga', 'align', 'rot', 'caps'])
+          && l.text is string && l.text.size() > 0 && l.text.size() <= 120
+          && l.x is number && l.x >= 0 && l.x <= 1
+          && l.y is number && l.y >= 0 && l.y <= 1
+          && l.anchor in ['top', 'middle', 'bottom']
+          && l.w is number && l.w >= 0.15 && l.w <= 1
+          && l.size is number && l.size >= 0 && l.size <= 30
+          && l.font in ['impact', 'pow', 'marker', 'comic', 'clean', 'serif', 'mono']
+          && hexColor(l.color) && hexColor(l.stroke)
+          && l.sw is number && l.sw >= 0 && l.sw <= 0.3
+          && (l.bg == '' || hexColor(l.bg))
+          && l.bga is number && l.bga >= 0.1 && l.bga <= 1
+          && l.align in ['left', 'center', 'right']
+          && l.rot is number && l.rot >= -180 && l.rot <= 180
+          && l.caps is bool;
+      }
+      function layerOk(ls, i) { return ls.size() <= i || validLayer(ls[i]); }
+      function validLayers(ls) {
+        return ls is list && ls.size() >= 1 && ls.size() <= 8
+          && layerOk(ls, 0) && layerOk(ls, 1) && layerOk(ls, 2) && layerOk(ls, 3)
+          && layerOk(ls, 4) && layerOk(ls, 5) && layerOk(ls, 6) && layerOk(ls, 7);
+      }
+      function validFrame(f) {
+        return f is map && f.keys().hasOnly(['top', 'bottom', 'color']) && f.keys().hasAll(['top', 'bottom', 'color'])
+          && f.top is number && f.top >= 0 && f.top <= 0.6
+          && f.bottom is number && f.bottom >= 0 && f.bottom <= 0.6
+          && hexColor(f.color);
+      }
+
       // Guests can browse. Hidden memes are visible only to their author.
       allow read: if resource.data.hidden == false
         || (signedIn() && resource.data.authorId == request.auth.uid);
 
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['authorId', 'authorName', 'gif', 'title', 'topText', 'bottomText', 'textColor', 'fontScale', 'allCaps', 'remixOf', 'upvotes', 'downvotes', 'score', 'hotScore', 'reportCount', 'hidden', 'createdAt'])
-        && request.resource.data.keys().hasAll(['authorId', 'authorName', 'gif', 'title', 'topText', 'bottomText', 'textColor', 'fontScale', 'allCaps', 'remixOf', 'upvotes', 'downvotes', 'score', 'hotScore', 'reportCount', 'hidden', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['authorId', 'authorName', 'gif', 'title', 'layers', 'frame', 'filter', 'caption', 'remixOf', 'upvotes', 'downvotes', 'score', 'hotScore', 'reportCount', 'hidden', 'createdAt'])
+        && request.resource.data.keys().hasAll(['authorId', 'authorName', 'gif', 'title', 'layers', 'frame', 'filter', 'caption', 'remixOf', 'upvotes', 'downvotes', 'score', 'hotScore', 'reportCount', 'hidden', 'createdAt'])
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.authorName == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username
         && validGif(request.resource.data.gif)
         && request.resource.data.title is string && request.resource.data.title.size() <= 100
-        && request.resource.data.topText is string && request.resource.data.topText.size() <= 80
-        && request.resource.data.bottomText is string && request.resource.data.bottomText.size() <= 80
-        && (request.resource.data.topText.size() > 0 || request.resource.data.bottomText.size() > 0)
-        && request.resource.data.textColor in ['white', 'yellow']
-        && request.resource.data.fontScale is number
-        && (request.resource.data.fontScale == 0 || (request.resource.data.fontScale >= 0.5 && request.resource.data.fontScale <= 1.6))
-        && request.resource.data.allCaps is bool
+        && validLayers(request.resource.data.layers)
+        && validFrame(request.resource.data.frame)
+        && request.resource.data.filter in ['none', 'fried', 'mono', 'faded', 'warm', 'cool', 'moody']
+        && request.resource.data.caption is string && request.resource.data.caption.size() > 0 && request.resource.data.caption.size() <= 1000
         && (request.resource.data.remixOf == null || (request.resource.data.remixOf is string && request.resource.data.remixOf.size() < 64))
         && request.resource.data.upvotes == 0
         && request.resource.data.downvotes == 0
