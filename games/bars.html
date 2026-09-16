@@ -23,12 +23,14 @@
         The full list is also at the bottom of this file if you'd rather add them by hand.
      Firebase Storage is NOT used. Everything runs on the free Spark plan.
 
-  3. GIPHY
-     a. Go to https://developers.giphy.com/dashboard and "Create an App" > API.
-     b. Copy the API key. Beta keys are rate-limited, so BARS caches searches per session.
+  3. GIF SEARCH KEYS (one is enough; both doubles your free searches)
+     a. GIPHY: https://developers.giphy.com/dashboard > "Create an App" > API. Copy the key.
+     b. KLIPY: https://partner.klipy.com > API Keys > create a key. Copy it.
+     Free keys allow about 100 searches an hour each. With both, BARS spreads searches across them
+     and switches automatically when one is busy. Only searching costs calls; viewing memes doesn't.
 
   4. PASTE + DEPLOY
-     a. In the <script type="module"> below, fill in FIREBASE_CONFIG and GIPHY_API_KEY
+     a. In the <script type="module"> below, fill in FIREBASE_CONFIG, GIPHY_API_KEY and/or KLIPY_API_KEY
         (the very first lines of the script).
      b. Drop this file into your games folder as games/bars.html and deploy
         (GitHub Pages, Netlify or Firebase Hosting). HUB_URL points back to ../index.html.
@@ -47,6 +49,8 @@
 <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://api.giphy.com" crossorigin>
 <link rel="preconnect" href="https://media.giphy.com" crossorigin>
+<link rel="preconnect" href="https://api.klipy.com" crossorigin>
+<link rel="preconnect" href="https://static.klipy.com" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Anton&display=swap" onload="this.onload=null;this.rel='stylesheet'">
@@ -457,6 +461,8 @@ body.setup-mode .sidebar,body.setup-mode .bottom-nav,body.setup-mode .top-action
 .avp-grid button[aria-pressed="true"]{border-color:var(--yellow)}
 .avp-grid img{width:100%;height:100%;object-fit:cover}
 .giphy-attr{font-size:11.5px;font-weight:700;color:var(--text-muted);margin-top:8px;display:flex;align-items:center;gap:6px}
+.giphy-attr.is-klipy::before{display:none}
+.giphy-attr:empty{display:none}
 .giphy-attr::before{content:"";width:10px;height:12px;background:linear-gradient(90deg,#00FF99 0 25%,#00CCFF 25% 50%,#9933FF 50% 75%,#FF6666 75%);border-radius:1px}
 
 /* Cropper */
@@ -768,7 +774,7 @@ body.setup-mode .sidebar,body.setup-mode .bottom-nav,body.setup-mode .top-action
     </section>
     <section id="otherView" hidden></section>
     <footer class="site-footer">
-      <p>BARS is a fan-made parody site and is not affiliated with, endorsed by, or connected to Optus. Memes are user-generated. GIFs powered by GIPHY.</p>
+      <p>BARS is a fan-made parody site and is not affiliated with, endorsed by, or connected to Optus. Memes are user-generated. <span class="gif-credit">GIFs powered by GIPHY.</span></p>
       <div class="footer-links"><a href="../index.html" id="hubLink">← Optus Games</a><button class="link-btn" data-action="toggle-theme">Switch theme</button></div>
     </footer>
   </main>
@@ -777,7 +783,7 @@ body.setup-mode .sidebar,body.setup-mode .bottom-nav,body.setup-mode .top-action
     <section class="sb-block"><h2>Top today</h2><div id="sbTop"><div class="sk sk-line" style="width:80%;margin:8px 0"></div><div class="sk sk-line" style="width:60%;margin:8px 0"></div></div></section>
     <section class="sb-block"><h2>Rising creators</h2><div id="sbCreators"><div class="sk sk-line" style="width:70%;margin:8px 0"></div></div></section>
     <div class="sb-foot">
-      <p>BARS is a fan-made parody site and is not affiliated with, endorsed by, or connected to Optus. Memes are user-generated. GIFs powered by GIPHY.</p>
+      <p>BARS is a fan-made parody site and is not affiliated with, endorsed by, or connected to Optus. Memes are user-generated. <span class="gif-credit">GIFs powered by GIPHY.</span></p>
       <a href="../index.html" class="hub-link">← Optus Games</a>
     </div>
   </aside>
@@ -805,22 +811,15 @@ body.setup-mode .sidebar,body.setup-mode .bottom-nav,body.setup-mode .top-action
 // ============================================================
 // 1. CONFIG  (paste your keys here)
 // ============================================================
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBVTeUN-9cT4vbnWts_oTZ8OiRIoyFDKKM",
-  authDomain: "bars-fb0bc.firebaseapp.com",
-  projectId: "bars-fb0bc",
-  storageBucket: "bars-fb0bc.firebasestorage.app",
-  messagingSenderId: "755330373898",
-  appId: "1:755330373898:web:f7a86916513bd6de2dc2f3",
-  measurementId: "G-2GQN5LEYWF"
-};
-const GIPHY_API_KEY = "Hiqz38PpWlnI2d3Bo0jedZaQXAYfyQUo";
+const FIREBASE_CONFIG = { /* paste here */ };
+const GIPHY_API_KEY = "PASTE_KEY_HERE";
+const KLIPY_API_KEY = "PASTE_KEY_HERE";      // optional second GIF source; each key adds ~100 searches/hour
 const APP_NAME = "BARS";
 
 // Versions (leave these alone). APP_VERSION lets open tabs notice a newer bars.html is live;
 // RULES_VERSION must match the "rules-vN" probe in the security rules at the bottom of this file.
-const APP_VERSION = "2026.09.16-5";
-const RULES_VERSION = 5;
+const APP_VERSION = "2026.09.16-6";
+const RULES_VERSION = 6;
 
 // Tweakables
 const HUB_URL = "../index.html";          // "← Optus Games" link
@@ -1237,8 +1236,9 @@ function errorMessage(e) {
   const code = e?.code || '';
   if (code === 'permission-denied') return 'Firestore blocked this request. Check that the security rules are published.';
   if (code === 'failed-precondition') return isIndexBuilding(e) ? 'The Firestore index for this is still building. That usually takes 2 to 10 minutes.' : "This needs a Firestore index that hasn't been created yet.";
-  if (code === 'rate-limited') return 'GIPHY needs a breather. Wait a moment and try again.';
-  if (code === 'bad-key') return 'GIPHY rejected the API key. Check GIPHY_API_KEY in the config block.';
+  if (code === 'rate-limited') return 'GIF search is busy right now. Wait a few minutes and try again.';
+  if (code === 'bad-key') return 'GIF search keys were rejected. Check GIPHY_API_KEY and KLIPY_API_KEY in the config block.';
+  if (code === 'gif-http') return 'GIF search is having trouble. Try again in a moment.';
   if (!navigator.onLine || code === 'unavailable') return "You're in a blackspot. Check your connection and try again.";
   return 'Looks like a blackspot. Try again.';
 }
@@ -1573,11 +1573,11 @@ function avatarPicker({ username = '', value = 'generated' }) {
     <div class="avp-gif" hidden>
       <div class="gif-search field" style="margin:0">${icon('search', 18)}<input type="search" placeholder="Search GIFs for your avatar" aria-label="Search GIFs for your avatar" autocomplete="off"></div>
       <div class="avp-grid" aria-label="GIF avatar results"></div>
-      <p class="giphy-attr">Powered by GIPHY</p>
+      <p class="giphy-attr">Powered by ${esc(GIF_PROVIDERS[0]?.label || 'GIPHY')}</p>
     </div>`;
   const preview = el.querySelector('.avp-preview img'), gen = el.querySelector('.avp-gen');
   const file = el.querySelector('input[type=file]'), gifPanel = el.querySelector('.avp-gif');
-  const grid = el.querySelector('.avp-grid'), search = gifPanel.querySelector('input');
+  const grid = el.querySelector('.avp-grid'), search = gifPanel.querySelector('input'), attr = gifPanel.querySelector('.giphy-attr');
   let showingGif = false, gifToken = 0, gifItems = [];
   const sync = () => {
     preview.src = current === 'generated' ? generatedAvatar(name) : current;
@@ -1590,8 +1590,9 @@ function avatarPicker({ username = '', value = 'generated' }) {
     const my = ++gifToken;
     grid.innerHTML = Array.from({ length: 8 }, () => '<div class="sk" style="aspect-ratio:1;border-radius:10px"></div>').join('');
     try {
-      const res = q ? await giphy('search', { q, limit: 16 }) : await giphy('trending', { limit: 16 });
+      const res = await gifSession(q, { perPage: 16 }).next();
       if (my !== gifToken) return;
+      attr.textContent = `Powered by ${res.provider.label}`; attr.classList.toggle('is-klipy', res.provider.id === 'klipy');
       gifItems = res.items.filter(g => g._avatar);
       grid.innerHTML = gifItems.length ? gifItems.map((g, i) => `<button type="button" data-i="${i}" aria-pressed="${g._avatar === current}" aria-label="${esc(g.title || 'GIF')}"><img src="${esc(g._avatar)}" alt="" loading="lazy" decoding="async"></button>`).join('')
         : `<p class="sb-empty" style="grid-column:1/-1">No GIFs found. Try another word.</p>`;
@@ -1889,12 +1890,18 @@ function toggleTheme() {
 }
 
 // ============================================================
-// 5. GIPHY
+// 5. GIF SOURCES: GIPHY + KLIPY, stacked
+// Each key has its own ~100 calls/hour, so BARS spreads searches across both and quietly
+// switches to the other one when a source is rate-limited, misconfigured or down.
 // ============================================================
-const giphyCache = new Map();
-function normalizeGif(g) {
+const MEDIA_URL_RX = /^https:\/\/([a-z0-9-]+\.)*(giphy\.com|klipy\.com|klipy\.co)\/[^\s"'<>]*$/;
+const safeMedia = u => (typeof u === 'string' && u.length < 1000 && MEDIA_URL_RX.test(u)) ? u : '';
+const hasKey = k => !!(k && k !== 'PASTE_KEY_HERE' && String(k).length > 10);
+const COOLDOWN_MS = { 'rate-limited': 15 * 60000, 'bad-key': 60 * 60000, default: 2 * 60000 };
+
+function normalizeGiphy(g) {
   const im = g.images || {};
-  const pick = (...c) => c.find(v => typeof v === 'string' && v.startsWith('https://')) || '';
+  const pick = (...c) => c.map(safeMedia).find(Boolean) || '';
   const mp4Url = pick(im.original?.mp4, im.original_mp4?.mp4, im.downsized_small?.mp4, im.fixed_width?.mp4, im.fixed_height?.mp4);
   const webpUrl = pick(im.fixed_width?.webp, im.original?.webp, im.downsized?.url, im.fixed_width?.url, im.original?.url);
   const stillUrl = pick(im.fixed_width_still?.url, im.original_still?.url, im.downsized_still?.url, im['480w_still']?.url, im.fixed_height_still?.url);
@@ -1903,38 +1910,135 @@ function normalizeGif(g) {
   const thumb = pick(im.fixed_width_small?.webp, im.fixed_width_small?.url, im.fixed_width?.webp, im.fixed_width?.url, im.preview_gif?.url, stillUrl);
   const tw = +(im.fixed_width_small?.width || im.fixed_width?.width || width) || width;
   const th = +(im.fixed_width_small?.height || im.fixed_width?.height || height) || height;
-  if (!g.id || (!mp4Url && !webpUrl)) return null;
+  if (!g.id || /[^A-Za-z0-9-]/.test(String(g.id)) || (!mp4Url && !webpUrl) || !thumb) return null;
   return {
-    id: String(g.id), title: String(g.title || '').slice(0, 140), mp4Url, webpUrl, stillUrl, width, height,
-    _thumb: thumb, _tw: tw, _th: th,
+    id: String(g.id).slice(0, 60), title: String(g.title || '').slice(0, 140), mp4Url, webpUrl, stillUrl, width, height,
+    _thumb: thumb, _tw: tw, _th: th, _source: 'giphy',
     _avatar: pick(im.fixed_height_small?.webp, im.fixed_width_small?.webp, im.fixed_height_small?.url, im.fixed_width_small?.url, thumb),
   };
 }
-function giphy(endpoint, params = {}) {
-  const url = new URL(`https://api.giphy.com/v1/gifs/${endpoint}`);
-  const p = { api_key: GIPHY_API_KEY, rating: 'pg-13', bundle: 'messaging_non_clips', limit: 24, ...params };
-  Object.entries(p).forEach(([k, v]) => url.searchParams.set(k, String(v)));
-  const key = url.toString();
-  if (giphyCache.has(key)) return giphyCache.get(key);
-  const pr = fetch(key).then(async res => {
-    if (res.status === 429) throw codeErr('rate-limited');
-    if (res.status === 401 || res.status === 403) throw codeErr('bad-key');
-    if (!res.ok) throw codeErr('giphy-http', `GIPHY ${res.status}`);
-    const j = await res.json();
-    return {
-      items: (j.data || []).map(normalizeGif).filter(Boolean),
-      total: j.pagination?.total_count ?? 0,
-      count: j.pagination?.count ?? (j.data || []).length,
-    };
-  });
-  giphyCache.set(key, pr);
-  pr.catch(() => giphyCache.delete(key));
+// KLIPY items: { id, slug, title, type, file: { hd|md|sm|xs: { gif|webp|jpg|mp4|webm: { url, width, height, size } } } }
+function normalizeKlipy(it) {
+  if (!it || it.type === 'ad' || !it.file || typeof it.file !== 'object') return null;
+  const f = it.file;
+  const pick = (fmts, sizes) => { for (const s of sizes) for (const fmt of fmts) { const r = f[s]?.[fmt]; if (r && safeMedia(r.url)) return r; } return null; };
+  const mp4 = pick(['mp4'], ['md', 'hd', 'sm']);
+  const anim = pick(['webp', 'gif'], ['md', 'sm', 'hd']);
+  const still = pick(['jpg'], ['md', 'sm', 'hd', 'xs']);
+  const thumb = pick(['webp', 'gif'], ['sm', 'xs', 'md']) || still;
+  const avatar = pick(['webp', 'gif'], ['xs', 'sm']) || thumb;
+  const dims = mp4 || anim || thumb;
+  const rawId = String(it.id ?? it.slug ?? '').replace(/[^A-Za-z0-9-]/g, '').slice(0, 50);
+  if (!rawId || (!mp4 && !anim) || !thumb) return null;
+  const width = Math.round(+dims?.width || 480) || 480, height = Math.round(+dims?.height || 360) || 360;
+  return {
+    id: `klipy_${rawId}`, title: String(it.title || '').slice(0, 140),
+    mp4Url: mp4?.url || '', webpUrl: anim?.url || '', stillUrl: still?.url || '', width, height,
+    _thumb: thumb.url, _tw: +thumb.width || width, _th: +thumb.height || height, _source: 'klipy', _avatar: avatar.url,
+  };
+}
+function customerId() {
+  let id = store.get('bars:gifClient');
+  if (!id) { id = (crypto.randomUUID?.() || `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`); store.set('bars:gifClient', id); }
+  return id;
+}
+async function fetchJson(url) {
+  let res;
+  try { res = await fetch(url); } catch { throw codeErr('network'); }
+  if (res.status === 429) throw codeErr('rate-limited');
+  if (res.status === 401 || res.status === 403) throw codeErr('bad-key');
+  if (!res.ok) throw codeErr('gif-http', `HTTP ${res.status}`);
+  try { return await res.json(); } catch { throw codeErr('gif-http', 'Bad JSON'); }
+}
+const GIF_PROVIDERS = [
+  {
+    id: 'giphy', label: 'GIPHY', enabled: hasKey(GIPHY_API_KEY),
+    async page(q, page, perPage) {
+      const url = new URL(`https://api.giphy.com/v1/gifs/${q ? 'search' : 'trending'}`);
+      const offset = (page - 1) * perPage;
+      Object.entries({ api_key: GIPHY_API_KEY, rating: 'pg-13', bundle: 'messaging_non_clips', limit: perPage, offset, ...(q ? { q, lang: 'en' } : {}) })
+        .forEach(([k, v]) => url.searchParams.set(k, String(v)));
+      const j = await fetchJson(url);
+      const raw = j.data || [];
+      const total = j.pagination?.total_count ?? 0, count = j.pagination?.count ?? raw.length;
+      return { items: raw.map(normalizeGiphy).filter(Boolean), hasNext: count > 0 && offset + count < Math.min(total, 4999) };
+    },
+  },
+  {
+    id: 'klipy', label: 'KLIPY', enabled: hasKey(KLIPY_API_KEY),
+    async page(q, page, perPage) {
+      const url = new URL(`https://api.klipy.com/api/v1/${encodeURIComponent(KLIPY_API_KEY)}/gifs/${q ? 'search' : 'trending'}`);
+      const locale = (navigator.language || 'en-AU').replace('-', '_');
+      Object.entries({ page, per_page: clamp(perPage, 8, 50), customer_id: customerId(), locale, content_filter: 'medium', ...(q ? { q } : {}) })
+        .forEach(([k, v]) => url.searchParams.set(k, String(v)));
+      const j = await fetchJson(url);
+      if (j.result === false) throw codeErr('gif-http', 'KLIPY returned an error');
+      const d = j.data || {};
+      return { items: (d.data || []).map(normalizeKlipy).filter(Boolean), hasNext: !!d.has_next };
+    },
+  },
+].filter(p => p.enabled);
+const gifProvider = id => GIF_PROVIDERS.find(p => p.id === id);
+function gifSourceOf(gif) { return String(gif?.id || '').startsWith('klipy_') ? 'KLIPY' : 'GIPHY'; }
+function gifCreditText() { return GIF_PROVIDERS.length ? `GIFs powered by ${GIF_PROVIDERS.map(p => p.label).join(' and ')}.` : 'GIFs powered by GIPHY.'; }
+
+// Cooldowns and this device's usage, persisted so reloads and other tabs respect them.
+function gifCooldowns() { const c = store.get('bars:gifCooldown', {}); return c && typeof c === 'object' ? c : {}; }
+function coolDown(id, code) {
+  const c = gifCooldowns(); c[id] = Date.now() + (COOLDOWN_MS[code] || COOLDOWN_MS.default); store.set('bars:gifCooldown', c);
+  if (code === 'bad-key') console.warn(`[BARS] ${gifProvider(id)?.label} rejected its API key. Check the key in the config block.`);
+}
+function noteGifUse(id) {
+  const hour = Math.floor(Date.now() / 3600000);
+  let u = store.get('bars:gifUse', {}); if (!u || u.hour !== hour) u = { hour };
+  u[id] = (u[id] || 0) + 1; store.set('bars:gifUse', u);
+}
+function providerOrder() {
+  const now = Date.now(), cool = gifCooldowns(), hour = Math.floor(now / 3600000);
+  const use = (() => { const u = store.get('bars:gifUse', {}); return u && u.hour === hour ? u : {}; })();
+  const ready = GIF_PROVIDERS.filter(p => !(cool[p.id] > now)).sort((a, b) => (use[a.id] || 0) - (use[b.id] || 0));
+  const cooling = GIF_PROVIDERS.filter(p => cool[p.id] > now).sort((a, b) => cool[a.id] - cool[b.id]);
+  return [...ready, ...cooling];
+}
+const gifPageCache = new Map();
+function cachedGifPage(p, q, page, perPage) {
+  const key = `${p.id}|${q}|${page}|${perPage}`;
+  if (gifPageCache.has(key)) return gifPageCache.get(key);
+  noteGifUse(p.id);
+  const pr = p.page(q, page, perPage);
+  gifPageCache.set(key, pr);
+  pr.catch(() => gifPageCache.delete(key));
   return pr;
+}
+// A search session: pages through one source, and on failure continues seamlessly from the next.
+function gifSession(q, { perPage = 24, only = null } = {}) {
+  const s = { q, provider: null, page: 1, done: false, tried: new Set(), lastErr: null, limited: false };
+  s.others = () => GIF_PROVIDERS.filter(p => p.id !== s.provider?.id);
+  s.next = async () => {
+    if (!GIF_PROVIDERS.length) throw codeErr('bad-key');
+    for (;;) {
+      if (!s.provider) {
+        const p = (only ? GIF_PROVIDERS.filter(x => x.id === only) : providerOrder()).find(x => !s.tried.has(x.id));
+        if (!p) throw (s.limited ? codeErr('rate-limited') : s.lastErr) || codeErr('rate-limited');
+        s.provider = p; s.page = 1;
+      }
+      try {
+        const res = await cachedGifPage(s.provider, q, s.page, perPage);
+        s.page++; s.done = !res.hasNext;
+        return { items: res.items, provider: s.provider, done: s.done };
+      } catch (e) {
+        s.lastErr = e; if (e.code === 'rate-limited') s.limited = true;
+        coolDown(s.provider.id, e.code);
+        s.tried.add(s.provider.id); s.provider = null;
+      }
+    }
+  };
+  return s;
 }
 function cleanGif(g) {
   return {
     id: String(g.id), title: String(g.title || '').slice(0, 140),
-    mp4Url: g.mp4Url || '', webpUrl: g.webpUrl || '', stillUrl: g.stillUrl || '',
+    mp4Url: safeMedia(g.mp4Url), webpUrl: safeMedia(g.webpUrl), stillUrl: safeMedia(g.stillUrl),
     width: Math.round(+g.width || 480), height: Math.round(+g.height || 360),
   };
 }
@@ -3130,8 +3234,8 @@ function buildCreator() {
     </div>
     <div class="creator-body">
       <section class="c-step" data-step="1" hidden><div class="c-wrap">
-        <div class="gif-search field" style="margin:0">${icon('search', 20)}<input type="search" placeholder="Search GIPHY" aria-label="Search GIFs" enterkeyhint="search" autocomplete="off" spellcheck="false"></div>
-        <div class="gif-head-row"><span class="field-label" style="margin:0">Telco moods</span><span class="giphy-attr" style="margin:0">Powered by GIPHY</span></div>
+        <div class="gif-search field" style="margin:0">${icon('search', 20)}<input type="search" placeholder="Search GIFs" aria-label="Search GIFs" enterkeyhint="search" autocomplete="off" spellcheck="false"></div>
+        <div class="gif-head-row"><span class="field-label" style="margin:0">Telco moods</span><span class="giphy-attr gb-attr" style="margin:0"></span></div>
         <div class="chips" role="group" aria-label="Quick picks">${GIPHY_CHIPS.map(c => `<button type="button" class="chip" data-chip="${esc(c)}" aria-pressed="false">${esc(c)}</button>`).join('')}</div>
         <div class="gif-grid" aria-label="GIF results"></div>
         <div class="gif-status" aria-live="polite"></div>
@@ -3159,7 +3263,7 @@ function buildCreator() {
             </div>
           </div>
           <p class="sr-only" id="edLive" aria-live="polite"></p>
-          <div class="c-under"><button type="button" class="link-btn" data-c="change-gif">Change GIF</button><span class="giphy-attr" style="margin:0">Powered by GIPHY</span></div>
+          <div class="c-under"><button type="button" class="link-btn" data-c="change-gif">Change GIF</button><span class="giphy-attr ed-attr" style="margin:0"></span></div>
         </div>
         <div class="ed-panel">
           <div class="ed-remix" hidden></div>
@@ -3350,6 +3454,8 @@ function edSyncUndo() {
 function edRenderMedia() {
   const d = creator.draft, dm = edDims(), wrap = edQ('.ed-canvas-wrap'), cv = edQ('.ed-canvas');
   if (!cv || !d.gif) return;
+  const attr = edQ('.ed-attr');
+  if (attr) { const src = gifSourceOf(d.gif); attr.textContent = `Powered by ${src}`; attr.classList.toggle('is-klipy', src === 'KLIPY'); }
   wrap.style.setProperty('--ar', (1 / dm.H).toFixed(4));
   cv.style.aspectRatio = `1 / ${dm.H.toFixed(4)}`;
   cv.style.background = dm.top || dm.bottom ? dm.color : '#000';
@@ -3862,10 +3968,10 @@ async function postMeme(btn) {
 }
 
 // ---- Why did Firestore refuse this post? ----
-const GIPHY_URL_RX = /^https:\/\/([a-z0-9-]+\.)*giphy\.com\/.*/;
+
 function findPostProblem(meme, title) {
   const g = meme.gif || {};
-  if (!g.id || [g.mp4Url, g.webpUrl, g.stillUrl].some(u => u && (!GIPHY_URL_RX.test(u) || u.length >= 1000)) || (!g.mp4Url && !g.webpUrl)) return "That GIF has an unusual link BARS can't save. Pick a different GIF.";
+  if (!g.id || [g.mp4Url, g.webpUrl, g.stillUrl].some(u => u && !safeMedia(u)) || (!g.mp4Url && !g.webpUrl)) return "That GIF has an unusual link BARS can't save. Pick a different GIF.";
   if ((title || '').length > MAX_TITLE) return 'The title is too long.';
   if (!meme.caption) return 'Add some text first.';
   if (JSON.stringify({ v: 1, layers: meme.layers, frame: meme.frame, filter: meme.filter }).length > 6000) return 'This meme has too much styling data. Remove a text box or two.';
@@ -3923,7 +4029,7 @@ async function explainPostRejection(meme, opts, fresh) {
 function gifBrowser(root, onPick) {
   const grid = root.querySelector('.gif-grid'), status = root.querySelector('.gif-status'), sentinel = root.querySelector('.gif-sentinel');
   const input = root.querySelector('.gif-search input');
-  const st = { q: '', offset: 0, loading: false, done: false, token: 0, items: [], cols: [], heights: [], ncols: 0 };
+  const st = { q: '', loading: false, done: false, token: 0, items: [], cols: [], heights: [], ncols: 0, sess: null };
   const colsFor = () => { const w = grid.clientWidth || window.innerWidth; return w < 420 ? 2 : w < 760 ? 3 : 4; };
   const layout = (force) => {
     const n = colsFor(); if (!force && n === st.ncols) return false;
@@ -3948,20 +4054,27 @@ function gifBrowser(root, onPick) {
     }
     frags.forEach((f, i) => st.cols[i].append(f));
   };
-  const load = async reset => {
+  const attr = root.querySelector('.gb-attr');
+  const setAttr = prov => { if (!attr) return; attr.textContent = prov ? `Powered by ${prov.label}` : ''; attr.classList.toggle('is-klipy', prov?.id === 'klipy'); };
+  setAttr(GIF_PROVIDERS[0]);
+  const load = async (reset, only = null) => {
     if (reset) {
-      st.token++; st.offset = 0; st.done = false; st.items = []; layout(true); st.loading = false;
+      st.token++; st.done = false; st.items = []; layout(true); st.loading = false;
+      st.sess = gifSession(st.q, { perPage: 24, only });
       status.innerHTML = `<div class="gif-sk" aria-hidden="true">${'<div class="sk"></div>'.repeat(9)}</div><span class="sr-only">Searching for coverage…</span>`;
     }
     if (st.loading || st.done) return;
     const token = st.token; st.loading = true;
     try {
-      const res = st.q ? await giphy('search', { q: st.q, offset: st.offset, lang: 'en' }) : await giphy('trending', { offset: st.offset });
+      const res = await st.sess.next();
       if (token !== st.token) return;
       add(res.items);
-      st.offset += res.count || res.items.length;
-      st.done = !res.items.length || st.offset >= Math.min(res.total || 0, 4999);
-      status.innerHTML = !st.items.length ? stateHtml({ title: 'No signal here yet', body: `No GIFs for "${st.q}". Try another word.` }) : '';
+      setAttr(res.provider);
+      st.done = res.done;
+      if (!st.items.length) {
+        const other = GIF_PROVIDERS.find(p => p.id !== res.provider.id);
+        status.innerHTML = stateHtml({ title: 'No signal here yet', body: st.q ? `No GIFs for "${st.q}" on ${res.provider.label}. Try another word.` : 'No GIFs came back. Try a search.', action: other ? `<button type="button" class="btn btn-ghost" data-gif-source="${other.id}">Search ${other.label} instead</button>` : '' });
+      } else status.innerHTML = '';
     } catch (e) {
       if (token !== st.token) return;
       status.innerHTML = `<div class="inline-retry"><span>${esc(errorMessage(e))}</span><button type="button" class="btn btn-ghost btn-sm" data-gif-retry>Try again</button></div>`;
@@ -3977,7 +4090,10 @@ function gifBrowser(root, onPick) {
   input.addEventListener('input', () => debounced(input.value.trim()));
   input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); debounced.cancel(); st.q = input.value.trim(); syncChips(); load(true); input.blur(); } });
   grid.addEventListener('click', e => { const b = e.target.closest('.gif-item'); if (b) onPick(st.items[+b.dataset.idx]); });
-  status.addEventListener('click', e => { if (e.target.closest('[data-gif-retry]')) { if (st.items.length) load(false); else load(true); } });
+  status.addEventListener('click', e => {
+    if (e.target.closest('[data-gif-retry]')) { if (st.items.length) load(false); else load(true); }
+    const src = e.target.closest('[data-gif-source]'); if (src) load(true, src.dataset.gifSource);
+  });
   layout(true); load(true);
   return {
     search(q) { debounced.cancel(); st.q = q; syncChips(); load(true); },
@@ -4427,6 +4543,7 @@ async function renderSetupCheck() {
     { label: 'Profiles (New), Following feed, More from @user', idx: 'memes: authorId ↑, hidden ↑, createdAt ↓', q: () => baseQuery(F.where('authorId', '==', 'setup-check'), F.orderBy('createdAt', 'desc'), F.limit(1)) },
     { label: 'Profiles (Top), best meme', idx: 'memes: authorId ↑, hidden ↑, score ↓', q: () => baseQuery(F.where('authorId', '==', 'setup-check'), F.orderBy('score', 'desc'), F.limit(1)) },
     { label: 'Security rules are the latest version', idx: 'No index needed. Checks the rules from the bottom of bars.html are published.', rulesProbe: true },
+    ...[['giphy', 'GIPHY', GIPHY_API_KEY], ['klipy', 'KLIPY', KLIPY_API_KEY]].map(([id, label, key]) => ({ label: `${label} search key`, idx: hasKey(key) ? 'Uses 1 search from this key.' : `Optional. Add KLIPY_API_KEY or GIPHY_API_KEY to stack free searches.`, gifProbe: id, gifKey: hasKey(key) })),
     { label: 'Test post', idx: 'Sends a hidden test post through the security rules, then deletes it. Needs you to be signed in.', postProbe: true },
   ];
   host.innerHTML = `<section class="setup"><div class="setup-card">
@@ -4448,6 +4565,18 @@ async function renderSetupCheck() {
       row.querySelector('.idx-act').innerHTML = act;
     };
     try {
+      if (c.gifProbe) {
+        if (!c.gifKey) { set('checking', 'wait', 'Not set'); return; }
+        try {
+          const res = await gifProvider(c.gifProbe).page('', 1, c.gifProbe === 'klipy' ? 8 : 1);
+          set(res.items.length ? 'ok' : 'checking', res.items.length ? 'ok' : 'wait', res.items.length ? 'Working' : 'No results');
+          const cd = gifCooldowns(); if (cd[c.gifProbe]) { delete cd[c.gifProbe]; store.set('bars:gifCooldown', cd); }
+        } catch (e) {
+          if (e.code === 'rate-limited') set('checking', 'wait', 'Busy (hourly limit reached)');
+          else { blocked++; set('bad', 'bad', e.code === 'bad-key' ? 'Key rejected' : 'Not reachable'); }
+        }
+        return;
+      }
       if (c.postProbe) {
         await Promise.race([authReadyP, sleep(3000)]);
         if (!state.user || !state.profile) { set('checking', 'wait', 'Sign in to run'); return; }
@@ -4781,7 +4910,7 @@ function watchFonts() {
 // ============================================================
 function checkConfig() {
   const fbOk = !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId && FIREBASE_CONFIG.appId);
-  const gOk = !!(GIPHY_API_KEY && GIPHY_API_KEY !== 'PASTE_KEY_HERE' && GIPHY_API_KEY.length > 10);
+  const gOk = GIF_PROVIDERS.length > 0;
   return { fbOk, gOk };
 }
 function renderSetup({ fbOk, gOk }) {
@@ -4792,23 +4921,27 @@ function renderSetup({ fbOk, gOk }) {
     ${BARS_MARK}
     <h1>Almost on air</h1>
     <p>BARS needs two keys before it can go live. Paste them into the config block at the very top of the script in <code>bars.html</code>, then refresh.</p>
-    <ul class="checklist">${row(fbOk, 'Firebase config')}${row(gOk, 'GIPHY API key')}</ul>
+    <ul class="checklist">${row(fbOk, 'Firebase config')}${row(gOk, 'GIF search key (GIPHY and/or KLIPY)')}</ul>
     <ol>
       <li><b>Firebase:</b> create a project at <a href="https://console.firebase.google.com" target="_blank" rel="noopener">console.firebase.google.com</a>, add a Web app and copy its <code>firebaseConfig</code>.</li>
       <li><b>Sign-in:</b> Authentication, then turn on Email/Password and Google. Add your site's domain under Settings, Authorised domains.</li>
       <li><b>Firestore:</b> create the database, paste the security rules from the bottom of this file into the Rules tab, and create the listed composite indexes.</li>
-      <li><b>GIPHY:</b> create an API app at <a href="https://developers.giphy.com/dashboard" target="_blank" rel="noopener">developers.giphy.com</a> and copy the key.</li>
+      <li><b>GIF search:</b> create a key at <a href="https://developers.giphy.com/dashboard" target="_blank" rel="noopener">developers.giphy.com</a>, <a href="https://partner.klipy.com" target="_blank" rel="noopener">partner.klipy.com</a>, or both. Each free key allows about 100 searches an hour, and BARS stacks them.</li>
     </ol>
     <pre><code>const FIREBASE_CONFIG = {
-  apiKey: "…",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project",
-  appId: "…"
+  apiKey: "AIzaSyBVTeUN-9cT4vbnWts_oTZ8OiRIoyFDKKM",
+  authDomain: "bars-fb0bc.firebaseapp.com",
+  projectId: "bars-fb0bc",
+  storageBucket: "bars-fb0bc.firebasestorage.app",
+  messagingSenderId: "755330373898",
+  appId: "1:755330373898:web:f7a86916513bd6de2dc2f3",
+  measurementId: "G-2GQN5LEYWF"
 };
-const GIPHY_API_KEY = "…";</code></pre>
+const GIPHY_API_KEY = "Hiqz38PpWlnI2d3Bo0jedZaQXAYfyQUo";
+const KLIPY_API_KEY = "3gwszSkEyPXTMGeUJfhoFiOeu70daQkTiaNUeiFty8KIzvns2RZ3bdXFBnDBPY82";</code></pre>
     <p style="margin-top:14px">Full step-by-step notes are in the comment at the top of the file.</p>
   </div>
-  <footer class="site-footer"><p>BARS is a fan-made parody site and is not affiliated with, endorsed by, or connected to Optus. Memes are user-generated. GIFs powered by GIPHY.</p><a href="${esc(HUB_URL)}">← Optus Games</a></footer></section>`;
+  <footer class="site-footer"><p>BARS is a fan-made parody site and is not affiliated with, endorsed by, or connected to Optus. Memes are user-generated. ${esc(gifCreditText())}</p><a href="${esc(HUB_URL)}">← Optus Games</a></footer></section>`;
 }
 function renderFatal(e) {
   $('#main').innerHTML = `<section class="setup"><div class="setup-card">${BARS_MARK}<h1>No signal from Firebase</h1>
@@ -4824,6 +4957,7 @@ function loadSessionCaches() {
 }
 async function boot() {
   applyTheme(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+  $$('.gif-credit').forEach(s => { s.textContent = gifCreditText(); });
   wireGlobalEvents();
   placeSeg();
   renderAuthSlot();
@@ -4870,14 +5004,15 @@ service cloud.firestore {
       return a is string && (
         a == 'generated'
         || (a.size() < 30000 && a.matches('^data:image/(webp|jpeg);base64,[A-Za-z0-9+/=]+$'))
-        || (a.size() < 1000 && a.matches('^https://([a-z0-9-]+[.])*giphy[.]com/.*'))
+        || (a.size() < 1000 && a.matches('^https://([a-z0-9-]+[.])*(giphy[.]com|klipy[.]com|klipy[.]co)/.*'))
       );
     }
 
     // (createdAtSeconds - EPOCH) / 45000, EPOCH = 1767225600 (2026-01-01 UTC). Must match HOT_EPOCH in the app.
     function hotBase(t) { return (t.toMillis() / 1000.0 - 1767225600.0) / 45000.0; }
+    // GIF media must come from GIPHY or KLIPY.
     function giphyUrl(u) {
-      return u is string && (u == '' || (u.size() < 1000 && u.matches('^https://([a-z0-9-]+[.])*giphy[.]com/.*')));
+      return u is string && (u == '' || (u.size() < 1000 && u.matches('^https://([a-z0-9-]+[.])*(giphy[.]com|klipy[.]com|klipy[.]co)/.*')));
     }
     function validGif(g) {
       return g is map
@@ -5063,10 +5198,10 @@ service cloud.firestore {
     }
 
     // ---------- rules version probe ----------
-    // The app reads meta/rules-v5 (it never exists). Allowed means these rules are published;
+    // The app reads meta/rules-v6 (it never exists). Allowed means these rules are published;
     // denied means Firebase still has older rules. Keep the number in sync with RULES_VERSION.
     match /meta/{docId} {
-      allow get: if docId == 'rules-v5';
+      allow get: if docId == 'rules-v6';
       allow list, write: if false;
     }
 
