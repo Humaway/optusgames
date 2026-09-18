@@ -304,6 +304,18 @@ label.fld > span{display:block;font-size:12.5px;font-weight:700;color:var(--mute
 .edwrap{display:grid;gap:16px;grid-template-columns:1fr}
 @media(min-width:900px){.edwrap{grid-template-columns:minmax(0,1fr) 320px}}
 .stage{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:12px;overflow:hidden;border:1px solid var(--line);touch-action:none}
+.stage.dropping{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-glow)}
+.stage.dropping::after{
+  content:"Drop to use as background";
+  position:absolute;inset:0;display:grid;place-items:center;
+  background:rgba(0,201,183,.16);color:#fff;font-weight:800;font-size:15px;
+  text-shadow:0 2px 8px #000;pointer-events:none;
+}
+.stage.busy::after{
+  content:"Reading image…";
+  position:absolute;inset:0;display:grid;place-items:center;
+  background:rgba(0,0,0,.55);color:#fff;font-weight:700;font-size:14px;pointer-events:none;
+}
 .stage canvas{width:100%;height:100%;display:block;touch-action:none}
 .edtabs{display:flex;gap:6px;margin-bottom:12px}
 .edtabs button{flex:1;padding:8px;border-radius:9px;font-size:13px;font-weight:700;background:var(--bg);border:1px solid var(--line);color:var(--muted)}
@@ -477,19 +489,31 @@ footer.site b{color:var(--teal)}
             </div>
 
             <div class="pane on" id="paneBg">
+              <button class="btn yellow" id="bgUpload" style="width:100%;justify-content:center;margin-bottom:10px">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+                Upload an image
+              </button>
+              <div class="hint" style="margin:-4px 0 12px">…or drag one onto the canvas, or paste with Ctrl/⌘+V. Your photos never leave the page until you publish.</div>
               <div class="bggrid" id="bgGrid"></div>
               <label class="fld" style="margin-top:12px"><span>Or paste an image URL</span>
                 <input class="inp" type="url" id="bgUrl" placeholder="https://…" autocomplete="off">
               </label>
-              <button class="btn sm" id="bgUrlGo" style="width:100%;justify-content:center">Load image</button>
-              <div class="hint">Cross-origin images may refuse to export. If loading fails, the built-in backgrounds always work.</div>
+              <button class="btn sm" id="bgUrlGo" style="width:100%;justify-content:center">Load from URL</button>
+              <div class="hint">Cross-origin URLs may refuse to export — uploading the file instead always works.</div>
             </div>
 
             <div class="pane" id="paneSticker">
               <div class="stgrid" id="stGrid"></div>
               <div class="hint" style="margin-top:10px">Tap to add, then drag it around the canvas. Drag the yellow corner handle to resize.</div>
+              <button class="btn yellow sm" id="stUpload" style="width:100%;justify-content:center;margin-top:10px">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+                Upload an image as a layer
+              </button>
+              <div class="hint">Drop a face in, scale it up, point the red arrow at it. You know what you're doing.</div>
               <div class="ctlrow"><button class="btn sm" id="delSel">Delete selected</button><button class="btn sm" id="frontSel">Bring to front</button></div>
             </div>
+
+            <input type="file" id="imgFile" accept="image/*" hidden>
 
             <div class="pane" id="paneText">
               <label class="fld"><span>Impact text</span>
@@ -1813,6 +1837,58 @@ const STICKERS = [
   }}
 ];
 
+/* ---------------------- local image files ------------------------------- */
+const IMG = {
+  MAX_BYTES: 25 * 1024 * 1024,
+  MAX_DIM: 1600,              // downscale on the way in — keeps memory sane on phones
+
+  /**
+   * Decode a user's file into an offscreen canvas.
+   * A canvas is same-origin by definition, so nothing here can taint the
+   * export the way a hotlinked URL can. Returns {canvas, w, h}.
+   */
+  async fromFile(file) {
+    if (!file) throw new Error('No file chosen.');
+    const looksImage = /^image\//i.test(file.type) ||
+      /\.(jpe?g|png|gif|webp|bmp|avif|heic|heif)$/i.test(file.name || '');
+    if (!looksImage) throw new Error('That is not an image file.');
+    if (file.size > this.MAX_BYTES) throw new Error('That image is over 25MB — pick a smaller one.');
+
+    const url = URL.createObjectURL(file);
+    try {
+      const img = new Image();
+      img.decoding = 'sync';
+      const ok = await new Promise(res => {
+        img.onload = () => res(true);
+        img.onerror = () => res(false);
+        img.src = url;
+      });
+      if (!ok || !img.naturalWidth) {
+        throw new Error(/hei[cf]/i.test(file.type + file.name)
+          ? 'This browser cannot read HEIC photos. Save it as JPEG and try again.'
+          : 'Could not read that image file.');
+      }
+      const scale = Math.min(1, this.MAX_DIM / Math.max(img.naturalWidth, img.naturalHeight));
+      const cv = document.createElement('canvas');
+      cv.width  = Math.max(1, Math.round(img.naturalWidth * scale));
+      cv.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      return cv;
+    } finally {
+      URL.revokeObjectURL(url);   // always, even on failure
+    }
+  },
+
+  /** First image found in a drop or paste, or null. */
+  fromTransfer(dt) {
+    if (!dt) return null;
+    const f = [...(dt.files || [])].find(x => /^image\//i.test(x.type));
+    if (f) return f;
+    const item = [...(dt.items || [])].find(i => i.kind === 'file' && /^image\//i.test(i.type));
+    return item ? item.getAsFile() : null;
+  }
+};
+
 /* ------------------------------ the editor ------------------------------- */
 const Ed = {
   cv: null, ctx: null, pv: null, pvx: null,
@@ -1865,6 +1941,15 @@ const Ed = {
     toast(def.name + ' added — drag it around.', 'good');
   },
 
+  /** A user's photo as a draggable, resizable layer. */
+  addImageLayer(cv) {
+    const aspect = cv.width / cv.height;
+    const size = Math.min(this.H * .62, this.W * .62 / aspect);
+    this.layers.push({ type: 'image', img: cv, x: this.W / 2, y: this.H / 2, size, aspect, shadow: true });
+    this.sel = this.layers[this.layers.length - 1];
+    this.draw();
+  },
+
   addText(text, size, colour, caps) {
     if (!text.trim()) { toast('Type some text first.', 'bad'); return; }
     this.layers.push({ type: 'text', text: text.slice(0, 40), size, colour, caps, x: this.W / 2, y: this.H * .78 });
@@ -1887,7 +1972,7 @@ const Ed = {
     return lines.slice(0, 3);
   },
   bounds(o) {
-    if (o.type === 'sticker') return { w: o.size * o.aspect, h: o.size };
+    if (o.type !== 'text') return { w: o.size * o.aspect, h: o.size };
     const c = this.ctx;
     const lines = this.textLines(o);
     c.font = `900 ${o.size}px Impact, "Arial Black", sans-serif`;
@@ -1921,6 +2006,10 @@ const Ed = {
       const w = o.size * o.aspect * scale, h = o.size * scale;
       c.translate(o.x * scale - w / 2, o.y * scale - h / 2);
       def.draw(c, w, h);
+    } else if (o.type === 'image') {
+      const w = o.size * o.aspect * scale, h = o.size * scale;
+      if (o.shadow) { c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 18 * scale; }
+      c.drawImage(o.img, o.x * scale - w / 2, o.y * scale - h / 2, w, h);
     } else {
       const size = o.size * scale;
       c.font = `900 ${size}px Impact, "Arial Black", sans-serif`;
@@ -1960,7 +2049,9 @@ const Ed = {
     const bar = $('#selBar');
     clear(bar);
     if (!this.sel) { bar.append('Nothing selected — tap a sticker or text on the canvas to move it.'); return; }
-    const label = this.sel.type === 'text' ? `Text: “${this.sel.text}”` : STICKERS.find(s => s.kind === this.sel.kind).name;
+    const label = this.sel.type === 'text'  ? `Text: “${this.sel.text}”`
+                : this.sel.type === 'image' ? 'Your image'
+                : STICKERS.find(s => s.kind === this.sel.kind).name;
     bar.append(el('b', { text: label }), ' — drag to move, yellow corner to resize. ',
       el('button', { class: 'btn sm', type: 'button', text: 'Delete', onclick: () => this.deleteSel() }));
   },
@@ -2011,6 +2102,55 @@ const Ed = {
     const end = e => { if (mode) { mode = null; try { stage.releasePointerCapture(e.pointerId); } catch {} } };
     stage.addEventListener('pointerup', end);
     stage.addEventListener('pointercancel', end);
+
+    /* ---- drag and drop an image straight onto the canvas ---- */
+    let dragDepth = 0;
+    stage.addEventListener('dragenter', e => {
+      e.preventDefault(); dragDepth++; stage.classList.add('dropping');
+    });
+    stage.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+    stage.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; stage.classList.remove('dropping'); } });
+    stage.addEventListener('drop', e => {
+      e.preventDefault(); dragDepth = 0; stage.classList.remove('dropping');
+      const f = IMG.fromTransfer(e.dataTransfer);
+      if (f) this.loadFile(f, 'bg');
+      else toast('That drop had no image in it.', 'bad');
+    });
+    // the page as a whole must not navigate away when a drop misses the stage
+    ['dragover', 'drop'].forEach(ev => document.addEventListener(ev, e => {
+      if (!e.target.closest?.('#stage')) e.preventDefault();
+    }));
+
+    /* ---- paste an image while the editor is open ---- */
+    document.addEventListener('paste', e => {
+      if (!$('#upModal').classList.contains('open') || Upload.step !== 1) return;
+      const f = IMG.fromTransfer(e.clipboardData);
+      if (!f) return;
+      e.preventDefault();
+      this.loadFile(f, 'bg');
+    });
+  },
+
+  /** mode: 'bg' uses it as the background, 'layer' drops it in as a movable layer. */
+  async loadFile(file, mode = 'bg') {
+    const stage = $('#stage');
+    stage.classList.add('busy');
+    try {
+      const cv = await IMG.fromFile(file);
+      if (mode === 'layer') {
+        this.addImageLayer(cv);
+        toast('Image added — drag it, scale it, point an arrow at it.', 'good');
+      } else {
+        this.bgImg = cv;
+        this.bg = { kind: 'image' };
+        this.draw();
+        toast('Background set from your image.', 'good');
+      }
+    } catch (e) {
+      toast(e.message || 'Could not load that image.', 'bad');
+    } finally {
+      stage.classList.remove('busy');
+    }
   },
 
   async loadUrl(url) {
@@ -2032,14 +2172,17 @@ const Ed = {
       do {
         url = this.cv.toDataURL('image/jpeg', q);
         bytes = Math.ceil((url.length - url.indexOf(',') - 1) * 0.75);
-        q -= 0.1;
-      } while (bytes > CFG.THUMB_MAX_BYTES && q > 0.25);
+        q -= 0.08;
+      } while (bytes > CFG.THUMB_MAX_BYTES && q >= 0.18);
     } catch (err) {
       this.draw(true);
-      throw new Error('That background image is cross-origin and cannot be exported. Pick a built-in background instead.');
+      // only a hotlinked URL can taint the canvas — uploaded files never do
+      throw new Error('That image was loaded from another site and cannot be exported. Upload the file instead.');
     }
     this.draw(true);
-    if (bytes > CFG.THUMB_MAX_BYTES) throw new Error('Thumbnail is too heavy. Try a simpler background.');
+    if (bytes > CFG.THUMB_MAX_BYTES) {
+      throw new Error(`Thumbnail still ${Math.round(bytes / 1024)}KB after compression. Try a less detailed photo.`);
+    }
     return url;
   }
 };
@@ -2224,6 +2367,17 @@ const Upload = {
       $$('.pane').forEach(p => p.classList.toggle('on', p.id === b.dataset.pane));
     }));
     $('#bgUrlGo').addEventListener('click', () => Ed.loadUrl($('#bgUrl').value.trim()));
+
+    // one hidden input serves both buttons; the click target sets the intent
+    const imgFile = $('#imgFile');
+    let fileMode = 'bg';
+    $('#bgUpload').addEventListener('click', () => { fileMode = 'bg'; imgFile.click(); });
+    $('#stUpload').addEventListener('click', () => { fileMode = 'layer'; imgFile.click(); });
+    imgFile.addEventListener('change', () => {
+      const f = imgFile.files && imgFile.files[0];
+      imgFile.value = '';                 // so picking the same file twice still fires
+      if (f) Ed.loadFile(f, fileMode);
+    });
     $('#addTxt').addEventListener('click', () => {
       Ed.addText($('#txtVal').value, +$('#txtSize').value, $('#txtColor').value, $('#txtCaps').checked);
     });
@@ -2525,6 +2679,9 @@ function startFeed() {
     window.addEventListener('hashchange', render);
     render();
     await maybeSeed();
+
+    // a deliberate handle for tinkering from the console: YesTube.Ed, YesTube.Store, YesTube.CFG
+    window.YesTube = { Ed, Store, CFG, Upload, BACKGROUNDS, STICKERS, clickbaitify };
 
     if (Store.mode === 'local') {
       console.info('%cYesTube is in LOCAL DEMO MODE — paste your Firebase keys at the top of the file to go multiplayer.',
