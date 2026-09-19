@@ -271,7 +271,8 @@ const CFG = {
   colors: { yes: 0xFFC800, teal: 0x006B74, tealDeep: 0x003A40, paper: 0xFFF8EA, euc: 0x7FA58A, sand: 0xD9C29A, terra: 0xC4663F },
 };
 const QUALITY = {
-  Low:    { scale: 0.7, shadow: 1024, grass: 36000, ao: false, bloom: true, smaa: false, tex: 256, trees: 0.6, npcs: 22, view: 480 },
+  Potato: { scale: 0.55, shadow: 512, grass: 9000, ao: false, bloom: false, smaa: false, tex: 256, trees: 0.4, npcs: 12, view: 360 },
+  Low:   { scale: 0.7, shadow: 1024, grass: 36000, ao: false, bloom: true, smaa: false, tex: 256, trees: 0.6, npcs: 22, view: 480 },
   Medium: { scale: 0.9, shadow: 2048, grass: 70000, ao: false, bloom: true, smaa: true,  tex: 512, trees: 0.85, npcs: 28, view: 640 },
   High:   { scale: 1.0, shadow: 2048, grass: 110000, ao: true, bloom: true, smaa: true,  tex: 512, trees: 1, npcs: 34, view: 820 },
   Ultra:  { scale: 1.0, shadow: 4096, grass: 150000, ao: true, bloom: true, smaa: true,  tex: 1024, trees: 1, npcs: 40, view: 650 },
@@ -2329,15 +2330,15 @@ const RENDER = {
   },
   buildComposer() {
     const r = this.renderer, q = QUALITY[G.settings.quality] || QUALITY.Medium; const w = innerWidth, h = innerHeight;
-    const nL = { Low: 2, Medium: 4, High: 6, Ultra: 8 }[G.settings.quality] || 4; while (this.lightPool.length < nL) { const L = new THREE.PointLight(0xffffff, 0, 10, 1.5); L.position.set(0, -500, 0); this.scene.add(L); this.lightPool.push(L); } while (this.lightPool.length > nL) this.scene.remove(this.lightPool.pop());
-    const maxDpr = { Low: 1, Medium: 1, High: 1.5, Ultra: 2 }[G.settings.quality] || 1; const scale = q.scale * (G.settings.renderScale || 1); r.setPixelRatio(Math.min(devicePixelRatio, maxDpr) * scale); r.setSize(w, h, false);
+    const nL = { Potato: 1, Low: 2, Medium: 4, High: 6, Ultra: 8 }[G.settings.quality] || 4; while (this.lightPool.length < nL) { const L = new THREE.PointLight(0xffffff, 0, 10, 1.5); L.position.set(0, -500, 0); this.scene.add(L); this.lightPool.push(L); } while (this.lightPool.length > nL) this.scene.remove(this.lightPool.pop());
+    const maxDpr = { Potato: 1, Low: 1, Medium: 1, High: 1.5, Ultra: 2 }[G.settings.quality] || 1; const scale = q.scale * (G.settings.renderScale || 1) * (this.dyn || 1); r.setPixelRatio(Math.min(devicePixelRatio, maxDpr) * scale); r.setSize(w, h, false);
     this.sun.shadow.mapSize.set(q.shadow, q.shadow); if (this.sun.shadow.map) { this.sun.shadow.map.dispose(); this.sun.shadow.map = null; }
     const rt = new THREE.WebGLRenderTarget(w * r.getPixelRatio(), h * r.getPixelRatio(), { type: THREE.HalfFloatType, samples: 0 });
     if (this.composer) this.composer.dispose();
     const c = this.composer = new EffectComposer(r, rt);
     c.addPass(this.renderPass = new RenderPass(this.scene, this.camera));
     this.gtao = null; if (q.ao && G.settings.ao) { try { this.gtao = new GTAOPass(this.scene, this.camera, w * r.getPixelRatio(), h * r.getPixelRatio()); this.gtao.output = GTAOPass.OUTPUT.Default; this.gtao.blendIntensity = 0.85; this.gtao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.4, thickness: 1.2, scale: 1, samples: 12 }); c.addPass(this.gtao); } catch (e) { this.gtao = null; } }
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h).multiplyScalar(0.5), 0.14, 0.35, 1.2); this.bloom.enabled = G.settings.bloom; c.addPass(this.bloom);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h).multiplyScalar(0.5), 0.14, 0.35, 1.2); this.bloom.enabled = G.settings.bloom && q.bloom; c.addPass(this.bloom);
     this.bokeh = new BokehPass(this.scene, this.camera, { focus: 6, aperture: 0.004, maxblur: 0.008 }); this.bokeh.enabled = false; c.addPass(this.bokeh);
     this.grade = new ShaderPass(GradeShader); c.addPass(this.grade);
     this.smaa = null; if (q.smaa && G.settings.smaa) { this.smaa = new SMAAPass(w * r.getPixelRatio(), h * r.getPixelRatio()); c.addPass(this.smaa); }
@@ -3625,6 +3626,21 @@ function buildCarGeometry(T, paint, stripe) {
     box(W * 0.42, 0.12, 0.05, 0, T.nose - 0.26, L / 2 - 0.0, trim, 0.5); box(W * 0.42, 0.02, 0.055, 0, T.nose - 0.26, L / 2 + 0.002, chrome, 0.2);
     box(W * 0.98, 0.18, 0.18, 0, 0.42, L / 2 - 0.02, trim, 0.6, 0.06); box(W * 0.98, 0.18, 0.18, 0, 0.42, -L / 2 + 0.02, trim, 0.6, 0.06);
     box(0.52, 0.12, 0.02, 0, 0.44, L / 2 + 0.075, plate, 0.4); box(0.52, 0.12, 0.02, 0, 0.44, -L / 2 - 0.075, plate, 0.4);
+    // detail pass: skirts, door shut-lines, chrome belt, grille slats, fog lamps, exhaust, antenna, per-model aero
+    const zb = lerp(z0, z1, 0.45);
+    for (const sx of [-1, 1]) {
+      box(0.07, 0.1, T.wb - archR * 2.3, sx * (W / 2 - 0.01), 0.35, 0, trim, 0.75, 0.02);
+      for (const zz of [z1 - 0.12, zb, T.type === 'ute' ? null : z0 + 0.12]) if (zz !== null) box(0.012, T.belt - 0.46, 0.014, sx * (W / 2 + 0.003), (T.belt + 0.4) / 2, zz, trim, 0.85);
+      box(0.014, 0.02, z1 - z0 - 0.1, sx * (ww + 0.012), T.belt - 0.005, (z0 + z1) / 2, chrome, 0.15);
+      box(0.13, 0.06, 0.04, sx * (W / 2 - 0.3), 0.43, L / 2 + 0.07, head, 0.02, 0.015);
+      box(0.18, 0.03, 0.02, sx * (W / 2 - 0.2), T.tail - 0.26, -L / 2 + 0.01, amber, 0.03);
+    }
+    for (let k = 0; k < 3; k++) box(W * 0.4, 0.012, 0.02, 0, T.nose - 0.21 - k * 0.035, L / 2 + 0.012, chrome, 0.2);
+    { const ex = GEO.cyl(0.045, 0.05, 0.2, 10); ex.rotateX(Math.PI / 2); ex.translate(W * 0.28, 0.33, -L / 2 - 0.03); parts.push({ geo: ex, col: [chrome, 0.2] }); }
+    box(0.012, 0.36, 0.012, W * 0.22, T.roofH + 0.19, roofZ0 + 0.05, trim, 0.6);
+    if (T.type === 'hatch') { box(topW * 1.9, 0.035, 0.3, 0, T.roofH + 0.02, roofZ0 - 0.1, P, 0.3, 0.015); box(0.34, 0.03, 0.02, 0, T.roofH - 0.01, roofZ0 - 0.26, tail, 0.03); }
+    if (T.type === 'sedan') { box(W * 0.62, 0.03, 0.12, 0, T.tail + 0.02, -L / 2 + 0.14, P, 0.3, 0.012); box(0.34, 0.03, 0.02, 0, T.belt + 0.06, z0 - 0.02, tail, 0.03); }
+    if (T.type === 'ute') { const rz = z0 - 0.14; for (const sx of [-1, 1]) box(0.07, 0.5, 0.07, sx * W * 0.4, T.belt + 0.25, rz, trim, 0.5, 0.02); box(W * 0.84, 0.07, 0.07, 0, T.belt + 0.5, rz, trim, 0.5, 0.02); box(W * 0.5, 0.06, 0.1, 0, T.roofH + 0.06, z1 - 0.35, trim, 0.5, 0.02); for (let k = -2; k <= 2; k++) box(0.1, 0.04, 0.02, k * 0.18, T.roofH + 0.06, z1 - 0.29, amber, 0.03); }
     if (T.tray) { const tz = -L / 2 + L * 0.19; box(W * 0.96, 0.1, L * 0.36, 0, T.belt - 0.12, tz, trim, 0.8); for (const sx of [-1, 1]) box(0.06, 0.4, L * 0.36, sx * (W * 0.48 - 0.03), T.belt + 0.1, tz, P, 0.3); box(W * 0.96, 0.4, 0.06, 0, T.belt + 0.1, -L / 2 + 0.05, P, 0.3); }
   }
   const merged = [];
@@ -3633,16 +3649,19 @@ function buildCarGeometry(T, paint, stripe) {
 }
 const WHEELS = { mesh: null, n: 0, cap: 112 };
 function wheelGeometry() {
-  const tyre = new THREE.TorusGeometry(0.24, 0.085, 10, 24); const rim = GEO.cyl(0.2, 0.2, 0.18, 16); rim.rotateX(Math.PI / 2); const hub = GEO.cyl(0.07, 0.07, 0.2, 8); hub.rotateX(Math.PI / 2);
-  const spokes = []; for (let k = 0; k < 5; k++) { const s = GEO.box(0.035, 0.34, 0.03); s.rotateZ(k / 5 * TAU); s.translate(0, 0, 0.08); spokes.push(s); }
-  const b = new MeshBatch('wheel'); b.add('p', tyre, null, { color: 0x151515, uv: false }); b.add('p', rim, null, { color: 0x9a9a9a, uv: false }); b.add('p', hub, null, { color: 0x555555, uv: false }); spokes.forEach(s => b.add('p', s, null, { color: 0xc8c8c8, uv: false }));
+  const tyre = new THREE.TorusGeometry(0.24, 0.085, 10, 28); tyre.scale(1, 1, 1.25); const rim = GEO.cyl(0.19, 0.19, 0.17, 18); rim.rotateX(Math.PI / 2); const hub = GEO.cyl(0.06, 0.07, 0.2, 8); hub.rotateX(Math.PI / 2);
+  const lip = GEO.torus(0.19, 0.014, 6, 24); lip.translate(0, 0, 0.09); const disc = GEO.cyl(0.15, 0.15, 0.02, 16); disc.rotateX(Math.PI / 2); disc.translate(0, 0, -0.05);
+  const spokes = []; for (let k = 0; k < 6; k++) { const s = GEO.box(0.04, 0.32, 0.025); s.rotateZ(k / 6 * TAU); s.translate(0, 0, 0.085); spokes.push(s); }
+  const b = new MeshBatch('wheel'); b.add('p', tyre, null, { color: 0x121212, uv: false }); b.add('p', rim, null, { color: 0x3a3d40, uv: false }); b.add('p', disc, null, { color: 0x6a6a6a, uv: false }); b.add('p', lip, null, { color: 0xd8d8d8, uv: false }); b.add('p', hub, null, { color: 0x888888, uv: false }); spokes.forEach(s => b.add('p', s, null, { color: 0xc8c8c8, uv: false }));
   const g = mergeBatch(b); g.rotateY(Math.PI / 2); return g;
 }
 
+// car paint: same vertex-colour/roughness trick as CHAR_MAT, with a touch of metal so the clearcoat catches the sky
+const CAR_MAT = (() => { const m = CHAR_MAT.clone(); m.onBeforeCompile = CHAR_MAT.onBeforeCompile; m.customProgramCacheKey = CHAR_MAT.customProgramCacheKey; m.metalness = 0.3; ENV_MATS.add(m); m.userData.envBase = 1.4; return m; })();
 class Car {
   constructor(parent, typeKey, paint, stripe, pos, yaw) {
     const T = this.T = CAR_TYPES[typeKey]; this.type = typeKey; this.name = T.name;
-    this.mesh = new THREE.Mesh(buildCarGeometry(T, paint, stripe), CHAR_MAT); this.mesh.castShadow = true; this.mesh.receiveShadow = true; parent.add(this.mesh);
+    this.mesh = new THREE.Mesh(buildCarGeometry(T, paint, stripe), CAR_MAT); this.mesh.castShadow = true; this.mesh.receiveShadow = true; parent.add(this.mesh);
     this.pos = pos.clone(); this.quat = new THREE.Quaternion().setFromAxisAngle(_v1.set(0, 1, 0), yaw); this.vel = new THREE.Vector3(); this.ang = new THREE.Vector3();
     this.wheels = []; const hw = T.track / 2, hz = T.wb / 2;
     for (const [x, z, front] of [[hw, hz, true], [-hw, hz, true], [hw, -hz, false], [-hw, -hz, false]]) this.wheels.push({ local: new THREE.Vector3(x, 0.45, z), front, comp: 0.2, prevComp: 0.2, spin: 0, contact: false, idx: WHEELS.n++, slip: 0, world: new THREE.Vector3(), steerA: 0 });
@@ -3663,7 +3682,7 @@ class Car {
     // controls
     if (this.driver && input) {
       const [mx, my] = input.moveVec(); const fwdSpeed = this.forward(_v1).dot(this.vel);
-      const wantSteer = -mx * clamp(1 - Math.abs(fwdSpeed) / 70, 0.28, 1) * 0.62; this.steer = damp(this.steer, wantSteer, 7, dt);
+      const wantSteer = -mx * clamp(1 - Math.abs(fwdSpeed) / 62, 0.24, 1) * 0.62; this.steer = damp(this.steer, wantSteer, Math.abs(wantSteer) < Math.abs(this.steer) ? 12 : 9, dt);
       if (my > 0.05) { if (fwdSpeed < -1) { this.brake = my; this.throttle = 0; } else { this.throttle = my; this.brake = 0; } }
       else if (my < -0.05) { if (fwdSpeed > 1) { this.brake = -my; this.throttle = 0; } else { this.throttle = my * 0.55; this.brake = 0; } }
       else { this.throttle = 0; this.brake = 0.03; }
@@ -3687,7 +3706,7 @@ class Car {
       let mu = T.grip * (w.surface === 'grass' ? 0.7 : w.surface === 'sand' ? 0.55 : 1) * (RENDER.weather ? 1 - RENDER.weather.wet * 0.18 : 1); if (this.hand && !w.front) mu *= 0.38;
       const alpha = Math.atan2(vs, Math.max(Math.abs(vf), 2)); let Fy = -Math.sin(1.35 * Math.atan(alpha * 9)) * mu * N;
       let Fx = 0; const driven = T.drive === 'F' ? w.front : !w.front;
-      if (driven && this.throttle !== 0) { const gearMul = [0, 1.9, 1.35, 1.0, 0.78, 0.62][this.gear] || 0.6; Fx += this.throttle * T.power * gearMul * (Math.abs(vf) > T.top ? 0.1 : 1); }
+      if (driven && this.throttle !== 0) { const gearMul = [0, 1.9, 1.35, 1.0, 0.78, 0.62][this.gear] || 0.6; Fx += this.throttle * T.power * gearMul * clamp((T.top - Math.abs(vf)) / 6, 0.05, 1); }
       if (this.brake > 0) Fx -= Math.sign(vf) * Math.min(Math.abs(vf) * M * 0.5, this.brake * mu * N * 0.85);
       if (this.hand && !w.front) Fx -= Math.sign(vf) * Math.min(Math.abs(vf) * M * 0.3, mu * N * 0.6);
       Fx -= vf * 12; // rolling resistance
@@ -3698,11 +3717,15 @@ class Car {
       w.spin += vf / T.wr * dt;
       if (w.slip > 0.45 && Math.random() < dt * 20 && FX) FX.smoke(_v2.set(mount.x, gq.y + 0.1, mount.z));
     }
+    // handling assists: light downforce and anti-roll keep cars planted through fast corners
+    if (grounded >= 2) { F.addScaledVector(up, -Math.min(this.vel.lengthSq(), 2500) * M * 0.0035); Tq.addScaledVector(fwd, -right.y * this.I.z * 22); }
     // drag & integrate
     const sp = this.vel.length(); F.addScaledVector(this.vel, -0.9 * sp);
     this.vel.addScaledVector(F, dt / M);
     const iq = _q1.copy(this.quat).invert(); const lt = Tq.applyQuaternion(iq); lt.x /= this.I.x; lt.y /= this.I.y; lt.z /= this.I.z; lt.applyQuaternion(this.quat);
     this.ang.addScaledVector(lt, dt); this.ang.multiplyScalar(grounded ? 1 - 1.2 * dt : 1 - 0.3 * dt);
+    // yaw assist: pull the yaw rate part-way toward what the front wheels ask for (handbrake turns it off so drifts still work)
+    if (grounded >= 3 && this.driver && !this.hand) { const want = fwd.dot(this.vel) * Math.tan(this.steer) / T.wb, yr = this.ang.dot(up); this.ang.addScaledVector(up, (want - yr) * Math.min(1, dt * 5) * 0.45); }
     this.pos.addScaledVector(this.vel, dt);
     const wl = this.ang.length(); if (wl > 1e-6) { _q2.setFromAxisAngle(_v1.copy(this.ang).multiplyScalar(1 / wl), wl * dt); this.quat.premultiply(_q2).normalize(); }
     // body vs ground (flipped / bottoming out)
@@ -4160,10 +4183,13 @@ const GAME = {
 // UI — HUD, menus, map, reader, keypad, wheel, photo mode, debug; SAVE
 // ════════════════════════════════════════════════════════════════════════════
 const $ = id => document.getElementById(id);
-const DEFAULT_SETTINGS = { quality: 'Medium', renderScale: 1, ao: true, bloom: true, smaa: true, post: true, grain: true, vignette: true, weather: true, shake: true, sensitivity: 1, invertY: false, autoCenter: true, fov: 62, vMaster: 0.8, vMusic: 0.6, vSfx: 0.85, vAmb: 0.7, subtitles: true, hudAuto: true };
+const DEFAULT_SETTINGS = { quality: 'Medium', renderScale: 1, ao: true, bloom: true, smaa: true, post: true, grain: true, vignette: true, weather: true, shake: true, sensitivity: 1, invertY: false, autoCenter: true, fov: 62, vMaster: 0.8, vMusic: 0.6, vSfx: 0.85, vAmb: 0.7, subtitles: true, hudAuto: true, dynRes: true };
 const SAVE = {
   key: 'yestown.save.v1', skey: 'yestown.settings.v1', last: 0,
-  loadSettings() { G.settings = Object.assign({}, DEFAULT_SETTINGS, Store.get(this.skey, {})); },
+  loadSettings() {
+    const st = Store.get(this.skey, null); G.settings = Object.assign({}, DEFAULT_SETTINGS, st || {});
+    if (!st) { const c = navigator.hardwareConcurrency || 4, m = navigator.deviceMemory || 8, mob = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent); G.settings.quality = mob || c <= 2 || m <= 2 ? 'Potato' : c <= 4 || m <= 4 ? 'Low' : 'Medium'; } // first run: pick a preset the machine can hold
+  },
   saveSettings() { Store.set(this.skey, G.settings); },
   has() { return !!Store.get(this.key, null); },
   load() { const s = Store.get(this.key, null); return s && s.v === 1 ? s : null; },
@@ -4206,7 +4232,7 @@ const UI = {
   letterbox(on) { [...this.lb.children].forEach(c => c.style.height = on ? '11vh' : '0'); $('hud').style.opacity = on ? 0 : 1; },
   fade(t, mid) { const f = $('fade'); f.style.opacity = 1; setTimeout(() => { mid && mid(); f.style.opacity = 0; }, t * 1000); },
   wakeHud() { this.hudT = 0; },
-  objective() { const P = GAME.prog; if (!P) return; const i = Math.min(Math.floor(P.stage === 4.5 ? 4 : P.stage), OBJECTIVES.length - 1); const o = OBJECTIVES[i]; $('objective').innerHTML = `<b>${i < 8 ? 'FIRST SHIFT' : i < OBJECTIVES.length - 1 ? 'THE FIVE KEYS' : 'SIGNAL CITY'}</b>${typeof o.t === 'function' ? o.t() : o.t}`; this.objTarget = o.at; this.wakeHud(); },
+  objective() { const P = GAME.prog; if (!P) return; const i = Math.min(Math.floor(P.stage === 4.5 ? 4 : P.stage), OBJECTIVES.length - 1); const o = OBJECTIVES[i]; $('objective').innerHTML = `<b>${i < 8 ? 'FIRST SHIFT' : i < 12 ? 'THE FIVE KEYS' : i < OBJECTIVES.length - 1 ? 'THE LAST BROADCAST' : 'SIGNAL CITY'}</b>${typeof o.t === 'function' ? o.t() : o.t}`; this.objTarget = o.at; this.wakeHud(); },
   hotbar() {
     const hb = $('hotbar'); hb.innerHTML = ''; const pw = G.powers || {}; const sel = GAME.prog ? GAME.prog.sel : 1;
     for (const id of Object.keys(POWER_INFO)) { const info = POWER_INFO[id]; const d = document.createElement('div'); d.className = 'slot' + (pw[id] ? ' have' : '') + (sel === info.slot && pw[id] ? ' sel' : ''); d.innerHTML = `<span class="k">${info.slot}</span>` + (pw[id] ? `<span class="ico">${info.icon}</span>` : '?'); d.title = pw[id] ? info.name : 'Undiscovered'; if (pw[id] && ((id === 'vision' && pw.visionOn) || (id === 'surge' && pw.surgeOn))) d.style.boxShadow = `0 0 22px #${info.color.toString(16).padStart(6, '0')}`; hb.appendChild(d); }
@@ -4286,7 +4312,7 @@ const UI = {
     const S = G.settings; const row = (label, html) => `<div class="row"><label>${label}</label>${html}</div>`;
     const sel = (k, opts) => `<select data-k="${k}">${opts.map(o => `<option ${S[k] === o ? 'selected' : ''}>${o}</option>`).join('')}</select>`;
     const chk = k => `<input type="checkbox" data-k="${k}" ${S[k] ? 'checked' : ''}>`; const rng = (k, a, b, st) => `<input type="range" data-k="${k}" min="${a}" max="${b}" step="${st}" value="${S[k]}">`;
-    const wrap = document.createElement('div'); wrap.innerHTML = `<h3>Graphics</h3>${row('Quality preset', sel('quality', Object.keys(QUALITY)))}${row('Render scale', rng('renderScale', 0.5, 1.25, 0.05))}${row('Ambient occlusion (High+)', chk('ao'))}${row('Bloom', chk('bloom'))}${row('SMAA anti-aliasing', chk('smaa'))}${row('Post-processing', chk('post'))}${row('Film grain', chk('grain'))}${row('Vignette', chk('vignette'))}${row('Dynamic weather', chk('weather'))}
+    const wrap = document.createElement('div'); wrap.innerHTML = `<h3>Graphics</h3>${row('Quality preset', sel('quality', Object.keys(QUALITY)))}${row('Render scale', rng('renderScale', 0.5, 1.25, 0.05))}${row('Ambient occlusion (High+)', chk('ao'))}${row('Bloom', chk('bloom'))}${row('SMAA anti-aliasing', chk('smaa'))}${row('Dynamic resolution (holds framerate)', chk('dynRes'))}${row('Post-processing', chk('post'))}${row('Film grain', chk('grain'))}${row('Vignette', chk('vignette'))}${row('Dynamic weather', chk('weather'))}
       <h3>Camera & controls</h3>${row('Mouse / stick sensitivity', rng('sensitivity', 0.3, 2.5, 0.05))}${row('Invert Y', chk('invertY'))}${row('Camera auto-centre', chk('autoCenter'))}${row('Camera shake', chk('shake'))}${row('Field of view', rng('fov', 50, 85, 1))}
       <h3>Audio</h3>${row('Master', rng('vMaster', 0, 1, 0.01))}${row('Music', rng('vMusic', 0, 1, 0.01))}${row('Effects', rng('vSfx', 0, 1, 0.01))}${row('Ambience', rng('vAmb', 0, 1, 0.01))}
       <h3>Interface</h3>${row('Subtitles', chk('subtitles'))}${row('Auto-hide HUD', chk('hudAuto'))}${row('Reset progress', '<button class="btn small ghost" id="btnReset">Erase save</button>')}`;
@@ -4502,7 +4528,7 @@ const MAIN = {
     const T = SH.time.value; const hm = WORLD.signalHeads; if (hm && G.frame % 6 === 0) { for (const it of INTERSECTIONS) { if (!it.lights) continue; const c = (T + it.phase) % 24; for (const L of it.lights) { const green = L.axis === 'x' ? c < 10 : c >= 12 && c < 22; const amber = L.axis === 'x' ? c >= 10 && c < 12 : c >= 22; const red = !green && !amber; [red, amber, green].forEach((on, k) => hm.setColorAt(L.heads[k], on ? _c1.setRGB(...[[4, 0.4, 0.2], [4, 2.4, 0.2], [0.4, 4, 1.2]][k]) : _c1.setRGB(0.05, 0.05, 0.05))); } } hm.instanceColor.needsUpdate = true; }
     // plaza screen slogans
     for (const s of WORLD.screens) { s.t -= dt; if (s.t <= 0) { s.t = 7; s.i = (s.i + 1) % SLOGANS.length; const x = s.canvas.getContext('2d'); drawBillboard(x, s.canvas.width, s.canvas.height, s.i); s.tex.needsUpdate = true; } }
-    if (WORLD.towerBeacon) WORLD.towerBeacon.material.emissiveIntensity = (Math.sin(SH.time.value * 3) > 0.6 ? 6 : 0.4) * (0.3 + SH.night.value);
+    if (WORLD.towerBeacon) { const c = SH.time.value % 4, oz = GAME.prog && GAME.prog.stage >= 16; WORLD.towerBeacon.material.emissiveIntensity = (oz ? c < 2.5 && (c * 2) % 1 < 0.5 : Math.sin(SH.time.value * 3) > 0.6) ? 6 * (0.3 + SH.night.value) : 0.4 * (0.3 + SH.night.value); } // after Chapter 3 it signs off like Oswald: five blinks, a pause
     { const cp = RENDER.camera.position, b = CAVES.bounds; const near = cp.x > b.x0 - 30 && cp.x < b.x1 + 30 && cp.z > b.z0 - 30 && cp.z < b.z1 + 30 && (cp.y < 4 || (G.player && G.player.body.inCave)); if (CAVES.mesh) { CAVES.mesh.visible = near; for (const e of CAVES.extras || []) e.visible = near; } }
   },
   titleFrame(dt) {
@@ -5878,6 +5904,8 @@ class FirebaseTransport {
   releaseVehicle(vid) { this.db.set(this.r(`vehicles/${vid}/d`), null); this.db.onDisconnect(this.r(`vehicles/${vid}/d`)).cancel(); }
   onVehicles(cb) { const v = this.r('vehicles'); this.db.onChildAdded(v, s => cb(s.key, s.val())); this.db.onChildChanged(v, s => cb(s.key, s.val())); }
   sendChat(msg) { this.db.push(this.r('chat'), msg); }
+  sendRace(r) { this.db.set(this.r('race'), r); }
+  onRace(cb) { this.db.onValue(this.r('race'), s => { const v = s.val(); if (v) cb(v); }); }
   onChat(cb) { this.db.onChildAdded(this.db.query(this.r('chat'), this.db.limitToLast(15)), s => cb(s.val())); }
   leave() { try { this.db.remove(this.r(`players/${this.uid}`)); } catch (e) { } }
 }
@@ -5890,6 +5918,7 @@ class LocalTransport { // same-device tabs via BroadcastChannel, plus practice b
     if (m.k === 'bye') { delete this.players[m.id]; this.h.remove.forEach(f => f(m.id)); }
     if (m.k === 'v') { this.vehicles[m.id] = Object.assign(this.vehicles[m.id] || {}, m.v); this.h.veh.forEach(f => f(m.id, this.vehicles[m.id])); }
     if (m.k === 'chat') this.h.chat.forEach(f => f(m.v));
+    if (m.k === 'race') (this.h.race || []).forEach(f => f(m.v));
   }
   async listRooms() { return []; }
   setLobby() { }
@@ -5901,6 +5930,8 @@ class LocalTransport { // same-device tabs via BroadcastChannel, plus practice b
   onVehicles(cb) { this.h.veh.push(cb); }
   sendChat(msg) { this.post({ k: 'chat', v: msg }); this.h.chat.forEach(f => f(msg)); }
   onChat(cb) { this.h.chat.push(cb); }
+  sendRace(r) { this.post({ k: 'race', v: r }); (this.h.race || []).forEach(f => f(r)); }
+  onRace(cb) { (this.h.race = this.h.race || []).push(cb); }
   leave() { this.post({ k: 'bye', id: this.uid }); }
   // practice bot: jogs around, hops in a car, drives laps with a passenger seat free
   addBot() {
@@ -5928,6 +5959,8 @@ const MP = {
   vid(v) { if (!v) return null; if (v.isHeli) return 'heli'; const i = G.vehicles.cars.indexOf(v); return i >= 0 ? 'car' + i : null; },
   veh(id) { if (!id) return null; if (id === 'heli') return HELI.heli; const i = +id.slice(3); return G.vehicles.cars[i] || null; },
   live() { const s = new Set(Object.keys(this.remotes)); s.add(this.uid); return s; },
+  // map a sender timestamp onto our clock: track the smallest observed (arrival - sent) gap, relaxing slowly for clock drift
+  stamp(o, t) { const now = Date.now(); if (!t) return now; const d = now - t; o.skew = o.skew === undefined ? d : Math.min(d, o.skew + 2); return t + o.skew; },
 
   // ── lobby UI ──
   buildLobby() {
@@ -6010,11 +6043,11 @@ const MP = {
   upsert(id, v) {
     if (id === this.uid || !v) return; let R = this.remotes[id];
     if (!R) { if (!v.lk) return; R = this.remotes[id] = { id, name: v.n || 'Player', look: v.lk, char: new Character(Object.assign({}, v.lk), WORLD.root), buf: [], rag: null, label: document.createElement('div') }; R.label.className = 'mpName'; R.label.textContent = R.name; document.body.appendChild(R.label); this.chatLine({ n: '\u2022', m: `${R.name} joined`, sys: true }); }
-    R.buf.push({ at: performance.now(), p: v.p || [0, 0, 0], y: v.y || 0, s: v.s || 0, st: v.st || 'ground', v: v.v || null, se: v.se || 0, iv: v.iv, rg: v.rg }); if (R.buf.length > 20) R.buf.shift(); R.last = performance.now();
+    R.rc = v.rc || null; R.buf.push({ at: this.stamp(R, v.t), p: v.p || [0, 0, 0], y: v.y || 0, s: v.s || 0, st: v.st || 'ground', v: v.v || null, se: v.se || 0, iv: v.iv, rg: v.rg }); if (R.buf.length > 20) R.buf.shift(); R.last = performance.now();
   },
   drop(id) { const R = this.remotes[id]; if (!R) return; R.char.obj.parent && R.char.obj.parent.remove(R.char.obj); R.label.remove(); delete this.remotes[id]; this.chatLine({ n: '\u2022', m: `${R.name} left`, sys: true }); for (const [vid, st] of Object.entries(this.vehicles)) if (st.d === id) { st.d = null; const car = this.veh(vid); if (car) car.remote = false; } },
   sample(R) {
-    const t = performance.now() - MP_DELAY, b = R.buf; if (!b.length) return null; let a = b[0], c = b[b.length - 1];
+    const t = Date.now() - MP_DELAY, b = R.buf; if (!b.length) return null; let a = b[0], c = b[b.length - 1];
     for (let i = 0; i < b.length - 1; i++) if (b[i].at <= t && b[i + 1].at >= t) { a = b[i]; c = b[i + 1]; break; }
     const k = c.at === a.at ? 1 : clamp((t - a.at) / (c.at - a.at), 0, 1); const dy = Math.atan2(Math.sin(c.y - a.y), Math.cos(c.y - a.y));
     return { x: lerp(a.p[0], c.p[0], k), y: lerp(a.p[1], c.p[1], k), z: lerp(a.p[2], c.p[2], k), yaw: a.y + dy * k, s: lerp(a.s, c.s, k), st: c.st, v: c.v, se: c.se, iv: c.iv, rg: c.rg };
@@ -6022,8 +6055,8 @@ const MP = {
   // ── shared vehicles ──
   vehicleState(id, v) {
     const car = this.veh(id); if (!car || !v) return; const st = this.vehicles[id] = Object.assign(this.vehicles[id] || { buf: [] }, v); if (!st.buf) st.buf = [];
-    const mine = st.d === this.uid; car.remote = !!st.d && !mine;
-    if (v.p && !mine) { st.buf.push({ at: performance.now(), p: v.p, q: v.q, vl: v.vl || [0, 0, 0], s: v.s || 0, r: v.r || 0 }); if (st.buf.length > 20) st.buf.shift(); if (!st.d) { car.pos.set(...v.p); if (v.q) car.quat.set(...v.q); car.vel.set(0, 0, 0); car.sleep = false; } }
+    const mine = st.d === this.uid; car.remote = !!st.d && !mine; if (v.d !== undefined && v.d !== st.lastD) { st.lastD = v.d; st.skew = undefined; st.buf.length = 0; }
+    if (v.p && !mine) { st.buf.push({ at: this.stamp(st, v.t), p: v.p, q: v.q, vl: v.vl || [0, 0, 0], s: v.s || 0, r: v.r || 0 }); if (st.buf.length > 20) st.buf.shift(); if (!st.d) { car.pos.set(...v.p); if (v.q) car.quat.set(...v.q); car.vel.set(0, 0, 0); car.sleep = false; } }
   },
   async tryEnter(car, player, enterFn) {
     const vid = this.vid(car); const st = this.vehicles[vid] || {}; const live = this.live();
@@ -6043,13 +6076,14 @@ const MP = {
   },
   sendVehicle(car, force) {
     const vid = this.vid(car); if (!vid) return; const q = car.quat; const data = { d: this.uid, p: [+car.pos.x.toFixed(2), +car.pos.y.toFixed(2), +car.pos.z.toFixed(2)], q: [+q.x.toFixed(4), +q.y.toFixed(4), +q.z.toFixed(4), +q.w.toFixed(4)], vl: [+car.vel.x.toFixed(2), +car.vel.y.toFixed(2), +car.vel.z.toFixed(2)], s: +(car.speed || 0).toFixed(2), r: car.isHeli ? +car.rpm.toFixed(2) : 0, t: Date.now() };
-    this.tx.setVehicle(vid, data); void force;
+    const sig = JSON.stringify([data.p, data.q]); const now = Date.now(); if (!force && sig === this._vsig && now - (this._vsigT || 0) < 2000) return; this._vsig = sig; this._vsigT = now; this.tx.setVehicle(vid, data);
   },
   sendPlayer(force) {
     const pl = G.player; if (!pl) return; const rag = pl.ragdoll; const at = rag ? rag.pelvis() : pl.pos;
     const st = rag ? 'rag' : pl.vehicle ? (pl.seat ? 'pass' : 'drive') : pl.state === 'swim' ? 'swim' : pl.body && !pl.body.grounded ? 'air' : 'ground';
     const data = { n: this.name, lk: pl.look, p: [+at.x.toFixed(2), +at.y.toFixed(2), +at.z.toFixed(2)], y: +pl.yaw.toFixed(3), s: +(pl.speed || 0).toFixed(2), st, v: this.vid(pl.vehicle), se: pl.seat || 0, t: Date.now() };
-    if (rag && this.ragImpulse) data.iv = this.ragImpulse; this.tx.setPlayer(data); void force;
+    if (rag && this.ragImpulse) data.iv = this.ragImpulse; const rc = RACE.rc(); if (rc) data.rc = rc;
+    const sig = JSON.stringify([data.p, data.y, data.st, data.v, data.se, data.rc]); const now = Date.now(); if (!force && sig === this._sig && now - (this._sigT || 0) < 2000) return; this._sig = sig; this._sigT = now; this.tx.setPlayer(data);
   },
   chatLine(m) {
     if (!this.chatEl) return; const d = document.createElement('div'); d.className = 'm'; d.innerHTML = m.sys ? `<i style="opacity:.7">${String(m.m).replace(/</g, '&lt;')}</i>` : `<b style="color:var(--yes)">${String(m.n).replace(/</g, '&lt;')}</b> ${String(m.m).replace(/</g, '&lt;')}`;
@@ -6065,9 +6099,11 @@ const MP = {
     // remote vehicles: interpolate
     for (const [vid, st] of Object.entries(this.vehicles)) {
       const car = this.veh(vid); if (!car) continue; const driverLive = st.d && st.d !== this.uid && (this.remotes[st.d] || (tx.bots && tx.bots.some(b => b.id === st.d))); car.remote = !!driverLive; if (!car.remote || !st.buf.length) continue;
-      const t = now - MP_DELAY, b = st.buf; let a = b[0], c = b[b.length - 1]; for (let i = 0; i < b.length - 1; i++) if (b[i].at <= t && b[i + 1].at >= t) { a = b[i]; c = b[i + 1]; break; }
+      const t = Date.now() - MP_DELAY, b = st.buf; let a = b[0], c = b[b.length - 1]; for (let i = 0; i < b.length - 1; i++) if (b[i].at <= t && b[i + 1].at >= t) { a = b[i]; c = b[i + 1]; break; }
       const k = c.at === a.at ? 1 : clamp((t - a.at) / (c.at - a.at), 0, 1); const over = Math.min(0.25, Math.max(0, (t - c.at) / 1000));
-      car.pos.set(lerp(a.p[0], c.p[0], k) + c.vl[0] * over, lerp(a.p[1], c.p[1], k) + c.vl[1] * over, lerp(a.p[2], c.p[2], k) + c.vl[2] * over);
+      // cubic Hermite through both samples using their velocities: follows the real curve through corners instead of cutting them
+      const T = (c.at - a.at) / 1000; if (T > 0 && T < 0.5 && k < 1) { const k2 = k * k, k3 = k2 * k, h00 = 2 * k3 - 3 * k2 + 1, h10 = k3 - 2 * k2 + k, h01 = 3 * k2 - 2 * k3, h11 = k3 - k2; car.pos.set(h00 * a.p[0] + h10 * T * a.vl[0] + h01 * c.p[0] + h11 * T * c.vl[0], h00 * a.p[1] + h10 * T * a.vl[1] + h01 * c.p[1] + h11 * T * c.vl[1], h00 * a.p[2] + h10 * T * a.vl[2] + h01 * c.p[2] + h11 * T * c.vl[2]); }
+      else car.pos.set(lerp(a.p[0], c.p[0], k) + c.vl[0] * over, lerp(a.p[1], c.p[1], k) + c.vl[1] * over, lerp(a.p[2], c.p[2], k) + c.vl[2] * over);
       if (a.q && c.q) { _q1.set(...a.q); _q2.set(...c.q); car.quat.copy(_q1).slerp(_q2, k); } car.vel.set(...c.vl); car.speed = lerp(a.s, c.s, k); car.yaw = Math.atan2(_v1.set(0, 0, 1).applyQuaternion(car.quat).x, _v1.z);
       if (car.isHeli) { car.rpm = damp(car.rpm, c.r || 1, 3, dt); car.sync(dt); car.updateAudio(); } else { for (const w of car.wheels) { w.contact = true; w.comp = 0.2; w.spin += car.speed * dt / car.T.wr; } if (!car.engine && AUDIO.ctx && car.pos.distanceTo(pl.pos) < 60) car.engine = AUDIO.makeEngine(car.pos); }
       // struck by a remote driver?
@@ -6124,7 +6160,247 @@ HOOKS.update.push((dt, pl) => MP.update(dt, pl));
 { const tt = MAIN.toTitle.bind(MAIN); MAIN.toTitle = function (first) { if (MP.on) { MP.leave(); setTimeout(() => location.reload(), 150); return; } return tt(first); }; }
 
 
-window.SIGNALCITY = { G, GAME, WORLD, CAVES, MAIN, RENDER, PHYS, UI, HELI, PROG, SCRATCH, ECON, TRAFFIC, COUNTRY, MP, HEADLIGHTS, STUNT };
+// ════════════════════════════════════════════════════════════════════════════
+// V2 — street races (solo + multiplayer), Chapter 3 "The Last Broadcast",
+// new secrets, roadside power lines, dynamic resolution
+// ════════════════════════════════════════════════════════════════════════════
+function sayLines(lines, gap = 3200, pos) { // lines: [who, text]
+  lines.forEach(([who, l], i) => setTimeout(() => { UI.subtitle(who, l, gap / 1000 + 0.4); if (pos && l[0] !== '(') AUDIO.babble(l, 95, pos); }, i * gap));
+  return lines.length * gap;
+}
+
+// ── races ──
+const RACE = {
+  // ponytail: medal times are first-pass guesses; tune gold/silver after a few test laps
+  courses: [
+    { id: 'loop', name: 'Town Loop', laps: 2, gold: 45, silver: 60, pts: [[40, -60], [40, 20], [70, 50], [100, 20], [100, -50], [70, -90], [40, -90]] },
+    { id: 'grand', name: 'Grand Circuit', laps: 1, gold: 50, silver: 66, pts: [[150, -160], [150, -60], [150, 40], [140, 110], [40, 110], [-60, 110], [-120, 60], [-120, -60], [-120, -160], [-60, -190], [60, -190], [145, -188]] },
+  ],
+  active: null, pending: null, last: null, best: {},
+  course(id) { return this.courses.find(c => c.id === id); },
+  rc() { const a = this.active; if (a) return [a.r.id, a.idx]; const l = this.last; return l && Date.now() - l.t < 60000 ? [l.id, l.n] : null; },
+  fmt(t) { const m = Math.floor(t / 60); return `${m}:${(t - m * 60).toFixed(2).padStart(5, '0')}`; },
+  init() {
+    try { this.best = JSON.parse(localStorage.getItem('signalcity.race.best') || '{}'); } catch (e) { }
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffc800, transparent: true, opacity: 0.85, fog: false, depthWrite: false });
+    this.ring = new THREE.Mesh(GEO.torus(5.2, 0.28, 8, 40), mat); this.ring2 = new THREE.Mesh(GEO.torus(5.2, 0.16, 6, 32), new THREE.MeshBasicMaterial({ color: 0x39f2ff, transparent: true, opacity: 0.35, fog: false, depthWrite: false }));
+    this.beam = new THREE.Mesh(GEO.cyl(0.6, 0.6, 80, 8, true), new THREE.MeshBasicMaterial({ color: 0xffc800, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    for (const m of [this.ring, this.ring2, this.beam]) { m.visible = false; m.frustumCulled = false; WORLD.root.add(m); }
+    const el = this.hud = document.createElement('div'); el.style.cssText = 'position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:21;display:none;font:800 15px var(--body);color:#fff8ea;background:rgba(0,40,46,.62);border:1px solid rgba(255,200,0,.45);border-radius:14px;padding:8px 16px;pointer-events:none;text-align:center;white-space:nowrap'; document.body.appendChild(el);
+    const big = this.big = document.createElement('div'); big.style.cssText = 'position:fixed;left:50%;top:30%;transform:translate(-50%,-50%);z-index:22;display:none;font:900 88px var(--heavy);color:#FFC800;text-shadow:0 6px 0 #003A40,0 12px 30px rgba(0,0,0,.5);pointer-events:none'; document.body.appendChild(big);
+    addEventListener('keydown', e => {
+      if (e.code !== 'KeyT' || e.repeat || G.state !== 'play' || G.modal || G.paused) return;
+      const pl = G.player, car = pl.vehicle; if (!car || car.isHeli || pl.seat) return;
+      if (this.active) return this.stop('Race abandoned');
+      if (this.pending && this.pending.at > Date.now()) return this.join(this.pending);
+      this.menu();
+    });
+  },
+  menu() {
+    let el = document.getElementById('raceMenu'); if (!el) { el = document.createElement('div'); el.id = 'raceMenu'; el.style.cssText = 'position:fixed;inset:0;z-index:55;display:flex;align-items:center;justify-content:center;background:rgba(0,10,12,.7);backdrop-filter:blur(6px)'; document.body.appendChild(el); }
+    G.modal = 'race'; G.input.unlock(); el.style.display = 'flex';
+    const close = () => { el.style.display = 'none'; G.modal = null; MAIN.resumeLock(); };
+    el.innerHTML = `<div style="background:linear-gradient(160deg,#063c42,#021c20);border:1px solid rgba(255,200,0,.4);border-radius:20px;padding:24px 28px;color:#fff8ea;font-family:var(--body);min-width:min(420px,90vw)"><h2 style="margin:0 0 4px;font-family:var(--heavy);color:var(--yes)">Street Race</h2><p style="margin:0 0 14px;opacity:.75">${MP.on ? 'Everyone in the room gets 10 seconds to join the grid.' : 'Hit the checkpoints. Beat the clock.'}</p>
+      ${this.courses.map(c => `<button class="btn small" data-c="${c.id}" style="display:flex;justify-content:space-between;gap:20px;width:100%;margin:8px 0"><span>${c.name} · ${c.laps} lap${c.laps > 1 ? 's' : ''}</span><span style="opacity:.8">${this.best[c.id] ? 'Best ' + this.fmt(this.best[c.id]) : 'Gold ' + this.fmt(c.gold)}</span></button>`).join('')}
+      <button class="btn small ghost" id="raceClose" style="margin-top:8px">Not now</button></div>`;
+    el.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { AUDIO.click(); close(); this.host(this.course(b.dataset.c)); });
+    el.querySelector('#raceClose').onclick = () => { AUDIO.click(); close(); };
+  },
+  host(c) {
+    const r = { id: Math.random().toString(36).slice(2, 8), course: c.id, at: Date.now() + (MP.on ? 10000 : 3600), host: MP.on ? MP.name : 'You', uid: MP.uid };
+    if (MP.on) MP.tx.sendRace(r); else this.join(r);
+  },
+  onRemote(r) {
+    if (!r || r.at < Date.now() || (this.active && this.active.r.id === r.id)) return; const c = this.course(r.course); if (!c) return;
+    if (r.uid === MP.uid) return this.join(r);
+    this.pending = r; UI.toast(`${String(r.host).replace(/</g, '')} started a race`, `${c.name} · get in a car and press T to join (10 s)`); MP.chatLine({ m: `🏁 ${r.host} is starting ${c.name}. In a car? Press T to join.`, sys: true }); AUDIO.ding();
+  },
+  join(r) {
+    const pl = G.player, car = pl.vehicle; if (!car || car.isHeli || pl.seat) { UI.toast('Get in a car first', 'You need to be driving to race.'); AUDIO.denied(); return; }
+    const c = this.course(r.course), P = c.pts, n = P.length; this.pending = null;
+    const seq = [P[0]]; for (let l = 0; l < c.laps; l++) { for (let i = 1; i < n; i++) seq.push(P[i]); seq.push(P[0]); }
+    // grid slot: stable order of everyone in the room so two players never share a spot
+    const ids = MP.on ? [...MP.live()].sort() : [MP.uid]; const slot = Math.max(0, ids.indexOf(MP.uid));
+    const dx = P[0][0] - P[n - 1][0], dz = P[0][1] - P[n - 1][1], dl = Math.hypot(dx, dz), fx = dx / dl, fz = dz / dl;
+    const back = 9 + Math.floor(slot / 2) * 7, side = slot % 2 ? 2.3 : -2.3;
+    const gx = P[0][0] - fx * back + fz * side, gz = P[0][1] - fz * back - fx * side, yaw = Math.atan2(fx, fz);
+    const gy = PHYS.groundAt(gx, gz, car.pos.y + 20, 0.5, {}).y + 0.25;
+    const gridPos = new THREE.Vector3(gx, gy, gz), gridQuat = new THREE.Quaternion().setFromAxisAngle(_v1.set(0, 1, 0), yaw);
+    car.pos.copy(gridPos); car.quat.copy(gridQuat); car.vel.set(0, 0, 0); car.ang.set(0, 0, 0); car.sleep = false; car.sync(); if (MP.on) MP.sendVehicle(car, true);
+    MAIN.rig && MAIN.rig.snap && MAIN.rig.snap();
+    this.active = { r, c, seq, idx: 0, car, gridPos, gridQuat, beat: -1, per: n };
+    UI.objTarget = () => this.active ? this.target() : null; this.showMarkers();
+  },
+  target() { const a = this.active, p = a.seq[Math.min(a.idx, a.seq.length - 1)]; return _v5.set(p[0], HF.at(p[0], p[1]), p[1]); },
+  showMarkers() {
+    const a = this.active; if (!a) { this.ring.visible = this.ring2.visible = this.beam.visible = false; return; }
+    const place = (m, i) => { const p = a.seq[i]; if (!p) { m.visible = false; return; } const q = a.seq[i - 1] || a.seq[a.seq.length - 2] || p; const y = HF.at(p[0], p[1]); m.position.set(p[0], y + 5.4, p[1]); m.rotation.set(0, Math.atan2(p[0] - q[0], p[1] - q[1]), 0); m.visible = true; };
+    place(this.ring, a.idx); place(this.ring2, a.idx + 1); this.beam.position.set(this.ring.position.x, this.ring.position.y + 40, this.ring.position.z); this.beam.visible = true;
+    this.ring.material.color.set(a.idx === a.seq.length - 1 ? 0xffffff : 0xffc800);
+  },
+  stop(msg) { if (!this.active) return; this.active = null; this.showMarkers(); this.hud.style.display = 'none'; this.big.style.display = 'none'; UI.objective(); if (msg) UI.toast(msg, ''); },
+  finish() {
+    const a = this.active, c = a.c, t = (Date.now() - a.r.at) / 1000; this.last = { id: a.r.id, n: a.seq.length, t: Date.now() };
+    const place = MP.on ? 1 + Object.values(MP.remotes).filter(R => R.rc && R.rc[0] === a.r.id && R.rc[1] >= a.seq.length).length : 0;
+    const medal = t <= c.gold ? 'GOLD' : t <= c.silver ? 'SILVER' : 'BRONZE'; const pb = !this.best[c.id] || t < this.best[c.id];
+    if (pb) { this.best[c.id] = t; try { localStorage.setItem('signalcity.race.best', JSON.stringify(this.best)); } catch (e) { } }
+    this.stop(); this.flash(place ? `P${place}` : medal, 2.4); AUDIO.stinger(); FX.confetti(a.car.pos, 60);
+    UI.toast(`${c.name} — ${this.fmt(t)}`, `${medal}${pb ? ' · personal best!' : ''}${place ? ` · finished P${place}` : ''}`);
+    if (!MP.on) ECON.add(medal === 'GOLD' ? 25 : medal === 'SILVER' ? 10 : 4, 'Race prize');
+    if (MP.on) MP.tx.sendChat({ n: '🏁', m: `${MP.name} finished ${c.name} in ${this.fmt(t)} (P${place})`, t: Date.now(), sys: true });
+    if (medal === 'GOLD') GAME.find('race_gold_' + c.id);
+    if (G.hour > 23.5 || G.hour < 0.5) GAME.find('odd_midnight_race');
+  },
+  flash(txt, dur = 0.9) { const b = this.big; b.textContent = txt; b.style.display = 'block'; clearTimeout(this._ft); this._ft = setTimeout(() => b.style.display = 'none', dur * 1000); },
+  fixed() { const a = this.active; if (a && Date.now() < a.r.at) { const c = a.car; c.pos.copy(a.gridPos); c.quat.copy(a.gridQuat); c.vel.set(0, 0, 0); c.ang.set(0, 0, 0); } },
+  update(dt, pl) {
+    const a = this.active; if (!a) return;
+    if (pl.vehicle !== a.car) return this.stop('Race abandoned — you left the car');
+    const now = Date.now(), rem = (a.r.at - now) / 1000;
+    if (rem > 0) { const k = Math.ceil(rem); if (k !== a.beat) { a.beat = k; if (k <= 3) { this.flash(String(k)); AUDIO.tone({ f: 440, d: 0.18, v: 0.25, type: 'square', lp: 2000 }); } } this.hud.style.display = 'block'; this.hud.innerHTML = `<b style="color:var(--yes)">${a.c.name}</b> · starts in ${k}s`; return; }
+    if (a.beat !== 0) { a.beat = 0; this.flash('GO!'); AUDIO.tone({ f: 880, d: 0.5, v: 0.3, type: 'square', lp: 3000 }); }
+    const p = a.seq[a.idx]; if (Math.hypot(a.car.pos.x - p[0], a.car.pos.z - p[1]) < 10) {
+      a.idx++; AUDIO.tone({ f: mtof(MOTIF[a.idx % 4] + 12), d: 0.18, v: 0.2, type: 'triangle' }); FX.ring(a.car.pos, 5);
+      if (a.idx >= a.seq.length) return this.finish(); this.showMarkers(); if (MP.on) MP.sendPlayer(true);
+    }
+    const t = (now - a.r.at) / 1000, lap = a.idx === 0 ? 1 : Math.min(a.c.laps, Math.floor((a.idx - 1) / a.per) + 1);
+    let pos = ''; if (MP.on) { const rivals = Object.values(MP.remotes).filter(R => R.rc && R.rc[0] === a.r.id); pos = ` · P${1 + rivals.filter(R => R.rc[1] > a.idx).length}/${rivals.length + 1}`; }
+    this.hud.style.display = 'block'; this.hud.innerHTML = `<b style="color:var(--yes)">${a.c.name}</b> · Lap ${lap}/${a.c.laps} · CP ${a.idx}/${a.seq.length}${pos} · <b>${this.fmt(t)}</b>${this.best[a.c.id] ? ` <span style="opacity:.6">(best ${this.fmt(this.best[a.c.id])})</span>` : ''}`;
+    this.ring.rotation.z += dt * 0.8;
+  },
+};
+HOOKS.init.push(() => { if (!RACE.hud) RACE.init(); });
+HOOKS.fixed.push(() => RACE.fixed());
+HOOKS.update.push((dt, pl) => RACE.update(dt, pl));
+{ const b0 = MP.begin.bind(MP); MP.begin = function () { b0(); if (this.tx.onRace) this.tx.onRace(r => RACE.onRemote(r)); UI.toast('Street races', 'In a car, press T to start a race for the whole room.'); }; }
+
+// ── Chapter 3: The Last Broadcast (stages 12–16) ──
+const STORY = {
+  tapes: [
+    { id: 'tape_heli', name: 'Tape 1: 5:52 pm', where: () => [HELIPAD.x + 9, HELIPAD.z + 4], lines: [['Oswald (tape)', 'Chopper Five over Signal City, 5:52. Traffic’s light on Five Bars Parade. Olwyn, love, put the kettle on. Home by seven.'], ['Oswald (tape)', 'Hang on. The Tower’s lights just went out. All of them. My radio’s showing zero bars.'], ['Oswald (tape)', 'Zero. I’ve never seen zero.']] },
+    { id: 'tape_dish', name: 'Tape 2: 6:14 pm', where: () => { const S = siteOf('dishes'); return [S.x + S.r * 0.8, S.z]; }, lines: [['Oswald (tape)', '6:14. Earth Station’s dark too. Every dish pointing at nothing.'], ['Oswald (tape)', 'People are standing in the streets holding their phones up at the sky. The hospital can’t call out. The brigade can’t call in.'], ['Oswald (tape)', 'They’ll call this the Great Dropout. It’s not a story any more, folks. It’s tonight.']] },
+    { id: 'tape_exchange', name: 'Tape 3: 6:40 pm', where: () => { const S = siteOf('exchange'); return [S.x + S.r * 0.8, S.z + 4]; }, lines: [['Oswald (tape)', '6:40. I’m hovering over the Old Exchange. Olwyn’s switchboard still runs on copper.'], ['Oswald (tape)', 'If I patch the chopper’s radio into the Tower relay by hand, it might hold one bar. One bar is enough for a triple-zero call.'], ['Oswald (tape)', 'It’ll cook the transmitter. Might be the last thing I ever broadcast. Worth it.'], ['Oswald (tape)', 'Say yes for me, Olwyn.']] },
+  ],
+  items: {},
+  have() { const P = GAME.prog; return this.tapes.filter(t => P.secrets[t.id]).length; },
+  spot(t) { const [x, z] = t.where(); return new THREE.Vector3(x, HF.at(x, z) + 1.0, z); },
+  nextTape() { const t = this.tapes.find(q => !GAME.prog.secrets[q.id]); return t ? this.spot(t) : null; },
+  projector() { const S = siteOf('drivein'); return new THREE.Vector3(S.x, HF.at(S.x, S.z - 14), S.z - 14); },
+  spawnTapes() {
+    const P = GAME.prog, PK = GAME.pickups;
+    for (const t of this.tapes) { if (P.secrets[t.id] || this.items[t.id]) continue;
+      const it = PK.addItem('tape', t.id, this.spot(t), { secret: t.id, reach: 3.2 }); this.items[t.id] = it;
+      const body = new THREE.Mesh(GEO.rbox(0.42, 0.27, 0.07, 0.02), std({ color: 0x1a1a1a, roughness: 0.4 })); it.g.add(body);
+      const label = new THREE.Mesh(GEO.box(0.34, 0.1, 0.075), new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0xffc800, emissiveIntensity: 1.4 })); label.position.y = 0.06; it.g.add(label);
+      for (const sx of [-0.09, 0.09]) { const reel = new THREE.Mesh(GEO.cyl(0.045, 0.045, 0.08, 12), std({ color: 0xeeeeee, roughness: 0.5 })); reel.rotation.x = Math.PI / 2; reel.position.set(sx, -0.04, 0); it.g.add(reel); }
+      it.g.scale.setScalar(1.8); WORLD.lights.push({ pos: it.g.position, color: 0xffc800, distance: 6, decay: 1.5, range: 40, base: 3, active: () => it.g.visible });
+    }
+  },
+  init(P) {
+    if (P.stage >= 13 && P.stage < 16) this.spawnTapes();
+    G.bus.on('pickup', it => { if (it.kind !== 'tape') return; GAME.pickups.take(it); AUDIO.jingle(it.pos); FX.confetti(it.pos, 30); GAME.find(it.secret); const t = this.tapes.find(q => q.id === it.id);
+      setTimeout(() => { UI.toast('Oswald’s flight tape', `${t.name} · ${this.have()} of 3`); sayLines([['', '(Click. Rotor noise. A voice you’ve only seen on a memorial.)'], ...t.lines]); UI.objective(); if (this.have() === 3) setTimeout(() => GAME.setStage(14), 12000); }, 600); });
+    G.bus.on('talk', id => { if (id !== 'olwyn' || GAME.prog.stage !== 12 || this.busy) return; this.busy = true; const o = new THREE.Vector3(58, 1.6, -98);
+      const d = sayLines([['Nan Olwyn', 'Ever since you lit that beacon, my old radio picks up rotor noise. Every night. Just rotors, then static.'], ['Nan Olwyn', 'Oswald flew Traffic Chopper 5 the night of the Great Dropout. He never came home. They found the chopper on the hill, not a scratch on it.'], ['Nan Olwyn', 'He recorded everything, dear. Three flight tapes. They were never found.'], ['Nan Olwyn', 'If anyone can find them, it’s the rep who made the Tower say yes. Try the helipad, the Earth Station, and my old Exchange.']], 3600, o);
+      setTimeout(() => { this.busy = false; GAME.setStage(13); }, d); });
+    HOOKS.stage.push(s => { if (s === 13) this.spawnTapes(); });
+  },
+  playFilm(player) {
+    if (SH.night.value < 0.5) { UI.subtitle('Projector', '(It’s too bright to see anything on the big screen. Come back after dark.)', 3.5); AUDIO.denied(); return; }
+    if (this.busy) return; this.busy = true; AUDIO.noise({ ft: 'bandpass', f: 1800, q: 0.6, d: 2.5, v: 0.15, pos: this.projector() });
+    const d = sayLines([['', '(The projector clatters to life. Oswald’s face flickers across the big screen, filmed in the cockpit.)'], ['Oswald', 'If you’re watching this, someone found my tapes. Good on you.'], ['Oswald', 'The relay held. The town got one bar back that night. Enough for the ambulance. Enough for the brigade.'], ['Oswald', 'The chopper didn’t crash. I set her down on the hill and walked into the Tower to keep the patch alive by hand.'], ['Oswald', 'Everyone says the Tower saved Signal City. Let ’em. But the Tower only says yes because somebody asks it to.'], ['Oswald', 'Olwyn. Meet me where we watched the sunsets. Coverage Hill. You’ll know me when you see the Tower blink.'], ['', '(The film runs out. The loose end of the reel flaps round and round.)']], 3800);
+    setTimeout(() => { this.busy = false; GAME.setStage(15); }, d);
+  },
+  finale() {
+    const P = GAME.prog; if (this.busy) return; this.busy = true; G.cinematic = true; UI.letterbox(true);
+    const d = sayLines([['', '(The Yes Tower’s beacon stops. Then it blinks. Five times. A pause. Five more.)'], ['Nan Olwyn (on your phone)', 'Are you seeing this, dear? Five blinks. That was always his sign-off.'], ['Nan Olwyn (on your phone)', 'Forty years I thought he just flew off and left me. He stayed. He kept the line open for all of us.'], ['Nan Olwyn (on your phone)', 'I’m going to sit here every sunset from now on. You come and say hello to him too.'], ['', '(Somewhere, very faintly, a radio plays the old Yes FM jingle.)']], 4000);
+    setTimeout(() => { this.busy = false; G.cinematic = false; UI.letterbox(false); GAME.find('odd_lastbroadcast'); ECON.add(150, 'The Last Broadcast'); if (!RADIO.stations.includes('Chopper 5 Memorial')) RADIO.stations.push('Chopper 5 Memorial'); P.chopper5fm = true; UI.toast('New radio station', 'Chopper 5 Memorial · press Q in a car'); GAME.setStage(16); }, d);
+  },
+  update(dt, pl) {
+    const P = GAME.prog; if (!P) return;
+    if (P.stage === 15 && !this.busy && pl.state === 'sit' && WORLD.anchors.lookout && pl.pos.distanceTo(WORLD.anchors.lookout) < 6 && G.hour > 16.8 && G.hour < 19.5) { this.sitT = (this.sitT || 0) + dt; if (this.sitT > 3) { this.sitT = 0; this.finale(); } } else this.sitT = 0;
+    if (P.chopper5fm && !RADIO.stations.includes('Chopper 5 Memorial')) RADIO.stations.push('Chopper 5 Memorial');
+    // speed & horn oddities
+    const car = pl.vehicle; if (car && !car.isHeli && !pl.seat && car.speed > 44.5) GAME.find('odd_ton');
+  },
+};
+OBJECTIVES[12] = { t: 'Nan Olwyn’s radio has been crackling since the beacon lit. Visit her near the plaza', at: () => new THREE.Vector3(58, 0.15, -98) };
+OBJECTIVES.push(
+  { t: () => `Find Oswald’s three flight tapes (${STORY.have()}/3): the helipad, the Earth Station, the Old Exchange`, at: () => STORY.nextTape() },
+  { t: 'Play the tapes on the Signal Drive-In projector after dark', at: () => STORY.projector() },
+  { t: 'Take Oswald’s message to the Coverage Hill lookout. Sit there at sunset', at: () => WORLD.anchors.lookout },
+  { t: 'Signal City is yours. Race the streets (T in a car) and chase the last secrets', at: () => null },
+);
+SECRETS.push(
+  { id: 'tape_heli', name: 'Tape 1: 5:52 pm', cat: 'Flight Tape', hint: 'Oswald always kept a spare tape where he landed.' },
+  { id: 'tape_dish', name: 'Tape 2: 6:14 pm', cat: 'Flight Tape', hint: 'He flew over the Earth Station when the dishes went dark.' },
+  { id: 'tape_exchange', name: 'Tape 3: 6:40 pm', cat: 'Flight Tape', hint: 'Olwyn’s old workplace, up on Ridge Road.' },
+  { id: 'odd_lastbroadcast', name: 'The Last Broadcast', cat: 'Oddity', hint: 'Finish what Oswald started.' },
+  { id: 'race_gold_loop', name: 'Town Loop Gold', cat: 'Race', hint: 'Beat the gold time on the Town Loop. Press T in any car.' },
+  { id: 'race_gold_grand', name: 'Grand Circuit Gold', cat: 'Race', hint: 'Beat the gold time on the Grand Circuit.' },
+  { id: 'odd_midnight_race', name: 'Midnight Run', cat: 'Race', hint: 'Finish a race right as the clock strikes midnight.' },
+  { id: 'odd_ton', name: 'Five Bars Per Second', cat: 'Oddity', hint: 'Some say a car can crack 160 km/h on a long straight.' },
+  { id: 'odd_ducks', name: 'Duck Duck Honk', cat: 'Oddity', hint: 'The ducks of Still Water have strong opinions about car horns.' },
+);
+DIALOGUE.hint.push(
+  'Street racers meet on Signal St after dark. Hop in a car and press T, if you’re brave.',
+  'Kev reckons the ducks go absolutely feral if you honk at them. Three times, he says.',
+  'Olwyn’s radio keeps picking up rotor noise at night. Gives me the shivers.',
+);
+LOCAL_LINES.olwyn = (orig => ctx => ctx.stage === 12 ? ['Oh, it’s you. Sit with me a minute, dear. It’s about my Oswald.'] : ctx.stage >= 13 && ctx.stage < 16 ? ['Have you found them? The helipad, the Earth Station, the Exchange. He was a creature of habit.', 'The drive-in has an old projector. Oswald used to run films there on Sundays.'] : ctx.stage >= 16 ? ['Five blinks, every night. I never miss it now.', ...orig(ctx)] : orig(ctx))(LOCAL_LINES.olwyn);
+LOCAL_LINES.priya = (orig => ctx => ctx.stage >= 12 ? ['Head office keeps asking why the Tower glows at night. I told them it’s a promotion.', 'You’re Employee of the Month. And the year. And, apparently, the century.', ctx.stage >= 16 ? 'Olwyn came in today and bought a new phone. First one in forty years. She was smiling.' : 'Nan Olwyn was asking after you. Something about her radio.'] : orig(ctx))(LOCAL_LINES.priya);
+LOCAL_LINES.tully = (orig => ctx => [...orig(ctx), 'Street racing’s my second sport. Get in a car, hit T, and try to beat my Town Loop. Gold’s under forty-five seconds.'])(LOCAL_LINES.tully);
+LOCAL_LINES.dee = (orig => ctx => [...orig(ctx), 'If you’re going to race, keep it off my roundabout. And the park. And the footpath.'])(LOCAL_LINES.dee);
+LOCAL_LINES.kev = (orig => ctx => [...orig(ctx), 'Whatever you do, don’t honk at the ducks. They remember. Three honks and they’ll never forgive you.'])(LOCAL_LINES.kev);
+HOOKS.init.push(P => STORY.init(P));
+HOOKS.update.push((dt, pl) => STORY.update(dt, pl));
+HOOKS.interact.push((p, cands, player) => { const P = GAME.prog; if (P && P.stage === 14 && STORY.projector().distanceTo(p) < 3) cands.push({ d: 0.5, label: 'Thread Oswald’s tapes into the projector', act: () => STORY.playFilm(player) }); });
+{ const h0 = AUDIO.horn.bind(AUDIO); AUDIO.horn = (pos, pitch) => { h0(pos, pitch); if (!GAME.prog || !pos || Math.hypot((pos.x - POND.x) / (POND.rx + 10), (pos.z - POND.z) / (POND.rz + 10)) > 1) return; STORY.honks = (STORY.honks || 0) + 1; if (STORY.honks === 3) { UI.subtitle('Ducks', '(QUACK. QUACK QUACK QUACK. They are absolutely furious.)', 3.5); GAME.find('odd_ducks'); } }; }
+
+// projector booth at the drive-in (Chapter 3 needs somewhere to play the film)
+HOOKS.build.push(() => {
+  const S = siteOf('drivein'); if (!S) return; const x = S.x, z = S.z - 16, y = HF.at(x, z);
+  const B = new MeshBatch('booth'); B.add('paint', GEO.box(3.2, 2.8, 3), M4(x, y + 1.4, z), { color: 0xf4f0e4 }); B.add('paint', GEO.box(3.6, 0.2, 3.4), M4(x, y + 2.9, z), { color: 0xFFC800 });
+  B.add('metal', GEO.cyl(0.18, 0.22, 0.4, 12), M4(x, y + 2, z + 1.6, 0, Math.PI / 2), { color: 0x222222 }); B.build(WORLD.root);
+  COLL.box(x, z, y, y + 2.9, 1.6, 1.5);
+  WORLD.lights.push({ pos: new THREE.Vector3(x, y + 2, z + 2.2), color: 0xfff2c0, distance: 8, decay: 1.5, range: 50, base: 3, active: () => SH.night.value > 0.5 });
+});
+
+// ── roadside power poles and sagging wires ──
+HOOKS.build.push(() => {
+  const poles = [], wire = [];
+  ROADS.forEach((r, ri) => {
+    if (ri === 0) return; // Signal St is the shopping strip: already has lamps and awnings
+    const [, x0, z0, x1, z1] = r, L = Math.hypot(x1 - x0, z1 - z0), fx = (x1 - x0) / L, fz = (z1 - z0) / L, nx = fz, nz = -fx; let prev = null;
+    for (let d = 14; d < L - 8; d += 30) {
+      const x = x0 + fx * d + nx * 8.6, z = z0 + fz * d + nz * 8.6;
+      const nearOther = ROADS.some((o, oi) => oi !== ri && distSeg2(x, z, o[1], o[2], o[3], o[4]) < 12);
+      const y = HF.at(x, z), blocked = Math.hypot(x - ROUNDABOUT.x, z - ROUNDABOUT.z) < 20 || COLL.query(x, z, 1.6, []).some(k => { if (k.y1 !== undefined && k.y1 < y + 0.6) return false; if (k.type === 'cyl') return Math.hypot(x - k.x, z - k.z) < k.r + 1.2; const [lx, lz] = COLL.toLocal(k, x, z); return Math.abs(lx) < k.hx + 1.2 && Math.abs(lz) < k.hz + 1.2; });
+      if (nearOther || blocked) { prev = null; continue; }
+      const p = { x, y, z, yaw: Math.atan2(fx, fz), nx, nz }; poles.push(p); COLL.cyl(x, z, y, y + 9, 0.2);
+      if (prev) for (const o of [-0.75, 0, 0.75]) { const ax = prev.x + nx * o, az = prev.z + nz * o, ay = prev.y + 8.55, bx = x + nx * o, bz = z + nz * o, by = y + 8.55; for (let k = 0; k < 8; k++) { const t0 = k / 8, t1 = (k + 1) / 8, s0 = 0.7 * 4 * t0 * (1 - t0), s1 = 0.7 * 4 * t1 * (1 - t1); wire.push(lerp(ax, bx, t0), lerp(ay, by, t0) - s0, lerp(az, bz, t0), lerp(ax, bx, t1), lerp(ay, by, t1) - s1, lerp(az, bz, t1)); } }
+      prev = p;
+    }
+  });
+  if (!poles.length) return;
+  const parts = [GEO.cyl(0.11, 0.16, 9, 7).translate(0, 4.5, 0), GEO.box(1.9, 0.12, 0.12).translate(0, 8.4, 0), ...[-0.75, 0, 0.75].map(o => GEO.cyl(0.04, 0.05, 0.16, 6).translate(o, 8.55, 0))].map(g => g.index ? g.toNonIndexed() : g);
+  parts.forEach(g => { for (const k of Object.keys(g.attributes)) if (!['position', 'normal'].includes(k)) g.deleteAttribute(k); });
+  const im = new THREE.InstancedMesh(BGU.mergeGeometries(parts), std({ color: 0x5a4a3a, roughness: 0.85 }), poles.length);
+  poles.forEach((p, i) => im.setMatrixAt(i, M4(p.x, p.y, p.z, p.yaw))); im.castShadow = true; im.receiveShadow = true; WORLD.root.add(im);
+  const wg = new THREE.BufferGeometry(); wg.setAttribute('position', new THREE.Float32BufferAttribute(wire, 3));
+  WORLD.root.add(new THREE.LineSegments(wg, new THREE.LineBasicMaterial({ color: 0x1c1c1c })));
+});
+
+// ── dynamic resolution: trade pixels for framerate on weak GPUs, give them back when there's headroom ──
+{ const D = { acc: 0, n: 0 }; HOOKS.update.push((dt, pl, I, raw) => {
+  if (!G.settings.dynRes) { if (RENDER.dyn && RENDER.dyn !== 1) { RENDER.dyn = 1; RENDER.buildComposer(); } return; }
+  D.acc += raw; D.n++; if (D.acc < 3) return; const fps = D.n / D.acc; D.acc = D.n = 0; const cur = RENDER.dyn || 1;
+  const nx = fps < 40 ? Math.max(0.6, cur - 0.1) : fps > 57 && cur < 1 ? Math.min(1, cur + 0.05) : cur;
+  if (Math.abs(nx - cur) > 0.01) { RENDER.dyn = nx; RENDER.buildComposer(); }
+}); }
+
+
+window.SIGNALCITY = { G, GAME, WORLD, CAVES, MAIN, RENDER, PHYS, UI, HELI, PROG, SCRATCH, ECON, TRAFFIC, COUNTRY, MP, HEADLIGHTS, STUNT, RACE, STORY };
 MAIN.boot();
 
 </script>
