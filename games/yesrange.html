@@ -1431,6 +1431,7 @@ function findHover(h) {
     if (dx * dx + dy * dy + dz2 * dz2 > 1.2) continue;
     for (const gp of it.points) {
       if (gp.cond && !gp.cond(h, it)) continue;
+      if ((gp.type === 'free' || gp.type === 'primary') && it.kind === 'gun' && heldBy(it)) continue;   // a held gun only offers its working parts to the other hand
       gpWorld(it, gp, _palm, _gw);
       const d = _gw.distanceTo(_palm), r = gp.r * rf;
       if (d > r) continue;
@@ -1468,7 +1469,12 @@ function grab(h, it, gp) {
     h.hold = { kind: 'joint', it, gp, gun, joint: j, start: j.pos, hs: gun.axisAlong(h.pos) };
     gun.onRackGrab(h); return;
   }
-  if (t === 'secondary') { h.hold = { kind: 'secondary', it, gp, gun: it.owner }; return; }
+  if (t === 'secondary') {
+    // lock the support hand where it first closed on the handguard (no sliding along it afterwards)
+    const lp = gp.pos.clone();
+    if (gp.seg) { it.obj.updateWorldMatrix(true, false); _im.copy(it.obj.matrixWorld).invert(); lp.z = clamp(V3().copy(h.pos).applyMatrix4(_im).z, gp.pos.z - gp.seg, gp.pos.z + gp.seg); }
+    h.hold = { kind: 'secondary', it, gp, gun: it.owner, lp }; return;
+  }
   if (t === 'magwell') {
     const mag = it.owner; mag.seat.grabbed = true; mag.seat.drive = mag.seat.pos;
     h.hold = { kind: 'magseat', it, gp, mag, start: mag.seat.pos, hs: mag.gun.wellAlong(h.pos) }; return;
@@ -1522,11 +1528,11 @@ function updateHold(h, dt) {
     b.tq.copy(h.quat).multiply(hd.offQ);
     if (hd.it.kind === 'gun') {
       const o = hands[1 - h.side];
-      if (o.hold && o.hold.kind === 'secondary' && o.hold.it === hd.it && (G.xr || o.override)) {
-        // Two-hand aim: rotate so primary→secondary grip vector points at the support hand; primary roll preserved.
-        _v1.copy(o.hold.gp.pos).sub(hd.gp.pos).applyQuaternion(b.tq).normalize();
+      if (o.hold && o.hold.kind === 'secondary' && o.hold.it === hd.it && !o.hold.gp.noAim && (G.xr || o.override)) {
+        // Two-hand aim: the barrel lies along the rear-hand → front-hand line; the primary hand's roll is kept.
+        _v1.set(0, 0, -1).applyQuaternion(b.tq);
         _v2.copy(o.pos).sub(h.pos);
-        if (_v2.lengthSq() > 0.01) { _v2.normalize(); _q1.setFromUnitVectors(_v1, _v2); b.tq.premultiply(_q1); }
+        if (_v2.lengthSq() > 0.12 * 0.12) { _v2.normalize(); _q1.setFromUnitVectors(_v1, _v2); b.tq.premultiply(_q1); }
       }
       b.tq.multiply(_q1.setFromAxisAngle(AX, hd.it.owner.climb));   // accumulated muzzle climb the shooter has to fight
     }
@@ -1555,7 +1561,8 @@ function updateHold(h, dt) {
     mag.seat.drive = d;
     if (d < -0.3) { const gun = mag.gun; gun.detachMag(false); h.hold = null; grab(h, mag.item, primaryGp(mag.item)); }
   } else if (hd.kind === 'secondary') {
-    if (!hd.gun.primaryHand()) convertToFree(h, hd.it);
+    if (!hd.gun.primaryHand()) { convertToFree(h, hd.it); return; }
+    if (G.xr && V3().copy(hd.lp).applyMatrix4(hd.it.obj.matrixWorld).distanceTo(h.pos) > 0.25) release(h, true);   // pulled the hand right off the gun
   }
 }
 // PD "physical hands": critically damped spring per held body, run every physics substep.
@@ -1705,7 +1712,7 @@ function updateHandVisuals() {
       const gq = h.side === 0 ? mirrorQ(hd.gp.quat, _gq) : _gq.copy(hd.gp.quat);
       if (hd.kind === 'body' && hd.gp.type === 'free') { vq.copy(_oq).multiply(_q1.copy(hd.offQ).invert()); vp.copy(hd.offP).applyQuaternion(vq).negate().add(_op); }
       else if (hd.kind === 'joint') { const g = hd.gun, jp = g.parts.ch ? g.chPos : hd.joint.pos; _v1.copy(hd.gp.pos); if (hd.gp.move) _v1.addScaledVector(hd.gp.move, jp); else _v1.addScaledVector(g.def.boltAxis, g.def.boltTravel * jp); vp.copy(_v1).applyQuaternion(_oq).add(_op); vq.copy(_oq).multiply(gq); }
-      else if (hd.kind === 'secondary') { gpWorld(hd.it, hd.gp, h.pos, vp); vq.copy(_oq).multiply(gq); }
+      else if (hd.kind === 'secondary') { vp.copy(hd.lp).applyQuaternion(_oq).add(_op); vq.copy(_oq).multiply(gq); }
       else { vp.copy(hd.gp.pos).applyQuaternion(_oq).add(_op); vq.copy(_oq).multiply(gq); }
       glued = true;
       const gpz = hd.gp.pose;
@@ -2020,6 +2027,7 @@ const DEFS = {
     colliders: [[0, 0.003, -0.09, 0.014], [0, 0.003, -0.045, 0.014], [0, 0.003, 0, 0.014], [0, 0.003, 0.05, 0.014], [0, -0.06, 0.055, 0.016], [0, -0.1, 0.07, 0.016]],
     grips: [
       { type: 'primary', pos: new THREE.Vector3(0, -0.07, 0.055), r: 0.09, pri: 1, pose: [0.75, 0.15, 1.0, 1.0, 0.95, 0.5] },
+      { type: 'secondary', pos: new THREE.Vector3(-0.012, -0.108, 0.04), quat: new THREE.Quaternion().setFromAxisAngle(AY, -0.35), r: 0.06, pri: 2.2, needsOther: true, noAim: true, pose: [0.8, 0.85, 0.9, 0.9, 0.9, 0.85] },
       { type: 'slide', pos: new THREE.Vector3(0, 0.004, 0.058), quat: new THREE.Quaternion().setFromAxisAngle(AZ, Math.PI / 2), r: 0.07, pri: 2, needsOther: true, pose: [0.7, 0.6, 0.8, 0.8, 0.8, 0.6] },
       { type: 'free', pos: new THREE.Vector3(0, 0, -0.02), r: 0.1, pri: -1 }
     ],
@@ -2256,7 +2264,7 @@ class Firearm {
     const pf = sup ? 2 : 3 + (pel > 1 ? 2 : 0);
     for (let i = 0; i < pf; i++) { const k = rand(0.2, 0.9); FX.smoke.emit(_mz.x, _mz.y, _mz.z, _md.x * k + rand(-0.08, 0.08), _md.y * k + rand(0.02, 0.12), _md.z * k + rand(-0.08, 0.08), rand(0.9, 1.8), rand(0.02, 0.035), 0.82, 0.82, 0.84, 0.06, 1.6, rand(0.08, 0.14), sup ? 0.18 : 0.3, rand(-0.6, 0.6)); }
     if (!sup && (pel > 1 || c.mass > 0.009)) for (let i = 0; i < 5; i++) { const sp = rand(3, 9); FX.sparks.emit(_mz.x, _mz.y, _mz.z, (_md.x + rand(-0.15, 0.15)) * sp, (_md.y + rand(-0.15, 0.15)) * sp, (_md.z + rand(-0.15, 0.15)) * sp, rand(0.05, 0.14), 0.007, 1, 0.7, 0.3, -6, 1, 0, 1); }
-    this.heat += 1;
+    this.heat = Math.min(this.heat + 1, 5);   // capped: a few seconds of barrel wisp after a long string, not a minute
     AUDIO.gunshot(_mz, d.cal, sup);
     this.buzz(d.haptic[0], d.haptic[1]);
     EV.emit('fire', this);
@@ -2299,7 +2307,7 @@ class Firearm {
     const P = this.parts, d = this.def;
     if (dt > 0) {
       this.climb *= Math.exp(-dt * 5);
-      this.heat = Math.max(0, this.heat - dt * 0.8);
+      this.heat = Math.max(0, this.heat - dt * 1.5);
       if (this.heat > 2 && Math.random() < 0.3) {
         _mz.copy(this.muzzleLocal()).applyQuaternion(this.body.quat).add(this.body.pos);
         FX.smoke.emit(_mz.x, _mz.y, _mz.z, rand(-0.05, 0.05), rand(0.1, 0.25), rand(-0.05, 0.05), rand(1.2, 2.2), 0.02, 0.8, 0.8, 0.82, 0.05, 0.6, 0.06, Math.min(0.35, this.heat * 0.04), rand(-0.5, 0.5));
@@ -2784,7 +2792,7 @@ function buildSMG() {
   b.add('polymer', sideEx([[-0.02, -0.055], [-0.03, -0.08], [-0.04, -0.12], [-0.045, -0.135], [-0.075, -0.135], [-0.07, -0.1], [-0.06, -0.06], [-0.05, -0.03]].map(p => [p[0] + 0.018, p[1]]), 0.03, 0.002));
   b.add('polymer', sideEx([[-0.13, 0.018], [-0.36, 0.012], [-0.37, 0.005], [-0.37, -0.075], [-0.35, -0.085], [-0.25, -0.03], [-0.13, -0.018]], 0.04, 0.003));
   b.add('rubber', box(0.04, 0.085, 0.01), 0, -0.035, 0.372);
-  b.add('dark', box(0.024, 0.002, 0.03), 0, -0.029, -0.02);
+  b.add('parker', box(0.03, 0.04, 0.042), 0, -0.042, -0.1); b.add('dark', box(0.024, 0.002, 0.034), 0, -0.0625, -0.1);   // magwell housing ahead of the trigger group
   b.build(root);
   const s = new PB(); s.add('polished', box(0.014, 0.018, 0.1), 0, 0, 0.05); s.build(slide);
   const c = new PB(); c.add('blackSatin', box(0.004, 0.008, 0.012), -0.016, 0.02, -0.19); c.add('blackSatin', box(0.018, 0.006, 0.008), -0.024, 0.02, -0.19, 0, 0, 0.3); c.build(ch);
@@ -2913,6 +2921,7 @@ Object.assign(DEFS, {
     mag: MAGDEFS.s45, build: build1911, dims: [0.03, 0.14, 0.22],
     colliders: [[0, 0.003, -0.1, 0.014], [0, 0.003, -0.05, 0.014], [0, 0.003, 0, 0.014], [0, 0.003, 0.06, 0.014], [0, -0.06, 0.06, 0.016], [0, -0.1, 0.075, 0.016]],
     grips: [{ type: 'primary', pos: new THREE.Vector3(0, -0.068, 0.058), r: 0.09, pri: 1, pose: [0.75, 0.15, 1, 1, 0.95, 0.5] },
+      { type: 'secondary', pos: new THREE.Vector3(-0.012, -0.112, 0.045), quat: hq(0).setFromAxisAngle(AY, -0.35), r: 0.06, pri: 2.2, needsOther: true, noAim: true, pose: [0.8, 0.85, 0.9, 0.9, 0.9, 0.85] },
       { type: 'slide', pos: new THREE.Vector3(0, 0.004, 0.07), quat: hq(Math.PI / 2), r: 0.07, pri: 2, needsOther: true, pose: [0.7, 0.6, 0.8, 0.8, 0.8, 0.6] },
       { type: 'free', pos: new THREE.Vector3(0, 0, -0.02), r: 0.1, pri: -1 }],
     stats: [0.6, 0.55, 0.3, 0.45, 0.45], desc: 'Single-action classic. Thumb safety (stick click), grip safety, exposed hammer. 8 rounds of .45 Roaming.' },
@@ -2922,15 +2931,16 @@ Object.assign(DEFS, {
     modes: ['DA'], haptic: [0.95, 45], muzzle: new THREE.Vector3(0, 0, -0.137), sight: new THREE.Vector3(0, 0.016, 0.03),
     sizeClass: 'pistol', trigRot: 0.35, build: buildRevolver, dims: [0.04, 0.14, 0.22],
     colliders: [[0, 0, -0.12, 0.012], [0, 0, -0.07, 0.013], [0, -0.013, 0, 0.02], [0, -0.07, 0.045, 0.017], [0, -0.105, 0.055, 0.017]],
-    grips: [{ type: 'primary', pos: new THREE.Vector3(0, -0.082, 0.052), r: 0.09, pri: 1, pose: [0.75, 0.15, 1, 1, 0.95, 0.5] }, { type: 'free', pos: new THREE.Vector3(0, 0, -0.03), r: 0.1, pri: -1 }],
+    grips: [{ type: 'primary', pos: new THREE.Vector3(0, -0.082, 0.052), r: 0.09, pri: 1, pose: [0.75, 0.15, 1, 1, 0.95, 0.5] },
+      { type: 'secondary', pos: new THREE.Vector3(-0.012, -0.118, 0.045), quat: hq(0).setFromAxisAngle(AY, -0.35), r: 0.06, pri: 2.2, needsOther: true, noAim: true, pose: [0.8, 0.85, 0.9, 0.9, 0.9, 0.85] }, { type: 'free', pos: new THREE.Vector3(0, 0, -0.03), r: 0.1, pri: -1 }],
     stats: [0.75, 0.75, 0.2, 0.3, 0.5], desc: 'Swing-out double action. A: crane, B: eject, stick: thumb-cock. Speedloader in the pouch.' },
   smg: { id: 'smg', name: 'Unlimited SMG', cal: '9mm', capacity: 30, rpm: 800, massKg: 2.6, hkNotch: true,
     recoil: { back: 0.35, rise: 3.2, yaw: 1.6, two: 0.5, stock: 0.6, climb: 0.012 }, trigger: { slack: 0.2, wall: 0.5, brk: 0.68, reset: 0.45 },
     ejectVel: [2.0, 0.8, 0.3], ejectSpin: 24, boltTravel: 0.085, boltAxis: new THREE.Vector3(0, 0, 1), boltK: 1100, boltC: 12, cycleVel: 62,
     lockOnEmpty: false, lockPos: 0.97, modes: ['SAFE', 'SEMI', 'BURST', 'AUTO'], selRot: { SAFE: 0, SEMI: 0.6, BURST: 1.2, AUTO: 1.8 }, haptic: [0.6, 30],
     muzzle: new THREE.Vector3(0, 0, -0.395), sight: new THREE.Vector3(0, 0.049, 0.042), stock: new THREE.Vector3(0, -0.03, 0.37), sizeClass: 'long', trigRot: 0.3,
-    feedFrom: new THREE.Vector3(0, -0.025, -0.0), thread: true,
-    well: { top: new THREE.Vector3(0, -0.02, -0.015), axis: new THREE.Vector3(0, 1, 0), quat: new THREE.Quaternion(), travel: 0.08 },
+    feedFrom: new THREE.Vector3(0, -0.026, -0.085), thread: true,
+    well: { top: new THREE.Vector3(0, -0.022, -0.1), axis: new THREE.Vector3(0, 1, 0), quat: new THREE.Quaternion(), travel: 0.08 },
     mag: MAGDEFS.smg, build: buildSMG, dims: [0.05, 0.18, 0.76],
     colliders: [[0, 0.005, -0.33, 0.022], [0, 0.005, -0.24, 0.025], [0, 0.005, -0.12, 0.024], [0, 0.005, 0.0, 0.024], [0, 0.005, 0.12, 0.024], [0, -0.09, 0.05, 0.022], [0, -0.02, 0.26, 0.03], [0, -0.03, 0.36, 0.035]],
     rails: [{ a: new THREE.Vector3(0, 0.036, 0.0), b: new THREE.Vector3(0, 0.036, 0.08), types: ['optic'] }, { a: new THREE.Vector3(0, -0.042, -0.31), b: new THREE.Vector3(0, -0.042, -0.23), types: ['grip', 'light', 'laser'], flip: true }],
