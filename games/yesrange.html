@@ -698,7 +698,7 @@ class Body {
     this.ccd = !!o.ccd; this.ccdR = o.ccdR || 0.01;
     this.linDamp = o.linDamp ?? 0.05; this.angDamp = o.angDamp ?? 0.15;
     this.sleeping = false; this.sleepT = 0; this.kinematic = false; this.active = true; this.held = false;
-    this.tp = new THREE.Vector3(); this.tq = new THREE.Quaternion(); this.tv = new THREE.Vector3(); this.onImpact = null; this.impactCool = 0; this.gravScale = 1;
+    this.tp = new THREE.Vector3(); this.tq = new THREE.Quaternion(); this.tv = new THREE.Vector3(); this.tw = new THREE.Vector3(); this.onImpact = null; this.impactCool = 0; this.gravScale = 1;
     if (this.obj) { this.pos.copy(this.obj.position); this.quat.copy(this.obj.quaternion); }
     this.prevPos.copy(this.pos); this.prevQuat.copy(this.quat);
   }
@@ -879,7 +879,7 @@ class Joint1D {
     this.grabbed = false; this.drive = 0; this.onStop = null;
   }
   step(dt) {
-    this.prev = this.pos;
+    this.prev = this.pos; let rest = 0.3;
     const lo = Math.max(this.min, this.lockMin), hi = Math.min(this.max, this.lockMax);
     if (this.grabbed) {
       const tgt = clamp(this.drive, lo, hi);
@@ -889,9 +889,10 @@ class Joint1D {
       let a = -this.k * (this.pos - this.rest) - this.c * this.vel;
       for (const d of this.detents) { const x = this.pos - d.pos; if (Math.abs(x) < d.w) a -= d.s * x / d.w; }
       this.vel += a * dt; this.pos += this.vel * dt;
+      rest = Math.abs(a) * dt * 1.5 + 0.3;   // speed the spring alone adds in one step: resting contact, not an impact
     }
-    if (this.pos < lo) { this.pos = lo; if (this.vel < 0) { const v = -this.vel; this.vel = v * this.bounce; if (this.onStop) this.onStop(-1, v); } }
-    if (this.pos > hi) { this.pos = hi; if (this.vel > 0) { const v = this.vel; this.vel = -v * this.bounce; if (this.onStop) this.onStop(1, v); } }
+    if (this.pos < lo) { this.pos = lo; if (this.vel < 0) { const v = -this.vel; if (v <= rest) this.vel = 0; else { this.vel = v * this.bounce; if (this.onStop) this.onStop(-1, v); } } }
+    if (this.pos > hi) { this.pos = hi; if (this.vel > 0) { const v = this.vel; if (v <= rest) this.vel = 0; else { this.vel = -v * this.bounce; if (this.onStop) this.onStop(1, v); } } }
   }
 }
 
@@ -974,9 +975,9 @@ const AUDIO = {
     const g = c.createGain(); g.gain.value = kind === 'hum' ? 0.012 : 0.008;
     s.connect(f); f.connect(g); g.connect(this.amb); s.start(t); this.ambNodes.push(s);
   },
-  out(pos, rev = 1, bus = null) {
+  out(pos, rev = 1, bus = null, hrtf = false) {
     const c = this.ctx, p = c.createPanner();
-    p.panningModel = 'HRTF'; p.distanceModel = 'inverse'; p.refDistance = 0.8; p.maxDistance = 1000; p.rolloffFactor = 1;
+    p.panningModel = hrtf ? 'HRTF' : 'equalpower'; p.distanceModel = 'inverse'; p.refDistance = 0.8; p.maxDistance = 1000; p.rolloffFactor = 1;   // HRTF only for shots/voices: per-foley HRTF is heavy on Quest
     p.positionX.value = pos.x; p.positionY.value = pos.y; p.positionZ.value = pos.z;
     p.connect(bus || this.sfx);
     if (rev > 0) { const s = c.createGain(); s.gain.value = rev; p.connect(s); s.connect(this.revSend); }
@@ -1006,14 +1007,14 @@ const AUDIO = {
   },
   ping(dest, t, freqs, decay, gain) { for (let i = 0; i < freqs.length; i++) this.tone(dest, t, 'sine', freqs[i], freqs[i] * 0.995, decay * (1 - i * 0.18), gain / (1 + i * 0.6), 0.0008); },
   // --- the four-layer gunshot ---
-  gunshot(pos, cal) {
+  gunshot(pos, cal, sup) {
     if (!this.ready) return;
-    const P = CALS[cal] || CALS['9mm'], t = this.ctx.currentTime, r = rand(0.94, 1.06);
-    const o = this.out(pos, 1.2, this.shot);
-    this.burst(o, t, 'highpass', 3000, 0.7, 0.004, 1.3 * P.g, 0.0005);                    // transient
-    this.burst(o, t, 'bandpass', P.bf * r, P.bq, P.bd, 1.1 * P.g);                         // body
-    this.burst(o, t, 'bandpass', P.bf * 0.45 * r, 0.8, P.bd * 1.3, 0.7 * P.g);
-    this.tone(o, t, 'sine', 120 * r, 40, 0.13, 0.9 * P.th);                                 // low thump
+    const P = CALS[cal] || CALS['9mm'], t = this.ctx.currentTime, r = rand(0.94, 1.06), k = sup ? 0.12 : 1;
+    const o = this.out(pos, sup ? 0.4 : 1.2, this.shot, true);
+    this.burst(o, t, 'highpass', 3000, 0.7, 0.004, 1.3 * P.g * k, 0.0005);                // transient
+    this.burst(o, t, 'bandpass', P.bf * r * (sup ? 0.5 : 1), P.bq, P.bd, 1.1 * P.g * k);  // body
+    this.burst(o, t, 'bandpass', P.bf * 0.45 * r, 0.8, P.bd * 1.3, 0.7 * P.g * (sup ? 0.35 : 1));
+    this.tone(o, t, 'sine', 120 * r, 40, 0.13, 0.9 * P.th * (sup ? 0.4 : 1));             // low thump (suppressed: a muffled thwp)
     const m = this.out(pos, 0.3);                                                           // mechanical layer
     this.ping(m, t + 0.006, P.mech.map(f => f * r), 0.06, 0.1);
     this.burst(m, t + 0.012, 'bandpass', 3000 * r, 2, 0.03, 0.12);
@@ -1063,6 +1064,8 @@ const AUDIO = {
       }
       case 'clatter': B('bandpass', 1100, 1, 0.08, 0.5); T('sine', 260, 170, 0.07, 0.25);
         this.burst(o, t + 0.04, 'bandpass', 1500 * r, 2, 0.03, 0.25 * vol); this.burst(o, t + 0.09, 'bandpass', 1300 * r, 2, 0.025, 0.15 * vol); break;
+      case 'pump': B('bandpass', 1400, 1, 0.07, 0.6); T('sine', 200, 110, 0.07, 0.35); P([1700, 2800], 0.06, 0.2, 0.04); break;
+      case 'bolt': B('bandpass', 2600, 1.4, 0.05, 0.5); P([2300, 3600, 5200], 0.09, 0.28); break;
       case 'thud': B('lowpass', 500, 0.8, 0.08, 0.5); T('sine', 120, 70, 0.08, 0.35); break;
       case 'motor': T('sawtooth', 70, 72, 0.25, 0.03); B('lowpass', 300, 1, 0.25, 0.05); break;
     }
@@ -1070,7 +1073,7 @@ const AUDIO = {
   // Formant synth: sawtooth through two band-pass formants with a pitch envelope — squeaky Ollie voice.
   voice(word, pos) {
     if (!this.ready) return;
-    const c = this.ctx, t = c.currentTime, o = this.out(pos, 0.6);
+    const c = this.ctx, t = c.currentTime, o = this.out(pos, 0.6, null, true);
     const W = { yes: { d: 0.42, f0: [380, 540, 430], F: [[300, 2300], [620, 1900], [600, 1850]], s: 0.28 },
                 no: { d: 0.38, f0: [470, 420, 350], F: [[260, 1000], [520, 880], [480, 820]], s: 0 },
                 noooo: { d: 1.0, f0: [560, 430, 210], F: [[330, 850], [360, 780], [300, 700]], s: 0 },
@@ -1174,13 +1177,23 @@ const FINGERS = [
   { y: -0.010, len: [0.042, 0.026, 0.021], r: 0.009 },
   { y: -0.027, len: [0.034, 0.021, 0.018], r: 0.008 }
 ];
-const _capCache = new Map();
-function capGeo(r, len) {
-  const k = r.toFixed(4) + ':' + len.toFixed(4);
-  if (!_capCache.has(k)) { const g = new THREE.CapsuleGeometry(r, Math.max(0.001, len - r * 1.2), 4, 10); g.rotateX(Math.PI / 2); g.translate(0, 0, -len / 2); _capCache.set(k, g); }
-  return _capCache.get(k);
+// All 15 finger/thumb segments of a hand draw as one InstancedMesh of a unit capsule (1 draw instead of 15).
+let _unitCap = null;
+function segMarker(r, len, list) {
+  const m = new THREE.Object3D(); m.position.z = -len / 2; m.userData.s = [r * 2, r * 2, (len + r * 0.8) / 2]; list.push(m); return m;
+}
+const _hsM = new THREE.Matrix4(), _hsS = new THREE.Matrix4();
+function syncHandSegs(m) {
+  for (let i = 0; i < m.segs.length; i++) {
+    const s = m.segs[i].userData.s;
+    _hsS.makeScale(m.mirror ? -s[0] : s[0], s[1], s[2]);   // undo the left hand's mirror so instances keep positive winding
+    m.inst.setMatrixAt(i, _hsM.multiplyMatrices(m.segs[i].matrixWorld, _hsS));
+  }
+  m.inst.instanceMatrix.needsUpdate = true;
 }
 function buildHandModel(side, ghost) {
+  if (!_unitCap) { _unitCap = new THREE.CapsuleGeometry(0.5, 1, 4, 10); _unitCap.rotateX(Math.PI / 2); }
+  const segs = [];
   const mat = ghost ? M.ghost : M.glove, kmat = ghost ? M.ghost : M.gloveKnuckle, cmat = ghost ? M.ghost : M.cuff;
   const g = new THREE.Group(), inner = new THREE.Group(); g.add(inner);
   if (side === 0) inner.scale.x = -1;
@@ -1193,7 +1206,7 @@ function buildHandModel(side, ghost) {
     for (let s = 0; s < 3; s++) {
       const j = new THREE.Group();
       if (s === 0) j.position.set(0.016, f.y, -0.04); else j.position.set(0, 0, -f.len[s - 1]);
-      const m = new THREE.Mesh(capGeo(f.r * (1 - s * 0.08), f.len[s]), mat); j.add(m);
+      j.add(segMarker(f.r * (1 - s * 0.08), f.len[s], segs));
       parent.add(j); segs.push(j); parent = j;
     }
     fingers.push(segs);
@@ -1204,13 +1217,14 @@ function buildHandModel(side, ghost) {
   for (let s = 0; s < 3; s++) {
     const j = new THREE.Group();
     if (s === 0) { j.position.set(0.012, 0.03, 0.0); j.rotation.set(0.35, 0.55, 0); } else j.position.set(0, 0, -tl[s - 1]);
-    j.add(new THREE.Mesh(capGeo(0.0105 * (1 - s * 0.08), tl[s]), mat)); tp.add(j); thumb.push(j); tp = j;
+    j.add(segMarker(0.0105 * (1 - s * 0.08), tl[s], segs)); tp.add(j); thumb.push(j); tp = j;
   }
+  const inst = new THREE.InstancedMesh(_unitCap, mat, segs.length); inst.frustumCulled = false; inst.castShadow = !ghost; scene.add(inst);
   const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.04, 0.05, 18, 1, true), mat); cuff.rotation.x = Math.PI / 2; cuff.position.set(0.02, -0.004, 0.07); inner.add(cuff);
   const trim = new THREE.Mesh(new THREE.TorusGeometry(0.037, 0.005, 8, 24), cmat); trim.position.set(0.02, -0.004, 0.047); inner.add(trim);
   if (!ghost) g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   scene.add(g);
-  return { g, inner, fingers, thumb, tip, curl: [0, 0, 0, 0, 0] };
+  return { g, inner, fingers, thumb, tip, segs, inst, mirror: side === 0, curl: [0, 0, 0, 0, 0] };
 }
 const CURL_MAX = [1.35, 1.5, 1.2];
 function setCurls(m, t, i, mi, r, p) {
@@ -1302,6 +1316,7 @@ function heldBy(it) { for (const h of hands) if (h.hold && h.hold.it === it) ret
 const _gl = new THREE.Vector3(), _gw = new THREE.Vector3(), _palm = new THREE.Vector3(), _im = new THREE.Matrix4();
 function gpWorld(it, gp, near, out) {
   _gl.copy(gp.pos);
+  if (JOINT_GP[gp.type] && it.owner.bolt) { const g = it.owner; if (gp.move) _gl.addScaledVector(gp.move, g.bolt.pos); else _gl.addScaledVector(g.def.boltAxis, g.def.boltTravel * g.bolt.pos); }   // grab zone rides with the moving part
   if (gp.seg) { _im.copy(it.obj.matrixWorld).invert(); const lz = V3().copy(near).applyMatrix4(_im).z; _gl.z = clamp(lz, gp.pos.z - gp.seg, gp.pos.z + gp.seg); }
   return out.copy(_gl).applyMatrix4(it.obj.matrixWorld);
 }
@@ -1329,13 +1344,22 @@ const SLOTS = [
   { name: 'Chest right', off: [0.1, -0.46, -0.16], acc: ['mag', 'small', 'pistol'] }
 ];
 const TORSO = new THREE.Group(); let torsoYaw = 0;
+let _infTex = null;
+function infTex() { return _infTex || (_infTex = canvasTex(64, 64, (g) => { g.fillStyle = '#FFD100'; g.beginPath(); g.arc(32, 32, 30, 0, 7); g.fill(); g.fillStyle = '#111'; g.font = `900 40px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('∞', 32, 34); })); }
+// Infinite slot: trigger while hovering a holstered magazine. Grabbing from it then hands you a fresh full copy.
+function toggleInfinite(h, it) {
+  const s = it.slot; s.infinite = !s.infinite;
+  AUDIO.play(s.infinite ? 'shimmer' : 'selector', h.pos, 0.6); pulse(h, 0.3, 20);
+  toast(s.infinite ? `${s.name}: unlimited magazines` : `${s.name}: normal`);
+}
 const POUCH = new THREE.Object3D();
 function buildSlots() {
   scene.add(TORSO);
   const rm = new THREE.MeshBasicMaterial({ color: 0x00e0d0, transparent: true, opacity: 0.35, depthWrite: false });
   for (const s of SLOTS) {
     s.obj = new THREE.Object3D(); s.obj.position.fromArray(s.off); TORSO.add(s.obj);
-    s.ring = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.004, 8, 32), rm.clone()); s.ring.rotation.x = Math.PI / 2; s.obj.add(s.ring); s.item = null;
+    s.ring = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.004, 8, 32), rm.clone()); s.ring.rotation.x = Math.PI / 2; s.obj.add(s.ring); s.item = null; s.infinite = false;
+    s.inf = new THREE.Sprite(new THREE.SpriteMaterial({ map: infTex(), transparent: true, depthWrite: false })); s.inf.scale.set(0.05, 0.05, 1); s.inf.position.set(0, 0.07, 0); s.inf.visible = false; s.obj.add(s.inf);
   }
   POUCH.position.set(-0.24, -0.66, 0.08); TORSO.add(POUCH);
   const pr = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.006, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffd100, transparent: true, opacity: 0.45, depthWrite: false }));
@@ -1348,7 +1372,12 @@ function updateTorso(dt) {
   torsoYaw += d * (1 - Math.exp(-dt * (Math.abs(d) > 1.2 ? 12 : 4)));
   TORSO.position.copy(_hp); TORSO.rotation.y = torsoYaw;
   const show = G.xr;
-  for (const s of SLOTS) { s.ring.visible = show; s.ring.material.color.setHex(s.item ? 0xffd100 : 0x00e0d0); s.ring.material.opacity = s.item ? 0.18 : 0.35; }
+  for (const s of SLOTS) {
+    if (s.infinite && (!s.item || s.item.kind !== 'mag')) s.infinite = false;
+    s.ring.visible = show; s.inf.visible = show && s.infinite;
+    s.ring.material.color.setHex(s.infinite ? 0xffd100 : s.item ? 0xffd100 : 0x00e0d0);
+    s.ring.material.opacity = s.infinite ? 0.6 + 0.3 * Math.sin(G.time * 5) : s.item ? 0.18 : 0.35;
+  }
   POUCH.userData.ring.visible = show && settings.pouch;
 }
 function slotFor(it, pos) {
@@ -1404,10 +1433,18 @@ function findHover(h) {
 
 function grab(h, it, gp) {
   if (!it || !gp) return;
+  if (it.slot && it.slot.infinite && it.kind === 'mag') {
+    const src = it.owner, m = new Magazine(src.def, src.def.cap);
+    it.obj.updateWorldMatrix(true, false); it.obj.matrixWorld.decompose(_op, _oq, _os);
+    m.body.setPose(_op, _oq); m.obj.position.copy(_op); m.obj.quaternion.copy(_oq); m.obj.updateMatrixWorld(true);
+    it = m.item; gp = primaryGp(it);
+  }
+  if (it.kind === 'attach' && it.owner.gun && gp.type !== 'knob') it.owner.detach(true);
   if (it.slot) unslot(it);
   pulse(h, 0.1, 8); AUDIO.play('grab', h.pos, 0.6);
   const t = gp.type;
-  if (t === 'slide' || t === 'charging') {
+  if (t === 'knob') { h.hold = { kind: 'knob', it, gp, lastQ: h.quat.clone() }; return; }
+  if (JOINT_GP[t]) {
     const gun = it.owner, j = gun.bolt;
     j.grabbed = true; j.drive = j.pos;
     h.hold = { kind: 'joint', it, gp, gun, joint: j, start: j.pos, hs: gun.axisAlong(h.pos) };
@@ -1436,7 +1473,7 @@ function release(h, quiet) {
   const hd = h.hold; if (!hd) return;
   h.hold = null;
   if (hd.kind === 'joint') { hd.joint.grabbed = false; hd.gun.onRackRelease(h); return; }
-  if (hd.kind === 'secondary') return;
+  if (hd.kind === 'secondary' || hd.kind === 'knob') return;
   if (hd.kind === 'magseat') { hd.mag.seat.grabbed = false; hd.mag.seat.vel = 0; return; }
   const it = hd.it, b = it.body;
   b.held = false;
@@ -1445,6 +1482,7 @@ function release(h, quiet) {
     const av = V3(), aw = V3();
     for (const e of h.hist) { av.addScaledVector(e.v, 0.2); aw.addScaledVector(e.w, 0.2); }
     b.vel.copy(av).multiplyScalar(av.length() > 1.2 ? settings.throwAssist : 1); b.ang.copy(aw).multiplyScalar(settings.throwAssist);
+    if (it.kind === 'attach' && it.owner.tryMount()) { EV.emit('release', it); return; }
     const s = slotFor(it, b.pos);
     if (s && G.xr) holster(it, s);
   }
@@ -1477,11 +1515,19 @@ function updateHold(h, dt) {
     // Grip point stays in the palm: tp = hand - tq * gripLocal (free holds keep their captured offset).
     if (hd.gp.type === 'free') b.tp.copy(hd.offP).applyQuaternion(h.quat).add(h.pos);
     else b.tp.copy(hd.gp.pos).applyQuaternion(b.tq).negate().add(h.pos);
-    b.tv.copy(h.vel);
+    b.tv.copy(h.vel); b.tw.copy(h.angVel);
     if (b.pos.distanceTo(b.tp) > 0.5) { hd.far += dt; if (hd.far > 0.35) { b.setPose(b.tp, b.tq); b.vel.set(0, 0, 0); hd.far = 0; } } else hd.far = 0;
   } else if (hd.kind === 'joint') {
     if (!hd.gun.primaryHand()) { release(h, true); return; }
-    hd.joint.drive = hd.start + (hd.gun.axisAlong(h.pos) - hd.hs) / hd.gun.def.boltTravel;
+    hd.joint.drive = hd.start + (hd.gun.axisAlong(h.pos) - hd.hs) / hd.gun.driveTravel();
+  } else if (hd.kind === 'knob') {
+    // twist of the hand about the knob's axis since last frame
+    const ax = _v1.copy(hd.gp.axis).applyQuaternion(hd.it.obj.getWorldQuaternion(_q1)).normalize();
+    _dq.copy(h.quat).multiply(_tq2.copy(hd.lastQ).invert()); if (_dq.w < 0) { _dq.x = -_dq.x; _dq.y = -_dq.y; _dq.z = -_dq.z; _dq.w = -_dq.w; }
+    const a = 2 * Math.atan2(_dq.x * ax.x + _dq.y * ax.y + _dq.z * ax.z, _dq.w);
+    if (Math.abs(a) > 1e-4) hd.gp.turn(a);
+    hd.lastQ.copy(h.quat);
+    if (!hd.it.owner.gun) release(h, true);
   } else if (hd.kind === 'magseat') {
     const mag = hd.mag;
     if (!mag.gun) { h.hold = null; grab(h, mag.item, primaryGp(mag.item)); return; }
@@ -1496,16 +1542,17 @@ function updateHold(h, dt) {
 function driveHeld(dt) {
   for (const h of hands) {
     const hd = h.hold; if (!hd || hd.kind !== 'body') continue;
-    const b = hd.it.body, w = Math.min(hd.it.driveW, 60), wr = w * 1.15;
+    const b = hd.it.body, w = Math.min(hd.it.driveW, 110), wr = w * 1.1;
     b.vel.x += (w * w * (b.tp.x - b.pos.x) + 2 * w * (b.tv.x - b.vel.x)) * dt;
     b.vel.y += (w * w * (b.tp.y - b.pos.y) + 2 * w * (b.tv.y - b.vel.y)) * dt;
     b.vel.z += (w * w * (b.tp.z - b.pos.z) + 2 * w * (b.tv.z - b.vel.z)) * dt;
+    b.vel.y -= PHYS.g * b.gravScale * dt * 0.9;   // arm holds most of the weight: no static sag off the sights, lag still reads as mass
     if (b.vel.lengthSq() > 225) b.vel.setLength(15);
     _dq.copy(b.tq).multiply(_tq2.copy(b.quat).invert());
     if (_dq.w < 0) { _dq.x = -_dq.x; _dq.y = -_dq.y; _dq.z = -_dq.z; _dq.w = -_dq.w; }
     const s = Math.sqrt(Math.max(0, 1 - _dq.w * _dq.w)), ang = 2 * Math.acos(Math.min(1, _dq.w));
     let ex = 0, ey = 0, ez = 0; if (s > 1e-6) { ex = _dq.x / s * ang; ey = _dq.y / s * ang; ez = _dq.z / s * ang; }
-    b.ang.x += (wr * wr * ex - 2 * wr * b.ang.x) * dt; b.ang.y += (wr * wr * ey - 2 * wr * b.ang.y) * dt; b.ang.z += (wr * wr * ez - 2 * wr * b.ang.z) * dt;
+    b.ang.x += (wr * wr * ex + 2 * wr * (b.tw.x - b.ang.x)) * dt; b.ang.y += (wr * wr * ey + 2 * wr * (b.tw.y - b.ang.y)) * dt; b.ang.z += (wr * wr * ez + 2 * wr * (b.tw.z - b.ang.z)) * dt;
     if (b.ang.lengthSq() > 1600) b.ang.setLength(40);
     b.sleeping = false; b.sleepT = 0;
   }
@@ -1528,7 +1575,7 @@ function deskPick() {
 }
 function spawnPouchMag(h) {
   const gun = hands[1 - h.side].hold.it.owner;
-  const mag = new Magazine(gun.def.mag, gun.def.mag.cap);
+  const mag = gun.pouchItem(h);   // magazine, speedloader, stripper clip or a loose shell/round
   mag.body.setPose(h.pos, h.quat); mag.obj.position.copy(h.pos); mag.obj.quaternion.copy(h.quat);
   mag.obj.updateMatrixWorld(true);
   grab(h, mag.item, primaryGp(mag.item));
@@ -1540,6 +1587,7 @@ function updateInteraction(dt) {
   for (const h of hands) {
     if (!h.hold) {
       if (!G.xr || h.tracked) findHover(h); else h.hover = null;
+      if (h.trigDown && h.hover && h.hover !== 'pouch' && h.hover.slot && h.hover.kind === 'mag') toggleInfinite(h, h.hover);
       if (h.gripDown && !G.xr) {
         const o = hands[1 - h.side], og = o.hold && o.hold.kind === 'body' && o.hold.it.kind === 'gun' ? o.hold.it : null;
         const sg = og ? og.points.find(p => p.type === 'secondary') : null;
@@ -1548,7 +1596,7 @@ function updateInteraction(dt) {
       } else if (h.gripDown) {
         if (h.hover === 'pouch') spawnPouchMag(h);
         else if (h.hover) grab(h, h.hover, h.hoverGp);
-        else if (settings.distanceGrab) { _rdir.set(0, 0, -1).applyQuaternion(h.quat); h.dg = rayPick(h.pos, _rdir, 6, (it) => it.kind === 'mag' || it.kind === 'round'); }
+        else if (settings.distanceGrab) { _rdir.set(0, 0, -1).applyQuaternion(h.quat); h.dg = rayPick(h.pos, _rdir, 6, (it) => it.kind === 'mag' || it.kind === 'round' || it.kind === 'speed' || it.kind === 'clip' || it.kind === 'attach'); }
       }
       if (G.xr && h.dg && h.gripOn) {
         _v1.set(1, 0, 0).applyQuaternion(h.quat);
@@ -1566,10 +1614,11 @@ function updateInteraction(dt) {
     const hd = h.hold;
     if (!hd || hd.kind !== 'body' || hd.it.kind !== 'gun') continue;
     const gun = hd.it.owner; gun.trig = h.trigger;
-    if (h.bDown) gun.dropMag();
-    if (h.aDown) gun.releaseSlide(true);
+    if (h.bDown) gun.buttonB();
+    if (h.aDown) gun.buttonA();
     if (h.stDown) gun.cycleSelector();
   }
+  for (const h of hands) { const hd = h.hold; if (hd && hd.kind === 'body') { if (hd.it.kind === 'speed' || hd.it.kind === 'clip') hd.it.owner.update(h); else if (hd.it.kind === 'attach') hd.it.owner.heldUpdate(h); } }
   checkMagInsert(); checkRoundLoad();
 }
 
@@ -1605,6 +1654,9 @@ function checkRoundLoad() {
   for (const h of hands) {
     const hd = h.hold; if (!hd || hd.kind !== 'body' || hd.it.kind !== 'round') continue;
     const rnd = hd.it.owner;
+    let taken = false;
+    for (const g of firearms) if (g.body.pos.distanceToSquared(rnd.body.pos) < 1 && g.tryLoad(rnd)) { taken = true; break; }
+    if (taken) { release(h, true); rnd.destroy(); pulse(h, 0.2, 10); continue; }
     for (const mag of mags) {
       if (mag.def.cal !== rnd.cal || mag.rounds.length >= mag.def.cap || mag.gun) continue;
       _me.copy(mag.def.lips).applyQuaternion(mag.body.quat).add(mag.body.pos);
@@ -1623,16 +1675,16 @@ function updateHandVisuals() {
   for (const h of hands) {
     const m = h.model, gh = h.ghost;
     const visible = G.xr ? h.tracked : (G.started && !DESK.hideHands);
-    m.g.visible = visible;
-    if (!visible) { gh.g.visible = false; continue; }
+    m.g.visible = m.inst.visible = visible;
+    if (!visible) { gh.g.visible = gh.inst.visible = false; continue; }
     const hd = h.hold, vp = h.vis.pos, vq = h.vis.quat;
     vp.copy(h.pos); vq.copy(h.quat);
     let t = h.grip, i = h.trigger, mi = h.grip, r = h.grip, p = h.grip, glued = false;
     if (hd) {
-      hd.it.obj.matrixWorld.decompose(_op, _oq, _os);
+      hd.it.obj.updateWorldMatrix(true, false); hd.it.obj.matrixWorld.decompose(_op, _oq, _os);
       const gq = h.side === 0 ? mirrorQ(hd.gp.quat, _gq) : _gq.copy(hd.gp.quat);
       if (hd.kind === 'body' && hd.gp.type === 'free') { vq.copy(_oq).multiply(_q1.copy(hd.offQ).invert()); vp.copy(hd.offP).applyQuaternion(vq).negate().add(_op); }
-      else if (hd.kind === 'joint') { const g = hd.gun; _v1.copy(hd.gp.pos).addScaledVector(g.def.boltAxis, g.def.boltTravel * (g.def.id === 'carbine' ? g.chPos : hd.joint.pos)); vp.copy(_v1).applyQuaternion(_oq).add(_op); vq.copy(_oq).multiply(gq); }
+      else if (hd.kind === 'joint') { const g = hd.gun, jp = g.parts.ch ? g.chPos : hd.joint.pos; _v1.copy(hd.gp.pos); if (hd.gp.move) _v1.addScaledVector(hd.gp.move, jp); else _v1.addScaledVector(g.def.boltAxis, g.def.boltTravel * jp); vp.copy(_v1).applyQuaternion(_oq).add(_op); vq.copy(_oq).multiply(gq); }
       else if (hd.kind === 'secondary') { gpWorld(hd.it, hd.gp, h.pos, vp); vq.copy(_oq).multiply(gq); }
       else { vp.copy(hd.gp.pos).applyQuaternion(_oq).add(_op); vq.copy(_oq).multiply(gq); }
       glued = true;
@@ -1642,9 +1694,10 @@ function updateHandVisuals() {
     }
     m.g.position.copy(vp); m.g.quaternion.copy(vq);
     setCurls(m, t, i, mi, r, p);
-    if (glued && G.xr && vp.distanceTo(h.pos) > 0.05) { gh.g.visible = true; gh.g.position.copy(h.pos); gh.g.quaternion.copy(h.quat); setCurls(gh, t, i, mi, r, p); }
+    if (glued && G.xr && vp.distanceTo(h.pos) > 0.05) { gh.g.visible = true; gh.g.position.copy(h.pos); gh.g.quaternion.copy(h.quat); setCurls(gh, t, i, mi, r, p); gh.g.updateMatrixWorld(true); syncHandSegs(gh); }
     else gh.g.visible = false;
-    m.g.updateMatrixWorld(true);
+    gh.inst.visible = gh.g.visible;
+    m.g.updateMatrixWorld(true); syncHandSegs(m);
     h.prevTip.copy(h.tip); m.tip.getWorldPosition(h.tip);
   }
 }
@@ -1728,20 +1781,27 @@ function bulletProfile(c) {
 }
 const RGEO = {};
 function roundGeos(cal) {
-  if (!RGEO[cal]) { const c = CAL[cal]; RGEO[cal] = { case: lathe(caseProfile(c), 18), bullet: lathe(bulletProfile(c), 18) }; }
+  if (!RGEO[cal]) {
+    const c = CAL[cal];
+    RGEO[cal] = c.shell   // shotgun shell: short brass head + plastic hull (the hull takes the "bullet" slot)
+      ? { case: lathe([[0, 0], [c.rim, 0], [c.rim, 0.0015], [c.body, 0.0018], [c.body, 0.016], [0, 0.016]], 20), bullet: lathe([[0, 0.016], [c.body * 0.99, 0.016], [c.body * 0.99, c.len - 0.001], [c.body * 0.6, c.len], [0, c.len]], 20) }
+      : { case: lathe(caseProfile(c), 18), bullet: lathe(bulletProfile(c), 18) };
+  }
   return RGEO[cal];
 }
 function roundGroup(cal, shadow = false) {
   const g = new THREE.Group(), r = roundGeos(cal);
-  const cm = new THREE.Mesh(r.case, M.brass), bm = new THREE.Mesh(r.bullet, M.copper);
+  const cm = new THREE.Mesh(r.case, M.brass), bm = new THREE.Mesh(r.bullet, CAL[cal].shell ? M.hull : M.copper);
   cm.castShadow = bm.castShadow = shadow; g.add(cm, bm); g.userData.bullet = bm; return g;
 }
 function casingGeo(cal) {
-  const c = CAL[cal], g = new THREE.LatheGeometry(caseProfile(c).map(p => new THREE.Vector2(p[0], p[1])), 14);
+  const c = CAL[cal], prof = c.shell ? [[0, 0], [c.rim, 0], [c.rim, 0.0015], [c.body, 0.0018], [c.body, c.caseLen], [c.body * 0.9, c.caseLen]] : caseProfile(c);
+  const g = new THREE.LatheGeometry(prof.map(p => new THREE.Vector2(p[0], p[1])), 14);
   const pos = g.attributes.position, col = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i++) {
     const r = Math.hypot(pos.getX(i), pos.getZ(i)), y = pos.getY(i);
     const k = (y < 0.0004 && r < c.rim * 0.5) ? 0.28 : (y < 0.0004 ? 0.8 : 1);   // darkened, struck primer on spent brass
+    if (c.shell && y > 0.016) { col[i * 3] = 0.55; col[i * 3 + 1] = 0.05; col[i * 3 + 2] = 0.05; continue; }
     col[i * 3] = k; col[i * 3 + 1] = k * 0.97; col[i * 3 + 2] = k * 0.92;
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -1965,33 +2025,46 @@ const DEFS = {
 /* ============================================================
    FIREARM — generic position-driven cycle of operation
    ============================================================ */
+/* ============================================================
+   FIREARM — generic position-driven cycle of operation.
+   feed: 'mag' | 'tube' | 'internal'; manual actions (pump/lever/bolt) never auto-cycle.
+   Revolver and BreakAction override the chamber model below.
+   ============================================================ */
 const EMPTY = 0, LIVE = 1, SPENT = 2;
 const SEL_ROT = { SAFE: 0, SEMI: Math.PI / 2, AUTO: Math.PI, BURST: Math.PI * 0.75 };
 const firearms = [], mags = [], rounds = [];
+const JOINT_GP = { slide: 1, charging: 1, pump: 1, lever: 1, bolt: 1 };
 const _mz = new THREE.Vector3(), _md = new THREE.Vector3(), _mv = new THREE.Vector3(), _mw = new THREE.Vector3(), _fq = new THREE.Quaternion();
 class Firearm {
   constructor(def) {
     this.def = def; const P = this.parts = def.build(); this.obj = P.root; scene.add(this.obj);
-    this.bolt = new Joint1D({ min: 0, max: 1, rest: 0, k: def.boltK, c: def.boltC, bounce: 0.12 });
+    this.bolt = new Joint1D({ min: 0, max: 1, rest: 0, k: def.manual ? 0 : def.boltK, c: def.manual ? 6 : def.boltC, bounce: def.manual ? 0.05 : 0.12 });
     this.bolt.onStop = (d, v) => this.onBoltStop(d, v);
     this.chamber = EMPTY; this.hammer = 1; this.extracted = 0; this.feeding = 0; this.locked = false; this.mag = null;
+    this.tube = []; this.actionLocked = false; this.stroke = 0; this.attach = []; this.supp = null;
     this.selector = def.modes.length > 1 ? 'SAFE' : def.modes[0]; this.lastFire = def.modes[def.modes.length > 1 ? 1 : 0];
     this.trig = 0; this.trigVis = 0; this.trigReset = true; this.burstN = 0; this.lastShot = -9;
     this.cycling = false; this.lastManual = -9; this.heat = 0; this.flashT = 0; this.climb = 0; this.chPos = 0; this.lastVel = new THREE.Vector3();
     this.dust = def.id === 'carbine' ? new Joint1D({ min: 0, max: 1.9, k: 0, c: 1.5, bounce: 0.35 }) : null;
+    this.bipod = def.bipod ? new Joint1D({ min: 0, max: 1, k: 0, c: 8, bounce: 0 }) : null; this.bipodOut = false;
     this.body = addBody(new Body({ obj: this.obj, owner: this, mass: def.massKg, dims: def.dims, spheres: def.colliders, mat: 'polymer', layer: L.GUN, linDamp: 0.1, angDamp: 0.4 }));
     this.body.onImpact = (v, m, p) => { if (this.body.impactCool <= 0 && v > 0.8) { AUDIO.play('clatter', p, Math.min(1, v / 5)); this.body.impactCool = 0.15; } };
     const cond = (h) => { const ph = this.primaryHand(); return !!ph && ph !== h; };
     const points = def.grips.map(g => Object.assign({}, g, { cond: g.needsOther ? cond : null, pos: g.pos.clone(), quat: g.quat ? g.quat.clone() : new THREE.Quaternion() }));
-    this.item = registerGrab({ kind: 'gun', obj: this.obj, body: this.body, owner: this, size: def.sizeClass, points, driveW: 46 / Math.sqrt(Math.max(def.massKg, 0.3)) });
+    this.item = registerGrab({ kind: 'gun', obj: this.obj, body: this.body, owner: this, size: def.sizeClass, points, driveW: 85 / Math.sqrt(Math.max(def.massKg, 0.4)) });
     firearms.push(this);
+    this.init();
     this.sync(0);
   }
+  init() {}
   primaryHand() { for (const h of hands) if (h.hold && h.hold.kind === 'body' && h.hold.it === this.item) return h; return null; }
   secondaryHand() { for (const h of hands) if (h.hold && h.hold.kind === 'secondary' && h.hold.it === this.item) return h; return null; }
   buzz(i, ms) { for (const h of hands) if (h.hold && (h.hold.it === this.item || h.hold.gun === this)) pulse(h, i, ms); }
-  axisAlong(p) { return _mv.copy(p).sub(this.body.pos).dot(_mw.copy(this.def.boltAxis).applyQuaternion(this.body.quat)); }
+  driveAxis() { return this.def.driveAxis || this.def.boltAxis; }
+  driveTravel() { return this.def.driveTravel || this.def.boltTravel; }
+  axisAlong(p) { return _mv.copy(p).sub(this.body.pos).dot(_mw.copy(this.driveAxis()).applyQuaternion(this.body.quat)); }
   wellAlong(p) { return _mv.copy(p).sub(this.body.pos).dot(_mw.copy(this.def.well.axis).applyQuaternion(this.body.quat)); }
+  muzzleLocal() { return this.supp ? this.supp.muzzleOut : this.def.muzzle; }
   shouldered() {
     if (!this.def.stock) return false;
     if (!G.xr) return true;
@@ -1999,16 +2072,34 @@ class Firearm {
     return _mz.copy(this.def.stock).applyQuaternion(this.body.quat).add(this.body.pos).distanceTo(sp) < 0.16;
   }
   onBoltStop(d, v) {
-    if (d > 0) { if (v > 2) { if (!this.cycling) AUDIO.play('slideBack', this.body.pos, 0.8); this.buzz(0.4, 20); } }
-    else { if (v > 2) { AUDIO.play('slideFwd', this.body.pos, this.cycling ? 0.3 : 0.9); if (!this.cycling) this.buzz(0.3, 15); } this.cycling = false; }
+    if (PHYS.t - (this.lastStop || -1) < 0.04) return; this.lastStop = PHYS.t;
+    const s = this.def.manual ? (this.def.id === 'pump' ? 'pump' : 'bolt') : null;
+    if (d > 0) { if (v > 2) { AUDIO.play(s || 'slideBack', this.body.pos, this.cycling ? 0 : 0.8); this.buzz(0.4, 20); } }
+    else { if (v > 2) { AUDIO.play(s || 'slideFwd', this.body.pos, this.cycling ? 0.3 : 0.9); if (!this.cycling) this.buzz(0.3, 15); } this.cycling = false; }
   }
   onRackGrab() { this.lastManual = PHYS.t; }
   onRackRelease() {
     this.lastManual = PHYS.t;
-    const mEmpty = this.mag && this.mag.latched && this.mag.rounds.length === 0;
-    if (this.locked && this.bolt.pos > 0.95 && !mEmpty) { this.locked = false; }
+    if (this.def.hkNotch) { if (this.locked) this.locked = false; else if (this.bolt.pos > 0.95) { this.locked = true; AUDIO.play('safety', this.body.pos, 0.7); } return; }   // HK notch: park it, then slap it home
+    if (this.locked && this.bolt.pos > 0.95) this.locked = false;
   }
   releaseSlide(sound) { if (this.locked) { this.locked = false; if (sound) AUDIO.play('safety', this.body.pos, 0.6); } }
+  // Face buttons on the gun hand. A: slide/bolt release (pump: action release; lever: quick stroke). B: mag release / bipod.
+  buttonA() {
+    if (this.def.id === 'pump') { if (this.actionLocked) { this.actionLocked = false; AUDIO.play('safety', this.body.pos, 0.6); } return; }
+    if (this.def.quickStroke && !this.stroke) { this.stroke = 1; this.lastManual = PHYS.t; return; }
+    this.releaseSlide(true);
+  }
+  buttonB() {
+    if (this.bipod) { this.bipodOut = !this.bipodOut; this.bipod.k = 60; this.bipod.rest = this.bipodOut ? 1 : 0; AUDIO.play('selector', this.body.pos); this.setBipodColliders(); return; }
+    this.dropMag();
+  }
+  setBipodColliders() {
+    const sp = this.body.spheres, feet = this.def.bipod;
+    while (sp.length > this.def.colliders.length) sp.pop();
+    if (this.bipodOut) for (const f of feet) sp.push({ p: new THREE.Vector3(f[0], f[1], f[2]), r: 0.012, w: new THREE.Vector3(), imp: 0, oid: -1 });
+    this.body.bound = 0; for (const s of sp) this.body.bound = Math.max(this.body.bound, s.p.length() + s.r);
+  }
   cycleSelector() {
     const m = this.def.modes; if (m.length < 2) return;
     this.selector = m[(m.indexOf(this.selector) + 1) % m.length];
@@ -2016,12 +2107,12 @@ class Firearm {
     AUDIO.play('selector', this.body.pos); this.buzz(0.15, 10); EV.emit('selector', this);
   }
   toggleSafety() {
-    if (this.def.modes.indexOf('SAFE') < 0) { toast('Trigger-safety blade only — no manual safety'); return; }
+    if (this.def.modes.indexOf('SAFE') < 0) { toast('No manual safety'); return; }
     if (this.selector === 'SAFE') this.selector = this.lastFire; else { this.lastFire = this.selector; this.selector = 'SAFE'; }
     AUDIO.play('safety', this.body.pos); this.buzz(0.15, 10); toast(this.selector);
   }
   switchFire() {
-    const m = this.def.modes.filter(x => x !== 'SAFE'); if (m.length < 2) { toast('Semi-auto only'); return; }
+    const m = this.def.modes.filter(x => x !== 'SAFE'); if (m.length < 2) { toast('Single fire mode'); return; }
     const cur = this.selector === 'SAFE' ? this.lastFire : this.selector;
     this.selector = this.lastFire = m[(m.indexOf(cur) + 1) % m.length];
     AUDIO.play('selector', this.body.pos); this.buzz(0.15, 10); toast(this.selector);
@@ -2041,9 +2132,37 @@ class Firearm {
     AUDIO.play('magOut', this.body.pos); this.buzz(0.2, 15); EV.emit('magReleased', this);
   }
   dropMag() { if (this.mag) this.detachMag(true); }
+  canFeed() { return (this.def.feed || 'mag') === 'mag' ? !!(this.mag && this.mag.latched && this.mag.rounds.length) : this.tube.length > 0; }
+  takeRound() { if ((this.def.feed || 'mag') === 'mag') { this.mag.rounds.pop(); this.mag.updateVisual(); } else this.tube.pop(); }
+  roundCount() { return ((this.def.feed || 'mag') === 'mag' ? (this.mag ? this.mag.rounds.length : 0) : this.tube.length) + (this.chamber === LIVE ? 1 : 0); }
+  // Loose round pushed into the loading gate / open action. Returns true when it was taken.
+  tryLoad(rnd) {
+    const d = this.def; if (!d.gate || rnd.cal !== d.cal || this.tube.length >= d.capacity) return false;
+    if (d.feed === 'internal' && this.bolt.pos < 0.8) return false;
+    _mz.copy(d.gate).applyQuaternion(this.body.quat).add(this.body.pos);
+    if (rnd.body.pos.distanceTo(_mz) > (G.xr ? 0.04 : 0.07)) return false;
+    this.tube.push(rnd.cal); AUDIO.play('roundLoad', _mz); this.buzz(0.2, 10); return true;
+  }
+  pouchItem(h) {
+    const d = this.def;
+    if (d.mag) { const m = new Magazine(d.mag, d.mag.cap); return m; }
+    if (d.pouch === 'speedloader') return new Speedloader(d.cal);
+    if (d.pouch === 'clip') return new StripperClip(d.cal);
+    return new Round(d.cal);
+  }
   stepMech(dt) {
     const b = this.bolt, d = this.def;
+    if (this.locked && b.grabbed && b.pos > 0.95 && !d.hkNotch) this.locked = false;
     b.lockMin = this.locked ? d.lockPos : -Infinity;
+    b.lockMax = this.actionLocked ? 0.001 : Infinity;
+    if (this.stroke) {   // scripted full stroke (lever quick-cycle / spin cock) through the same position path
+      b.grabbed = true; b.drive = this.stroke === 1 ? 1.05 : -0.05;
+      if (this.stroke === 1 && b.pos >= 0.99) this.stroke = 2; else if (this.stroke === 2 && b.pos <= 0.01) { this.stroke = 0; b.grabbed = false; }
+    }
+    if (d.spinCock && !this.stroke && !b.grabbed && this.primaryHand()) {
+      const w = _mw.set(1, 0, 0).applyQuaternion(this.body.quat).dot(this.body.ang);
+      if (Math.abs(w) > 16) { this.stroke = 1; this.lastManual = PHYS.t; }
+    }
     b.step(dt);
     const p0 = b.prev, p1 = b.pos;
     if (p1 > p0) {
@@ -2053,22 +2172,22 @@ class Firearm {
       }
       if (p0 < 0.85 && p1 >= 0.85 && this.extracted) this.eject();
       if (p0 < 0.95 && p1 >= 0.95) this.hammer = 1;
-      if (p1 >= 0.97 && d.lockOnEmpty && !this.locked && this.mag && this.mag.latched && this.mag.rounds.length === 0) { this.locked = true; AUDIO.play('safety', this.body.pos, 0.5); }
+      if (p1 >= 0.97 && d.lockOnEmpty && this.cycling && !b.grabbed && !this.locked && this.mag && this.mag.latched && this.mag.rounds.length === 0) { this.locked = true; AUDIO.play('safety', this.body.pos, 0.5); }
     } else if (p1 < p0) {
       if (p0 > 0.3 && p1 <= 0.3 && this.extracted) { if (!this.chamber) this.chamber = this.extracted; this.extracted = 0; }
-      if (p0 > 0.5 && p1 <= 0.5 && !this.feeding && this.chamber === EMPTY && !this.extracted && this.mag && this.mag.latched && this.mag.rounds.length) {
-        this.mag.rounds.pop(); this.feeding = LIVE; this.mag.updateVisual();
-      }
-      if (p0 > 0.05 && p1 <= 0.05 && this.feeding) {
-        this.chamber = LIVE; this.feeding = 0; this.buzz(0.5, 25);
-        EV.emit('chambered', { gun: this, manual: PHYS.t - this.lastManual < 0.6 });
+      if (p0 > 0.5 && p1 <= 0.5 && !this.feeding && this.chamber === EMPTY && !this.extracted && this.canFeed()) { this.takeRound(); this.feeding = LIVE; }
+      if (p0 > 0.05 && p1 <= 0.05) {
+        if (this.feeding) { this.chamber = LIVE; this.feeding = 0; this.buzz(0.5, 25); EV.emit('chambered', { gun: this, manual: PHYS.t - this.lastManual < 0.6 }); }
+        if (d.id === 'pump' && !b.grabbed) this.actionLocked = true;
       }
     }
+    if (d.id === 'pump' && b.grabbed && b.pos <= 0.02 && b.prev > 0.02) this.actionLocked = true;
     if (this.parts.ch) {
       let held = false; for (const h of hands) if (h.hold && h.hold.kind === 'joint' && h.hold.gun === this) held = true;
       this.chPos = held ? b.pos : Math.min(this.chPos, b.pos);
     }
     if (this.dust) { this.dust.step(dt); if (!this.dustOpen && b.pos > 0.08) { this.dustOpen = true; this.dust.k = 40; this.dust.rest = 1.9; this.dust.vel = 25; } }
+    if (this.bipod) this.bipod.step(dt);
     const tc = d.trigger;
     if (this.trig < tc.reset) { this.trigReset = true; this.burstN = 0; }
     if (this.trig >= tc.brk) this.tryFire();
@@ -2086,72 +2205,222 @@ class Firearm {
   }
   tryFire() {
     const d = this.def;
-    if (this.selector === 'SAFE') return;
+    if (this.selector === 'SAFE' || (d.gripSafety && !this.primaryHand())) return;
     if (this.selector === 'SEMI' && !this.trigReset) return;
     if (this.selector === 'BURST' && !this.trigReset && this.burstN >= 3) return;
     if (this.bolt.pos > 0.02 || this.bolt.grabbed || !this.hammer) return;
     if (PHYS.t - this.lastShot < 60 / d.rpm) return;
     this.hammer = 0;
-    if (this.chamber === LIVE) this.fire();
+    if (this.chamber === LIVE) { this.chamber = SPENT; this.fire(); if (!d.manual) this.bolt.vel = d.cycleVel; else if (d.id === 'pump') this.actionLocked = false; }
     else { this.trigReset = false; AUDIO.play('dry', this.body.pos); this.buzz(0.15, 10); EV.emit('dry', this); }
   }
+  // Shot effects shared by every action type: ballistics, recoil impulse, flash, sound, haptics.
   fire() {
-    const d = this.def, b = this.body, R = d.recoil;
-    this.chamber = SPENT; this.trigReset = false; this.burstN++; this.lastShot = PHYS.t; this.cycling = true;
-    _mz.copy(d.muzzle).applyQuaternion(b.quat).add(b.pos); _md.set(0, 0, -1).applyQuaternion(b.quat);
-    const supported = !!this.secondaryHand(), stock = this.shouldered();
-    BALLISTICS.fire(_mz, _md, d.cal, b.vel, this, supported || stock ? 0.0006 : 0.0012);
-    const f = (supported ? R.two : 1) * (stock ? R.stock : 1);
+    const d = this.def, b = this.body, R = d.recoil, c = CAL[d.cal];
+    this.trigReset = false; this.burstN++; this.lastShot = PHYS.t; this.cycling = !d.manual;
+    _mz.copy(this.muzzleLocal()).applyQuaternion(b.quat).add(b.pos); _md.set(0, 0, -1).applyQuaternion(b.quat);
+    const supported = !!this.secondaryHand() || (this.bipodOut && this.bipodRest), stock = this.shouldered();
+    const pel = c.pellets || 1;
+    for (let i = 0; i < pel; i++) BALLISTICS.fire(_mz, _md, d.cal, b.vel, this, pel > 1 ? d.choke || 0.03 : (supported || stock ? 0.0005 : 0.0012));
+    const f = (supported ? (this.gripBonus || R.two) : 1) * (stock ? R.stock : 1) * (this.bipodOut && this.bipodRest ? 0.3 : 1);
     b.vel.addScaledVector(_mw.set(0, 0, 1).applyQuaternion(b.quat), R.back * (stock ? 0.5 : 1));
     b.ang.addScaledVector(_mw.set(1, 0, 0).applyQuaternion(b.quat), R.rise * f);
     b.ang.addScaledVector(AY, (Math.random() - 0.5) * R.yaw * f);
     this.climb = Math.min(this.climb + R.climb * f, 0.5);
-    this.bolt.vel = d.cycleVel;
-    if (settings.infiniteAmmo && this.mag) { while (this.mag.rounds.length < d.mag.cap) this.mag.rounds.push(d.cal); this.mag.updateVisual(); }
-    this.flashT = 2; const F = this.parts.flash;
-    F.star.material = M.flash[(Math.random() * 3) | 0]; F.star.rotation.z = Math.random() * 6.28; F.g.scale.setScalar(rand(0.8, 1.2));
-    flashLight(_mz, d.cal === '556' ? 1.3 : 1);
+    if (settings.infiniteAmmo) { if (this.mag) { while (this.mag.rounds.length < d.mag.cap) this.mag.rounds.push(d.cal); this.mag.updateVisual(); } else if (d.feed === 'tube' || d.feed === 'internal') while (this.tube.length < d.capacity) this.tube.push(d.cal); }
+    const sup = !!this.supp;
+    this.flashT = sup ? 0 : 2; const F = this.parts.flash;
+    if (F) { F.g.position.copy(this.muzzleLocal()); F.star.material = M.flash[(Math.random() * 3) | 0]; F.star.rotation.z = Math.random() * 6.28; F.g.scale.setScalar(rand(0.8, 1.2)); }
+    if (!sup) flashLight(_mz, clamp(c.mass * 150, 0.8, 1.6)); else FX.smoke.emit(_mz.x, _mz.y, _mz.z, 0, 0.1, 0, 0.8, 0.03, 0.8, 0.8, 0.8, 0.05, 1, 0.1, 0.25);
     this.heat += 1;
-    AUDIO.gunshot(_mz, d.cal);
+    AUDIO.gunshot(_mz, d.cal, sup);
     this.buzz(d.haptic[0], d.haptic[1]);
     EV.emit('fire', this);
   }
   eject() {
     const d = this.def, b = this.body, typ = this.extracted, c = CAL[d.cal]; this.extracted = 0;
-    _mz.set(0.004, 0.006, d.boltTravel * this.bolt.pos - c.len * 0.5).applyQuaternion(b.quat).add(b.pos);
+    const back = d.boltLift ? Math.max(0, (this.bolt.pos - d.boltLift) / (1 - d.boltLift)) : this.bolt.pos;
+    _mz.set(0.004, 0.006, d.boltTravel * back - c.len * 0.5).applyQuaternion(b.quat).add(b.pos);
     _mv.set(d.ejectVel[0] * rand(0.8, 1.2), d.ejectVel[1] * rand(0.8, 1.2), d.ejectVel[2] * rand(0.6, 1.4)).applyQuaternion(b.quat).add(b.vel);
     _mw.set(rand(-4, 4), d.ejectSpin * rand(0.7, 1.3), rand(-4, 4)).applyQuaternion(b.quat);
-    if (typ === SPENT) CASINGS.spawn(d.cal, _mz, b.quat, _mv, _mw);
-    else { const r = new Round(d.cal); r.body.setPose(_mz, b.quat); r.body.vel.copy(_mv); r.body.ang.copy(_mw); r.obj.position.copy(_mz); r.obj.quaternion.copy(b.quat); }
+    spawnBrass(typ, d.cal, _mz, b.quat, _mv, _mw);
   }
-  sync(dt) {
-    const P = this.parts, d = this.def;
-    P.slide.position.z = d.boltTravel * this.bolt.pos;
+  syncParts(dt) {
+    const P = this.parts, d = this.def, bp = this.bolt.pos;
+    const back = d.boltLift ? Math.max(0, (bp - d.boltLift) / (1 - d.boltLift)) : bp;
+    P.slide.position.z = d.boltTravel * back;
+    if (P.boltHandle) P.boltHandle.rotation.z = d.boltLift ? Math.min(1, bp / d.boltLift) * Math.PI / 2 : 0;
     if (P.ch) P.ch.position.z = d.boltTravel * this.chPos;
+    if (P.pump) P.pump.position.z = d.boltTravel * bp;
+    if (P.lever) P.lever.rotation.x = bp * 0.85;
+    if (P.hammer) P.hammer.rotation.x = this.hammer || bp > 0.4 ? 0.75 : 0;
+    if (P.gsafe) P.gsafe.rotation.x = this.primaryHand() ? -0.12 : 0;
     this.trigVis = lerp(this.trigVis, this.trig, 0.5); P.trigger.rotation.x = -clamp(this.trigVis, 0, 1) * d.trigRot;
-    P.chamberRound.visible = this.chamber !== EMPTY; P.chamberRound.userData.bullet.visible = this.chamber === LIVE;
-    P.extractRound.visible = this.extracted !== 0; P.extractRound.userData.bullet.visible = this.extracted === LIVE;
-    P.feedRound.visible = !!this.feeding;
-    if (this.feeding) { const t = clamp((0.5 - this.bolt.pos) / 0.45, 0, 1); P.feedRound.position.lerpVectors(d.feedFrom, ZERO, t); P.feedRound.quaternion.slerpQuaternions(d.well.quat, _fq.identity(), t); }
+    if (P.chamberRound) { P.chamberRound.visible = this.chamber !== EMPTY; P.chamberRound.userData.bullet.visible = this.chamber === LIVE; }
+    if (P.extractRound) { P.extractRound.visible = this.extracted !== 0; P.extractRound.userData.bullet.visible = this.extracted === LIVE; }
+    if (P.feedRound) {
+      P.feedRound.visible = !!this.feeding;
+      if (this.feeding) { const t = clamp((0.5 - bp) / 0.45, 0, 1); P.feedRound.position.lerpVectors(d.feedFrom, ZERO, t); P.feedRound.quaternion.slerpQuaternions(d.well ? d.well.quat : _fq.identity(), _fq.identity(), t); }
+    }
     if (this.mag) { const W = d.well; this.mag.obj.position.copy(W.top).addScaledVector(W.axis, (this.mag.seat.pos - 1) * W.travel); this.mag.obj.quaternion.copy(W.quat); }
-    if (P.selector) P.selector.rotation.x = lerp(P.selector.rotation.x, SEL_ROT[this.selector], 0.4);
+    if (P.selector) P.selector.rotation.x = lerp(P.selector.rotation.x, (d.selRot || SEL_ROT)[this.selector], 0.4);
     if (P.stop) P.stop.rotation.x = this.locked ? 0.28 : 0;
     if (P.dust) P.dust.rotation.z = -this.dust.pos;
-    if (this.flashT > 0) { P.flash.g.visible = true; this.flashT--; } else P.flash.g.visible = false;
+    if (P.bipod) for (const leg of P.bipod) leg.rotation.x = leg.userData.dir * this.bipod.pos * 1.45;
+    if (P.flash) { if (this.flashT > 0) { P.flash.g.visible = true; this.flashT--; } else P.flash.g.visible = false; }
+  }
+  sync(dt) {
+    this.syncParts(dt);
+    const P = this.parts, d = this.def;
     if (dt > 0) {
       this.climb *= Math.exp(-dt * 5);
       this.heat = Math.max(0, this.heat - dt * 0.8);
       if (this.heat > 3 && Math.random() < 0.35) {
-        _mz.copy(d.muzzle).applyQuaternion(this.body.quat).add(this.body.pos);
+        _mz.copy(this.muzzleLocal()).applyQuaternion(this.body.quat).add(this.body.pos);
         FX.smoke.emit(_mz.x, _mz.y, _mz.z, rand(-0.05, 0.05), rand(0.1, 0.25), rand(-0.05, 0.05), rand(1.2, 2.2), 0.02, 0.8, 0.8, 0.82, 0.05, 0.6, 0.06, Math.min(0.35, this.heat * 0.04), rand(-0.5, 0.5));
       }
-      if (this.locked) {
+      if (this.locked && P.stopPt) {
         P.stopPt.getWorldPosition(_mz);
         for (const h of hands) if (!(h.hold && h.hold.it === this.item) && h.tip.distanceTo(_mz) < 0.02) this.releaseSlide(true);
       }
+      this.bipodRest = this.bipodOut && bipodTouching(this);
+      for (const a of this.attach) if (a.update) a.update(dt, this);
     }
   }
+  destroy() {
+    if (this.mag) this.mag.destroy();
+    for (const a of this.attach.slice()) a.detach(false);
+    for (const h of hands) if (h.hold && (h.hold.it === this.item || h.hold.gun === this)) h.hold = null;
+    if (this.item.slot) this.item.slot.item = null;
+    removeBody(this.body); unregisterGrab(this.item); this.obj.removeFromParent();
+    const i = firearms.indexOf(this); if (i >= 0) firearms.splice(i, 1);
+  }
 }
+function bipodTouching(gun) {
+  const n = gun.def.colliders.length;
+  for (let i = 0; i < PHYS.nC; i++) { const c = PHYS.contacts[i]; if (c.a === gun.body && gun.body.spheres.indexOf(c.sa) >= n) return true; }
+  return false;
+}
+function spawnBrass(typ, cal, p, q, v, w) {
+  if (typ === SPENT) CASINGS.spawn(cal, p, q, v, w);
+  else { const r = new Round(cal); r.body.setPose(p, q); r.body.vel.copy(v); r.body.ang.copy(w); r.obj.position.copy(p); r.obj.quaternion.copy(q); }
+}
+
+/* ---------- Revolver: six chambers on a swing-out crane ---------- */
+class Revolver extends Firearm {
+  init() {
+    this.ch6 = [0, 0, 0, 0, 0, 0]; this.idx = 0; this.cylAng = 0; this.cylVel = 0; this.sa = false; this.pull = 0;
+    this.crane = new Joint1D({ min: 0, max: 1.35, rest: 0, k: 0, c: 3, bounce: 0.2 }); this.craneOpen = false;
+    this.crane.onStop = (d, v) => { if (v > 1.5) AUDIO.play(d > 0 ? 'magOut' : 'magSeat', this.body.pos, 0.6); };
+  }
+  roundCount() { return this.ch6.filter(c => c === LIVE).length; }
+  buttonA() { this.craneOpen = !this.craneOpen; this.crane.k = this.craneOpen ? 25 : 90; this.crane.lockMax = Infinity; this.crane.rest = this.craneOpen ? 1.35 : 0; this.crane.vel = this.craneOpen ? 6 : -5; AUDIO.play('safety', this.body.pos); }
+  buttonB() { if (this.crane.pos > 1.0) this.ejectAll(); }
+  cycleSelector() { if (this.crane.pos < 0.05 && !this.sa) { this.sa = true; this.index(); AUDIO.play('safety', this.body.pos); this.buzz(0.2, 10); } }   // thumb-cock: single action
+  index() { this.idx = (this.idx + 1) % 6; this.cylVel = 12; }
+  ejectAll() {
+    const b = this.body, P = this.parts;
+    for (let i = 0; i < 6; i++) {
+      if (!this.ch6[i]) continue;
+      P.chambers[i].getWorldPosition(_mz); _mv.set(rand(-0.3, 0.3), 0.3, 1.8).applyQuaternion(b.quat).add(b.vel);
+      spawnBrass(this.ch6[i], this.def.cal, _mz, b.quat, _mv, _mw.set(rand(-3, 3), rand(-3, 3), rand(-3, 3)));
+      this.ch6[i] = EMPTY;
+    }
+    this.ejT = 0.25; AUDIO.play('clatter', b.pos, 0.6); this.buzz(0.4, 25);
+  }
+  chamberMouth(i, out) { return this.parts.chambers[i].getWorldPosition(out); }
+  tryLoad(rnd) {
+    if (rnd.cal !== this.def.cal || this.crane.pos < 1.0) return false;
+    for (let i = 0; i < 6; i++) if (!this.ch6[i] && this.chamberMouth(i, _mz).distanceTo(rnd.body.pos) < (G.xr ? 0.03 : 0.08)) { this.ch6[i] = LIVE; AUDIO.play('roundLoad', _mz); this.buzz(0.2, 10); return true; }
+    return false;
+  }
+  stepMech(dt) {
+    this.crane.step(dt);
+    if (!this.craneOpen && this.crane.lockMax !== 0 && this.crane.pos < 0.08) { this.crane.pos = 0; this.crane.vel = 0; this.crane.lockMax = 0; AUDIO.play('magSeat', this.body.pos, 0.7); this.buzz(0.4, 20); }   // latches shut
+    // flick closed: a sharp roll of the gun hand swings the crane home
+    if (this.crane.pos > 0.4 && this.primaryHand()) { const w = _mw.set(0, 0, 1).applyQuaternion(this.body.quat).dot(this.body.ang); if (Math.abs(w) > 9) { this.craneOpen = false; this.crane.rest = 0; this.crane.k = 40; } }
+    this.cylAng = lerp(this.cylAng, this.idx * Math.PI / 3 + (this.sa ? 0 : this.pull * Math.PI / 3), 0.35);
+    const tc = this.def.trigger, closed = this.crane.pos < 0.03, t = this.trig;
+    if (t < tc.reset) this.trigReset = true;
+    if (!closed) { this.pull = 0; return; }
+    if (this.sa) { if (t >= tc.slack && this.trigReset) this.shoot(); return; }   // light single-action break
+    this.pull = this.trigReset ? clamp((t - tc.slack) / (tc.brk - tc.slack), 0, 1) : 0;
+    if (t >= tc.brk && this.trigReset) { this.index(); this.shoot(); }
+  }
+  shoot() {
+    this.sa = false; this.trigReset = false; this.pull = 0;
+    const c = this.ch6[this.idx];
+    if (c === LIVE) { this.ch6[this.idx] = SPENT; this.fire(); }
+    else { AUDIO.play('dry', this.body.pos); this.buzz(0.15, 10); }
+  }
+  syncParts(dt) {
+    const P = this.parts;
+    P.crane.rotation.z = this.crane.pos;
+    P.cyl.rotation.z = -this.cylAng;
+    if (this.ejT > 0) { this.ejT -= dt || 0; P.ejector.position.z = 0.03 * Math.max(0, this.ejT) / 0.25; } else P.ejector.position.z = 0;
+    for (let i = 0; i < 6; i++) { const r = P.chRounds[i]; r.visible = !!this.ch6[i]; r.userData.bullet.visible = this.ch6[i] === LIVE; }
+    P.hammer.rotation.x = this.sa ? 0.75 : this.pull * 0.75;
+    this.trigVis = lerp(this.trigVis, this.trig, 0.5); P.trigger.rotation.x = -clamp(this.trigVis, 0, 1) * this.def.trigRot;
+    if (this.flashT > 0) { P.flash.g.visible = true; this.flashT--; } else P.flash.g.visible = false;
+  }
+}
+
+/* ---------- Break action: hinged barrels, one chamber per barrel ---------- */
+class BreakAction extends Firearm {
+  init() {
+    const n = this.def.barrels; this.chs = new Array(n).fill(EMPTY); this.cocked = new Array(n).fill(true);
+    this.brk = new Joint1D({ min: 0, max: this.def.breakMax, rest: 0, k: 0, c: 2, bounce: 0.15 }); this.latched = true; this.extracted2 = false;
+    this.brk.onStop = (d, v) => { if (v > 1.2) AUDIO.play(d > 0 ? 'bolt' : 'magSeat', this.body.pos, 0.8); if (d < 0 && !this.latched) this.latch(); };
+  }
+  roundCount() { return this.chs.filter(c => c === LIVE).length; }
+  latch() { this.latched = true; this.brk.k = 0; this.cocked.fill(true); AUDIO.play('slideFwd', this.body.pos, 0.8); this.buzz(0.5, 25); }
+  buttonA() {
+    if (this.latched) { this.latched = false; this.brk.k = 30; this.brk.rest = this.def.breakMax; this.extracted2 = false; AUDIO.play('safety', this.body.pos); }
+    else { this.brk.rest = 0; this.brk.k = 60; }
+  }
+  buttonB() { if (this.def.barrels > 1) this.pullBarrel(1); }
+  tryLoad(rnd) {
+    if (rnd.cal !== this.def.cal || this.brk.pos < this.def.breakMax * 0.7) return false;
+    for (let i = 0; i < this.chs.length; i++) if (!this.chs[i] && this.parts.mouths[i].getWorldPosition(_mz).distanceTo(rnd.body.pos) < (G.xr ? 0.035 : 0.09)) { this.chs[i] = LIVE; AUDIO.play('roundLoad', _mz); this.buzz(0.2, 10); return true; }
+    return false;
+  }
+  pullBarrel(i) {
+    if (!this.latched || !this.cocked[i]) return;
+    this.cocked[i] = false;
+    if (this.chs[i] === LIVE) { this.chs[i] = SPENT; this.barrelIdx = i; this.fire(); }
+    else { AUDIO.play('dry', this.body.pos); this.buzz(0.15, 10); }
+  }
+  muzzleLocal() { return this.def.muzzles ? this.def.muzzles[this.barrelIdx || 0] : this.def.muzzle; }
+  stepMech(dt) {
+    const bk = this.brk; bk.lockMax = this.latched ? 0 : Infinity; bk.step(dt);
+    if (!this.latched && bk.rest === 0 && bk.pos <= 0.002) this.latch();
+    if (!this.latched && this.primaryHand()) {   // flick the muzzle up to snap it shut
+      const w = _mw.set(1, 0, 0).applyQuaternion(this.body.quat).dot(this.body.ang);
+      if (w > 7 && bk.pos > 0.05) { bk.rest = 0; bk.k = 80; bk.vel = -6; }
+    }
+    if (!this.latched && !this.extracted2 && bk.pos > this.def.breakMax * 0.8) {
+      this.extracted2 = true; const fast = bk.vel > 2.5;
+      for (let i = 0; i < this.chs.length; i++) {
+        if (this.chs[i] === SPENT || (fast && this.chs[i] === LIVE)) {
+          this.parts.mouths[i].getWorldPosition(_mz); _mv.set(0, 1.2, fast ? 2.5 : 0.6).applyQuaternion(this.body.quat).add(this.body.vel);
+          spawnBrass(this.chs[i], this.def.cal, _mz, this.body.quat, _mv, _mw.set(rand(-4, 4), 0, rand(-4, 4))); this.chs[i] = EMPTY;
+        }
+      }
+    }
+    const tc = this.def.trigger;
+    if (this.trig < tc.reset) this.trigReset = true;
+    if (this.trig >= tc.brk && this.trigReset) { this.trigReset = false; this.pullBarrel(this.cocked[0] || this.chs.length === 1 ? 0 : 1); }
+  }
+  syncParts(dt) {
+    const P = this.parts;
+    P.barrels.rotation.x = -this.brk.pos;
+    P.lever.rotation.y = this.latched ? 0 : 0.5;
+    for (let i = 0; i < this.chs.length; i++) { const r = P.chRounds[i]; r.visible = !!this.chs[i]; }
+    this.trigVis = lerp(this.trigVis, this.trig, 0.5); P.trigger.rotation.x = -clamp(this.trigVis, 0, 1) * this.def.trigRot;
+    if (this.flashT > 0) { P.flash.g.visible = true; P.flash.g.position.copy(this.muzzleLocal()); this.flashT--; } else P.flash.g.visible = false;
+  }
+}
+
 
 class Magazine {
   constructor(def, n) {
@@ -2162,7 +2431,7 @@ class Magazine {
     this.gun = null; this.latched = false;
     this.seat = new Joint1D({ min: -0.35, max: 1, rest: 0, k: 0, c: 25, bounce: 0 });
     const pose = [0.8, 0.8, 0.9, 0.9, 0.9, 0.8];
-    this.item = registerGrab({ kind: 'mag', obj: this.obj, body: this.body, owner: this, size: 'mag', driveW: 55,
+    this.item = registerGrab({ kind: 'mag', obj: this.obj, body: this.body, owner: this, size: 'mag', driveW: 95,
       points: [
         { type: 'magazine', pos: new THREE.Vector3(0, def.gripY, def.gripZ), r: 0.07, pri: 0.5, pose, cond: () => !this.gun },
         { type: 'magwell', pos: new THREE.Vector3(0, def.gripY, def.gripZ), r: 0.07, pri: 1.5, pose, cond: () => !!this.gun && !this.latched }
@@ -2192,7 +2461,7 @@ class Round {
     this.body = addBody(new Body({ obj: this.obj, owner: this, mass: c.mass * 1.6, dims: [0.01, 0.01, c.len], spheres: [[0, 0, -c.len * 0.25, 0.0052], [0, 0, -c.len * 0.75, 0.0052]],
       mat: 'brass', layer: L.SMALL, mask: L.ENV | L.GUN | L.MAG | L.PROP, ccd: true, ccdR: 0.006, angDamp: 0.5 }));
     this.body.onImpact = (v, m, p) => { if (this.body.impactCool <= 0 && v > 0.6) { AUDIO.play('tink', p, Math.min(1, v / 4), m.snd); this.body.impactCool = 0.06; } };
-    this.item = registerGrab({ kind: 'round', obj: this.obj, body: this.body, owner: this, size: 'small', driveW: 60,
+    this.item = registerGrab({ kind: 'round', obj: this.obj, body: this.body, owner: this, size: 'small', driveW: 100,
       points: [{ type: 'round', pos: new THREE.Vector3(0, 0, -c.len * 0.5), r: 0.05, pose: [0.6, 0.7, 0.85, 0.9, 0.9, 0.7] }] });
     rounds.push(this);
   }
@@ -2209,8 +2478,8 @@ const CASINGS = {
   n: 150, list: [], meshes: {}, next: 0,
   init() {
     for (const cal of Object.keys(CAL)) {
-      const m = new THREE.InstancedMesh(casingGeo(cal), M.brassCase, this.n);
-      m.frustumCulled = false; m.castShadow = true; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      const m = new THREE.InstancedMesh(casingGeo(cal), CAL[cal].shell ? M.hullCase : M.brassCase, this.n);
+      m.frustumCulled = false; m.castShadow = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       const e = m.instanceMatrix.array; e.fill(0); for (let i = 0; i < this.n; i++) e[i * 16 + 15] = 1;
       scene.add(m); this.meshes[cal] = m;
     }
@@ -2245,6 +2514,682 @@ const CASINGS = {
   }
 };
 const _zeroM = new THREE.Matrix4().makeScale(0, 0, 0), _one = new THREE.Vector3(1, 1, 1);
+
+/* ============================================================
+   ROSTER (Milestone 2) — SIM Ejector .45, Roaming .357, Unlimited SMG, Plan Switcher 870,
+   Double Bundle, Fibre Lever .357, Tower Bolt .308 + attachments and optics
+   ============================================================ */
+Object.assign(CAL, {
+  '45':   { name: '.45 Roaming',   caseLen: 0.0228, rim: 0.006,  body: 0.006,  mouth: 0.006,  bulletR: 0.0057, len: 0.0324, mass: 0.0149, v0: 255, drag: 1.3e-3 },
+  '357':  { name: '.357 Unlimited', caseLen: 0.033, rim: 0.0055, body: 0.0048, mouth: 0.0048, bulletR: 0.0045, len: 0.04,   mass: 0.0102, v0: 440, drag: 1.2e-3 },
+  '308':  { name: '.308 Tower',    caseLen: 0.0512, rim: 0.006, body: 0.006, shoulder: 0.041, neck: 0.0043, bulletR: 0.0039, len: 0.071, mass: 0.0097, v0: 820, drag: 4.8e-4 },
+  '12ga': { name: '12ga Bundle',   caseLen: 0.07, rim: 0.0114, body: 0.0102, mouth: 0.0102, bulletR: 0.0102, len: 0.07, mass: 0.0032, v0: 400, drag: 2.2e-3, shell: true, pellets: 8 }
+});
+Object.assign(CALS, {
+  '45':   { bf: 1100, bq: 0.8, bd: 0.11, th: 1.1, g: 1.05, mech: [2200, 3400, 4900] },
+  '357':  { bf: 1700, bq: 0.7, bd: 0.15, th: 1.0, g: 1.3,  mech: [2600, 3900] },
+  '308':  { bf: 1500, bq: 0.5, bd: 0.24, th: 1.4, g: 1.5,  mech: [1800, 3000, 4400] },
+  '12ga': { bf: 900,  bq: 0.5, bd: 0.22, th: 1.6, g: 1.45, mech: [1600, 2600] }
+});
+function initM2Materials() {
+  const S = 256, d = new Uint8Array(S * S * 4);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const u = x / S, v = y / S, ring = 0.5 + 0.5 * Math.sin((v * 22 + pfbm(u * 3, v * 3, 3, 4) * 6) * Math.PI * 2);
+    const fig = pfbm(u * 12, v * 2, 12, 3), k = 0.55 + 0.25 * ring + 0.2 * fig, i = (y * S + x) * 4;
+    d[i] = 118 * k; d[i + 1] = 66 * k; d[i + 2] = 34 * k; d[i + 3] = 255;
+  }
+  TEX.walnut = mkData(d, S, S, true); TEX.walnut.repeat.set(9, 9);
+  M.walnut = new THREE.MeshPhysicalMaterial({ map: TEX.walnut, roughness: 0.5, clearcoat: 0.7, clearcoatRoughness: 0.25 });
+  M.blued = std({ color: 0x1b1f26, roughness: 0.3, metalness: 0.9, normalMap: TEX.grainN, normalScale: nscale(0.15) });
+  M.hull = std({ color: 0xa3141e, roughness: 0.5 });
+  M.hullCase = std({ vertexColors: true, roughness: 0.45, metalness: 0.2 });
+  M.glass = std({ color: 0x0a2a33, roughness: 0.05, metalness: 0.9 });
+  M.laser = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.05, 0.05).multiplyScalar(3), transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
+  M.lightCone = new THREE.MeshBasicMaterial({ color: 0xfff2d0, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  SPOT.light = new THREE.SpotLight(0xfff2dc, 0, 30, 0.32, 0.5, 1.2); SPOT.target = new THREE.Object3D(); SPOT.light.target = SPOT.target; scene.add(SPOT.light, SPOT.target);
+  SCOPE.rt = new THREE.WebGLRenderTarget(512, 512); SCOPE.rt.texture.colorSpace = THREE.SRGBColorSpace;
+  SCOPE.cam = new THREE.PerspectiveCamera(5, 1, 0.03, 3000);
+}
+const SPOT = { light: null, target: null, owner: null };
+const scaleX = (pts, k) => pts.map(p => [p[0] * k, p[1]]);
+function sights(pb, zr, zf, y, mat = 'blackSatin') {
+  pb.add(mat, box(0.0075, 0.0065, 0.006), 0.0065, y, zr); pb.add(mat, box(0.0075, 0.0065, 0.006), -0.0065, y, zr);
+  pb.add(mat, box(0.0035, 0.0065, 0.005), 0, y, zf);
+}
+function dots(parent, zr, zf, y) {
+  const g = new PB();
+  g.add('sightW', new THREE.SphereGeometry(0.0012, 8, 6), 0.0065, y + 0.001, zr + 0.0032); g.add('sightW', new THREE.SphereGeometry(0.0012, 8, 6), -0.0065, y + 0.001, zr + 0.0032);
+  g.add('sightY', new THREE.SphereGeometry(0.0014, 8, 6), 0, y + 0.0008, zf + 0.0027); g.build(parent, false);
+}
+const TRIG = [[0, 0], [0.004, 0], [0.0062, -0.008], [0.0066, -0.016], [0.004, -0.022], [0.0008, -0.021], [0.0018, -0.014], [0.0012, -0.006]];
+function finish(root, cal, flashScale, muzzle, P) {
+  const flash = makeFlash(flashScale); flash.g.position.copy(muzzle); root.add(flash.g);
+  root.traverse(o => { if (o.isMesh && !o.material.transparent) o.castShadow = true; });
+  return Object.assign({ root, flash }, P);
+}
+function mkLabel(root, lines, w, h, color, x, y, z, ry, metal = 0.3) { const m = engrave(lines, w, h, color, metal); m.position.set(x, y, z); m.rotation.y = ry; root.add(m); }
+
+/* ---------- SIM Ejector .45 (1911 pattern) ---------- */
+const S45_L = [[-0.09, -0.011], [-0.09, 0.012], [-0.087, 0.017], [0.118, 0.017], [0.125, 0.012], [0.125, -0.004], [0.12, -0.011]];
+const S45_R = [[-0.09, -0.011], [-0.09, 0.012], [-0.087, 0.017], [0.0, 0.017], [0.0, 0.002], [0.034, 0.002], [0.034, 0.017], [0.118, 0.017], [0.125, 0.012], [0.125, -0.004], [0.12, -0.011]];
+function build1911() {
+  const root = new THREE.Group(), slide = new THREE.Group(), trigger = new THREE.Group(), hammer = new THREE.Group(), selector = new THREE.Group(), gsafe = new THREE.Group();
+  root.add(slide, trigger, hammer, selector, gsafe);
+  const f = new PB();
+  f.add('parker', sideEx(scaleX(P9_FRAME, 1.1), 0.022, 0.0012, [scaleX(P9_GUARD, 1.1)]));
+  f.add('walnut', sideEx(scaleX(P9_GRIP, 1.1), 0.029, 0.002));
+  for (const p of [[-0.06, -0.075], [-0.07, -0.105]]) { f.add('polished', cyl(0.0025, 0.0295, 10), 0, p[1], -p[0] * 1.1, 0, 0, Math.PI / 2); }
+  f.add('parker', box(0.0135, 0.016, 0.034), 0, 0.001, -0.017);
+  f.add('parker', lathe([[0.0055, 0], [0.0075, 0], [0.0075, 0.093], [0.0055, 0.093]], 20), 0, 0, -0.034);
+  f.add('polished', lathe([[0.0075, 0], [0.0095, 0], [0.0095, 0.006], [0.0075, 0.006]], 20), 0, 0, -0.121);
+  f.add('dark', new THREE.CircleGeometry(0.0055, 16), 0, 0, -0.1272, 0, Math.PI, 0);
+  f.add('parker', box(0.025, 0.004, 0.008), 0, -0.016, -0.035);
+  f.build(root);
+  const s = new PB();
+  s.add('tealCk', sideEx(S45_L, 0.011, 0.0011), -0.0065, 0, 0); s.add('tealCk', sideEx(S45_R, 0.013, 0.0011), 0.0055, 0, 0);
+  for (let k = 0; k < 9; k++) s.add('tealCk', box(0.0254, 0.019, 0.0012), 0, 0.003, 0.062 + k * 0.0028);
+  sights(s, 0.08, -0.115, 0.0205); s.add('polished', box(0.012, 0.012, 0.002), 0, 0, 0.0005);
+  s.build(slide); dots(slide, 0.08, -0.115, 0.0205);
+  const t = new PB(); t.add('polished', box(0.006, 0.014, 0.004), 0, -0.007, 0); t.build(trigger); trigger.position.set(0, -0.035, -0.008);
+  const hm = new PB(); hm.add('parker', sideEx([[-0.004, -0.012], [0.004, -0.012], [0.003, 0.004], [-0.002, 0.012], [-0.012, 0.013], [-0.013, 0.008], [-0.006, 0.005]], 0.007, 0.0008)); hm.build(hammer); hammer.position.set(0, 0.004, 0.094);
+  const sl = new PB(); sl.add('parker', sideEx([[0, 0], [0.014, 0.0], [0.016, 0.004], [0.002, 0.005]], 0.0016, 0.0005)); sl.build(selector); selector.position.set(-0.0125, -0.009, 0.072);
+  const gs = new PB(); gs.add('parker', box(0.02, 0.03, 0.006), 0, -0.02, 0); gs.build(gsafe); gsafe.position.set(0, -0.025, 0.095);
+  mkLabel(slide, [{ t: 'SIM EJECTOR', b: 1 }, { t: '.45 ROAMING' }], 0.055, 0.013, 0x053338, -0.0122, 0.004, -0.04, -Math.PI / 2);
+  mkLabel(root, [{ t: 'SIM-45 000451' }], 0.03, 0.006, 0x55595e, 0.0112, -0.02, -0.07, Math.PI / 2);
+  const chamberRound = roundGroup('45'), extractRound = roundGroup('45'), feedRound = roundGroup('45');
+  root.add(chamberRound, feedRound); slide.add(extractRound); chamberRound.visible = extractRound.visible = feedRound.visible = false;
+  return finish(root, '45', 0.85, new THREE.Vector3(0, 0, -0.128), { slide, trigger, hammer, selector, gsafe, chamberRound, extractRound, feedRound });
+}
+// Generic straight box magazine (single or double stack) with witness holes and visible top rounds.
+function boxMag(o) {
+  return () => {
+    const root = new THREE.Group(), pb = new PB(), c = CAL[o.cal], dh = o.depth / 2;
+    pb.add(o.body || 'blackSatin', sideEx([[-dh, -o.len], [-dh, -0.004], [-dh + 0.003, 0], [dh - 0.006, 0], [dh, -0.006], [dh, -o.len]], o.width, 0.001));
+    pb.add(o.pad || 'tealCk', sideEx([[-dh - 0.003, -o.len - 0.007], [-dh - 0.003, -o.len], [dh + 0.003, -o.len], [dh + 0.003, -o.len - 0.004], [dh, -o.len - 0.008], [-dh, -o.len - 0.008]], o.width + 0.004, 0.0015));
+    pb.build(root);
+    const holes = o.witness.map((n) => { const m = new THREE.Mesh(new THREE.CircleGeometry(0.0021, 12), M.holeDark); m.position.set(0, -0.006 - (n - 1) * o.per, dh + 0.0003); m.userData.n = n; m.userData.noRim = true; root.add(m); return m; });
+    const top = [roundGroup(o.cal), roundGroup(o.cal)];
+    top[0].position.set(o.stagger, -0.005, c.len / 2); top[1].position.set(-o.stagger, -0.005 - c.rim * 1.9, c.len / 2); root.add(top[0], top[1]);
+    const follower = new THREE.Mesh(box(o.width - 0.003, 0.004, o.depth - 0.004), M.polyYellow); follower.position.y = -0.004; root.add(follower);
+    root.traverse(m => { if (m.isMesh) m.castShadow = true; });
+    return { root, holes, top, follower };
+  };
+}
+function curvedMag(o) {
+  return () => {
+    const root = new THREE.Group(), pb = new PB(), c = CAL[o.cal], f = [], bk = [], dh = o.depth / 2;
+    for (let i = 0; i <= 8; i++) { const t = i / 8, off = o.curve * t * t, y = -o.len * t; f.push([dh + off, y]); bk.push([-dh + off, y]); }
+    const pts = [[-dh, 0], [-dh + 0.005, 0.003], [dh - 0.01, 0.003], [dh, 0]]; for (let i = 1; i <= 8; i++) pts.push(f[i]); for (let i = 8; i >= 1; i--) pts.push(bk[i]);
+    pb.add('blackSatin', sideEx(pts, o.width, 0.0012));
+    const bx = o.curve - dh, fx = o.curve + dh;
+    pb.add('tealCk', sideEx([[bx - 0.004, -o.len], [fx + 0.004, -o.len], [fx + 0.004, -o.len - 0.009], [bx - 0.004, -o.len - 0.009]], o.width + 0.004, 0.0015));
+    pb.build(root);
+    const holes = o.witness.map((n) => { const t = n / o.cap * 0.85, m = new THREE.Mesh(new THREE.CircleGeometry(0.0024, 12), M.holeDark);
+      m.position.set(-(o.width / 2 + 0.0003), -o.len * t - 0.01, -(-dh + o.curve * t * t + 0.009)); m.rotation.y = -Math.PI / 2; m.userData.n = n; m.userData.noRim = true; root.add(m); return m; });
+    const top = [roundGroup(o.cal), roundGroup(o.cal)];
+    top[0].position.set(0.0033, -0.004, c.len / 2); top[1].position.set(-0.0033, -0.0088, c.len / 2); root.add(top[0], top[1]);
+    const follower = new THREE.Mesh(box(o.width - 0.004, 0.004, o.depth - 0.012), M.polyYellow); follower.position.set(0, -0.004, 0); root.add(follower);
+    root.traverse(m => { if (m.isMesh) m.castShadow = true; });
+    return { root, holes, top, follower };
+  };
+}
+Object.assign(MAGDEFS, {
+  s45: { id: 's45mag', name: 'SIM Ejector Magazine', cal: '45', cap: 8, mass: 0.2, dims: [0.018, 0.125, 0.034], gripY: -0.07, gripZ: 0,
+    spheres: [[0, -0.01, 0.009, 0.01], [0, -0.01, -0.009, 0.01], [0, -0.115, 0.009, 0.01], [0, -0.115, -0.009, 0.01]], lips: new THREE.Vector3(0, -0.004, 0.0162),
+    build: boxMag({ cal: '45', depth: 0.034, len: 0.12, width: 0.018, stagger: 0, per: 0.012, witness: [8, 6, 4, 2], body: 'parker', pad: 'blackSatin' }) },
+  smg: { id: 'smgmag', name: 'Unlimited SMG Magazine', cal: '9mm', cap: 30, mass: 0.35, dims: [0.022, 0.2, 0.034], gripY: -0.1, gripZ: -0.02,
+    spheres: [[0, -0.02, -0.002, 0.014], [0, -0.07, -0.01, 0.014], [0, -0.12, -0.026, 0.014], [0, -0.17, -0.05, 0.014]], lips: new THREE.Vector3(0, -0.004, 0.0146),
+    build: curvedMag({ cal: '9mm', depth: 0.032, len: 0.2, width: 0.022, curve: 0.06, cap: 30, witness: [30, 20, 10] }) }
+});
+
+/* ---------- Roaming .357 revolver ---------- */
+const REV_FRAME = [[0.04, 0.012], [0.04, -0.036], [0.03, -0.042], [0.02, -0.045], [0.018, -0.05], [0.02, -0.062], [0.005, -0.068], [-0.02, -0.065], [-0.03, -0.058],
+  [-0.034, -0.07], [-0.04, -0.1], [-0.045, -0.125], [-0.07, -0.13], [-0.078, -0.12], [-0.07, -0.09], [-0.062, -0.06], [-0.058, -0.03], [-0.052, -0.008], [-0.045, 0.005], [-0.035, 0.012]];
+function buildRevolver() {
+  const root = new THREE.Group(), trigger = new THREE.Group(), hammer = new THREE.Group(), crane = new THREE.Group(), cyl = new THREE.Group(), ejector = new THREE.Group();
+  root.add(trigger, hammer, crane); crane.add(cyl); cyl.add(ejector);
+  const f = new PB();
+  f.add('blued', sideEx(REV_FRAME, 0.026, 0.0012, [[[-0.023, -0.035], [0.023, -0.035], [0.023, 0.009], [-0.023, 0.009]], [[-0.022, -0.06], [0.012, -0.06], [0.014, -0.05], [-0.018, -0.047]]]));
+  f.add('walnut', sideEx([[-0.03, -0.06], [-0.034, -0.07], [-0.04, -0.1], [-0.045, -0.126], [-0.07, -0.132], [-0.08, -0.12], [-0.072, -0.09], [-0.064, -0.06], [-0.058, -0.035], [-0.045, -0.04]], 0.034, 0.003));
+  f.add('blued', lathe([[0.0035, 0], [0.0085, 0], [0.0085, 0.095], [0.0035, 0.095]], 20), 0, 0, -0.04);
+  f.add('blued', box(0.012, 0.014, 0.093), 0, -0.012, -0.087);
+  f.add('polished', lathe([[0, 0], [0.003, 0], [0.003, 0.07], [0, 0.07]], 10), 0, -0.02, -0.03);
+  f.add('blued', box(0.004, 0.009, 0.018), 0, 0.012, -0.126); f.add('sightY', box(0.0042, 0.003, 0.004), 0, 0.0155, -0.12);
+  f.add('blued', box(0.012, 0.004, 0.012), 0, 0.0135, 0.03);
+  f.add('dark', new THREE.CircleGeometry(0.0035, 14), 0, 0, -0.1352, 0, Math.PI, 0);
+  f.build(root);
+  const c = new PB();
+  c.add('blued', lathe([[0.004, 0], [0.019, 0], [0.019, 0.04], [0.004, 0.04]], 30), 0, 0, 0.02);
+  for (let k = 0; k < 6; k++) { const a = (30 + k * 60) * deg; c.add('dark', box(0.004, 0.003, 0.026), Math.cos(a) * 0.0185, Math.sin(a) * 0.0185, 0, 0, 0, a); }
+  c.add('blued', box(0.006, 0.02, 0.04), -0.006, -0.014, 0);
+  c.build(cyl);
+  const ej = new PB(); ej.add('polished', cyl6(0.008, 0.002), 0, 0, 0.021, Math.PI / 2, 0, 0); ej.build(ejector);
+  crane.position.set(-0.012, -0.034, 0); cyl.position.set(0.012, 0.0205, 0);
+  const chambers = [], chRounds = [];
+  for (let k = 0; k < 6; k++) {
+    const a = (90 + k * 60) * deg, o = new THREE.Object3D(); o.position.set(Math.cos(a) * 0.0135, Math.sin(a) * 0.0135, 0.022); cyl.add(o); chambers.push(o);
+    const r = roundGroup('357'); r.position.set(Math.cos(a) * 0.0135, Math.sin(a) * 0.0135, 0.0205); r.visible = false; cyl.add(r); chRounds.push(r);
+  }
+  const cylRear = new THREE.Object3D(); cylRear.position.set(0, 0, 0.022); cyl.add(cylRear);
+  const t = new PB(); t.add('polished', sideEx(TRIG, 0.006, 0.0008)); t.build(trigger); trigger.position.set(0, -0.045, -0.004);
+  const hm = new PB(); hm.add('blued', sideEx([[-0.004, -0.012], [0.004, -0.012], [0.003, 0.004], [-0.002, 0.012], [-0.014, 0.014], [-0.015, 0.008], [-0.006, 0.005]], 0.007, 0.0008)); hm.build(hammer); hammer.position.set(0, 0.002, 0.04);
+  mkLabel(root, [{ t: 'ROAMING .357', b: 1 }, { t: 'UNLIMITED' }], 0.045, 0.012, 0x777c82, -0.0132, -0.004, -0.085, -Math.PI / 2, 0.8);
+  return finish(root, '357', 0.9, new THREE.Vector3(0, 0, -0.136), { slide: new THREE.Group(), trigger, hammer, crane, cyl, ejector, chambers, chRounds, cylRear });
+}
+function cyl6(r, l) { return new THREE.CylinderGeometry(r, r, l, 6); }
+
+/* ---------- Speedloader & stripper clip ---------- */
+const extras = [];
+class Speedloader {
+  constructor(cal) {
+    this.cal = cal; this.n = 6; this.obj = new THREE.Group(); scene.add(this.obj);
+    const pb = new PB(); pb.add('polymer', lathe([[0.004, 0], [0.021, 0], [0.021, 0.012], [0.004, 0.012]], 24), 0, 0, 0.02); pb.add('polished', lathe([[0, 0], [0.008, 0], [0.008, 0.018], [0, 0.018]], 12), 0, 0, 0.038); pb.build(this.obj);
+    this.rs = [];
+    for (let k = 0; k < 6; k++) { const a = (90 + k * 60) * deg, r = roundGroup(cal); r.position.set(Math.cos(a) * 0.0135, Math.sin(a) * 0.0135, 0.0205); this.obj.add(r); this.rs.push(r); }
+    this.body = addBody(new Body({ obj: this.obj, owner: this, mass: 0.12, dims: [0.045, 0.045, 0.05], spheres: [[0, 0, 0.02, 0.022], [0, 0, 0.0, 0.02]], mat: 'polymer', layer: L.SMALL, ccd: true, ccdR: 0.02 }));
+    this.item = registerGrab({ kind: 'speed', obj: this.obj, body: this.body, owner: this, size: 'small', points: [{ type: 'primary', pos: new THREE.Vector3(0, 0, 0.045), r: 0.07, pose: [0.8, 0.7, 0.8, 0.8, 0.8, 0.7] }] });
+    this.twist = 0; extras.push(this);
+  }
+  update(h) {
+    if (!this.n) return;
+    for (const g of firearms) {
+      if (!(g instanceof Revolver) || g.crane.pos < 1.1) continue;
+      g.parts.cylRear.getWorldPosition(_mz);
+      if (this.body.pos.distanceTo(_mz) > (G.xr ? 0.04 : 0.09)) continue;
+      const a = _mv.set(0, 0, -1).applyQuaternion(this.body.quat), b = _mw.set(0, 0, -1).applyQuaternion(g.parts.cyl.getWorldQuaternion(Q4()));
+      if (a.dot(b) < 0.85) continue;
+      this.twist += Math.abs(h.angVel.dot(a)) / 72;
+      if (this.twist > 0.6 || h.trigDown || !G.xr) {
+        for (let i = 0; i < 6; i++) if (!g.ch6[i]) g.ch6[i] = LIVE;
+        this.n = 0; for (const r of this.rs) r.visible = false;
+        AUDIO.play('roundLoad', _mz); AUDIO.play('magIn', _mz, 0.6); pulse(h, 0.5, 30); this.twist = 0;
+      }
+      return;
+    }
+    this.twist = 0;
+  }
+  destroy() { destroyExtra(this); }
+}
+class StripperClip {
+  constructor(cal) {
+    this.cal = cal; this.n = 5; this.obj = new THREE.Group(); scene.add(this.obj);
+    const pb = new PB(); pb.add('parker', box(0.012, 0.064, 0.004), 0, -0.028, 0.002); pb.build(this.obj);
+    this.rs = []; for (let k = 0; k < 5; k++) { const r = roundGroup(cal); r.position.set(0, -k * 0.0122, 0); this.obj.add(r); this.rs.push(r); }
+    this.body = addBody(new Body({ obj: this.obj, owner: this, mass: 0.14, dims: [0.013, 0.065, 0.07], spheres: [[0, -0.005, -0.03, 0.008], [0, -0.05, -0.03, 0.008], [0, -0.005, 0.0, 0.008], [0, -0.05, 0.0, 0.008]], mat: 'brass', layer: L.SMALL, ccd: true }));
+    this.item = registerGrab({ kind: 'clip', obj: this.obj, body: this.body, owner: this, size: 'small', points: [{ type: 'primary', pos: new THREE.Vector3(0, -0.025, -0.02), r: 0.06, pose: [0.8, 0.6, 0.7, 0.8, 0.8, 0.6] }] });
+    extras.push(this);
+  }
+  update(h) {
+    if (!this.n) return;
+    for (const g of firearms) {
+      const d = g.def; if (d.pouch !== 'clip' || g.bolt.pos < 0.85 || d.cal !== this.cal) continue;
+      _mz.copy(d.gate).applyQuaternion(g.body.quat).add(g.body.pos);
+      if (this.body.pos.distanceTo(_mz) > (G.xr ? 0.045 : 0.1)) continue;
+      const up = _mv.set(0, 1, 0).applyQuaternion(this.body.quat), gu = _mw.set(0, 1, 0).applyQuaternion(g.body.quat);
+      if (up.dot(gu) < 0.7) continue;
+      while (this.n > 0 && g.tube.length < d.capacity) { g.tube.push(this.cal); this.n--; this.rs[this.n].visible = false; }
+      AUDIO.play('magSeat', _mz, 0.8); pulse(h, 0.5, 30);
+      return;
+    }
+  }
+  destroy() { destroyExtra(this); }
+}
+function destroyExtra(x) {
+  for (const h of hands) if (h.hold && h.hold.it === x.item) h.hold = null;
+  if (x.item.slot) x.item.slot.item = null;
+  removeBody(x.body); unregisterGrab(x.item); x.obj.removeFromParent();
+  const i = extras.indexOf(x); if (i >= 0) extras.splice(i, 1);
+}
+
+/* ---------- Unlimited SMG (roller-delayed pattern) ---------- */
+function buildSMG() {
+  const root = new THREE.Group(), slide = new THREE.Group(), trigger = new THREE.Group(), selector = new THREE.Group(), ch = new THREE.Group();
+  root.add(slide, trigger, selector, ch);
+  const b = new PB();
+  b.add('parker', sideEx([[-0.13, -0.022], [-0.13, 0.024], [-0.12, 0.03], [0.2, 0.03], [0.205, 0.024], [0.205, -0.02], [0.08, -0.022], [0.075, -0.03], [0.0, -0.03], [-0.005, -0.022]], 0.03, 0.0015, [[[-0.07, -0.012], [-0.02, -0.012], [-0.02, 0.01], [-0.07, 0.01]]]));
+  b.add('parker', lathe([[0, 0], [0.012, 0], [0.012, 0.18], [0, 0.18]], 16), 0, 0.018, -0.04);
+  b.add('polymer', sideEx([[0.2, 0.012], [0.33, 0.012], [0.335, 0.004], [0.335, -0.035], [0.32, -0.042], [0.2, -0.04]], 0.044, 0.004));
+  b.add('parker', lathe([[0, 0], [0.008, 0], [0.008, 0.05], [0.0095, 0.05], [0.0095, 0.062], [0, 0.062]], 16), 0, 0, -0.33);
+  b.add('parker', box(0.005, 0.018, 0.012), 0, 0.037, -0.215); b.add('parker', cyl(0.009, 0.004, 16), 0, 0.05, -0.215, Math.PI / 2, 0, 0);
+  b.add('parker', box(0.03, 0.012, 0.04), 0, 0.034, 0.04); b.add('parker', lathe([[0.004, 0], [0.009, 0], [0.009, 0.004], [0.004, 0.004]], 16), 0, 0.048, 0.04 + 0.002);
+  b.add('polymer', sideEx([[-0.005, -0.03], [0.075, -0.03], [0.07, -0.04], [0.05, -0.06], [0.0, -0.062], [-0.02, -0.055]], 0.028, 0.0015, [[[0.005, -0.052], [0.045, -0.052], [0.045, -0.036], [0.005, -0.036]]]));
+  b.add('polymer', sideEx([[-0.02, -0.055], [-0.03, -0.08], [-0.04, -0.12], [-0.045, -0.135], [-0.075, -0.135], [-0.07, -0.1], [-0.06, -0.06], [-0.05, -0.03]].map(p => [p[0] - 0.01, p[1]]), 0.03, 0.002));
+  b.add('polymer', sideEx([[-0.13, 0.018], [-0.36, 0.012], [-0.37, 0.005], [-0.37, -0.075], [-0.35, -0.085], [-0.25, -0.03], [-0.13, -0.018]], 0.04, 0.003));
+  b.add('rubber', box(0.04, 0.085, 0.01), 0, -0.035, 0.372);
+  b.add('dark', box(0.024, 0.002, 0.03), 0, -0.029, -0.02);
+  b.build(root);
+  const s = new PB(); s.add('polished', box(0.014, 0.018, 0.1), 0, 0, 0.05); s.build(slide);
+  const c = new PB(); c.add('blackSatin', box(0.004, 0.008, 0.012), -0.016, 0.02, -0.19); c.add('blackSatin', box(0.018, 0.006, 0.008), -0.024, 0.02, -0.19, 0, 0, 0.3); c.build(ch);
+  const t = new PB(); t.add('polymerSmooth', sideEx(TRIG, 0.005, 0.0007)); t.build(trigger); trigger.position.set(0, -0.036, -0.03);
+  const sl = new PB(); sl.add('parker', cyl(0.007, 0.004, 12), 0, 0, 0, 0, 0, Math.PI / 2); sl.add('sightY', box(0.002, 0.012, 0.003), -0.002, 0.004, 0); sl.build(selector); selector.position.set(-0.0165, -0.02, 0.03);
+  mkLabel(root, [{ t: 'UNLIMITED SMG', b: 1 }, { t: '9mm DATA · MACQUARIE PARK' }], 0.07, 0.014, 0x8a9096, -0.0157, 0.004, -0.05, -Math.PI / 2, 0.6);
+  mkLabel(root, [{ t: 'S' }, { t: 'E' }, { t: '3' }, { t: 'F' }], 0.006, 0.02, 0xffd100, -0.016, -0.012, 0.02, -Math.PI / 2, 0.1);
+  const stopPt = new THREE.Object3D(); stopPt.position.set(-0.024, 0.02, -0.19 + 0.09); root.add(stopPt);
+  const chamberRound = roundGroup('9mm'), extractRound = roundGroup('9mm'), feedRound = roundGroup('9mm');
+  root.add(chamberRound, feedRound); slide.add(extractRound); chamberRound.visible = extractRound.visible = feedRound.visible = false;
+  return finish(root, '9mm', 0.8, new THREE.Vector3(0, 0, -0.395), { slide, trigger, selector, ch, stopPt, chamberRound, extractRound, feedRound });
+}
+
+/* ---------- Plan Switcher 870 (pump) ---------- */
+function buildPump() {
+  const root = new THREE.Group(), slide = new THREE.Group(), trigger = new THREE.Group(), pump = new THREE.Group();
+  root.add(slide, trigger, pump);
+  const b = new PB();
+  b.add('blued', sideEx([[-0.07, -0.03], [-0.07, 0.018], [-0.06, 0.024], [0.13, 0.024], [0.14, 0.015], [0.14, -0.035], [-0.05, -0.035]], 0.032, 0.0015, [[[-0.045, -0.008], [0.02, -0.008], [0.02, 0.012], [-0.045, 0.012]]]));
+  b.add('blued', lathe([[0.0075, 0], [0.0105, 0], [0.0105, 0.55], [0.0075, 0.55]], 20), 0, 0.004, -0.14);
+  b.add('blued', lathe([[0, 0], [0.0115, 0], [0.0115, 0.44], [0, 0.44]], 18), 0, -0.022, -0.14);
+  b.add('polished', new THREE.SphereGeometry(0.0022, 8, 6), 0, 0.0165, -0.685);
+  b.add('dark', box(0.02, 0.002, 0.07), 0, -0.035, -0.04);
+  b.add('blued', sideEx([[-0.05, -0.035], [0.02, -0.035], [0.015, -0.055], [-0.02, -0.06], [-0.05, -0.05]], 0.022, 0.0012, [[[-0.04, -0.052], [0.008, -0.052], [0.008, -0.038], [-0.04, -0.038]]]));
+  b.add('polymer', sideEx([[-0.07, 0.016], [-0.1, 0.012], [-0.42, 0.0], [-0.425, -0.012], [-0.425, -0.14], [-0.4, -0.145], [-0.22, -0.07], [-0.1, -0.055], [-0.07, -0.03]], 0.04, 0.004));
+  b.add('rubber', box(0.042, 0.13, 0.014), 0, -0.07, 0.43);
+  mkLabel(root, [{ t: 'PLAN SWITCHER 870', b: 1 }, { t: '12ga BUNDLE' }], 0.08, 0.018, 0x777c82, -0.0162, -0.008, -0.06, -Math.PI / 2, 0.8);
+  b.build(root);
+  const s = new PB(); s.add('polished', box(0.016, 0.018, 0.075), 0, 0.002, 0.03); s.build(slide);
+  const p = new PB(); p.add('polymer', lathe([[0.012, 0], [0.021, 0.004], [0.022, 0.18], [0.012, 0.185]], 16), 0, -0.018, -0.2);
+  for (let k = 0; k < 8; k++) p.add('polymerSmooth', lathe([[0.021, 0], [0.0232, 0.004], [0.021, 0.008]], 16), 0, -0.018, -0.23 - k * 0.018);
+  p.build(pump);
+  const t = new PB(); t.add('blued', sideEx(TRIG, 0.006, 0.0008)); t.build(trigger); trigger.position.set(0, -0.037, -0.012);
+  const chamberRound = roundGroup('12ga'), extractRound = roundGroup('12ga'), feedRound = roundGroup('12ga');
+  root.add(chamberRound, feedRound); slide.add(extractRound); chamberRound.visible = extractRound.visible = feedRound.visible = false;
+  return finish(root, '12ga', 1.4, new THREE.Vector3(0, 0.004, -0.692), { slide, trigger, pump, chamberRound, extractRound, feedRound });
+}
+
+/* ---------- Double Bundle (side-by-side break action) ---------- */
+function buildDouble() {
+  const root = new THREE.Group(), trigger = new THREE.Group(), barrels = new THREE.Group(), lever = new THREE.Group();
+  root.add(trigger, barrels, lever);
+  const b = new PB();
+  b.add('blued', sideEx([[-0.08, -0.03], [-0.08, 0.012], [-0.06, 0.015], [0.01, 0.015], [0.02, 0.0], [0.02, -0.035], [-0.03, -0.04]], 0.044, 0.002));
+  b.add('walnut', sideEx([[-0.08, 0.008], [-0.12, 0.004], [-0.43, -0.006], [-0.435, -0.02], [-0.435, -0.14], [-0.41, -0.145], [-0.22, -0.07], [-0.1, -0.05], [-0.08, -0.03]], 0.042, 0.004));
+  b.add('blued', sideEx([[-0.05, -0.04], [0.0, -0.04], [-0.005, -0.058], [-0.03, -0.062], [-0.05, -0.052]], 0.02, 0.0012, [[[-0.043, -0.056], [-0.008, -0.056], [-0.008, -0.043], [-0.043, -0.043]]]));
+  b.add('rubber', box(0.044, 0.13, 0.014), 0, -0.075, 0.44);
+  mkLabel(root, [{ t: 'DOUBLE BUNDLE', b: 1 }, { t: '12ga · TWO PLANS, ONE BILL' }], 0.07, 0.02, 0xc9a24a, -0.0222, -0.012, 0.03, -Math.PI / 2, 0.9);
+  mkLabel(root, [{ t: 'YES' }], 0.03, 0.012, 0xc9a24a, 0.0222, -0.012, 0.03, Math.PI / 2, 0.9);
+  b.build(root);
+  const bb = new PB();
+  for (const x of [-0.0105, 0.0105]) bb.add('blued', lathe([[0.0092, 0], [0.0112, 0], [0.0112, 0.7], [0.0092, 0.7]], 20), x, 0.018, 0);
+  bb.add('blued', box(0.004, 0.003, 0.68), 0, 0.0305, -0.35); bb.add('polished', new THREE.SphereGeometry(0.0022, 8, 6), 0, 0.0335, -0.69);
+  bb.add('walnut', sideEx([[0.02, -0.004], [0.25, -0.004], [0.26, -0.014], [0.24, -0.024], [0.03, -0.024]], 0.04, 0.003), 0, 0.018, 0);
+  bb.build(barrels);
+  barrels.position.set(0, -0.018, -0.02);
+  const mouths = [], chRounds = [];
+  for (const x of [0.0105, -0.0105]) { const o = new THREE.Object3D(); o.position.set(x, 0.018, 0.006); barrels.add(o); mouths.push(o); const r = roundGroup('12ga'); r.position.set(x, 0.018, 0.001); r.visible = false; barrels.add(r); chRounds.push(r); }
+  const lv = new PB(); lv.add('blued', box(0.008, 0.005, 0.03), 0.006, 0.0, 0.015, 0, 0.4, 0); lv.build(lever); lever.position.set(0, 0.017, -0.04);
+  const t = new PB(); t.add('blued', sideEx(TRIG, 0.005, 0.0008)); t.add('blued', sideEx(TRIG, 0.005, 0.0008), 0, 0, 0.014); t.build(trigger); trigger.position.set(0, -0.04, -0.035);
+  return finish(root, '12ga', 1.4, new THREE.Vector3(0.0105, 0, -0.72), { slide: new THREE.Group(), trigger, barrels, lever, mouths, chRounds });
+}
+
+/* ---------- Fibre Lever .357 ---------- */
+function buildLever() {
+  const root = new THREE.Group(), slide = new THREE.Group(), trigger = new THREE.Group(), lever = new THREE.Group(), hammer = new THREE.Group();
+  root.add(slide, trigger, lever, hammer);
+  const b = new PB();
+  b.add('blued', sideEx([[-0.07, -0.03], [-0.07, 0.014], [-0.06, 0.02], [0.1, 0.02], [0.11, 0.01], [0.11, -0.03]], 0.028, 0.0015, [[[-0.03, -0.004], [0.02, -0.004], [0.02, 0.014], [-0.03, 0.014]]]));
+  b.add('blued', lathe([[0.004, 0], [0.0095, 0], [0.0095, 0.45], [0.004, 0.45]], 8, Math.PI / 8), 0, 0, -0.11);
+  b.add('blued', lathe([[0, 0], [0.008, 0], [0.008, 0.42], [0, 0.42]], 14), 0, -0.018, -0.11);
+  b.add('walnut', sideEx([[0.11, -0.004], [0.32, -0.004], [0.33, -0.014], [0.32, -0.03], [0.11, -0.032]], 0.036, 0.003));
+  b.add('walnut', sideEx([[-0.07, 0.012], [-0.1, 0.008], [-0.42, -0.004], [-0.425, -0.02], [-0.425, -0.135], [-0.4, -0.14], [-0.2, -0.07], [-0.1, -0.05], [-0.07, -0.03]], 0.038, 0.004));
+  b.add('polished', box(0.003, 0.01, 0.024), 0.0142, -0.012, -0.03);
+  b.add('blued', box(0.003, 0.009, 0.004), 0, 0.022, -0.54); b.add('sightY', box(0.0034, 0.002, 0.003), 0, 0.0268, -0.54);
+  b.add('blued', box(0.012, 0.006, 0.004), 0, 0.012, -0.2);
+  mkLabel(root, [{ t: 'FIBRE LEVER', b: 1 }, { t: '.357 UNLIMITED' }], 0.06, 0.016, 0xc9a24a, -0.0142, -0.012, -0.03, -Math.PI / 2, 0.9);
+  b.build(root);
+  const s = new PB(); s.add('polished', box(0.014, 0.012, 0.07), 0, 0.012, 0.035); s.build(slide);
+  const lv = new PB();
+  const loop = shapeFrom([[0.0, 0.0], [0.01, -0.01], [0.012, -0.03], [0.004, -0.06], [-0.02, -0.075], [-0.07, -0.07], [-0.09, -0.05], [-0.085, -0.035], [-0.06, -0.032], [-0.03, -0.028], [-0.01, -0.012]]);
+  loop.holes.push(shapeFrom([[-0.02, -0.035], [-0.06, -0.045], [-0.075, -0.052], [-0.06, -0.062], [-0.022, -0.062], [-0.004, -0.05], [0.0, -0.035]], THREE.Path));
+  const lg = new THREE.ExtrudeGeometry(loop, { depth: 0.007, bevelEnabled: true, bevelThickness: 0.001, bevelSize: 0.0008, bevelSegments: 2 }); lg.rotateY(Math.PI / 2); lg.translate(-0.0035, 0, 0);
+  lv.add('blued', lg); lv.build(lever); lever.position.set(0, -0.03, -0.02);
+  const t = new PB(); t.add('polished', sideEx(TRIG, 0.005, 0.0008)); t.build(trigger); trigger.position.set(0, -0.032, 0.02);
+  const hm = new PB(); hm.add('blued', sideEx([[-0.004, -0.01], [0.004, -0.01], [0.003, 0.004], [-0.002, 0.012], [-0.014, 0.015], [-0.015, 0.009], [-0.006, 0.005]], 0.007, 0.0008)); hm.build(hammer); hammer.position.set(0, 0.012, 0.075);
+  const chamberRound = roundGroup('357'), extractRound = roundGroup('357'), feedRound = roundGroup('357');
+  root.add(chamberRound, feedRound); slide.add(extractRound); chamberRound.visible = extractRound.visible = feedRound.visible = false;
+  return finish(root, '357', 1.0, new THREE.Vector3(0, 0, -0.562), { slide, trigger, lever, hammer, chamberRound, extractRound, feedRound });
+}
+
+/* ---------- Tower Bolt .308 ---------- */
+function buildBolt() {
+  const root = new THREE.Group(), slide = new THREE.Group(), trigger = new THREE.Group(), boltHandle = new THREE.Group(), bip = new THREE.Group();
+  root.add(slide, trigger, bip); slide.add(boltHandle);
+  const b = new PB();
+  b.add('blued', lathe([[0, 0], [0.017, 0], [0.017, 0.22], [0, 0.22]], 24), 0, 0, -0.12, 0, Math.PI, 0);
+  b.add('blued', lathe([[0.0045, 0], [0.013, 0], [0.011, 0.6], [0.0045, 0.6]], 20), 0, 0, -0.12);
+  b.add('blued', lathe([[0.0045, 0], [0.012, 0], [0.012, 0.045], [0.0045, 0.045]], 20), 0, 0, -0.72);
+  for (let k = 0; k < 4; k++) b.add('dark', box(0.026, 0.004, 0.008), 0, 0, -0.73 - k * 0.009);
+  b.add('tealCk', sideEx([[0.12, -0.012], [0.4, -0.012], [0.42, -0.02], [0.42, -0.04], [0.4, -0.046], [0.05, -0.05], [-0.02, -0.06], [-0.05, -0.1], [-0.07, -0.13], [-0.1, -0.13], [-0.1, -0.08], [-0.2, -0.06], [-0.4, -0.06], [-0.43, -0.07], [-0.44, -0.16], [-0.41, -0.17], [-0.3, -0.12], [-0.12, -0.03], [-0.1, -0.015]], 0.05, 0.004));
+  b.add('polymer', sideEx([[-0.1, -0.015], [-0.25, 0.0], [-0.35, 0.02], [-0.4, 0.02], [-0.42, 0.01], [-0.42, -0.06], [-0.2, -0.06], [-0.12, -0.03]], 0.038, 0.004));
+  b.add('rubber', box(0.05, 0.12, 0.014), 0, -0.1, 0.447);
+  b.add('anod', box(0.02, 0.008, 0.2), 0, 0.021, -0.02);
+  b.add('blued', sideEx([[-0.015, -0.05], [0.03, -0.05], [0.025, -0.065], [-0.01, -0.07]], 0.022, 0.0012, [[[-0.008, -0.064], [0.02, -0.064], [0.02, -0.054], [-0.008, -0.054]]]));
+  mkLabel(root, [{ t: 'TOWER BOLT', b: 1 }, { t: '.308 TOWER · LONG RANGE PLAN' }], 0.08, 0.018, 0xffd100, -0.0172, -0.002, -0.02, -Math.PI / 2, 0.3);
+  b.build(root);
+  const s = new PB(); s.add('polished', lathe([[0, 0], [0.0085, 0], [0.0085, 0.13], [0, 0.13]], 16), 0, 0, 0.13, 0, Math.PI, 0); s.build(slide);
+  const bh = new PB(); bh.add('polished', cyl(0.003, 0.045, 10), 0.024, 0, 0, 0, 0, Math.PI / 2); bh.add('blackSatin', new THREE.SphereGeometry(0.009, 14, 10), 0.047, 0, 0); bh.build(boltHandle); boltHandle.position.set(0, 0, 0.1);
+  const t = new PB(); t.add('polished', sideEx(TRIG, 0.005, 0.0008)); t.build(trigger); trigger.position.set(0, -0.052, -0.008);
+  const legs = [];
+  for (const x of [-0.022, 0.022]) { const lg = new THREE.Group(); lg.position.set(x, -0.05, -0.42); bip.add(lg); const lp = new PB(); lp.add('anod', box(0.008, 0.008, 0.2), 0, 0, -0.1); lp.add('rubber', new THREE.SphereGeometry(0.008, 8, 6), 0, 0, -0.2); lp.build(lg); lg.userData.dir = -1; legs.push(lg); }
+  const chamberRound = roundGroup('308'), extractRound = roundGroup('308'), feedRound = roundGroup('308');
+  root.add(chamberRound, feedRound); slide.add(extractRound); chamberRound.visible = extractRound.visible = feedRound.visible = false;
+  return finish(root, '308', 1.3, new THREE.Vector3(0, 0, -0.766), { slide, trigger, boltHandle, bipod: legs, chamberRound, extractRound, feedRound });
+}
+
+const hq = (z) => new THREE.Quaternion().setFromAxisAngle(AZ, z);
+Object.assign(DEFS, {
+  s45: { id: 's45', name: 'SIM Ejector .45', cal: '45', capacity: 8, rpm: 900, massKg: 1.1, gripSafety: true,
+    recoil: { back: 1.0, rise: 12, yaw: 2.5, two: 0.6, stock: 1, climb: 0.05 }, trigger: { slack: 0.15, wall: 0.4, brk: 0.55, reset: 0.45 },
+    ejectVel: [1.8, 1.6, 0.4], ejectSpin: 26, boltTravel: 0.066, boltAxis: new THREE.Vector3(0, 0, 1), boltK: 1700, boltC: 15, cycleVel: 80,
+    lockOnEmpty: true, lockPos: 0.9, modes: ['SAFE', 'SEMI'], selRot: { SAFE: 0.35, SEMI: 0 }, haptic: [0.85, 40], muzzle: new THREE.Vector3(0, 0, -0.128), sight: new THREE.Vector3(0, 0.022, 0.08),
+    sizeClass: 'pistol', trigRot: 0.0, feedFrom: new THREE.Vector3(0, -0.02, 0.05), thread: true,
+    well: { top: new THREE.Vector3(0, -0.014, 0.034), axis: new THREE.Vector3(0, Math.cos(18 * deg), -Math.sin(18 * deg)), quat: new THREE.Quaternion().setFromAxisAngle(AX, -18 * deg), travel: 0.12 },
+    mag: MAGDEFS.s45, build: build1911, dims: [0.03, 0.14, 0.22],
+    colliders: [[0, 0.003, -0.1, 0.014], [0, 0.003, -0.05, 0.014], [0, 0.003, 0, 0.014], [0, 0.003, 0.06, 0.014], [0, -0.06, 0.06, 0.016], [0, -0.1, 0.075, 0.016]],
+    grips: [{ type: 'primary', pos: new THREE.Vector3(0, -0.07, 0.06), r: 0.09, pri: 1, pose: [0.75, 0.15, 1, 1, 0.95, 0.5] },
+      { type: 'slide', pos: new THREE.Vector3(0, 0.012, 0.07), quat: hq(Math.PI / 2), r: 0.07, pri: 2, needsOther: true, pose: [0.7, 0.6, 0.8, 0.8, 0.8, 0.6] },
+      { type: 'free', pos: new THREE.Vector3(0, 0, -0.02), r: 0.1, pri: -1 }],
+    stats: [0.6, 0.55, 0.3, 0.45, 0.45], desc: 'Single-action classic. Thumb safety (stick click), grip safety, exposed hammer. 8 rounds of .45 Roaming.' },
+  revolver: { id: 'revolver', cls: Revolver, name: 'Roaming .357', cal: '357', capacity: 6, rpm: 400, massKg: 1.1, feed: 'cylinder', pouch: 'speedloader',
+    recoil: { back: 1.1, rise: 15, yaw: 3, two: 0.6, stock: 1, climb: 0.06 }, trigger: { slack: 0.2, wall: 0.55, brk: 0.8, reset: 0.35 },
+    ejectVel: [0, 0, 1], ejectSpin: 10, boltTravel: 0.01, boltAxis: new THREE.Vector3(0, 0, 1), boltK: 0, boltC: 0, cycleVel: 0,
+    modes: ['DA'], haptic: [0.95, 45], muzzle: new THREE.Vector3(0, 0, -0.137), sight: new THREE.Vector3(0, 0.016, 0.03),
+    sizeClass: 'pistol', trigRot: 0.35, build: buildRevolver, dims: [0.04, 0.14, 0.22],
+    colliders: [[0, 0, -0.12, 0.012], [0, 0, -0.07, 0.013], [0, -0.013, 0, 0.02], [0, -0.07, 0.045, 0.017], [0, -0.105, 0.055, 0.017]],
+    grips: [{ type: 'primary', pos: new THREE.Vector3(0, -0.075, 0.05), r: 0.09, pri: 1, pose: [0.75, 0.15, 1, 1, 0.95, 0.5] }, { type: 'free', pos: new THREE.Vector3(0, 0, -0.03), r: 0.1, pri: -1 }],
+    stats: [0.75, 0.75, 0.2, 0.3, 0.5], desc: 'Swing-out double action. A: crane, B: eject, stick: thumb-cock. Speedloader in the pouch.' },
+  smg: { id: 'smg', name: 'Unlimited SMG', cal: '9mm', capacity: 30, rpm: 800, massKg: 2.6, hkNotch: true,
+    recoil: { back: 0.35, rise: 3.2, yaw: 1.6, two: 0.5, stock: 0.6, climb: 0.012 }, trigger: { slack: 0.2, wall: 0.5, brk: 0.68, reset: 0.45 },
+    ejectVel: [2.0, 0.8, 0.3], ejectSpin: 24, boltTravel: 0.085, boltAxis: new THREE.Vector3(0, 0, 1), boltK: 1100, boltC: 12, cycleVel: 62,
+    lockOnEmpty: false, lockPos: 0.97, modes: ['SAFE', 'SEMI', 'BURST', 'AUTO'], selRot: { SAFE: 0, SEMI: 0.6, BURST: 1.2, AUTO: 1.8 }, haptic: [0.6, 30],
+    muzzle: new THREE.Vector3(0, 0, -0.395), sight: new THREE.Vector3(0, 0.049, 0.042), stock: new THREE.Vector3(0, -0.03, 0.37), sizeClass: 'long', trigRot: 0.3,
+    feedFrom: new THREE.Vector3(0, -0.025, -0.0), thread: true,
+    well: { top: new THREE.Vector3(0, -0.02, -0.015), axis: new THREE.Vector3(0, 1, 0), quat: new THREE.Quaternion(), travel: 0.08 },
+    mag: MAGDEFS.smg, build: buildSMG, dims: [0.05, 0.18, 0.76],
+    colliders: [[0, 0.005, -0.33, 0.022], [0, 0.005, -0.24, 0.025], [0, 0.005, -0.12, 0.024], [0, 0.005, 0.0, 0.024], [0, 0.005, 0.12, 0.024], [0, -0.09, 0.05, 0.022], [0, -0.02, 0.26, 0.03], [0, -0.03, 0.36, 0.035]],
+    rails: [{ a: new THREE.Vector3(0, 0.036, 0.0), b: new THREE.Vector3(0, 0.036, 0.08), types: ['optic'] }, { a: new THREE.Vector3(0, -0.042, -0.31), b: new THREE.Vector3(0, -0.042, -0.23), types: ['grip', 'light', 'laser'], flip: true }],
+    grips: [{ type: 'primary', pos: new THREE.Vector3(0, -0.075, 0.06), r: 0.09, pri: 1, pose: [0.75, 0.15, 1, 1, 0.95, 0.5] },
+      { type: 'secondary', pos: new THREE.Vector3(0, -0.015, -0.27), seg: 0.06, quat: hq(-Math.PI / 2), r: 0.08, pri: 2, needsOther: true, pose: [0.7, 0.85, 0.9, 0.9, 0.9, 0.85] },
+      { type: 'charging', pos: new THREE.Vector3(-0.024, 0.02, -0.19), quat: hq(Math.PI / 2), r: 0.06, pri: 2.5, needsOther: true, pose: [0.7, 0.8, 0.8, 0.8, 0.8, 0.8] },
+      { type: 'free', pos: new THREE.Vector3(0, 0, -0.08), r: 0.14, pri: -1 }],
+    stats: [0.45, 0.25, 0.95, 0.9, 0.5], desc: 'Roller-delayed 9mm. Pull the side handle back into the notch, then slap it home. SAFE/SEMI/BURST/AUTO.' },
+  pump: { id: 'pump', name: 'Plan Switcher 870', cal: '12ga', capacity: 6, rpm: 300, massKg: 3.4, manual: true, feed: 'tube', pouch: 'round', choke: 0.028,
+    recoil: { back: 1.1, rise: 9, yaw: 3, two: 0.5, stock: 0.6, climb: 0.05 }, trigger: { slack: 0.2, wall: 0.5, brk: 0.7, reset: 0.45 },
+    ejectVel: [2.0, 1.0, 0.2], ejectSpin: 12, boltTravel: 0.09, boltAxis: new THREE.Vector3(0, 0, 1), boltK: 0, boltC: 6, cycleVel: 0,
+    modes: ['SEMI'], haptic: [1.0, 60], muzzle: new THREE.Vector3(0, 0.004, -0.692), sight: new THREE.Vector3(0, 0.02, 0.1), stock: new THREE.Vector3(0, -0.06, 0.43),
+    sizeClass: 'long', trigRot: 0.3, feedFrom: new THREE.Vector3(0, -0.022, -0.02), gate: new THREE.Vector3(0, -0.04, -0.03), build: buildPump, dims: [0.05, 0.15, 1.1],
+    colliders: [[0, 0.004, -0.62, 0.016], [0, 0.0, -0.48, 0.02], [0, -0.01, -0.32, 0.026], [0, -0.005, -0.15, 0.024], [0, 0, 0.0, 0.028], [0, -0.03, 0.15, 0.028], [0, -0.05, 0.3, 0.035], [0, -0.07, 0.42, 0.04]],
+    grips: [{ type: 'primary', pos: new THREE.Vector3(0, -0.07, 0.07), r: 0.09, pri: 1, pose: [0.75, 0.15, 1, 1, 0.95, 0.5] },
+      { type: 'pump', pos: new THREE.Vector3(0, -0.018, -0.29), quat: hq(-Math.PI / 2), r: 0.09, pri: 2, needsOther: true, pose: [0.7, 0.85, 0.9, 0.9, 0.9, 0.85] },
+      { type: 'free', pos: new THREE.Vector3(0, 0, -0.2), r: 0.15, pri: -1 }],
+    stats: [0.9, 0.85, 0.35, 0.3, 0.7], desc: 'Pump it with your support hand. Feed shells through the gate underneath. A: action release.' },
+  double: { id: 'double', cls: BreakAction, name: 'Double Bundle', cal: '12ga', capacity: 2, rpm: 600, massKg: 3.2, barrels: 2, breakMax: 0.6, pouch: 'round', choke: 0.022,
+    recoil: { back: 1.2, rise: 10, yaw: 3, two: 0.5, stock: 0.6, climb: 0.05 }, trigger: { slack: 0.2, wall: 0.5, brk: 0.72, reset: 0.45 },
+    ejectVel: [0, 1, 1], ejectSpin: 8, boltTravel: 0.01, boltAxis: new THREE.Vector3(0, 0, 1), boltK: 0, boltC: 0, cycleVel: 0,
+    modes: ['SEMI'], haptic: [1.0, 60], muzzle: new THREE.Vector3(0.0105, 0, -0.72), muzzles: [new THREE.Vector3(0.0105, 0, -0.72), new THREE.Vector3(-0.0105, 0, -0.72)],
+    sight: new THREE.Vector3(0, 0.03, 0.0), stock: new THREE.Vector3(0, -0.07, 0.44), sizeClass: 'long', trigRot: 0.3, build: buildDouble, dims: [0.05, 0.15, 1.15],
+    colliders: [[0, 0, -0.62, 0.02], [0, 0, -0.45, 0.022], [0, -0.005, -0.28, 0.026], [0, -0.01, -0.1, 0.028], [0, -0.03, 0.08, 0.028], [0, -0.05, 0.25, 0.035], [0, -0.07, 0.42, 0.04]],
+    grips: [{ type: 'primary', pos: new THREE.Vector3(0, -0.07, 0.07), r: 0.09, pri: 1, pose: [0.75, 0.15, 1, 1, 0.95, 0.5] },
+      { type: 'secondary', pos: new THREE.Vector3(0, -0.005, -0.18), seg: 0.08, quat: hq(-Math.PI / 2), r: 0.08, pri: 2, needsOther: true, pose: [0.7, 0.85, 0.9, 0.9, 0.9, 0.85] },
+      { type: 'free', pos: new THREE.Vector3(0, 0, -0.2), r: 0.15, pri: -1 }],
+    stats: [0.95, 0.9, 0.15, 0.6, 0.65], desc: 'Break it open (A), drop shells in, flick it shut. Trigger fires right, B fires left.' },
+  lever: { id: 'lever', name: 'Fibre Lever .357', cal: '357', capacity: 8, rpm: 400, massKg: 3.0, manual: true, feed: 'tube', pouch: 'round', quickStroke: true, spinCock: true,
+    recoil: { back: 0.6, rise: 6, yaw: 2, two: 0.5, stock: 0.6, climb: 0.03 }, trigger: { slack: 0.2, wall: 0.45, brk: 0.62, reset: 0.4 },
+    ejectVel: [0.3, 2.4, 0.4], ejectSpin: 18, boltTravel: 0.06, boltAxis: new THREE.Vector3(0, 0, 1), driveAxis: new THREE.Vector3(0, -0.94, 0.34), driveTravel: 0.075, boltK: 0, boltC: 6, cycleVel: 0,
+    modes: ['SEMI'], haptic: [0.8, 40], muzzle: new THREE.Vector3(0, 0, -0.562), sight: new THREE.Vector3(0, 0.026, 0.0), stock: new THREE.Vector3(0, -0.06, 0.42),
+    sizeClass: 'long', trigRot: 0.3, feedFrom: new THREE.Vector3(0, -0.018, -0.02), gate: new THREE.Vector3(0.016, -0.012, -0.03), build: buildLever, dims: [0.04, 0.15, 1.0],
+    colliders: [[0, 0, -0.5, 0.014], [0, -0.005, -0.36, 0.02], [0, -0.01, -0.2, 0.024], [0, -0.005, -0.04, 0.026], [0, -0.03, 0.12, 0.028], [0, -0.05, 0.28, 0.034], [0, -0.07, 0.41, 0.04]],
+    grips: [{ type: 'primary', pos: new THREE.Vector3(0, -0.06, 0.075), r: 0.09, pri: 1, pose: [0.75, 0.15, 1, 1, 0.95, 0.5] },
+      { type: 'secondary', pos: new THREE.Vector3(0, -0.015, -0.22), seg: 0.08, quat: hq(-Math.PI / 2), r: 0.08, pri: 2, needsOther: true, pose: [0.7, 0.85, 0.9, 0.9, 0.9, 0.85] },
+      { type: 'lever', pos: new THREE.Vector3(0, -0.075, 0.035), quat: hq(0), r: 0.05, pri: 2.5, needsOther: true, move: new THREE.Vector3(0, -0.055, 0.03), pose: [0.6, 0.8, 0.9, 0.9, 0.9, 0.8] },
+      { type: 'free', pos: new THREE.Vector3(0, 0, -0.2), r: 0.15, pri: -1 }],
+    stats: [0.7, 0.45, 0.45, 0.45, 0.6], desc: 'Work the lever with your other hand, press A, or spin-cock it. Loading gate on the right side.' },
+  sniper: { id: 'sniper', name: 'Tower Bolt .308', cal: '308', capacity: 5, rpm: 200, massKg: 5.2, manual: true, feed: 'internal', pouch: 'clip', boltLift: 0.18, thread: true,
+    recoil: { back: 0.9, rise: 7, yaw: 1.5, two: 0.5, stock: 0.55, climb: 0.04 }, trigger: { slack: 0.15, wall: 0.35, brk: 0.45, reset: 0.35 },
+    ejectVel: [2.2, 1.2, 0.3], ejectSpin: 14, boltTravel: 0.1, boltAxis: new THREE.Vector3(0, 0, 1), boltK: 0, boltC: 6, cycleVel: 0,
+    modes: ['SEMI'], haptic: [1.0, 55], muzzle: new THREE.Vector3(0, 0, -0.766), sight: new THREE.Vector3(0, 0.08, 0.05), stock: new THREE.Vector3(0, -0.08, 0.445),
+    sizeClass: 'long', trigRot: 0.25, feedFrom: new THREE.Vector3(0, -0.02, -0.01), gate: new THREE.Vector3(0, 0.03, 0.04), build: buildBolt, dims: [0.06, 0.2, 1.2],
+    bipod: [[-0.022, -0.25, -0.43], [0.022, -0.25, -0.43]], preAttach: ['scope'],
+    colliders: [[0, 0, -0.68, 0.016], [0, 0, -0.5, 0.018], [0, -0.02, -0.32, 0.03], [0, -0.02, -0.12, 0.034], [0, -0.03, 0.05, 0.034], [0, -0.07, 0.2, 0.034], [0, -0.08, 0.35, 0.04], [0, -0.1, 0.44, 0.045]],
+    rails: [{ a: new THREE.Vector3(0, 0.025, -0.1), b: new THREE.Vector3(0, 0.025, 0.06), types: ['optic'] }],
+    grips: [{ type: 'primary', pos: new THREE.Vector3(0, -0.075, 0.08), r: 0.09, pri: 1, pose: [0.75, 0.15, 1, 1, 0.95, 0.5] },
+      { type: 'secondary', pos: new THREE.Vector3(0, -0.03, -0.3), seg: 0.1, quat: hq(-Math.PI / 2), r: 0.09, pri: 2, needsOther: true, pose: [0.7, 0.85, 0.9, 0.9, 0.9, 0.85] },
+      { type: 'bolt', pos: new THREE.Vector3(0.047, 0, 0.1), quat: hq(Math.PI / 2), r: 0.05, pri: 2.5, needsOther: true, move: new THREE.Vector3(-0.03, 0.035, 0.085), pose: [0.6, 0.6, 0.7, 0.8, 0.8, 0.6] },
+      { type: 'free', pos: new THREE.Vector3(0, 0, -0.2), r: 0.16, pri: -1 }],
+    stats: [1.0, 0.6, 0.15, 0.15, 0.95], desc: 'Lift and pull the bolt. Top-load with a stripper clip. B: bipod. Twist the scope turrets (0.1 mil) and zoom ring (4–12x).' }
+});
+Object.assign(DEFS.p9, { thread: true, rails: [{ a: new THREE.Vector3(0, -0.029, -0.095), b: new THREE.Vector3(0, -0.029, -0.07), types: ['light', 'laser'], flip: true }] });
+Object.assign(DEFS.carbine, { thread: true, rails: [{ a: new THREE.Vector3(0, 0.034, -0.34), b: new THREE.Vector3(0, 0.034, 0.06), types: ['optic', 'light', 'laser'] }, { a: new THREE.Vector3(0, -0.023, -0.35), b: new THREE.Vector3(0, -0.023, -0.16), types: ['grip', 'light', 'laser'], flip: true }] });
+
+/* ============================================================
+   ATTACHMENTS — rail snapping, twist-on suppressor, reflex (infinity-projected reticle),
+   4–12x scope (render-to-texture, FFP mil reticle, turrets), laser, light, foregrips
+   ============================================================ */
+const attachments = [];
+const REFLEX_VS = `varying vec3 vW; varying vec2 vUv; void main(){ vUv = uv; vec4 w = modelMatrix * vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }`;
+const REFLEX_FS = `uniform vec3 uF; uniform vec3 uR; uniform vec3 uU; uniform float uB; uniform float uType; varying vec3 vW; varying vec2 vUv;
+void main(){
+  vec3 d = normalize(vW - cameraPosition); float fz = dot(d, uF); if (fz <= 0.0) discard;
+  vec2 t = vec2(dot(d, uR), dot(d, uU)) / fz;           // angular offset from the sight's axis: reticle projected to infinity
+  float a;
+  if (uType < 0.5) { float r = length(t); a = smoothstep(0.0009, 0.0005, r) + 0.25 * smoothstep(0.003, 0.0, r); }
+  else { vec2 q = t / 0.004; float ring = smoothstep(0.1, 0.0, abs(length(q * vec2(1.0, 0.85)) - 1.0)); float e = smoothstep(0.14, 0.08, length(q - vec2(-0.3, 0.05))) + smoothstep(0.14, 0.08, length(q - vec2(0.3, 0.05))); a = max(ring, e); }
+  float edge = smoothstep(0.5, 0.45, length(vUv - 0.5));
+  vec3 col = vec3(1.0, 0.12, 0.08) * a * uB * 3.0 + vec3(0.05, 0.12, 0.14);
+  gl_FragColor = vec4(col, max(a * uB, 0.1) * edge);
+}`;
+const SCOPE_FS = `uniform sampler2D map; uniform float uFov; uniform vec2 uEye; uniform float uEyeD; uniform float uOn; varying vec2 vUv;
+void main(){
+  vec2 c = vUv - 0.5; float r = length(c) * 2.0; if (r > 1.0) discard;
+  vec3 col = texture2D(map, vUv + uEye * 0.06).rgb * uOn;
+  float eb = smoothstep(1.0, 0.45, length(uEye)) * smoothstep(0.17, 0.07, abs(uEyeD - 0.085));
+  col *= eb * smoothstep(1.0, 0.82, r + length(uEye) * 0.35);
+  vec2 p = c * uFov / 0.001;                              // first focal plane: position in mils
+  float lw = 0.035 * uFov / 0.02;
+  float ln = step(abs(p.y), lw) + step(abs(p.x), lw);
+  vec2 n = floor(p + 0.5); float dd = length(p - n);
+  float dt = (abs(n.y) < 0.5 || abs(n.x) < 0.5) && length(n) < 10.5 && length(n) > 0.5 ? smoothstep(0.12, 0.08, dd) : 0.0;
+  float post = (abs(p.y) < 0.22 && abs(p.x) > 6.0) || (abs(p.x) < 0.22 && p.y < -6.0) ? 1.0 : 0.0;
+  float ret = clamp(ln + dt + post, 0.0, 1.0);
+  col = mix(col, vec3(0.01), ret);
+  gl_FragColor = vec4(col, 1.0);
+}`;
+const SCOPE = { rt: null, cam: null, active: null };
+const ATT = {
+  reddot: { name: 'Optus Dot', slot: 'optic', mass: 0.15, eye: new THREE.Vector3(0, 0.03, 0.02) },
+  scope: { name: 'Tower 4–12x', slot: 'optic', mass: 0.6, eye: new THREE.Vector3(0, 0.035, 0.26) },
+  supp: { name: 'Mute Mode', slot: 'muzzle', mass: 0.35, len: 0.16 },
+  laser: { name: 'Beam Plan', slot: 'laser', mass: 0.08 },
+  light: { name: 'Coverage Light', slot: 'light', mass: 0.12 },
+  vgrip: { name: 'Vertical Grip', slot: 'grip', mass: 0.1, bonus: 0.35 },
+  agrip: { name: 'Angled Grip', slot: 'grip', mass: 0.08, bonus: 0.4 }
+};
+function buildAttachment(type) {
+  const root = new THREE.Group(), pb = new PB(), P = { root };
+  if (type === 'reddot') {
+    pb.add('anod', box(0.024, 0.008, 0.035), 0, 0.004, 0); pb.add('tealCk', sideEx([[-0.018, 0.008], [0.018, 0.008], [0.016, 0.042], [-0.016, 0.042]], 0.028, 0.002), 0, 0, 0);
+    pb.add('anod', cyl(0.004, 0.008, 12), 0.016, 0.02, 0.0, 0, 0, Math.PI / 2);
+    pb.build(root);
+    const mat = new THREE.ShaderMaterial({ uniforms: { uF: { value: new THREE.Vector3() }, uR: { value: new THREE.Vector3() }, uU: { value: new THREE.Vector3() }, uB: { value: 1 }, uType: { value: 0 } },
+      vertexShader: REFLEX_VS, fragmentShader: REFLEX_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.0115, 24), mat); lens.position.set(0, 0.026, 0.0); lens.userData.noRim = true; root.add(lens); P.lens = lens;
+  } else if (type === 'scope') {
+    pb.add('anod', box(0.02, 0.012, 0.03), 0, 0.006, -0.04); pb.add('anod', box(0.02, 0.012, 0.03), 0, 0.006, 0.06);
+    pb.add('anod', box(0.03, 0.02, 0.018), 0, 0.02, -0.04); pb.add('anod', box(0.03, 0.02, 0.018), 0, 0.02, 0.06);
+    pb.add('blackSatin', lathe([[0, 0], [0.019, 0], [0.019, 0.05], [0.0128, 0.07], [0.0128, 0.22], [0.022, 0.26], [0.022, 0.32], [0, 0.32]], 28), 0, 0.035, 0.27);
+    pb.add('tealCk', lathe([[0.0195, 0], [0.0205, 0.002], [0.0205, 0.028], [0.0195, 0.03]], 28), 0, 0.035, 0.235);
+    pb.add('glass', new THREE.CircleGeometry(0.02, 24), 0, 0.035, -0.0505, 0, Math.PI, 0);
+    pb.build(root);
+    P.elev = new THREE.Group(); P.elev.position.set(0, 0.052, 0.0); root.add(P.elev); const e = new PB(); e.add('tealCk', cyl(0.011, 0.016, 20), 0, 0.008, 0); e.add('sightY', box(0.002, 0.003, 0.004), 0, 0.016, 0.01); e.build(P.elev);
+    P.wind = new THREE.Group(); P.wind.position.set(0.017, 0.035, 0.0); root.add(P.wind); const w = new PB(); w.add('tealCk', cyl(0.011, 0.016, 20), 0.008, 0, 0, 0, 0, Math.PI / 2); w.add('sightY', box(0.003, 0.004, 0.002), 0.016, 0.01, 0); w.build(P.wind);
+    const oc = new THREE.Mesh(new THREE.CircleGeometry(0.0185, 32), new THREE.ShaderMaterial({ uniforms: { map: { value: SCOPE.rt.texture }, uFov: { value: 0.1 }, uEye: { value: new THREE.Vector2() }, uEyeD: { value: 0.1 }, uOn: { value: 0 } },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`, fragmentShader: SCOPE_FS }));
+    oc.position.set(0, 0.035, 0.2705); oc.userData.noRim = true; root.add(oc); P.ocular = oc;
+    P.objective = new THREE.Object3D(); P.objective.position.set(0, 0.035, -0.06); root.add(P.objective);
+  } else if (type === 'supp') {
+    pb.add('tealCk', lathe([[0.005, 0], [0.016, 0.002], [0.017, 0.01], [0.017, 0.15], [0.015, 0.16], [0.005, 0.16]], 28), 0, 0, 0);
+    for (let k = 0; k < 6; k++) pb.add('blackSatin', lathe([[0.0171, 0], [0.0174, 0.002], [0.0171, 0.004]], 28), 0, 0, -0.03 - k * 0.018);
+    pb.build(root);
+    mkLabel(root, [{ t: 'MUTE MODE', b: 1 }], 0.06, 0.01, 0x063a3f, -0.0172, 0, -0.08, -Math.PI / 2, 0.2);
+  } else if (type === 'laser') {
+    pb.add('anod', box(0.022, 0.018, 0.04), 0, 0.012, 0); pb.add('dark', cyl(0.004, 0.002, 12), 0.005, 0.014, -0.0205, Math.PI / 2, 0, 0); pb.add('tealCk', box(0.008, 0.004, 0.01), 0, 0.022, 0.01); pb.build(root);
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.0012, 0.0012, 1).translate(0, 0, -0.5), M.laser); beam.position.set(0.005, 0.014, -0.02); beam.visible = false; beam.userData.noRim = true; root.add(beam); P.beam = beam;
+    P.dot = glowSprite(0xff2020, 0.03, 1); P.dot.visible = false; scene.add(P.dot);
+  } else if (type === 'light') {
+    pb.add('blackSatin', lathe([[0, 0], [0.013, 0], [0.013, 0.02], [0.011, 0.03], [0.011, 0.09], [0, 0.09]], 20), 0, 0.02, 0.045); pb.add('anod', box(0.014, 0.008, 0.03), 0, 0.004, 0); pb.add('emWarm', new THREE.CircleGeometry(0.011, 18), 0, 0.02, -0.0455, 0, Math.PI, 0); pb.build(root);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.4, 20, 1, true).translate(0, -1.2, 0).rotateX(-Math.PI / 2), M.lightCone); cone.position.set(0, 0.02, -0.05); cone.visible = false; cone.userData.noRim = true; root.add(cone); P.cone = cone;
+  } else if (type === 'vgrip') {
+    pb.add('anod', box(0.02, 0.008, 0.035), 0, 0.004, 0); pb.add('polymer', lathe([[0, 0], [0.013, 0], [0.015, 0.1], [0, 0.105]], 16), 0, 0.008, 0, -Math.PI / 2, 0, 0); pb.build(root);
+  } else if (type === 'agrip') {
+    pb.add('polymer', sideEx([[-0.05, 0.0], [0.035, 0.0], [0.03, 0.01], [-0.02, 0.035], [-0.05, 0.03]], 0.022, 0.003), 0, 0, 0, Math.PI, 0, 0); pb.build(root);
+  }
+  root.traverse(o => { if (o.isMesh && !o.material.transparent) o.castShadow = true; });
+  return P;
+}
+class Attachment {
+  constructor(type) {
+    this.type = type; this.def = ATT[type]; const P = this.parts = buildAttachment(type); this.obj = P.root; scene.add(this.obj);
+    this.gun = null; this.thread = 0; this.mag = 6; this.elevC = 0; this.windC = 0; this.acc = 0;
+    const sp = type === 'scope' ? [[0, 0.035, 0.2, 0.024], [0, 0.035, 0.05, 0.02], [0, 0.035, -0.02, 0.022]] : type === 'supp' ? [[0, 0, -0.03, 0.018], [0, 0, -0.12, 0.018]] : type === 'vgrip' ? [[0, -0.03, 0, 0.015], [0, -0.08, 0, 0.015]] : [[0, 0.012, 0, 0.018]];
+    this.body = addBody(new Body({ obj: this.obj, owner: this, mass: this.def.mass, dims: [0.04, 0.05, type === 'scope' ? 0.33 : 0.1], spheres: sp, mat: 'polymer', layer: L.SMALL, ccd: true, ccdR: 0.015 }));
+    const cp = type === 'scope' ? new THREE.Vector3(0, 0.035, 0.1) : type === 'supp' ? new THREE.Vector3(0, 0, -0.08) : new THREE.Vector3(0, 0.01, 0);
+    const points = [{ type: 'free', pos: cp, r: type === 'scope' ? 0.1 : 0.07, pri: 0.3 }];
+    const need = (h) => !!this.gun && !!this.gun.primaryHand() && this.gun.primaryHand() !== h;
+    if (type === 'reddot') points.push({ type: 'knob', pos: new THREE.Vector3(0.018, 0.02, 0), axis: new THREE.Vector3(1, 0, 0), r: 0.03, pri: 3, cond: need, pose: [0.4, 0.5, 0.7, 0.9, 0.9, 0.5],
+      turn: (a) => { const u = this.parts.lens.material.uniforms.uB; u.value = clamp(u.value + a * 0.4, 0.15, 1.6); } });   // brightness dial
+    if (type === 'scope') {
+      points.push({ type: 'knob', pos: new THREE.Vector3(0, 0.07, 0), axis: new THREE.Vector3(0, 1, 0), r: 0.035, pri: 3, cond: need, pose: [0.4, 0.5, 0.7, 0.9, 0.9, 0.5], turn: (a) => this.click('elev', a) });
+      points.push({ type: 'knob', pos: new THREE.Vector3(0.035, 0.035, 0), axis: new THREE.Vector3(1, 0, 0), r: 0.035, pri: 3, cond: need, pose: [0.4, 0.5, 0.7, 0.9, 0.9, 0.5], turn: (a) => this.click('wind', a) });
+      points.push({ type: 'knob', pos: new THREE.Vector3(0, 0.035, 0.25), axis: new THREE.Vector3(0, 0, 1), r: 0.04, pri: 3, cond: need, pose: [0.5, 0.6, 0.7, 0.8, 0.8, 0.6], turn: (a) => { this.mag = clamp(this.mag - a * 3, 4, 12); } });
+    }
+    this.item = registerGrab({ kind: 'attach', obj: this.obj, body: this.body, owner: this, size: 'small', points });
+    attachments.push(this);
+  }
+  click(which, a) {
+    this.acc += a; const step = Math.PI / 20;
+    while (Math.abs(this.acc) >= step) {
+      const s = Math.sign(this.acc); this.acc -= s * step;
+      if (which === 'elev') this.elevC += s; else this.windC += s;
+      AUDIO.play('tick', this.body.pos, 1.5); const h = heldBy(this.item); if (h) pulse(h, 0.12, 6); for (const hh of hands) if (hh.hold && hh.hold.it === this.item) pulse(hh, 0.12, 6);
+    }
+    this.parts.elev.rotation.y = this.elevC * step; this.parts.wind.rotation.x = this.windC * step;
+  }
+  // Called when the hand lets go: snap to the nearest compatible rail slot (or leave it loose).
+  tryMount() {
+    if (this.def.slot === 'muzzle') return false;
+    const pos = this.body.pos, up = _mv.set(0, 1, 0).applyQuaternion(this.body.quat), fw = _mw.set(0, 0, -1).applyQuaternion(this.body.quat).clone();
+    for (const g of firearms) {
+      if (!g.def.rails || g.body.pos.distanceToSquared(pos) > 1) continue;
+      _im.copy(g.obj.matrixWorld).invert(); const lp = V3().copy(pos).applyMatrix4(_im);
+      for (const r of g.def.rails) {
+        if (r.types.indexOf(this.def.slot) < 0) continue;
+        const ab = V3().subVectors(r.b, r.a), t = clamp(V3().subVectors(lp, r.a).dot(ab) / ab.lengthSq(), 0, 1), cp = V3().copy(r.a).addScaledVector(ab, t);
+        if (cp.distanceTo(lp) > (G.xr ? 0.05 : 0.2)) continue;
+        const gu = V3(0, r.flip ? -1 : 1, 0).applyQuaternion(g.body.quat), gf = V3(0, 0, -1).applyQuaternion(g.body.quat);
+        if (G.xr && (up.dot(gu) < 0.6 || fw.dot(gf) < 0.6)) continue;
+        if (g.attach.some(a => a.def.slot === this.def.slot || (a.def.slot === 'optic' && this.def.slot === 'optic'))) continue;
+        const len = ab.length(), s = Math.round(t * len / 0.01) * 0.01; cp.copy(r.a).addScaledVector(ab, len > 0 ? s / len : 0);
+        this.mount(g, cp, r.flip); return true;
+      }
+    }
+    return false;
+  }
+  mount(g, local, flip) {
+    this.gun = g; g.attach.push(this);
+    this.body.kinematic = true; this.body.vel.set(0, 0, 0); this.body.ang.set(0, 0, 0);
+    g.obj.add(this.obj); this.obj.position.copy(local); this.obj.quaternion.copy(flip ? hq(Math.PI) : _fq.identity());
+    if (this.def.slot === 'muzzle') { g.supp = this; this.muzzleOut = g.def.muzzle.clone().add(V3(0, 0, -this.def.len)); }
+    if (this.def.slot === 'grip') {
+      const cond = (h) => { const ph = g.primaryHand(); return !!ph && ph !== h; };
+      this.gp = { type: 'secondary', pos: local.clone().add(V3(0, flip ? -0.06 : 0.06, 0)), quat: new THREE.Quaternion(), r: 0.06, pri: 2.4, cond, pose: [0.75, 0.2, 1, 1, 0.95, 0.2] };
+      g.item.points.push(this.gp); g.gripBonus = this.def.bonus;
+    }
+    setRim(this.item, false);
+    AUDIO.play('magSeat', this.body.pos, 0.7); g.buzz(0.4, 25);
+  }
+  detach(toHand) {
+    const g = this.gun; if (!g) return;
+    g.attach.splice(g.attach.indexOf(this), 1); this.gun = null;
+    if (g.supp === this) g.supp = null;
+    if (this.gp) { g.item.points.splice(g.item.points.indexOf(this.gp), 1); this.gp = null; g.gripBonus = 0; for (const h of hands) if (h.hold && h.hold.kind === 'secondary' && h.hold.it === g.item && !g.item.points.some(p => p === h.hold.gp)) h.hold = null; }
+    g.obj.updateMatrixWorld(true); scene.attach(this.obj);
+    this.body.setPose(this.obj.position, this.obj.quaternion); this.body.kinematic = false; this.body.wake();
+    if (this.parts.beam) { this.parts.beam.visible = false; this.parts.dot.visible = false; }
+    if (this.parts.cone) this.parts.cone.visible = false;
+    if (SPOT.owner === this) { SPOT.owner = null; SPOT.light.intensity = 0; }
+    AUDIO.play('magOut', this.body.pos, 0.6);
+  }
+  // Suppressor: hold it against a threaded muzzle and twist it on — three full turns.
+  heldUpdate(h) {
+    if (this.def.slot !== 'muzzle' || this.gun) return;
+    for (const g of firearms) {
+      if (!g.def.thread || g.supp) continue;
+      _mz.copy(g.def.muzzle).applyQuaternion(g.body.quat).add(g.body.pos);
+      if (this.body.pos.distanceTo(_mz) > (G.xr ? 0.045 : 0.1)) continue;
+      const ax = _mw.set(0, 0, -1).applyQuaternion(g.body.quat), sa = _mv.set(0, 0, -1).applyQuaternion(this.body.quat);
+      if (sa.dot(ax) < 0.9) continue;
+      const before = Math.floor(this.thread / (Math.PI / 2));
+      this.thread += G.xr ? Math.abs(h.angVel.dot(ax)) / 72 : 0.25;
+      if (Math.floor(this.thread / (Math.PI / 2)) > before) { AUDIO.play('tick', _mz, 1); pulse(h, 0.15, 8); }
+      if (this.thread >= Math.PI * 6) { this.thread = 0; release(h, true); this.mount(g, g.def.muzzle.clone(), false); toast('Mute Mode on'); }
+      return;
+    }
+  }
+  update(dt, g) {
+    const held = !!g.primaryHand();
+    if (this.type === 'reddot') {
+      const u = this.parts.lens.material.uniforms, q = this.obj.getWorldQuaternion(Q4());
+      u.uF.value.set(0, 0, -1).applyQuaternion(q); u.uR.value.set(1, 0, 0).applyQuaternion(q); u.uU.value.set(0, 1, 0).applyQuaternion(q);
+    } else if (this.type === 'laser') {
+      const b = this.parts.beam, dot = this.parts.dot; b.visible = held;
+      if (held) {
+        b.getWorldPosition(_mz); _md.set(0, 0, -1).applyQuaternion(g.body.quat);
+        let t = PHYS.bvh.raycast(_mz, _md, 60, 0, _bh); if (t < 0) t = 60;
+        b.scale.z = t; dot.visible = t < 60; dot.position.copy(_mz).addScaledVector(_md, t - 0.01);
+      } else dot.visible = false;
+    } else if (this.type === 'light') {
+      this.parts.cone.visible = held;
+      if (held) { SPOT.owner = this; this.parts.cone.getWorldPosition(SPOT.light.position); SPOT.target.position.copy(SPOT.light.position).addScaledVector(_md.set(0, 0, -1).applyQuaternion(g.body.quat), 5); SPOT.light.intensity = 25; }
+      else if (SPOT.owner === this) { SPOT.light.intensity = 0; SPOT.owner = null; }
+    } else if (this.type === 'scope') {
+      const oc = this.parts.ocular; oc.getWorldPosition(_mz); camera.getWorldPosition(_mv);
+      if (G.xr) _mv.addScaledVector(_mw.set(1, 0, 0).applyQuaternion(camera.getWorldQuaternion(Q4())), G.dom ? 0.032 : -0.032);   // dominant eye
+      const near = held && _mz.distanceTo(_mv) < 0.3;
+      oc.material.uniforms.uOn.value = near ? 1 : 0;
+      if (near) {
+        _im.copy(oc.matrixWorld).invert(); const le = V3().copy(_mv).applyMatrix4(_im);
+        oc.material.uniforms.uEye.value.set(le.x / 0.012, le.y / 0.012); oc.material.uniforms.uEyeD.value = le.z;
+        const fov = 24 * deg / this.mag; oc.material.uniforms.uFov.value = fov;
+        if (!SCOPE.active || _mz.distanceTo(_mv) < SCOPE.dist) { SCOPE.active = this; SCOPE.dist = _mz.distanceTo(_mv); }
+      }
+    }
+  }
+  destroy() {
+    this.detach(false);
+    if (this.parts.dot) this.parts.dot.removeFromParent();
+    for (const h of hands) if (h.hold && h.hold.it === this.item) h.hold = null;
+    if (this.item.slot) this.item.slot.item = null;
+    removeBody(this.body); unregisterGrab(this.item); this.obj.removeFromParent();
+    attachments.splice(attachments.indexOf(this), 1);
+  }
+}
+// One scope renders per frame (the one at your eye), at 512² — skipped entirely when no scope is up.
+function renderScope() {
+  const s = SCOPE.active; SCOPE.active = null; SCOPE.dist = 99;
+  if (!s || !s.gun) return;
+  const cam = SCOPE.cam, q = s.gun.body.quat;
+  s.parts.objective.getWorldPosition(cam.position);
+  cam.quaternion.copy(q).multiply(qEuler(s.elevC * 0.0001, -s.windC * 0.0001, 0));   // 0.1 mil per click
+  cam.fov = 24 / s.mag; cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+  const xr = renderer.xr.enabled, sm = renderer.shadowMap.autoUpdate, vv = VIG.visible;
+  renderer.xr.enabled = false; renderer.shadowMap.autoUpdate = false; VIG.visible = false;
+  renderer.setRenderTarget(SCOPE.rt); renderer.render(scene, cam); renderer.setRenderTarget(null);
+  renderer.xr.enabled = xr; renderer.shadowMap.autoUpdate = sm; VIG.visible = vv;
+}
+function spawnGun(id, p, q) {
+  const def = DEFS[id], g = new (def.cls || Firearm)(def);
+  g.body.setPose(p, q); g.obj.position.copy(p); g.obj.quaternion.copy(q);
+  if (def.preAttach) for (const t of def.preAttach) { const a = new Attachment(t); const r = def.rails[0]; a.mount(g, r.a.clone().lerp(r.b, 0.5), false); }
+  return g;
+}
 
 /* ============================================================
    BALLISTICS — simulated projectiles: gravity, quadratic drag, wind,
@@ -2447,6 +3392,7 @@ function ollieMats() {
   visorGeo();
   OLM.body = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.28, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.08 });
   OLM.visor = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: _visorTex, alphaTest: 0.5, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.1 });
+  OLM.bodyLo = std({ vertexColors: true, roughness: 0.3 }); OLM.visorLo = std({ color: 0xffffff, map: _visorTex, alphaTest: 0.5, roughness: 0.3 });
   OLM.eye = new THREE.MeshPhysicalMaterial({ color: 0x080808, roughness: 0.2, clearcoat: 1 });
   OLM.leg = std({ color: 0x0c0c0c, roughness: 0.5 });
   OLM.hole = new THREE.MeshBasicMaterial({ map: TEX.decHole, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 });
@@ -2486,7 +3432,7 @@ class Ollie {
         }
         if (li < 2) g.add(new THREE.Mesh(legGeo(), mats.leg));
       }
-      g.traverse(m => { if (m.isMesh) { m.castShadow = !this.holo; } });
+      g.traverse(m => { if (m.isMesh) { m.castShadow = false; if (li > 0 && m.material === mats.body) m.material = mats.bodyLo; if (li > 0 && m.material === mats.visor) m.material = mats.visorLo; } });
       lod.addLevel(g, dist);
     });
     this.holes = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.03, 0.03), mats.hole, 20); this.holes.count = 0; this.holes.frustumCulled = false; this.holeN = 0;
@@ -2494,12 +3440,12 @@ class Ollie {
     if (!this.holo) {
       const sh = new THREE.Mesh(new THREE.PlaneGeometry(0.75, 0.55), mats.shadow); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.003; this.root.add(sh);
       if (this.kind === 'popper') {
-        const back = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.012, 32), M.gunmetal); back.rotation.x = Math.PI / 2; back.position.set(0, C.y, -OL.R * 0.72); back.castShadow = true; this.squash.add(back);
+        const back = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.012, 32), M.gunmetal); back.rotation.x = Math.PI / 2; back.position.set(0, C.y, -OL.R * 0.72); back.castShadow = false; this.squash.add(back);
         const post = new THREE.Mesh(box(0.04, OL.leg, 0.02), M.gunmetal); post.position.set(0, OL.leg / 2, -OL.R * 0.72); this.squash.add(post);
         const base = new THREE.Mesh(box(0.46, 0.025, 0.34), M.gunmetal); base.position.y = 0.0125; base.receiveShadow = true; this.root.add(base);
       }
     }
-    this.bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex('yes!'), transparent: true, depthWrite: false })); this.bubble.position.set(0.1, OL.leg + OL.H + 0.28, 0); this.bubble.scale.set(0.001, 0.001, 1); this.root.add(this.bubble);
+    this.bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTex('yes!'), transparent: true, depthWrite: false })); this.bubble.position.set(0.1, OL.leg + OL.H + 0.28, 0); this.bubble.scale.set(0.001, 0.001, 1); this.bubble.visible = false; this.root.add(this.bubble);
     this.joint = new Joint1D({ min: -0.3, max: Math.PI / 2, rest: 0, k: 60, c: 5, bounce: 0.25 });
     this.joint.onStop = (d, v) => { if (d > 0 && this.down && !this.landed) this.land(); };
     this.down = false; this.landed = false; this.sq = 0; this.sqv = 0; this.bubbleT = 9; this.tauntCool = 0; this.spinY = 0;
@@ -2575,8 +3521,9 @@ class Ollie {
     if (this.bubbleT < 2.2) {
       this.bubbleT += dt; const t = this.bubbleT;
       const k = t < 0.25 ? 1 + 2.2 * Math.pow(t / 0.25 - 1, 3) + 1.2 * Math.pow(t / 0.25 - 1, 2) : t > 1.8 ? Math.max(0, 1 - (t - 1.8) / 0.4) : 1;
-      this.bubble.scale.set(0.42 * k, 0.26 * k, 1);
-    } else this.bubble.scale.set(0.001, 0.001, 1);
+      this.bubble.scale.set(0.42 * k, 0.26 * k, 1); this.bubble.visible = true;
+    } else this.bubble.visible = false;
+    this.holes.visible = this.holes.count > 0;
     if (this.holo) { this.spinY += dt * 0.6; this.squash.rotation.y = Math.sin(this.spinY) * 0.35; OLM.holo.uniforms.uT.value = G.time; }
   }
 }
@@ -2684,7 +3631,9 @@ function updatePointers(dt) {
     if (!G.xr || !h.tracked) continue;
     // fingertip poke
     for (const p of pressables) {
-      if (!(p.range === null || p.range === G.range) || !isShown(p.mesh)) continue;
+      if (!(p.range === null || p.range === G.range)) continue;
+      const e = p.mesh.matrixWorld.elements, ex = e[12] - h.tip.x, ey = e[13] - h.tip.y, ez = e[14] - h.tip.z, rr = Math.max(p.w, p.h) * 0.75 + 0.05;
+      if (ex * ex + ey * ey + ez * ez > rr * rr || !isShown(p.mesh)) continue;
       _im.copy(p.mesh.matrixWorld).invert(); _lt.copy(h.tip).applyMatrix4(_im); _lp.copy(h.prevTip).applyMatrix4(_im);
       const front = p.panel ? 0 : 0.0125;
       if (Math.abs(_lt.x) < p.w / 2 && Math.abs(_lt.y) < p.h / 2 && _lt.z < front + 0.004 && _lt.z > front - 0.02 && _lp.z >= front + 0.002) doPress(p, _lt.x / p.w + 0.5, _lt.y / p.h + 0.5, h);
@@ -2724,7 +3673,7 @@ function buildWrist() {
     g.fillStyle = '#fff'; g.font = `800 40px ${FONT}`; g.fillText(G.timerOn || G.timer ? G.timer.toFixed(2) : '--', 200, 132); g.font = `600 18px ${FONT}`; g.fillStyle = '#9adbd6'; g.fillText('TIMER', 200, 154);
     const gun = gunInDominant();
     g.fillStyle = '#fff'; g.font = `800 40px ${FONT}`;
-    g.fillText(gun ? `${gun.mag ? gun.mag.rounds.length : 0}+${gun.chamber === LIVE ? 1 : 0}` : '—', 380, 132);
+    g.fillText(gun ? `${gun.roundCount()}` : '—', 380, 132);
     g.font = `600 18px ${FONT}`; g.fillStyle = '#9adbd6'; g.fillText(gun ? `AMMO · ${gun.selector}` : 'AMMO', 380, 154);
     panelBtn(g, P, 16, 180, 164, 60, 'STORE', () => travel('store'), 1);
     panelBtn(g, P, 190, 180, 164, 60, 'LANES', () => travel('lanes'), 2);
@@ -2763,14 +3712,36 @@ function recenter() {
 /* ============================================================
    SPAWNER — Yes Terminal kiosk: categories, live RTT preview, stats, spawn pad, settings
    ============================================================ */
-const CATS = ['Pistols', 'Rifles', 'Ammo', 'Targets', 'Settings'];
+const CATS = ['Pistols', 'SMGs', 'Rifles', 'Shotguns', 'Attachments', 'Ammo', 'Targets', 'Settings'];
 const CATALOG = [
   { cat: 'Pistols', name: 'Yes P9', gun: 'p9', stats: DEFS.p9.stats, desc: DEFS.p9.desc },
+  { cat: 'Pistols', name: 'SIM Ejector .45', gun: 's45', stats: DEFS.s45.stats, desc: DEFS.s45.desc },
+  { cat: 'Pistols', name: 'Roaming .357', gun: 'revolver', stats: DEFS.revolver.stats, desc: DEFS.revolver.desc },
+  { cat: 'SMGs', name: 'Unlimited SMG', gun: 'smg', stats: DEFS.smg.stats, desc: DEFS.smg.desc },
   { cat: 'Rifles', name: '5G Carbine', gun: 'carbine', stats: DEFS.carbine.stats, desc: DEFS.carbine.desc },
+  { cat: 'Rifles', name: 'Fibre Lever .357', gun: 'lever', stats: DEFS.lever.stats, desc: DEFS.lever.desc },
+  { cat: 'Rifles', name: 'Tower Bolt .308', gun: 'sniper', stats: DEFS.sniper.stats, desc: DEFS.sniper.desc },
+  { cat: 'Shotguns', name: 'Plan Switcher 870', gun: 'pump', stats: DEFS.pump.stats, desc: DEFS.pump.desc },
+  { cat: 'Shotguns', name: 'Double Bundle', gun: 'double', stats: DEFS.double.stats, desc: DEFS.double.desc },
+  { cat: 'Attachments', name: 'Optus Dot', att: 'reddot', stats: [0, 0, 0, 0, 0.15], desc: 'Reflex sight. Reticle projected to infinity, so it stays on target off-axis. Drop it on a top rail.' },
+  { cat: 'Attachments', name: 'Optus Dot (Ollie reticle)', att: 'reddot', reticle: 1, stats: [0, 0, 0, 0, 0.15], desc: 'Same sight with a tiny Ollie-silhouette reticle. Twist the side dial for brightness.' },
+  { cat: 'Attachments', name: 'Tower 4-12x Scope', att: 'scope', stats: [0, 0, 0, 0, 0.5], desc: 'Live magnified view, mil reticle. Twist turrets for 0.1 mil clicks; twist the eyepiece ring to zoom.' },
+  { cat: 'Attachments', name: 'Mute Mode Suppressor', att: 'supp', stats: [0, 0, 0, 0, 0.35], desc: 'Hold against a threaded muzzle and twist it on: three full turns.' },
+  { cat: 'Attachments', name: 'Beam Plan Laser', att: 'laser', stats: [0, 0, 0, 0, 0.08], desc: 'Visible beam and dot. Fits side and under rails.' },
+  { cat: 'Attachments', name: 'Coverage Light', att: 'light', stats: [0, 0, 0, 0, 0.12], desc: 'Weapon light. On while the gun is in hand.' },
+  { cat: 'Attachments', name: 'Vertical Grip', att: 'vgrip', stats: [0, 0, 0, 0, 0.1], desc: 'Under-rail grip: better two-hand control.' },
+  { cat: 'Attachments', name: 'Angled Grip', att: 'agrip', stats: [0, 0, 0, 0, 0.08], desc: 'Angled under-rail grip.' },
   { cat: 'Ammo', name: 'P9 Magazine', mag: 'p9', stats: [0, 0, 0.6, 0, 0.1], desc: 'Double-stack, 17 rounds. Witness holes at 5/10/15/17.' },
   { cat: 'Ammo', name: '5G Magazine', mag: 'carbine', stats: [0, 0, 1, 0, 0.18], desc: 'Curved polymer, 30 rounds. Witness windows at 10/20/30.' },
   { cat: 'Ammo', name: '9mm Data x10', rounds: '9mm', stats: [0.45, 0, 0.3, 0, 0.05], desc: 'Loose rounds. Push them into a P9 magazine\'s feed lips.' },
   { cat: 'Ammo', name: '5.56 Yes x10', rounds: '556', stats: [0.7, 0, 0.3, 0, 0.05], desc: 'Loose rounds for 5G magazines.' },
+  { cat: 'Ammo', name: 'SIM Ejector Magazine', mag: 's45', stats: [0, 0, 0.3, 0, 0.1], desc: 'Single stack, 8 rounds of .45 Roaming.' },
+  { cat: 'Ammo', name: 'Unlimited SMG Magazine', mag: 'smg', stats: [0, 0, 1, 0, 0.15], desc: 'Curved 30-round 9mm magazine.' },
+  { cat: 'Ammo', name: '12ga Bundle x8', rounds: '12ga', n: 8, stats: [0.9, 0, 0.3, 0, 0.1], desc: 'Shells. Pump: push into the gate underneath. Double: drop into the open chambers.' },
+  { cat: 'Ammo', name: '.357 Unlimited x12', rounds: '357', n: 12, stats: [0.7, 0, 0.3, 0, 0.05], desc: 'For the Roaming revolver and the Fibre Lever gate.' },
+  { cat: 'Ammo', name: 'Speedloader .357', speed: '357', stats: [0, 0, 0.2, 0, 0.1], desc: 'Six rounds. Line it up with the open cylinder and twist.' },
+  { cat: 'Ammo', name: 'Stripper Clip .308', clip: '308', stats: [1, 0, 0.15, 0, 0.1], desc: 'Five rounds. With the bolt open, push down into the top of the action.' },
+  { cat: 'Ammo', name: '.45 Roaming x10', rounds: '45', stats: [0.6, 0, 0.3, 0, 0.05], desc: 'Loose rounds for SIM Ejector magazines.' },
   { cat: 'Targets', name: 'Popper Ollie', ollie: false, stats: [0, 0, 0, 0, 0.9], desc: 'Steel-backed. Falls when the hit carries enough energy.' },
   { cat: 'Targets', name: 'Customer Ollie', ollie: true, stats: [0, 0, 0, 0, 0.9], desc: 'Friendly teal no-shoot. Hitting one costs 50 points.' }
 ];
@@ -2813,10 +3784,11 @@ const TERMINAL = {
     g.fillStyle = '#00707A'; g.fillRect(0, 0, 1024, 78);
     g.fillStyle = '#FFD100'; g.font = `900 40px ${FONT}`; g.fillText('YES TERMINAL', 28, 52);
     g.fillStyle = '#bff6f1'; g.font = `600 20px ${FONT}`; g.fillText('Item spawner · touch or point', 330, 50);
-    CATS.forEach((c, i) => panelBtn(g, P, 18, 96 + i * 76, 190, 62, c, () => { this.cat = c; this.page = c === 'Settings' ? 'settings' : 'items'; this.sel = 0; this.panel.redraw(); }, c === this.cat ? 1 : 0));
+    CATS.forEach((c, i) => panelBtn(g, P, 18, 92 + i * 66, 190, 56, c, () => { this.cat = c; this.page = c === 'Settings' ? 'settings' : 'items'; this.sel = 0; this.panel.redraw(); }, c === this.cat ? 1 : 0));
     if (this.page === 'settings') { this.drawSettings(g, P); return; }
     const list = this.items();
-    list.forEach((it, i) => panelBtn(g, P, 228, 96 + i * 70, 300, 58, it.name, () => { this.sel = i; this.panel.redraw(); }, i === this.sel ? 2 : 0));
+    const rh = Math.min(70, 520 / Math.max(1, list.length));
+    list.forEach((it, i) => panelBtn(g, P, 228, 92 + i * rh, 320, rh - 8, it.name, () => { this.sel = i; this.panel.redraw(); }, i === this.sel ? 2 : 0));
     const it = list[this.sel] || list[0]; if (!it) return;
     g.fillStyle = '#0b2a2e'; g.fillRect(560, 96, 440, 300);
     g.fillStyle = '#fff'; g.font = `800 30px ${FONT}`; g.fillText(it.name, 560, 432);
@@ -2847,12 +3819,18 @@ const TERMINAL = {
   spawn(it) {
     const base = this.spawnPoint().clone(), lay = qEuler(0, Math.PI / 2, Math.PI / 2).clone();
     if (it.gun) {
-      const g = new Firearm(DEFS[it.gun]); g.body.setPose(base, lay); g.obj.position.copy(base); g.obj.quaternion.copy(lay);
-      const m = new Magazine(DEFS[it.gun].mag, DEFS[it.gun].mag.cap); const mp = V3().copy(base).add(V3(0.1, 0.05, 0.12)); m.body.setPose(mp, qEuler(Math.PI / 2, 0, 0)); m.obj.position.copy(mp);
+      const g = spawnGun(it.gun, base, lay);
+      const n = g.def.mag || g.def.pouch !== 'round' ? 1 : 6;   // one magazine / speedloader / clip, or a handful of shells
+      for (let i = 0; i < n; i++) { const m = g.pouchItem(); const mp = V3().copy(base).add(V3(0.1 + (i % 3) * 0.03, 0.05 + (i / 3 | 0) * 0.02, 0.12)); m.body.setPose(mp, qEuler(Math.PI / 2, 0, 0)); m.obj.position.copy(mp); }
+    } else if (it.att) {
+      const a = new Attachment(it.att); a.body.setPose(base, qEuler(0, 0, 0)); a.obj.position.copy(base);
+      if (it.reticle) a.parts.lens.material.uniforms.uType.value = 1;
+    } else if (it.speed || it.clip) {
+      const x = it.speed ? new Speedloader(it.speed) : new StripperClip(it.clip); x.body.setPose(base, qEuler(0, 0, 0)); x.obj.position.copy(base);
     } else if (it.mag) {
       const m = new Magazine(DEFS[it.mag].mag, DEFS[it.mag].mag.cap); m.body.setPose(base, qEuler(0, 0, Math.PI / 2)); m.obj.position.copy(base);
     } else if (it.rounds) {
-      for (let i = 0; i < 10; i++) { const r = new Round(it.rounds); const p = V3().copy(base).add(V3((i % 5 - 2) * 0.02, 0.02 + (i / 5 | 0) * 0.015, 0)); r.body.setPose(p, qEuler(0, 0, 0)); r.obj.position.copy(p); }
+      for (let i = 0; i < (it.n || 10); i++) { const r = new Round(it.rounds); const p = V3().copy(base).add(V3((i % 5 - 2) * 0.02, 0.02 + (i / 5 | 0) * 0.015, 0)); r.body.setPose(p, qEuler(0, 0, 0)); r.obj.position.copy(p); }
     } else if (it.ollie !== undefined) {
       camera.getWorldPosition(_hp); camera.getWorldDirection(_fw); _fw.y = 0; _fw.normalize();
       const R = RANGES[G.range], x = _hp.x + _fw.x * 5 - R.origin.x, z = _hp.z + _fw.z * 5 - R.origin.z;
@@ -2867,12 +3845,14 @@ const TERMINAL = {
     for (const g of firearms.slice()) if (near(g)) g.destroy();
     for (const m of mags.slice()) if (!m.gun && near(m)) m.destroy();
     for (const r of rounds.slice()) if (near(r)) r.destroy();
+    for (const x of extras.slice()) if (near(x)) x.destroy();
+    for (const a of attachments.slice()) if (!a.gun && near(a)) a.destroy();
   },
   update(dt) {
     if (this.scanT < 1) { this.scanT += dt * 1.4; this.scan.material.uniforms.uT.value = Math.min(1, this.scanT); if (this.scanT >= 1) this.scan.visible = false; }
     this.frame++;
     camera.getWorldPosition(_hp);
-    if (this.page === 'items' && this.group.position.distanceTo(_hp) < 4 && this.frame % 2 === 0) this.renderPreview();
+    if (this.page === 'items' && this.group.position.distanceTo(_hp) < 2.5 && this.frame % 3 === 0) this.renderPreview();
   },
   renderPreview() {
     const list = this.items(), it = list[this.sel]; if (!it) return;
@@ -2880,6 +3860,8 @@ const TERMINAL = {
     if (!this.previews[key]) {
       let o;
       if (it.gun) o = DEFS[it.gun].build().root; else if (it.mag) o = DEFS[it.mag].mag.build().root;
+      else if (it.att) { o = buildAttachment(it.att).root; }
+      else if (it.speed || it.clip) { o = new THREE.Group(); for (let i = 0; i < (it.speed ? 6 : 5); i++) { const r = roundGroup(it.speed || it.clip); const a = i * Math.PI / 3; if (it.speed) r.position.set(Math.cos(a) * 0.0135, Math.sin(a) * 0.0135, 0); else r.position.y = -i * 0.0122; o.add(r); } }
       else if (it.rounds) { o = new THREE.Group(); for (let i = 0; i < 3; i++) { const r = roundGroup(it.rounds); r.position.x = (i - 1) * 0.015; r.position.z = 0.02; o.add(r); } }
       else { o = new THREE.Group(); const b = new THREE.Mesh(ollieBodyGeo(24, it.ollie), ollieMats().body); const v = new THREE.Mesh(visorGeo(), OLM.visor); v.position.set(0, OL.R, 0); b.add(v); b.position.y = -0.45; o.add(b); }
       const bb = new THREE.Box3().setFromObject(o), sz = bb.getSize(V3()).length(), c = bb.getCenter(V3());
@@ -2923,16 +3905,10 @@ function clearLoose() {
   CASINGS.clear();
   for (const r of rounds.slice()) if (!heldBy(r.item) && !r.item.slot) r.destroy();
   for (const m of mags.slice()) if (!m.gun && !heldBy(m.item) && !m.item.slot) m.destroy();
+  for (const x of extras.slice()) if (!heldBy(x.item) && !x.item.slot) x.destroy();
   for (const d of FX.decals) d.clear();
   toast('Loose items cleared');
 }
-Firearm.prototype.destroy = function () {
-  if (this.mag) this.mag.destroy();
-  for (const h of hands) if (h.hold && (h.hold.it === this.item || h.hold.gun === this)) h.hold = null;
-  if (this.item.slot) this.item.slot.item = null;
-  removeBody(this.body); unregisterGrab(this.item); this.obj.removeFromParent();
-  const i = firearms.indexOf(this); if (i >= 0) firearms.splice(i, 1);
-};
 
 /* ---------- Tutorial hologram ---------- */
 const TUT = {
@@ -3155,12 +4131,14 @@ function buildLanes() {
   B.box('blackEnv', 'polymer', 0.5, 1.2, 0.5, 5.9, 0.6, 1.6);
   for (let i = 0; i < 8; i++) {
     const c = new Carrier(R, i); LANES.carriers.push(c);
-    const pg = new THREE.Group(); pg.position.set(laneX(i) - 0.45, 1.12, 0.52); pg.rotation.x = -0.5; R.group.add(pg);
-    const back = new THREE.Mesh(box(0.5, 0.26, 0.03), M.blackSatin); back.position.z = -0.018; pg.add(back);
-    const scr = new Panel(0.44, 0.08, 440, 80, (g) => { g.fillStyle = '#071d20'; g.fillRect(0, 0, 440, 80); g.fillStyle = '#FFD100'; g.font = `800 30px ${FONT}`; g.fillText(`LANE ${i + 1} · ${c.target} m`, 12, 36); g.fillStyle = '#9adbd6'; g.font = `600 22px ${FONT}`; g.fillText(c.paper.holes.length > 1 ? `GROUP ${c.paper.group().toFixed(1)} cm · ${c.paper.holes.length} shots` : 'Send it downrange', 12, 68); }, 'lanes');
-    scr.mesh.position.set(0, 0.07, 0.001); pg.add(scr.mesh); LANES.panels.push(scr);
-    [3, 7, 15, 25].forEach((d, k) => worldButton(pg, `${d}`, 0.075, 0.06, '#00707A', () => { c.target = d; scr.redraw(); }, 'lanes').position.set(-0.17 + k * 0.085, -0.05, 0.012));
-    worldButton(pg, 'CLR', 0.075, 0.06, '#FFD100', () => { c.paper.clear(); scr.redraw(); }, 'lanes').position.set(0.19, -0.05, 0.012);
+    // One canvas panel per lane (readout + touch buttons) instead of seven meshes.
+    const scr = new Panel(0.44, 0.22, 440, 220, (g, P) => {
+      g.fillStyle = '#071d20'; g.fillRect(0, 0, 440, 220); g.fillStyle = '#FFD100'; g.font = `800 30px ${FONT}`; g.fillText(`LANE ${i + 1} · ${c.target} m`, 12, 36);
+      g.fillStyle = '#9adbd6'; g.font = `600 22px ${FONT}`; g.fillText(c.paper.holes.length > 1 ? `GROUP ${c.paper.group().toFixed(1)} cm · ${c.paper.holes.length} shots` : 'Send it downrange', 12, 70);
+      [3, 7, 15, 25].forEach((d, k) => panelBtn(g, P, 10 + k * 84, 110, 76, 96, `${d}`, () => { c.target = d; P.redraw(); }, c.target === d ? 1 : 2));
+      panelBtn(g, P, 350, 110, 80, 96, 'CLR', () => { c.paper.clear(); P.redraw(); }, 3);
+    }, 'lanes');
+    scr.mesh.position.set(laneX(i) - 0.45, 1.12, 0.52); scr.mesh.rotation.x = -0.5; R.group.add(scr.mesh); LANES.panels.push(scr);
   }
   EV.on('paperHit', (e) => LANES.panels[e.target.lane].redraw());
   // Steel bay: poppers + customers, shot-timer challenge
@@ -3272,13 +4250,19 @@ function* rackScript() {
   if (!gun) { toast('Hold a gun first (E)'); return; }
   let sec = false;
   if (off.hold) { if (off.hold.kind === 'secondary') { release(off, true); sec = true; } else { toast('Off hand is busy (Q to drop)'); return; } }
-  const gp = gun.item.points.find(p => p.type === 'slide' || p.type === 'charging');
+  const gp = gun.item.points.find(p => JOINT_GP[p.type]);
+  if (!gp) { gun.buttonA(); return; }
+  if (gun.actionLocked) gun.actionLocked = false;
   off.override = { p: off.pos.clone(), q: off.quat.clone() };
-  yield* approach(off, () => gpHandPose(gun, gp, off.side, 0), 0.1);
+  // hand target along the drive axis for a given joint position v (drive == v while grabbed)
+  const ax = gun.driveAxis(), T = gun.driveTravel(), s0 = gun.bolt.pos;
+  const pose = (v) => { const P = gpHandPose(gun, gp, off.side, 0); P.p.add(V3().copy(ax).applyQuaternion(_oq).multiplyScalar(T * v)); return P; };
+  yield* approach(off, () => pose(s0), 0.1);
   grab(off, gun.item, gp);
-  let t = 0; const T = gun.def.boltTravel * 1.1;
-  while (t < 0.13) { t += yield; const P = gpHandPose(gun, gp, off.side, T * smooth(Math.min(1, t / 0.13))); off.override.p.copy(P.p); off.override.q.copy(P.q); }
+  let t = 0;
+  while (t < 0.13) { t += yield; const P = pose(lerp(s0, 1.1, smooth(Math.min(1, t / 0.13)))); off.override.p.copy(P.p); off.override.q.copy(P.q); }
   yield* wait(0.04);
+  if (gun.def.manual) { t = 0; while (t < 0.13) { t += yield; const P = pose(lerp(1.1, -0.1, smooth(Math.min(1, t / 0.13)))); off.override.p.copy(P.p); off.override.q.copy(P.q); } yield* wait(0.03); }   // no return spring: push it home
   release(off, true);
   yield* approach(off, () => restPose(off.side), 0.12);
   off.override = null;
@@ -3405,7 +4389,9 @@ const DESK = {
       h.quat.setFromRotationMatrix(M4().lookAt(h.pos, tgt, V3(0, 1, 0).applyQuaternion(cq)));
       if (gun && this.ads && !this.inspect && h.hold.gp.type !== 'free') {
         const gp = h.hold.gp, gq = G.dom === 0 ? mirrorQ(gp.quat, _dq2) : _dq2.copy(gp.quat);
-        const objP = V3().copy(cp).addScaledVector(_fw, gun.def.stock ? 0.14 : 0.32).sub(V3().copy(gun.def.sight).applyQuaternion(cq));
+        const opt = gun.attach.find(a => a.def.slot === 'optic');
+        const sl = opt ? V3().copy(opt.obj.position).add(opt.type === 'scope' ? V3(0, 0.035, 0.355) : V3(0, 0.026, 0.12)) : gun.def.sight;
+        const objP = V3().copy(cp).addScaledVector(_fw, opt ? 0 : gun.def.stock ? 0.14 : 0.32).sub(V3().copy(sl).applyQuaternion(cq));
         h.quat.copy(cq).multiply(gq); h.pos.copy(gp.pos).applyQuaternion(cq).add(objP);
       }
       if (this.inspect) { h.pos.set(0.05, -0.12, -0.32).applyQuaternion(cq).add(cp); h.quat.copy(cq).multiply(qEuler(0.25, -1.25, 0.35)); }
@@ -3477,22 +4463,20 @@ function tick() {
   updateTorso(dt);
   updateInteraction(dt);                             // 2. interaction sets hand targets
   if (!G.xr) DESK.post();
-  TIME.acc += dt; let n = 0;                         // 3. fixed-step physics with mechanisms as constraints, 4. ballistics
-  while (TIME.acc >= STEP && n < MAX_SUB) {
-    driveHeld(STEP);
-    for (let i = 0; i < firearms.length; i++) firearms[i].stepMech(STEP);
-    physStep(STEP);
-    BALLISTICS.step(STEP);
-    TIME.acc -= STEP; n++;
+  // 3+4. Physics (mechanisms as constraints) + ballistics in equal ~120 Hz substeps locked to the display frame.
+  // ponytail: a free-running 120 Hz accumulator aliased against 72/90 Hz and made held guns judder; frame-locked steps don't.
+  const n = Math.min(MAX_SUB, Math.max(1, Math.round(dt / STEP))), sd = dt / n;
+  for (let s = 0; s < n; s++) {
+    driveHeld(sd);
+    for (let i = 0; i < firearms.length; i++) firearms[i].stepMech(sd);
+    physStep(sd);
+    BALLISTICS.step(sd);
   }
-  if (n === MAX_SUB) TIME.acc = 0;                   // drop backlog rather than spiral: frame rate wins
-  const alpha = TIME.acc / STEP;
-  syncBodies(alpha); CASINGS.sync(alpha);
+  syncBodies(1); CASINGS.sync(1);
   for (let i = 0; i < firearms.length; i++) firearms[i].sync(dt);
   for (let i = 0; i < ollies.length; i++) if (ollies[i].range === G.range) ollies[i].update(dt);   // 5. target logic
   if (G.range === 'lanes') updateLanes(dt);
   TERMINAL.update(dt); TUT.update(dt);
-  scene.updateMatrixWorld();
   updateHandVisuals();
   updatePointers(dt);
   updateWrist(dt);
@@ -3502,6 +4486,7 @@ function tick() {
   if (toastT > 0) { toastT -= dt; if (toastT <= 0) toastEl.style.opacity = 0; }
   perfT -= dt;
   if (perfT <= 0 && !G.xr) { perfT = 0.5; const pe = document.getElementById('perf'); pe.hidden = !settings.perf; if (settings.perf) pe.textContent = `${G.fps.toFixed(0)} fps · ${renderer.info.render.calls} draws · ${(renderer.info.render.triangles / 1000).toFixed(0)}k tris · ${PHYS.nC} contacts`; }
+  renderScope();
   renderer.render(scene, camera);                    // 7. render
 }
 
@@ -3561,7 +4546,7 @@ async function boot() {
   const st = $('status');
   bindEntrySettings();
   try {
-    buildTextures(); buildMaterials(); buildFX();
+    buildTextures(); buildMaterials(); initM2Materials(); buildFX();
     for (const h of hands) {
       h.model = buildHandModel(h.side, false); h.ghost = buildHandModel(h.side, true); h.model.g.visible = false; h.ghost.g.visible = false;
       const lg = new THREE.BoxGeometry(0.002, 0.002, 1); lg.translate(0, 0, -0.5);
@@ -3586,7 +4571,7 @@ async function boot() {
   else { $('btnVR').textContent = 'NO HEADSET'; st.textContent = 'No VR headset found — desktop mode is ready.'; }
 }
 // Console handle for automated acceptance checks (read-only use).
-window.YESRANGE = { G, DESK, hands, firearms, mags, rounds, scores, settings, LANES, travel, CASINGS, rig, PHYS, ollies, tick };
+window.YESRANGE = { G, DESK, hands, firearms, mags, rounds, scores, settings, LANES, travel, CASINGS, rig, PHYS, ollies, tick, SLOTS, grab, holster, primaryGp, renderer, release, TERMINAL, CATALOG, spawnGun, attachments, extras, Round, Attachment, SCOPE };
 boot();
 </script>
 </body>
