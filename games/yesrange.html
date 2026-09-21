@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>YES RANGE: VR</title>
+<title>YES RANGE: Ollie Takedown VR</title>
 <style>
 :root{--y:#FFD100;--t:#00707A;--bt:#00B2A9;--g:#2B2F33}
 *{box-sizing:border-box}
@@ -886,7 +886,7 @@ function collidePair(a, b) {
 class Joint1D {
   constructor(o) {
     this.min = o.min ?? 0; this.max = o.max ?? 1; this.rest = o.rest ?? 0; this.k = o.k ?? 0; this.c = o.c ?? 0;
-    this.pos = o.pos ?? this.rest; this.prev = this.pos; this.vel = 0; this.bounce = o.bounce ?? 0.2;
+    this.pos = o.pos ?? this.rest; this.prev = this.pos; this.vel = 0; this.bounce = o.bounce ?? 0.2; this.bounceLo = o.bounceLo ?? this.bounce;
     this.detents = o.detents || []; this.lockMin = -Infinity; this.lockMax = Infinity;
     this.grabbed = false; this.drive = 0; this.onStop = null;
   }
@@ -903,7 +903,7 @@ class Joint1D {
       this.vel += a * dt; this.pos += this.vel * dt;
       rest = Math.abs(a) * dt * 1.5 + 0.3;   // speed the spring alone adds in one step: resting contact, not an impact
     }
-    if (this.pos < lo) { this.pos = lo; if (this.vel < 0) { const v = -this.vel; if (v <= rest) this.vel = 0; else { this.vel = v * this.bounce; if (this.onStop) this.onStop(-1, v); } } }
+    if (this.pos < lo) { this.pos = lo; if (this.vel < 0) { const v = -this.vel; if (v <= rest) this.vel = 0; else { this.vel = v * this.bounceLo; if (this.onStop) this.onStop(-1, v); } } }
     if (this.pos > hi) { this.pos = hi; if (this.vel > 0) { const v = this.vel; if (v <= rest) this.vel = 0; else { this.vel = -v * this.bounce; if (this.onStop) this.onStop(1, v); } } }
   }
 }
@@ -1566,20 +1566,24 @@ function updateHold(h, dt) {
   }
 }
 // PD "physical hands": critically damped spring per held body, run every physics substep.
+// Implicit (backward-Euler) form: unconditionally stable. The explicit form went unstable once 2·w·dt > 2,
+// i.e. a stiff light pistol at 90 Hz with one substep — that was the in-hand buzzing.
 function driveHeld(dt) {
   for (const h of hands) {
     const hd = h.hold; if (!hd || hd.kind !== 'body') continue;
     const b = hd.it.body, w = Math.min(hd.it.driveW, 110), wr = w * 1.1;
-    b.vel.x += (w * w * (b.tp.x - b.pos.x) + 2 * w * (b.tv.x - b.vel.x)) * dt;
-    b.vel.y += (w * w * (b.tp.y - b.pos.y) + 2 * w * (b.tv.y - b.vel.y)) * dt;
-    b.vel.z += (w * w * (b.tp.z - b.pos.z) + 2 * w * (b.tv.z - b.vel.z)) * dt;
+    const k = w * w * dt, c = 2 * w * dt, inv = 1 / (1 + c + k * dt);
+    b.vel.x = (b.vel.x + k * (b.tp.x - b.pos.x) + c * b.tv.x) * inv;
+    b.vel.y = (b.vel.y + k * (b.tp.y - b.pos.y) + c * b.tv.y) * inv;
+    b.vel.z = (b.vel.z + k * (b.tp.z - b.pos.z) + c * b.tv.z) * inv;
     b.vel.y -= PHYS.g * b.gravScale * dt * 0.9;   // arm holds most of the weight: no static sag off the sights, lag still reads as mass
     if (b.vel.lengthSq() > 225) b.vel.setLength(15);
     _dq.copy(b.tq).multiply(_tq2.copy(b.quat).invert());
     if (_dq.w < 0) { _dq.x = -_dq.x; _dq.y = -_dq.y; _dq.z = -_dq.z; _dq.w = -_dq.w; }
     const s = Math.sqrt(Math.max(0, 1 - _dq.w * _dq.w)), ang = 2 * Math.acos(Math.min(1, _dq.w));
     let ex = 0, ey = 0, ez = 0; if (s > 1e-6) { ex = _dq.x / s * ang; ey = _dq.y / s * ang; ez = _dq.z / s * ang; }
-    b.ang.x += (wr * wr * ex + 2 * wr * (b.tw.x - b.ang.x)) * dt; b.ang.y += (wr * wr * ey + 2 * wr * (b.tw.y - b.ang.y)) * dt; b.ang.z += (wr * wr * ez + 2 * wr * (b.tw.z - b.ang.z)) * dt;
+    const kr = wr * wr * dt, cr = 2 * wr * dt, ir = 1 / (1 + cr + kr * dt);
+    b.ang.x = (b.ang.x + kr * ex + cr * b.tw.x) * ir; b.ang.y = (b.ang.y + kr * ey + cr * b.tw.y) * ir; b.ang.z = (b.ang.z + kr * ez + cr * b.tw.z) * ir;
     if (b.ang.lengthSq() > 1600) b.ang.setLength(40);
     b.sleeping = false; b.sleepT = 0;
   }
@@ -2066,7 +2070,7 @@ const _mz = new THREE.Vector3(), _md = new THREE.Vector3(), _mv = new THREE.Vect
 class Firearm {
   constructor(def) {
     this.def = def; const P = this.parts = def.build(); this.obj = P.root; scene.add(this.obj);
-    this.bolt = new Joint1D({ min: 0, max: 1, rest: 0, k: def.manual ? 0 : def.boltK, c: def.manual ? 6 : def.boltC, bounce: def.manual ? 0.05 : 0.12 });
+    this.bolt = new Joint1D({ min: 0, max: 1, rest: 0, k: def.manual ? 0 : def.boltK, c: def.manual ? 6 : def.boltC, bounce: def.manual ? 0.05 : 0.12, bounceLo: 0 });   // bolts lock into battery: no rebound off the forward stop (it stalled full auto)
     this.bolt.onStop = (d, v) => this.onBoltStop(d, v);
     this.chamber = EMPTY; this.hammer = 1; this.extracted = 0; this.feeding = 0; this.locked = false; this.mag = null;
     this.tube = []; this.actionLocked = false; this.stroke = 0; this.attach = []; this.supp = null;
@@ -4518,7 +4522,7 @@ function tick() {
   if (!G.xr) DESK.post();
   // 3+4. Physics (mechanisms as constraints) + ballistics in equal ~120 Hz substeps locked to the display frame.
   // ponytail: a free-running 120 Hz accumulator aliased against 72/90 Hz and made held guns judder; frame-locked steps don't.
-  const n = Math.min(MAX_SUB, Math.max(1, Math.round(dt / STEP))), sd = dt / n;
+  const n = Math.min(MAX_SUB, Math.max(1, Math.ceil(dt / STEP - 0.05))), sd = dt / n;   // never coarser than ~120 Hz (90 Hz display → 2 substeps)
   for (let s = 0; s < n; s++) {
     driveHeld(sd);
     for (let i = 0; i < firearms.length; i++) firearms[i].stepMech(sd);
