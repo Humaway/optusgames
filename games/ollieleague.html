@@ -320,7 +320,7 @@ body.reduceMotion .pressStart,body.reduceMotion #sbTime.red{animation:none}
 //     }
 //   }
 // }
-const FIREBASE_DB_URL = "";
+const FIREBASE_DB_URL = "https://ollieleague-87b52-default-rtdb.asia-southeast1.firebasedatabase.app";
 
 import * as THREE from 'three';
 
@@ -350,8 +350,11 @@ const CONFIG = {
     BOOST_MAX: 34, SUPERSONIC: 30, SUPERSONIC_EXIT: 27.5,
     JUMP: 11, JUMP_HOLD: 0.2, JUMP_HOLD_ACC: 35, COYOTE: 0.1, JUMP_BUFFER: 0.12, SECOND_WINDOW: 1.25,
     DOUBLE_JUMP: 9, FLIP_IMPULSE: 12, FLIP_TIME: 0.6, FLIP_VY_KEEP: 0.25, FLIP_HIT_BONUS: 1.35, FLIP_DEADZONE: 0.4,
-    AIR_PITCH: 5.5, AIR_PD_P: 14, AIR_PD_RESP: 22, AIR_DAMP: 7,
-    RECOVER_T: 0.4, RECOVER_HOP: 7, STUCK_T: 0.35, ROOF_T: 0.12,
+    AIR_PITCH: 8.5, AIR_PD_P: 20, AIR_PD_RESP: 34, AIR_DAMP: 7,
+    AIR_TURN_DEADZONE: 0.5,   // stick sideways against the nose in the air → twist to face that way (wheels stay down)
+    AIR_BOOST_STEER: 2.4,     // rad/s: while boosting in the air, the flight path bends toward the nose
+    RECOVER_T: 0.4, RECOVER_HOP: 10, STUCK_T: 0.35, ROOF_T: 0.1,
+    AUTO_LEVEL_K: 4, AUTO_LEVEL_W: 3.5,   // with no stick input the car gently rights itself in the air
     HIT_REST: 0.4, HIT_EXTRA_MAX: 46, HIT_EXTRA_K: 0.55, HIT_CD: 0.12, HIT_SPIN: 0.35,
     BUMP_REST: 0.3, BUMP_EXTRA: 0.35, DEMO_T: 3, RESPAWN_BOOST: 33, DEMO_DOT: 0.6,
     GROUND_SKIN: 0.15, STICK_PROBE: 0.45, NO_STICK_T: 0.12,
@@ -2284,7 +2287,7 @@ const Physics = (() => {
   function makeCar(idx, team, cls) {
     return { idx, team, cls, x: 0, y: 0, vx: 0, vy: 0, th: 0, w: 0, dir: 1, boost: P.START_BOOST, onGround: true, nx: 0, ny: 1,
       jumped: false, usedSecond: false, secondT: 0, jumpHoldT: 0, coyote: 0, jumpBuf: 0, flipT: 0, flipSign: 0, recoverT: 0, stuckT: 0, noStick: 0,
-      demoT: 0, supersonic: false, boosting: false, lockX: 0, lockY: 0, lockSign: 0, turnT: 0, hitCd: 0, airT: 0, boostUsed: 0, throttle: 0 };
+      demoT: 0, supersonic: false, boosting: false, lockX: 0, lockY: 0, lockSign: 0, turnT: 0, hitCd: 0, airT: 0, recW: 0, boostUsed: 0, throttle: 0 };
   }
   function respawnCar(st, car, ev) {
     const hb = HB[car.cls]; const s = car.team === 0 ? -1 : 1;
@@ -2366,15 +2369,26 @@ const Physics = (() => {
         car.vy += g * dt; car.vx += nx * 2; car.vy += ny * 2; car.onGround = false; car.noStick = 0.25; car.lockSign = 0;
       }
     } else {
-      // --- air control: point the nose toward the stick direction (PD, capped at 5.5 rad/s) ---
+      // --- air control: point the nose toward the stick direction (PD-controlled pitch) ---
       car.vy += P.GRAVITY * dt;
+      // Twist in place: pushing sideways against the nose mirrors the car about the vertical
+      // (a 180° yaw around its up axis) instead of pitching over the top, so the wheels stay down.
+      if (car.flipT <= 0 && car.recoverT <= 0 && Math.abs(ix) > P.AIR_TURN_DEADZONE && ix * car.dir * Math.cos(car.th) < 0) {
+        car.dir = -car.dir; car.th = wrapAngle(-car.th); car.w = -car.w; car.turnT = P.TURN_T; ev.push({ type: 'turn', car: car.idx });
+      }
       if (car.flipT > 0) { car.flipT -= dt; car.w = car.flipSign * TAU / P.FLIP_TIME; if (car.flipT <= 0) car.w *= 0.1; }
-      else if (car.recoverT > 0) { car.recoverT -= dt; }
+      else if (car.recoverT > 0) { car.recoverT -= dt; car.w = car.recW || car.w; if (car.recoverT <= 0) car.recW = 0; }   // hold the spin; collisions can't stall it
       else if (im > 0.3) {
         const target = Math.atan2(car.dir * iy, car.dir * ix); const err = wrapAngle(target - car.th);
         const rate = P.AIR_PITCH * hb.air;
         const wt = clamp(err * P.AIR_PD_P, -rate, rate); car.w += (wt - car.w) * Math.min(1, P.AIR_PD_RESP * dt);
-      } else car.w *= Math.exp(-P.AIR_DAMP * dt);
+      } else { const err = wrapAngle(-car.th); car.w = damp(car.w, clamp(err * P.AUTO_LEVEL_K, -P.AUTO_LEVEL_W, P.AUTO_LEVEL_W), P.AIR_DAMP, dt); }   // auto-level toward wheels-down
+      // Boost steering: the flight path bends toward the nose, so aerials follow where you point.
+      const spd = Math.hypot(car.vx, car.vy);
+      if (car.boosting && car.flipT <= 0 && spd > 5) {
+        const turn = clamp(wrapAngle(Math.atan2(car.dir * Math.sin(car.th), car.dir * Math.cos(car.th)) - Math.atan2(car.vy, car.vx)), -P.AIR_BOOST_STEER * dt, P.AIR_BOOST_STEER * dt);
+        const ct = Math.cos(turn), st2 = Math.sin(turn), vx = car.vx; car.vx = vx * ct - car.vy * st2; car.vy = vx * st2 + car.vy * ct;
+      }
     }
 
     const sp = Math.hypot(car.vx, car.vy); if (sp > P.CAR_MAX) { const k = P.CAR_MAX / sp; car.vx *= k; car.vy *= k; }
@@ -2432,10 +2446,11 @@ const Physics = (() => {
     // auto-recover: roof contact or stuck on a side → quick hop and spin wheels-down
     if (!car.onGround && car.recoverT <= 0) {
       const sp = Math.hypot(car.vx, car.vy);
-      if (roof > 0 || (any && sp < 2.5)) car.stuckT += dt; else car.stuckT = 0;
-      if (car.stuckT > (roof > 0 ? P.ROOF_T : P.STUCK_T)) {
+      const tipped = any && (-s * lnx + c * lny) < 0.3;   // touching something while not wheels-down
+      if (roof > 0 || tipped || (any && sp < 2.5)) car.stuckT += dt; else car.stuckT = 0;
+      if (car.stuckT > (roof > 0 || tipped ? P.ROOF_T : P.STUCK_T)) {
         const target = Math.atan2(-lnx, lny); const err = wrapAngle(target - car.th);
-        car.recoverT = P.RECOVER_T; car.vx += lnx * P.RECOVER_HOP; car.vy += lny * P.RECOVER_HOP; car.w = err / P.RECOVER_T;
+        car.recoverT = P.RECOVER_T; car.vx += lnx * P.RECOVER_HOP; car.vy += lny * P.RECOVER_HOP; car.w = car.recW = err / P.RECOVER_T;
         car.jumped = true; car.usedSecond = true; car.secondT = 0; car.stuckT = 0; car.noStick = 0.15;
         if (ev) ev.push({ type: 'recover', car: car.idx });
       }
@@ -4167,7 +4182,7 @@ class MatchCtl {
       const vis = cv.vis;
       vis.root.visible = !c.demo;
       vis.root.position.set(c.x, c.y, cv.z); vis.root.rotation.z = c.th;
-      const yawT = c.dir > 0 ? 0 : Math.PI; cv.yaw = damp(cv.yaw, yawT, 16, dt); vis.yaw.rotation.y = cv.yaw;
+      const yawT = c.dir > 0 ? 0 : Math.PI; cv.yaw = damp(cv.yaw, yawT, 24, dt); vis.yaw.rotation.y = cv.yaw;
       MeshFactory.animateCar(vis, dt, t, this.st.cars[i], inReplay ? 0 : (this.view.cars[i].speed || 0), c.boosting && !c.demo, c.supersonic);
       const dirx = c.dir * Math.cos(c.th), diry = c.dir * Math.sin(c.th);
       const ex = c.x - dirx * (vis.L / 2 + 0.2), ey = c.y - diry * (vis.L / 2 + 0.2) - Math.cos(c.th) * 0.1;
@@ -4981,7 +4996,7 @@ const App = (() => {
   const A = {
     state: 'BOOT', match: null, mode: 'match', lastOpts: null, netCfg: null, gestured: false, padListen: null,
   };
-  let last = performance.now(), lastRender = 0, hiddenTimer = null;
+  let lastRender = 0;
   const perf = { ema: 16, lowT: 0, goodT: 0, badT: 0 };
   const setBoot = (p, t) => { $('bootBar').style.width = p + '%'; if (t) $('bootText').textContent = t; };
   const nextFrame = () => new Promise(r => document.hidden ? setTimeout(r, 16) : requestAnimationFrame(() => r()));
@@ -5106,12 +5121,14 @@ const App = (() => {
   });
   function pause() { const m = A.match; if (!m) return; if (m.role === 'offline') m.paused = true; HUD.closeOverlays(); Input.resetTouch(); UI.show('pause'); }
   function resume() { const m = A.match; if (!m) return; m.paused = false; UI.hide(); }
+  // rAF stops in background tabs, so online matches (host or client) keep simulating and networking
+  // headlessly from a timer whenever the tab is hidden — including tabs that were hidden before the match began.
+  let hiddenT = performance.now();
+  setInterval(() => { const n = performance.now(), m = A.match; if (document.hidden && m && m.role !== 'offline') m.frame(Math.min(0.1, (n - hiddenT) / 1000), true); hiddenT = n; }, 50);
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      const m = A.match;
-      if (m && m.role === 'host') { let t = performance.now(); hiddenTimer = setInterval(() => { const n = performance.now(); m.frame(Math.min(0.1, (n - t) / 1000), true); t = n; }, 50); }
-      else if (m && m.role === 'offline' && m.o.mode !== 'attract' && !UI.current) pause();
-    } else { if (hiddenTimer) clearInterval(hiddenTimer); hiddenTimer = null; lastRender = 0; }
+    const m = A.match;
+    if (document.hidden) { if (m && m.role === 'offline' && m.o.mode !== 'attract' && !UI.current) pause(); }
+    else lastRender = 0;
   });
   let resizeT = null; window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => Render.resize(), 150); });
   Bus.on('contextlost', () => toast('Graphics context lost — reconnecting…'));
