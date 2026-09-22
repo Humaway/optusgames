@@ -42,16 +42,6 @@ const FRESH_DAYS    = 7;               // "Updated" badge shows within this many
 
 const GAMES = [
    {
-    title: "Five Days at Optus 2",
-    description: "Spooky Scary Sales Reps send MCC's down your spine!",
-    image: "thumbnails/fdao2.png",
-    url: "games/fdao2.html",
-    tags: ["Arcade", "Horror"],
-    releaseDate: "22nd Sep, 2026",
-    version: "Beta 1",
-    creator: "Luka w/Claude Opus 5"
-  },
-   {
     title: "Yes Range",
     description: "This will probably only make sense in VR lol",
     image: "thumbnails/yesrange.png",
@@ -765,7 +755,6 @@ select.sort {
   cursor: pointer;
 }
 select.sort:focus { outline: none; border-color: var(--aqua); }
-select.sort option:disabled { color: var(--faint); }
 
 .views { display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
 .views button {
@@ -1064,8 +1053,8 @@ footer {
   </div>
   <div class="chips" id="chips" role="group" aria-label="Filter by tag"></div>
   <div class="tool-right">
-    <select class="sort" id="sort" aria-label="Sort games">
-      <option value="upd" id="sort-upd" disabled>Recently updated</option>
+    <select class="sort" id="sort" aria-label="Sort games" autocomplete="off">
+      <option value="upd" selected>Recently updated</option>
       <option value="new">Newest first</option>
       <option value="old">Oldest first</option>
       <option value="az">A to Z</option>
@@ -1178,7 +1167,7 @@ function fullDate(ms) {
 /* ---- state --------------------------------------------------------------- */
 let query = "";
 let activeTag = "All";
-let sortMode = "new";
+let sortMode = "upd";   // until update times arrive this falls back to newest first
 
 const libraryEl = document.getElementById("library");
 const chipsEl   = document.getElementById("chips");
@@ -1189,7 +1178,6 @@ const heroEl    = document.getElementById("hero");
 const noteEl    = document.getElementById("shelf-note");
 const sortEl    = document.getElementById("sort");
 const syncEl    = document.getElementById("sync");
-const sortUpdEl = document.getElementById("sort-upd");
 
 /* Each game keeps a reference to its DOM node and a prebuilt search string, so
    filtering only toggles a class. The cards are never rebuilt, which means the
@@ -1619,10 +1607,7 @@ function applyUpdates(files) {
   });
   paintHero(files);
 
-  if (hits) {
-    sortUpdEl.disabled = false;
-    if (moved && sortMode === "upd") reorder();
-  }
+  if (moved && sortMode === "upd") reorder();
   return hits;
 }
 
