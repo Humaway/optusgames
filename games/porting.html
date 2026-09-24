@@ -241,13 +241,16 @@ const FIREBASE_CONFIG = {
     "rooms": {
       "$code": {
         ".read": "auth != null",
-        "meta": { ".write": "auth != null && (!data.exists() || data.child('hostUid').val() === auth.uid || !data.parent().child('players').child(data.child('hostUid').val()).exists())" },
+        "meta": {
+          ".write": "auth != null && (!data.child('hostUid').exists() || data.child('hostUid').val() === auth.uid || !data.parent().child('players').child(data.child('hostUid').val()).exists())",
+          "slots": { ".write": "auth != null && (!data.child('p1').exists() || newData.child('p1').val() === data.child('p1').val() || data.child('p1').val() === auth.uid) && (!data.child('p2').exists() || newData.child('p2').val() === data.child('p2').val() || data.child('p2').val() === auth.uid)" }
+        },
         "players": { "$uid": { ".write": "auth != null && auth.uid === $uid" } },
         "state":   { "$uid": { ".write": "auth != null && auth.uid === $uid" } },
         "portals": { "$uid": { ".write": "auth != null && auth.uid === $uid" } },
-        "objects": { "$id":  { ".write": "auth != null" } },
-        "level":   { ".write": "auth != null && root.child('rooms').child($code).child('meta/hostUid').val() === auth.uid" },
-        "events":  { "$id":  { ".write": "auth != null && newData.child('by').val() === auth.uid" } }
+        "objects": { ".write": "auth != null && data.parent().child('meta/hostUid').val() === auth.uid", "$id": { ".write": "auth != null" } },
+        "level":   { ".write": "auth != null && data.parent().child('meta/hostUid').val() === auth.uid" },
+        "events":  { ".write": "auth != null && data.parent().child('meta/hostUid').val() === auth.uid", "$id": { ".write": "auth != null && newData.child('by').val() === auth.uid" } }
       }
     }
   }
@@ -1523,7 +1526,7 @@ const PLAYER = {
     const holes = [];
     for (const p of PORTALS.list) {
       if (!p.linked) continue; const la = p.localOf(a), lb = p.localOf(b);
-      if (Math.min(la.z, lb.z) > r + 0.08 || Math.max(la.z, lb.z) < -2.2) continue;
+      if (Math.min(la.z, lb.z) > r + 0.08 || Math.max(la.z, lb.z) < -r) continue; // wholly behind the plane = not passing through it (e.g. standing on a slab over a down-facing portal)
       const lat = (l) => Math.abs(l.x) < p.w / 2 - r + 0.1 && l.y - r > -p.h / 2 - 0.3 && l.y + r < p.h / 2 + 0.3;
       if (p.n.y > 0.7) { if (Math.abs(la.x) < p.w / 2 - 0.05 && Math.abs(la.y) < p.h / 2 - 0.05) holes.push(p); } else if (lat(la) && lat(lb)) holes.push(p);
     }
@@ -2381,7 +2384,7 @@ function stepBodies(L, dt) {
     const r = b.r, a = b.pos.clone(), bb = b.pos.clone(); if (b.tall && !b.tipped) { a.y -= b.tall; bb.y += b.tall; }
     // portal holes for bodies (centre-based; an upright turret's capsule reaches `tall` further along a floor/ceiling normal)
     const tallN = p => b.tall && !b.tipped ? Math.abs(p.n.y) * b.tall : 0;
-    const holes = []; for (const p of PORTALS.list) { if (!p.linked) continue; const l = p.localOf(b.pos); if (l.z < r + 0.1 + tallN(p) && l.z > -1.5 && Math.abs(l.x) < p.w / 2 - 0.05 && Math.abs(l.y) < p.h / 2 - 0.05) holes.push(p); }
+    const holes = []; for (const p of PORTALS.list) { if (!p.linked) continue; const l = p.localOf(b.pos); if (l.z < r + 0.1 + tallN(p) && l.z > -r && Math.abs(l.x) < p.w / 2 - 0.05 && Math.abs(l.y) < p.h / 2 - 0.05) holes.push(p); }
     const filter = holes.length ? (ct => !holes.some(p => p.plane.distanceToPoint(ct.p) < 0.03)) : null;
     const extra = []; for (const o of L.bodies) if (o !== b && o.alive && !o.held) extra.push(o.col);
     if (!b.held && pl.alive) extra.push(pl.collider);
@@ -5322,8 +5325,8 @@ class LocalTransport {
   }
   send(m) { m.from = this.uid; try { this.ch.postMessage(m); } catch (e) { } }
   recv(m) {
-    if (m.op === 'hello') return this.send({ op: 'snap', to: m.from, db: this.db });
-    if (m.op === 'snap') { if (m.to === this.uid) { this.db = Object.assign(m.db || {}, this.db); this.notify(''); } return; }
+    if (m.op === 'hello') return this.send({ op: 'snap', to: m.from, db: this.db, now: Date.now() });
+    if (m.op === 'snap') { if (m.to === this.uid) { if (this.follower && m.now) this.offset = m.now - Date.now(); /* the joiner adopts the creator's clock */ this.db = Object.assign(m.db || {}, this.db); this.notify(''); } return; }
     this.apply(m);
   }
   apply(m) { if (m.op === 'set') setPath(this.db, m.path, m.value); else if (m.op === 'update') for (const [k, v] of Object.entries(m.value)) setPath(this.db, m.path + '/' + k, v); this.notify(m.path); }
@@ -5336,6 +5339,44 @@ class LocalTransport {
   async transaction(path, fn) { const v = fn(structuredClone(getPath(this.db, path) ?? null)); if (v === undefined) return { committed: false, value: getPath(this.db, path) }; this.set(path, v); return { committed: true, value: v }; }
   onDisconnectRemove(path) { this.drops.push(path); }
   leave() { for (const p of this.drops) this.remove(p); this.drops = []; this.subs = []; try { this.ch.close(); } catch (e) { } }
+}
+
+// Online with zero setup: a direct WebRTC link. Pairing is two copy-pasted codes (invite -> reply), no signalling
+// server; after that it is exactly the local mirror-DB protocol over a data channel.
+// ponytail: STUN only, no TURN relay — two strict/symmetric NATs can't connect; Firebase covers those players.
+const SDP_CODE = {
+  async enc(d) { const st = new Blob([JSON.stringify({ t: d.type, s: d.sdp })]).stream().pipeThrough(new CompressionStream('deflate-raw')); let bin = ''; for (const c of new Uint8Array(await new Response(st).arrayBuffer())) bin += String.fromCharCode(c); return 'PORT-' + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); },
+  async dec(code) {
+    const b = (code || '').replace(/\s+/g, '').replace(/^PORT-/, '').replace(/-/g, '+').replace(/_/g, '/'); if (!b) throw new Error('Paste the whole code (it starts with PORT-).');
+    const bin = atob(b + '==='.slice((b.length + 3) % 4)), st = new Blob([Uint8Array.from(bin, c => c.charCodeAt(0))]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    const o = JSON.parse(await new Response(st).text()); return { type: o.t, sdp: o.s };
+  },
+};
+class P2PTransport extends LocalTransport {
+  constructor(ui) { super(); this.kind = 'p2p'; this.ui = ui; }
+  async connect(code, create) {
+    const pc = this.pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun.cloudflare.com:3478' }] });
+    const gathered = () => new Promise(r => { if (pc.iceGatheringState === 'complete') return r(); pc.onicegatheringstatechange = () => pc.iceGatheringState === 'complete' && r(); setTimeout(r, 5000); });
+    let dc;
+    if (create) {
+      dc = pc.createDataChannel('porting'); await pc.setLocalDescription(await pc.createOffer()); await gathered();
+      await pc.setRemoteDescription(await SDP_CODE.dec(await this.ui.exchange('invite', await SDP_CODE.enc(pc.localDescription))));
+    } else {
+      this.follower = true; const got = new Promise(r => pc.ondatachannel = e => r(e.channel));
+      await pc.setRemoteDescription(await SDP_CODE.dec(await this.ui.exchange('join')));
+      await pc.setLocalDescription(await pc.createAnswer()); await gathered();
+      this.ui.exchange('reply', await SDP_CODE.enc(pc.localDescription));
+      dc = await Promise.race([got, wait(300000)]); if (!dc) throw new Error('Your friend never pasted the reply code. Start again.');
+    }
+    const open = await Promise.race([new Promise(r => dc.readyState === 'open' ? r(true) : dc.onopen = () => r(true)), wait(30000)]);
+    if (!open) throw new Error("Couldn't link up directly: one of your networks blocks peer-to-peer connections. Try another network (e.g. a phone hotspot), or set up Firebase (guide below).");
+    this.ch = { postMessage: m => { if (dc.readyState === 'open') dc.send(JSON.stringify(m)); }, close: () => { try { dc.close(); pc.close(); } catch (e) { } } };
+    dc.onmessage = e => this.recv(JSON.parse(e.data));
+    dc.onclose = () => { for (const k of ['players', 'state', 'portals']) for (const u of Object.keys(this.db[k] || {})) if (u !== this.uid) setPath(this.db, k + '/' + u, null); this.notify(''); }; // link dropped = partner left
+    this.send({ op: 'hello' });
+    for (let i = 0; i < 100 && this.follower && !this.db.meta?.hostUid; i++) await wait(50); // the creator claims line 1 first
+    return this.uid;
+  }
 }
 
 class FirebaseTransport {
@@ -5366,8 +5407,8 @@ const NET = {
   now() { return Date.now() + (this.t?.offset || 0); },
   async start(kind, code, create) {
     this.leave();
-    const t = this.t = kind === 'firebase' ? new FirebaseTransport() : new LocalTransport();
-    this.code = code; this.uid = await t.connect(code); this.events0 = this.now();
+    const t = this.t = kind === 'firebase' ? new FirebaseTransport() : kind === 'p2p' ? new P2PTransport(NETUI) : new LocalTransport();
+    this.code = code; this.uid = await t.connect(code, create); this.events0 = this.now();
     // claim a slot (max 2 players) with a transaction on meta/slots
     const res = await t.transaction('meta/slots', s => { s = s || {}; if (s.p1 === this.uid || s.p2 === this.uid) return s; if (!s.p1) s.p1 = this.uid; else if (!s.p2) s.p2 = this.uid; else return undefined; return s; });
     if (!res.committed) { this.leave(); throw new Error('That Group Plan is full (2 of 2 lines in use).'); }
@@ -5376,6 +5417,7 @@ const NET = {
     this.isHost = !meta?.hostUid || meta.hostUid === this.uid || create; if (this.isHost) t.update('meta', { hostUid: this.uid, createdAt: this.now(), status: 'lobby', buildVersion: BUILD });
     t.set('players/' + this.uid, { name: SETTINGS.name || 'Ollie', slot: this.slot, ready: false, character: this.slot === 'p1' ? 'ollie' : 'prepaid', joinedAt: this.now() });
     for (const p of ['players/', 'state/', 'portals/']) t.onDisconnectRemove(p + this.uid);
+    t.onDisconnectRemove('meta/slots/' + this.slot); // free the line so a reconnecting partner isn't told the plan is full
     this.active = true; this.stats = { p1: { portals: 0, deaths: 0, pings: 0 }, p2: { portals: 0, deaths: 0, pings: 0 } };
     t.on('meta', m => this.onMeta(m)); t.on('players', p => this.onPlayers(p)); t.on('state', s => this.onState(s)); t.on('portals', p => this.onPortals(p));
     t.on('level/state', s => this.onLevelState(s)); t.on('objects', o => this.onObjects(o)); t.on('events', e => this.onEvents(e));
@@ -5541,24 +5583,36 @@ const NETUI = {
       <li>Authentication → Settings → <b>Authorized domains</b> → add your hosting domain.</li><li>Serve the file over http(s) (e.g. <code>npx serve</code> or Firebase Hosting), not <code>file://</code>.</li>
       <li>Paste these Realtime Database rules:</li></ol><pre>${esc(RULES_JSON)}</pre></div>`;
     b.innerHTML = `<div class="row" style="margin-bottom:14px">${FIREBASE_READY ? '<button class="btn" data-a="fc">Create room (online)</button><button class="btn ghost" data-a="fj">Join room (online)</button>' : '<span class="muted">Online play is not configured on this copy — see the setup guide below.</span>'}</div>
+      <div class="row" style="margin-bottom:14px"><button class="btn" data-a="pc">Online, no setup: create invite</button><button class="btn ghost" data-a="pj">Online, no setup: join with invite</button></div>
       <div class="row" style="margin-bottom:18px"><button class="btn y" data-a="lc">Same-computer test mode: create</button><button class="btn ghost" data-a="lj">Same-computer: join</button><input id="codeIn" maxlength="5" placeholder="CODE" style="font-family:var(--mono);font-size:18px;width:110px;text-transform:uppercase;background:#081722;color:#fff;border:1px solid #2c5566;border-radius:10px;padding:8px"></div>
       <div id="lobbyView"></div>${FIREBASE_READY ? '' : guide}`;
     UI.panel('Group Plan', 'Online co-op · 2 lines · 6 chambers', b, () => { if (GAME.state === 'TITLE' && !(LVL && COOP.includes(LVL.def.id))) { } });
     const inp = b.querySelector('#codeIn'); if (code) inp.value = code;
     const go = async (kind, create) => {
-      const c = create ? roomCode() : (inp.value || '').toUpperCase().trim(); if (!create && c.length !== 5) { UI.toast('Group Plan', 'Enter the 5-character room code.'); return; }
+      const c = create || kind === 'p2p' ? roomCode() : (inp.value || '').toUpperCase().trim(); if (!create && kind !== 'p2p' && c.length !== 5) { UI.toast('Group Plan', 'Enter the 5-character room code.'); return; }
       try { b.querySelector('#lobbyView').innerHTML = '<p class="muted">Connecting…</p>'; await NET.start(kind, c, create); this.lobbyView(); JARVIS.say('coop_welcome'); }
       catch (e) { b.querySelector('#lobbyView').innerHTML = `<p class="jline">${esc(e.message || e)}</p>`; }
     };
-    b.querySelectorAll('[data-a]').forEach(x => x.onclick = () => { AUDIO.init(); SFX.ui(); const a = x.dataset.a; if (a === 'fc') go('firebase', true); if (a === 'fj') go('firebase', false); if (a === 'lc') go('local', true); if (a === 'lj') go('local', false); });
+    b.querySelectorAll('[data-a]').forEach(x => x.onclick = () => { AUDIO.init(); SFX.ui(); const a = x.dataset.a; if (a === 'fc') go('firebase', true); if (a === 'fj') go('firebase', false); if (a === 'lc') go('local', true); if (a === 'lj') go('local', false); if (a === 'pc') go('p2p', true); if (a === 'pj') go('p2p', false); });
     if (code && FIREBASE_READY) go('firebase', false);
+  },
+  // P2P pairing screens. mode 'invite' (show code, await their reply) · 'join' (await their invite) · 'reply' (show code)
+  exchange(mode, code) {
+    const v = $('#lobbyView'); if (!v) return Promise.reject(new Error('Group Plan panel closed.'));
+    const box = (id, ro, val = '') => `<textarea id="${id}" ${ro ? 'readonly' : ''} rows="3" spellcheck="false" style="width:100%;font-family:var(--mono);font-size:12px;background:#081722;color:#fff;border:1px solid #2c5566;border-radius:10px;padding:8px;word-break:break-all">${esc(val)}</textarea>`;
+    const say = { invite: ['1 · Send this invite code to your friend (any chat app):', '2 · Paste the reply code they send back:', 'Connect'], join: [null, 'Paste the invite code your friend sent you:', 'Next'], reply: ['Send this reply code back to your friend, then wait here:', null, null] }[mode];
+    v.innerHTML = (say[0] ? `<p>${say[0]}</p>${box('pOut', true, code)}<div class="row" style="margin:8px 0 14px"><button class="btn ghost" id="pCopy">Copy code</button></div>` : '') +
+      (say[1] ? `<p>${say[1]}</p>${box('pIn', false)}<div class="row" style="margin-top:8px"><button class="btn" id="pGo">${say[2]}</button></div>` : '<p class="muted">Waiting for them to paste it…</p>');
+    const cp = $('#pCopy'); if (cp) cp.onclick = () => { try { navigator.clipboard.writeText(code); UI.toast('Copied', 'Now paste it to your friend.'); } catch (e) { $('#pOut').select(); } };
+    if (!say[1]) return Promise.resolve();
+    return new Promise(res => { $('#pGo').onclick = () => { const t = $('#pIn').value.trim(); if (t) { $('#pGo').disabled = true; v.insertAdjacentHTML('beforeend', '<p class="muted">Connecting…</p>'); res(t); } }; });
   },
   lobbyView() {
     const v = $('#lobbyView'); if (!v) return; const link = location.origin + location.pathname + '?room=' + NET.code;
-    v.innerHTML = `<div class="row" style="justify-content:space-between"><div><div class="muted">Room code</div><div class="code">${NET.code}</div></div><div class="row"><button class="btn ghost" id="copyL">Copy invite link</button><button class="btn" id="readyB">Ready</button>${NET.isHost ? '<button class="btn y" id="startB">Start</button>' : ''}</div></div>
+    v.innerHTML = `<div class="row" style="justify-content:space-between">${NET.t.kind === 'p2p' ? '<div><div class="muted">Direct link</div><div class="code">LIVE</div></div><div class="row">' : `<div><div class="muted">Room code</div><div class="code">${NET.code}</div></div><div class="row"><button class="btn ghost" id="copyL">Copy invite link</button>`}<button class="btn" id="readyB">Ready</button>${NET.isHost ? '<button class="btn y" id="startB">Start</button>' : ''}</div></div>
       <div class="lobby" style="margin-top:16px"><div class="slot"><canvas id="pv1" width="300" height="170"></canvas><h4 id="n1"></h4><div class="muted" id="s1"></div></div><div class="slot"><canvas id="pv2" width="300" height="170"></canvas><h4 id="n2"></h4><div class="muted" id="s2"></div></div></div>
       <p class="jline" id="lobbyJ">${esc(pick(LINES.coop_lobby))}</p><p class="muted" id="lat"></p>`;
-    $('#copyL').onclick = () => { try { navigator.clipboard.writeText(link); UI.toast('Copied', link); } catch (e) { UI.toast('Invite link', link); } };
+    if ($('#copyL')) $('#copyL').onclick = () => { try { navigator.clipboard.writeText(link); UI.toast('Copied', link); } catch (e) { UI.toast('Invite link', link); } };
     $('#readyB').onclick = () => { NET.t.update('players/' + NET.uid, { ready: true }); SFX.approved(new V3()); };
     if ($('#startB')) $('#startB').onclick = () => { if (!NET.remote) { UI.toast('Group Plan', 'Waiting for a second line. Share the code.'); return; } NET.gotoLevel('g0'); };
     drawOlliePreview($('#pv1'), 'ollie'); drawOlliePreview($('#pv2'), 'prepaid'); this.refresh();
@@ -5608,13 +5662,16 @@ const RULES_JSON = `{
     "rooms": {
       "$code": {
         ".read": "auth != null",
-        "meta": { ".write": "auth != null && (!data.exists() || data.child('hostUid').val() === auth.uid || !data.parent().child('players').child(data.child('hostUid').val()).exists())" },
+        "meta": {
+          ".write": "auth != null && (!data.child('hostUid').exists() || data.child('hostUid').val() === auth.uid || !data.parent().child('players').child(data.child('hostUid').val()).exists())",
+          "slots": { ".write": "auth != null && (!data.child('p1').exists() || newData.child('p1').val() === data.child('p1').val() || data.child('p1').val() === auth.uid) && (!data.child('p2').exists() || newData.child('p2').val() === data.child('p2').val() || data.child('p2').val() === auth.uid)" }
+        },
         "players": { "$uid": { ".write": "auth != null && auth.uid === $uid" } },
         "state":   { "$uid": { ".write": "auth != null && auth.uid === $uid" } },
         "portals": { "$uid": { ".write": "auth != null && auth.uid === $uid" } },
-        "objects": { "$id":  { ".write": "auth != null" } },
-        "level":   { ".write": "auth != null && root.child('rooms').child($code).child('meta/hostUid').val() === auth.uid" },
-        "events":  { "$id":  { ".write": "auth != null && newData.child('by').val() === auth.uid" } }
+        "objects": { ".write": "auth != null && data.parent().child('meta/hostUid').val() === auth.uid", "$id": { ".write": "auth != null" } },
+        "level":   { ".write": "auth != null && data.parent().child('meta/hostUid').val() === auth.uid" },
+        "events":  { ".write": "auth != null && data.parent().child('meta/hostUid').val() === auth.uid", "$id": { ".write": "auth != null && newData.child('by').val() === auth.uid" } }
       }
     }
   }
@@ -5777,20 +5834,21 @@ async function warmUp(L, progress = () => { }) {
     const seen = new Set(); const scan = v => { if (!v || typeof v !== 'object' || seen.has(v)) return; seen.add(v); if (v.isMaterial) { add(v); return; } if (Array.isArray(v)) v.forEach(x => x?.isMaterial && scan(x)); };
     for (const e of L.list) for (const k of Object.keys(e)) { const v = e[k]; if (v?.isMaterial || Array.isArray(v)) scan(v); }
     L.def.warm?.(L, gal);
-    // force-visible, no culling, every layer
-    const hid = [], cul = [];
-    for (const sc of [SCENE, VMSCENE]) sc.traverse(o => { if (!o.visible) { hid.push(o); o.visible = true; } if (o.frustumCulled) { cul.push(o); o.frustumCulled = false; } });
-    const mask = CAMERA.layers.mask; CAMERA.layers.enableAll(); SCENE.updateMatrixWorld(true); VMSCENE.updateMatrixWorld(true);
+    // force-visible, no culling, every layer — only ever inside synchronous blocks: things opened by timers while we
+    // await (e.g. JARVIS placing his portal) must not be hidden again by a stale restore
+    let hid, cul, mask;
+    const force = () => { hid = []; cul = []; for (const sc of [SCENE, VMSCENE]) sc.traverse(o => { if (!o.visible) { hid.push(o); o.visible = true; } if (o.frustumCulled) { cul.push(o); o.frustumCulled = false; } }); mask = CAMERA.layers.mask; CAMERA.layers.enableAll(); SCENE.updateMatrixWorld(true); VMSCENE.updateMatrixWorld(true); };
+    const unforce = () => { for (const o of hid) o.visible = false; for (const o of cul) o.frustumCulled = true; CAMERA.layers.mask = mask; };
     progress(0.1);
-    try { await Promise.race([Promise.all([RENDERER.compileAsync(SCENE, CAMERA), RENDERER.compileAsync(VMSCENE, VMCAM)]), wait(90000)]); } catch (e) { }
+    force(); const compiling = Promise.all([RENDERER.compileAsync(SCENE, CAMERA), RENDERER.compileAsync(VMSCENE, VMCAM)]); unforce(); // compileAsync gathers materials synchronously, then polls
+    try { await Promise.race([compiling, wait(90000)]); } catch (e) { }
     progress(0.7);
     if (!ELEVATOR.scene) ELEVATOR.build();
     try { await Promise.race([RENDERER.compileAsync(ELEVATOR.scene, CAMERA), wait(30000)]); } catch (e) { }
     // one real draw of it all into an offscreen target: shadow-map variants, texture uploads, render-target paths
     if (!WARM.rt) WARM.rt = new THREE.WebGLRenderTarget(256, 256, { type: THREE.HalfFloatType, depthBuffer: true });
-    RENDERER.shadowMap.needsUpdate = true; RENDERER.setRenderTarget(WARM.rt); RENDERER.clear(); RENDERER.render(SCENE, CAMERA); RENDERER.render(VMSCENE, VMCAM); RENDERER.render(ELEVATOR.scene, CAMERA); RENDERER.setRenderTarget(null);
+    force(); RENDERER.shadowMap.needsUpdate = true; RENDERER.setRenderTarget(WARM.rt); RENDERER.clear(); RENDERER.render(SCENE, CAMERA); RENDERER.render(VMSCENE, VMCAM); RENDERER.render(ELEVATOR.scene, CAMERA); RENDERER.setRenderTarget(null); unforce();
     await nextFrame(); progress(0.9);
-    for (const o of hid) o.visible = false; for (const o of cul) o.frustumCulled = true; CAMERA.layers.mask = mask;
     SCENE.remove(gal); VMSCENE.remove(vmg); // materials are deliberately not disposed: disposing would release the programs we just built
     // settle: a few full frames through the real pipeline (portals included) before the card lifts
     const sp = L.spawn; CAMERA.position.copy(sp.pos).setY(sp.pos.y + 1.6); CAMERA.rotation.set(0, sp.yaw, 0); CAMERA.updateMatrixWorld(true);
