@@ -241,10 +241,7 @@ const FIREBASE_CONFIG = {
     "rooms": {
       "$code": {
         ".read": "auth != null",
-        "meta": {
-          ".write": "auth != null && (!data.child('hostUid').exists() || data.child('hostUid').val() === auth.uid || !data.parent().child('players').child(data.child('hostUid').val()).exists())",
-          "slots": { ".write": "auth != null && (!data.child('p1').exists() || newData.child('p1').val() === data.child('p1').val() || data.child('p1').val() === auth.uid) && (!data.child('p2').exists() || newData.child('p2').val() === data.child('p2').val() || data.child('p2').val() === auth.uid)" }
-        },
+        "meta":    { ".write": "auth != null && (!data.child('hostUid').exists() || data.child('hostUid').val() === auth.uid || !data.parent().child('players').child(data.child('hostUid').val()).exists())" },
         "players": { "$uid": { ".write": "auth != null && auth.uid === $uid" } },
         "state":   { "$uid": { ".write": "auth != null && auth.uid === $uid" } },
         "portals": { "$uid": { ".write": "auth != null && auth.uid === $uid" } },
@@ -5374,7 +5371,7 @@ class P2PTransport extends LocalTransport {
     dc.onmessage = e => this.recv(JSON.parse(e.data));
     dc.onclose = () => { for (const k of ['players', 'state', 'portals']) for (const u of Object.keys(this.db[k] || {})) if (u !== this.uid) setPath(this.db, k + '/' + u, null); this.notify(''); }; // link dropped = partner left
     this.send({ op: 'hello' });
-    for (let i = 0; i < 100 && this.follower && !this.db.meta?.hostUid; i++) await wait(50); // the creator claims line 1 first
+    for (let i = 0; i < 100 && this.follower && !this.db.players?.[this.db.meta?.hostUid]; i++) await wait(50); // the creator claims line 1 first
     return this.uid;
   }
 }
@@ -5385,7 +5382,9 @@ class FirebaseTransport {
     const base = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/`;
     const [appM, authM, dbM] = await Promise.all([import(base + 'firebase-app.js'), import(base + 'firebase-auth.js'), import(base + 'firebase-database.js')]);
     this.m = dbM; const app = appM.getApps().find(a => a.name === 'porting') || appM.initializeApp(FIREBASE_CONFIG, 'porting');
-    const cred = await authM.signInAnonymously(authM.getAuth(app)); this.uid = cred.user.uid; this.db = dbM.getDatabase(app); this.root = 'rooms/' + code;
+    // in-memory sign-in: every tab/window is its own player (the default shared persistence made two tabs the same user)
+    let auth; try { auth = authM.initializeAuth(app, { persistence: authM.inMemoryPersistence }); } catch (e) { auth = authM.getAuth(app); }
+    const cred = await authM.signInAnonymously(auth); this.uid = cred.user.uid; this.db = dbM.getDatabase(app); this.root = 'rooms/' + code;
     this.unsubs.push(dbM.onValue(dbM.ref(this.db, '.info/serverTimeOffset'), s => this.offset = s.val() || 0));
     this.unsubs.push(dbM.onValue(dbM.ref(this.db, '.info/connected'), s => { this.connected = !!s.val(); }));
     return this.uid;
@@ -5409,15 +5408,16 @@ const NET = {
     this.leave();
     const t = this.t = kind === 'firebase' ? new FirebaseTransport() : kind === 'p2p' ? new P2PTransport(NETUI) : new LocalTransport();
     this.code = code; this.uid = await t.connect(code, create); this.events0 = this.now();
-    // claim a slot (max 2 players) with a transaction on meta/slots
-    const res = await t.transaction('meta/slots', s => { s = s || {}; if (s.p1 === this.uid || s.p2 === this.uid) return s; if (!s.p1) s.p1 = this.uid; else if (!s.p2) s.p2 = this.uid; else return undefined; return s; });
-    if (!res.committed) { this.leave(); throw new Error('That Group Plan is full (2 of 2 lines in use).'); }
-    const slots = res.value; this.slot = slots.p1 === this.uid ? 'p1' : 'p2';
-    const meta = await new Promise(r => { let done = false; t.on('meta', m => { if (!done) { done = true; r(m); } }); });
-    this.isHost = !meta?.hostUid || meta.hostUid === this.uid || create; if (this.isHost) t.update('meta', { hostUid: this.uid, createdAt: this.now(), status: 'lobby', buildVersion: BUILD });
+    // Joining only ever writes this player's own node (players/<uid>), so it passes any version of the security rules.
+    // ponytail: no atomic slot claim — two people joining in the same instant could both get in; a transaction needs a shared-write rule
+    const once = path => new Promise(r => { let done = false; t.on(path, v => { if (!done) { done = true; r(v); } }); });
+    const [meta, players] = await Promise.all([once('meta'), once('players')]);
+    const others = Object.entries(players || {}).filter(([k]) => k !== this.uid);
+    if (others.length >= 2) { this.leave(); throw new Error('That Group Plan is full (2 of 2 lines in use).'); }
+    this.slot = players?.[this.uid]?.slot || (others.some(([, q]) => q.slot === 'p1') ? 'p2' : 'p1');
+    this.isHost = !meta?.hostUid || meta.hostUid === this.uid || create || !players?.[meta.hostUid]; if (this.isHost) t.update('meta', { hostUid: this.uid, createdAt: this.now(), status: 'lobby', buildVersion: BUILD });
     t.set('players/' + this.uid, { name: SETTINGS.name || 'Ollie', slot: this.slot, ready: false, character: this.slot === 'p1' ? 'ollie' : 'prepaid', joinedAt: this.now() });
     for (const p of ['players/', 'state/', 'portals/']) t.onDisconnectRemove(p + this.uid);
-    t.onDisconnectRemove('meta/slots/' + this.slot); // free the line so a reconnecting partner isn't told the plan is full
     this.active = true; this.stats = { p1: { portals: 0, deaths: 0, pings: 0 }, p2: { portals: 0, deaths: 0, pings: 0 } };
     t.on('meta', m => this.onMeta(m)); t.on('players', p => this.onPlayers(p)); t.on('state', s => this.onState(s)); t.on('portals', p => this.onPortals(p));
     t.on('level/state', s => this.onLevelState(s)); t.on('objects', o => this.onObjects(o)); t.on('events', e => this.onEvents(e));
@@ -5585,13 +5585,16 @@ const NETUI = {
     b.innerHTML = `<div class="row" style="margin-bottom:14px">${FIREBASE_READY ? '<button class="btn" data-a="fc">Create room (online)</button><button class="btn ghost" data-a="fj">Join room (online)</button>' : '<span class="muted">Online play is not configured on this copy — see the setup guide below.</span>'}</div>
       <div class="row" style="margin-bottom:14px"><button class="btn" data-a="pc">Online, no setup: create invite</button><button class="btn ghost" data-a="pj">Online, no setup: join with invite</button></div>
       <div class="row" style="margin-bottom:18px"><button class="btn y" data-a="lc">Same-computer test mode: create</button><button class="btn ghost" data-a="lj">Same-computer: join</button><input id="codeIn" maxlength="5" placeholder="CODE" style="font-family:var(--mono);font-size:18px;width:110px;text-transform:uppercase;background:#081722;color:#fff;border:1px solid #2c5566;border-radius:10px;padding:8px"></div>
-      <div id="lobbyView"></div>${FIREBASE_READY ? '' : guide}`;
+      <div id="lobbyView"></div>${FIREBASE_READY ? `<details class="guide"><summary class="muted">Firebase database rules</summary><pre>${esc(RULES_JSON)}</pre></details>` : guide}`;
     UI.panel('Group Plan', 'Online co-op · 2 lines · 6 chambers', b, () => { if (GAME.state === 'TITLE' && !(LVL && COOP.includes(LVL.def.id))) { } });
     const inp = b.querySelector('#codeIn'); if (code) inp.value = code;
     const go = async (kind, create) => {
       const c = create || kind === 'p2p' ? roomCode() : (inp.value || '').toUpperCase().trim(); if (!create && kind !== 'p2p' && c.length !== 5) { UI.toast('Group Plan', 'Enter the 5-character room code.'); return; }
       try { b.querySelector('#lobbyView').innerHTML = '<p class="muted">Connecting…</p>'; await NET.start(kind, c, create); this.lobbyView(); JARVIS.say('coop_welcome'); }
-      catch (e) { b.querySelector('#lobbyView').innerHTML = `<p class="jline">${esc(e.message || e)}</p>`; }
+      catch (e) {
+        const denied = /permission/i.test(String(e.message || e) + (e.code || ''));
+        b.querySelector('#lobbyView').innerHTML = `<p class="jline">${denied ? 'Firebase refused the connection (PERMISSION_DENIED). Open Firebase console → Realtime Database → <b>Rules</b>, replace them with the rules below, and press <b>Publish</b>.' : esc(e.message || e)}</p>`;
+      }
     };
     b.querySelectorAll('[data-a]').forEach(x => x.onclick = () => { AUDIO.init(); SFX.ui(); const a = x.dataset.a; if (a === 'fc') go('firebase', true); if (a === 'fj') go('firebase', false); if (a === 'lc') go('local', true); if (a === 'lj') go('local', false); if (a === 'pc') go('p2p', true); if (a === 'pj') go('p2p', false); });
     if (code && FIREBASE_READY) go('firebase', false);
@@ -5662,10 +5665,7 @@ const RULES_JSON = `{
     "rooms": {
       "$code": {
         ".read": "auth != null",
-        "meta": {
-          ".write": "auth != null && (!data.child('hostUid').exists() || data.child('hostUid').val() === auth.uid || !data.parent().child('players').child(data.child('hostUid').val()).exists())",
-          "slots": { ".write": "auth != null && (!data.child('p1').exists() || newData.child('p1').val() === data.child('p1').val() || data.child('p1').val() === auth.uid) && (!data.child('p2').exists() || newData.child('p2').val() === data.child('p2').val() || data.child('p2').val() === auth.uid)" }
-        },
+        "meta":    { ".write": "auth != null && (!data.child('hostUid').exists() || data.child('hostUid').val() === auth.uid || !data.parent().child('players').child(data.child('hostUid').val()).exists())" },
         "players": { "$uid": { ".write": "auth != null && auth.uid === $uid" } },
         "state":   { "$uid": { ".write": "auth != null && auth.uid === $uid" } },
         "portals": { "$uid": { ".write": "auth != null && auth.uid === $uid" } },
