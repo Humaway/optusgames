@@ -6108,7 +6108,8 @@ const Render = (() => {
 //   K.drop(…,{side}) (edge the road meets; inferred), K.door({hinge:'left'|'right', swing:±1, open:0..1|bool, chain,
 //     reader:'card'|'keypad'|'maglock', sign, signBack, color, window:false, depth, maxAngle}),
 //   K.pickup(…,{rot, scale, glint, extraOnEasy}), K.doc(…,{wall, rot, glint, color}) (glint: opt-in, true|size — a
-//     sparkle only where the torch / a lamp lights the item), K.sticker(…,{pitch, size}),
+//     sparkle only where the torch / a lamp lights the item), K.glint(obj,{y,size,strength,when}) (the same sparkle on
+//     any object), K.sticker(…,{pitch, size}),
 //   K.payphone(…,{own:true}), K.breakTable(…,{time:[h,m], clock:[x,y,z,rot]|false, own}), K.npc(…,{rig, y, whenTalk}),
 //   K.light(…,{name, on:false, rot, len, fixture, diffuser, halo, size, duty, phase, target, angle}),
 //   K.prop(…,{static, interact, examineId}); K.stairs(…,{rail, nosing, solid:false, bottom}); K.wall openings
@@ -7533,6 +7534,21 @@ const Kit = (() => {
     const whenVis = (obj, when, w) => { if (obj && when) { const f = () => { obj.visible = safeWhen(when) && matchWorld(w, S.outage); }; f(); rb.animated.push(f); } };
     const glintTick = (s) => rb.animated.push((dt, t) => { if (s.parent && s.parent.visible) s.userData.tick(t, dt); });
     const glintSize = (g, def) => (typeof g === 'number' ? g : def);
+    // CONTRACT+: K.glint(obj, {y, size = 0.24, strength = 0.9, when}) — the pickup sparkle on any object (a weapon prop
+    // leaning on a desk, an item model placed by hand). Same rule as K.pickup's: only where the torch or a lamp lights it.
+    // It hides with the object and while when() is false. y = height above the object's origin (default: its top + 0.05).
+    K.glint = (obj, o = {}) => {
+      if (!obj) return null;
+      obj.updateMatrixWorld(true);
+      let y = o.y;
+      if (y == null) { const bb = new THREE.Box3().setFromObject(obj), p = obj.getWorldPosition(new THREE.Vector3()); y = bb.isEmpty() ? 0.15 : bb.max.y - p.y + 0.05; }
+      const s = makeGlint(obj, y, glintSize(o.size, 0.24), o.strength ?? 0.9);
+      rb.animated.push((dt, t) => {
+        if (!s.parent || !s.parent.visible || (o.when && !safeWhen(o.when))) { s.visible = false; return; }
+        s.userData.tick(t, dt);
+      });
+      return s;
+    };
     K.pickup = (item, x, y, z, o = {}) => {
       const id = o.id || uid(`${roomId}:${item}`);
       if (S.taken && S.taken[id]) return dummyHandle(id);
@@ -35459,6 +35475,23 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
       K.prop('box', 13.5, 4.3, 20, { w: 0.4, h: 0.3, d: 0.3, variant: 'returns', text: 'RETURNS', y: 0.06 });
       const cutterTaken = !!(S.taken && S.taken['p4_busshelter:cutter']);
       const cutter = cutterTaken ? null : K.prop('box_cutter', 13.0, 5.45, 28, { y: 0.19, name: 'p4_cutter' });
+      // (weapons were easy to miss: a battery lantern left on beside the boxes lights them and the cutter, which catches
+      // the light — and the first time he comes down into the clearing, 'P-4w' shows it to him)
+      const lanternOn = () => !(S.taken && S.taken['p4_busshelter:cutter']);
+      const lantern = new THREE.Group(); lantern.name = 'p4_lantern'; lantern.position.set(12.45, 0, 5.05);
+      const lBody = { color: '#2f5b3a', roughness: 0.6 };
+      const lPart = (geo, mat, y) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; m.userData.ownedGeo = true; lantern.add(m); return m; };
+      lPart(new THREE.CylinderGeometry(0.075, 0.085, 0.05, 14), K.mat(lBody), 0.025);
+      const lGlass = new THREE.MeshStandardMaterial({ color: '#fff1cf', emissive: '#ffd79a', emissiveIntensity: 2.2, roughness: 0.3 });
+      lPart(new THREE.CylinderGeometry(0.06, 0.06, 0.13, 14), lGlass, 0.115);
+      lPart(new THREE.CylinderGeometry(0.07, 0.075, 0.035, 14), K.mat(lBody), 0.2);
+      lPart(new THREE.TorusGeometry(0.045, 0.006, 6, 14, Math.PI), K.mat({ color: '#9aa29c', roughness: 0.4 }), 0.22);
+      K.mesh(lantern, { name: 'p4_lantern' });
+      const lLight = K.light('point', 12.75, 0.5, 5.3, { color: '#ffd9a4', intensity: 2.6, distance: 3.4, name: 'p4:lantern' });
+      let lHalo = null;
+      try { lHalo = Render.halo([0, 0.12, 0], { parent: lantern, color: '#ffd9a0', size: 0.55, opacity: 0.5, name: 'p4:lanternHalo' }); } catch (e) { /* render */ }
+      K.animate(() => { const on = lanternOn(); lGlass.emissiveIntensity = on ? 2.2 : 0.05; if (lHalo) lHalo.visible = on; if (lLight && lLight.on && lLight.isOn !== on) lLight.on(on); });
+      if (cutter) K.glint(cutter, { size: 0.32, strength: 1, when: lanternOn });
       let hCut = null;
       hCut = K.interact(13.0, 0.35, 5.45, async (G) => {
         if (S.taken['p4_busshelter:cutter']) return;
@@ -35489,6 +35522,11 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
       K.exit({ id: 'p4_busshelter:west', box: [-1.7, 3.5, -1.2, 9.9], to: 'p3_hillroad', entry: 'bottom' });
       // the shelter-front trigger: getting too close reveals it (without the box cutter)
       K.trigger([2.2, 1.9, 6.6, 3.6], (G) => G.cutscene('P-4'), { id: 'p4_busshelter:near', when: (s) => !(s.done && s.done['p4:reveal']) && !(s.spawns && s.spawns['p4_busshelter:teth']) });
+      // the box cutter, shown: the first time he comes down out of the fog into the clearing, before anything else
+      K.trigger([-1.2, 3.5, 3.4, 9.9], (G) => G.cutscene('P-4w'), { id: 'p4_busshelter:showCutter', when: (s) => !(s.taken && s.taken['p4_busshelter:cutter']) && !(s.done && (s.done['p4:cutterShown'] || s.done['p4:reveal'])) });
+      // not up Relay Street empty-handed (the first time through): he turns back for the cutter
+      const noCutter = K.collider(6.4, -5.0, 12.6, -4.75, { h: 3, blocker: 'Not with nothing in my hands. There was a box cutter back by the bin.', soft: true });
+      K.animate(() => { if (noCutter) noCutter.enabled = S.chapter === 0 && !(S.taken && S.taken['p4_busshelter:cutter']); });
     },
     async onEnter(G) {
       // the outcome lines (the engine already tracks F / A for cut free / stomp)
@@ -35724,6 +35762,18 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
   // =================================================================================================================
   // IN-ENGINE P-4: the figure in the shelter turns. Bars climb to 2 with the EFTPOS beep; low behind Aidan.
   // =================================================================================================================
+  // P-4w (in-engine, a look): the box cutter on the flattened boxes by the bin, lit by the lantern someone left on. The
+  // weapons were easy to walk past; this is the only one the Prologue gives him.
+  defineCutscene('P-4w', async (G) => {
+    S.done['p4:cutterShown'] = true;
+    const A = G.aidan;
+    A.look([13.0, 0.25, 5.45]);
+    G.cam({ pos: [11.35, 1.05, 6.75], target: [12.98, 0.2, 5.45], fov: 34, to: { pos: [11.6, 0.95, 6.55], fov: 26 }, dur: 2.8 });
+    await G.wait(2.5);
+    A.look(null);
+    G.camRelease();
+  }, { letterbox: true, skippable: true });
+
   defineCutscene('P-4', async (G) => {
     S.done['p4:reveal'] = true;
     const e = G.enemy('p4_busshelter:teth');
@@ -35815,6 +35865,7 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
   const pickDoc = (base) => (typeof DOC_pick === 'function' ? DOC_pick(base) : base);
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const isPad = () => { try { return Input.lastDevice === 'gamepad'; } catch (e) { return false; } };
+  const hasBar = () => Array.isArray(S.inv) && S.inv.some((i) => i && i.id === 'steel_bar');
   // an actor move/turn started without await: keep its rejection (Script.ABORT when the scene is cut short) handled
   const q = (p) => { if (p && typeof p.catch === 'function') p.catch(() => {}); return p; };
 
@@ -36694,19 +36745,23 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
         if (sees) { C1.cctv.seenT += 0.07; C1.cctv.away = false; }
         else if (C1.cctv.seenT > 2.0) { C1.cctv.away = true; S.done['c1:cctvGone'] = true; }
       });
-      // the steel bar leaning on the monitor bank (a pickup: the examine line first)
+      // the steel bar laid on the key register desk, along its front edge beside the staff room key, under the desk lamp
+      // (a pickup: the examine line first). Weapons were easy to miss: it sits where he has to go for the key, it
+      // catches the lamp, and the first time he comes in 'c1-bar' shows it to him.
       const barTaken = !!(S.taken && S.taken['c1_security:bar']);
       if (!barTaken) {
-        const bar = K.prop('bar_steel', 7.0, 4.25, 0, { name: 'c1s_bar' });
-        if (bar) { bar.rotation.set(0, -Math.PI / 2, 0); bar.rotateZ(0.32); bar.position.y = 0.02; }
+        const bar = K.prop('bar_steel', 1.44, 1.38, 90, { variant: 'flat', y: 0.745, name: 'c1s_bar' });
+        if (bar) K.glint(bar, { size: 0.3, strength: 1, when: () => !(S.taken && S.taken['c1_security:bar']) });
       }
-      K.interact(7.05, 0.8, 4.25, async (G) => {
+      K.prop('desk_lamp', 1.02, 2.12, 0, { y: 0.745 });
+      K.trigger([3.0, 0.2, 5.0, 1.9], (G) => G.cutscene('c1-bar'), { id: 'c1_security:showBar', when: () => !(S.taken && S.taken['c1_security:bar']) && !hasBar() && !done('c1:barShown') });
+      K.interact(1.6, 0.85, 1.85, async (G) => {
         if (S.taken['c1_security:bar']) return;
         await G.think('Snapped off a demo table. Heavy.');
         const bar = G.obj('c1s_bar');
         await Script.builtins.pickup(G, { id: 'c1_security:bar', item: 'steel_bar', obj: bar });
         if (!S.equipped || S.equipped === 'box_cutter') G.prompt(isPad() ? 'Hold {ready} and press {attack} to swing it. Slow, but it hits hard.' : 'Tab: items. Equip the bar there. Slow, but it hits hard.', { id: 'c1_bar' });
-      }, { id: 'c1_security:barx', r: 1.3, when: () => !(S.taken && S.taken['c1_security:bar']) });
+      }, { id: 'c1_security:barx', r: 1.2, when: () => !(S.taken && S.taken['c1_security:bar']) });
       // the key register desk by the door: the Plaza Directory, the staff room key in the tray, the logbook
       K.prop('desk', 1.3, 1.55, 90, { variant: 'office' });
       K.prop('office_chair', 2.2, 1.7, -100, {});
@@ -37669,6 +37724,21 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
       K.interact(BO.term[0], 1.0, BO.term[1] + 0.3, (G) => C1_terminal(G), { id: 'c1_backoffice:terminal', r: 1.3, when: () => !flag('c1_address') });
       K.examine(BO.term[0], 1.0, BO.term[1] + 0.3, ['UNIT 9, HILLTOP VILLAGE, SIGNAL HILL. [beat] It\'s still on the screen.', 'Glitch. It was a glitch.'], { id: 'c1bo:termafter', r: 1.3, when: () => flag('c1_address') });
       K.light('screen', BO.term[0], 1.1, BO.term[1] + 0.5, { color: '#6f9fcf', intensity: 1.4, distance: 3.2 });
+      // a second chance before the Returns Cage: if he never picked up the bar in the security office, another one leans
+      // beside the stockroom door in the Outage (its desk lamp on the filing cabinet lights it), shown by 'c1-bar2'
+      const spareBar = () => !!S.outage && !hasBar() && !(S.taken && S.taken['c1_backoffice:bar']);
+      if (spareBar()) {
+        const bar2 = K.prop('bar_steel', 5.78, 3.45, -90, { variant: 'lean', name: 'c1b_bar', world: 'outage' });
+        if (bar2) K.glint(bar2, { size: 0.3, strength: 1, when: spareBar });
+        K.light('point', 5.35, 1.35, 3.35, { color: '#ffd8a0', intensity: 1.6, distance: 2.6, name: 'c1b:barLamp', world: 'outage' });
+        K.interact(5.72, 0.8, 3.45, async (G) => {
+          if (!spareBar()) return;
+          await G.think('Snapped off a demo table. Heavy.');
+          await Script.builtins.pickup(G, { id: 'c1_backoffice:bar', item: 'steel_bar', obj: G.obj('c1b_bar') });
+          if (!S.equipped || S.equipped === 'box_cutter') G.prompt(isPad() ? 'Hold {ready} and press {attack} to swing it. Slow, but it hits hard.' : 'Tab: items. Equip the bar there. Slow, but it hits hard.', { id: 'c1_bar' });
+        }, { id: 'c1_backoffice:barx', r: 1.2, world: 'outage', when: spareBar });
+        K.trigger([0, 0, 6, 5], (G) => G.cutscene('c1-bar2'), { id: 'c1_backoffice:showBar', world: 'outage', when: () => spareBar() && !done('c1:bar2Shown') });
+      }
       K.prop('mug', BO.term[0] - 0.55, 0.3, 20, { y: 0.745, text: 'CHLOE' });
       for (let k = 0; k < 4; k++) K.prop('energy_can', BO.term[0] + 0.6 + k * 0.09, 0.62 + (k % 2) * 0.1, k * 40, { y: 0.745 });
       K.prop('printer', 4.6, 0.35, 180, { y: 0.745 });
@@ -38750,6 +38820,27 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
   // =================================================================================================================
   // CUTSCENE 1-3 "Returns"
   // =================================================================================================================
+  // c1-bar / c1-bar2 (in-engine looks): the steel bar, shown the first time he comes into the security office (leaning on
+  // the key register desk under its lamp), and — if he still has no bar — the spare by the stockroom door
+  defineCutscene('c1-bar', async (G) => {
+    S.done['c1:barShown'] = true;
+    const A = G.aidan;
+    A.look([1.45, 0.8, 1.85]);
+    G.cam({ pos: [3.2, 1.55, 3.05], target: [1.45, 0.78, 1.8], fov: 36, to: { pos: [2.95, 1.45, 2.85], fov: 29 }, dur: 2.8 });
+    await G.wait(2.5);
+    A.look(null);
+    G.camRelease();
+  }, { letterbox: true, skippable: true });
+  defineCutscene('c1-bar2', async (G) => {
+    S.done['c1:bar2Shown'] = true;
+    const A = G.aidan;
+    A.look([5.78, 0.6, 3.45]);
+    G.cam({ pos: [3.9, 1.45, 4.2], target: [5.75, 0.55, 3.35], fov: 38, to: { pos: [4.15, 1.35, 4.05], fov: 31 }, dur: 2.8 });
+    await G.wait(2.5);
+    A.look(null);
+    G.camRelease();
+  }, { letterbox: true, skippable: true });
+
   defineCutscene('1-3', async (G) => {
     const A = G.aidan, e = C1.boss || G.enemy('c1_stockroom:cage');
     // 1. the stockroom from a high corner: he walks toward the chain-link returns cage. Boxes shift inside it.
@@ -41924,6 +42015,7 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
   const WATTS = { HALL: '960 W', FRAME: '1,440 W', RECORDS: '480 W', BASEMENT: '720 W', CANTEEN: '240 W', 'MAST FEED': '1,920 W' };
   const circList = () => { const v = S.done && S.done['c3:circ']; return v === undefined || v === null ? ['BASEMENT'] : String(v).split('|').filter(Boolean); };
   const circOn = (n) => circList().includes(n);
+  const hasExt = () => Array.isArray(S.inv) && S.inv.some((i) => i && i.id === 'extinguisher');
   const setCirc = (list) => { S.done['c3:circ'] = CIRC.filter((c) => list.includes(c)).join('|'); };
   const loadOf = (list) => list.reduce((s, c) => s + (AMPS[c] || 0), 0);
 
@@ -43227,8 +43319,17 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
       K.sign('FIRE\nEXTINGUISHER', 9.93, 1.95, 1.4, 0.3, 0.2, { rotY: -90, style: 'shop', bg: '#a3231b', fg: '#ffffff' });
       if (!extTaken) {
         const ext = Kit.itemModel('extinguisher');
-        if (ext) { ext.position.set(9.83, 0.4, 1.4); ext.rotation.y = -Math.PI / 2; K.obj('c3c_ext', ext); K.mesh(ext, { name: 'c3c_ext' }); }
+        if (ext) {
+          ext.position.set(9.83, 0.4, 1.4); ext.rotation.y = -Math.PI / 2; K.obj('c3c_ext', ext); K.mesh(ext, { name: 'c3c_ext' });
+          K.glint(ext, { size: 0.3, strength: 1, when: () => !(S.taken && S.taken['c3_canteen:extinguisher']) });
+        }
       }
+      // (weapons were easy to miss, and the canteen is dark until its circuit is on: the battery emergency light over the
+      // door lights the extinguisher and the corner, and the first time he comes in without one 'c3-ext' shows it)
+      K.box(9.25, 2.55, 0.1, 0.42, 0.14, 0.12, { color: '#e8e6dc', roughness: 0.5 });
+      for (const dx of [-0.13, 0.13]) K.sphere(9.25 + dx, 2.5, 0.2, 0.045, { color: '#fff4dc', emissive: '#fff0cc', emissiveIntensity: on ? 0.1 : 2.2 });
+      if (!on) K.light('point', 9.35, 2.3, 0.55, { color: '#fff1d8', intensity: 2.4, distance: 4.2, name: 'c3c:emergency' });
+      K.trigger([7.4, 0, 9.9, 2.0], (G) => G.cutscene('c3-ext'), { id: 'c3_canteen:showExt', when: () => !hasExt() && !(S.taken && S.taken['c3_canteen:extinguisher']) && !done('c3:extShown') });
       K.interact(9.3, 1.0, 1.4, async (G) => {
         if (S.taken['c3_canteen:extinguisher']) return;
         await G.think('Still charged. Nineteen seventy-something.');
@@ -43309,6 +43410,24 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
       for (const [x, r0, c] of [[0.18, 0.04, '#7a2a22'], [0.32, 0.025, '#8d9594'], [3.82, 0.035, '#8d9594']]) K.cyl(x, ST.low, 8.85, r0, 6.2, { tex: 'metal', color: c });
       K.cyl(3.84, ST.low, 0.2, 0.03, 6.2, { tex: 'metal', color: '#8d9594' });
       K.prop('first_aid_box', 0.08, 8.1, 90, { variant: 'wall', mount: 1.45, y: ST.low });
+      // a second chance: if he walked past the canteen's extinguisher, the fire point beside the cable vault door (the
+      // Unread are in there) has one on its bracket, shown by 'c3-ext2' when he first reaches the landing
+      const spareExt = () => !hasExt() && !(S.taken && S.taken['c3_stairs:extinguisher']);
+      if (spareExt()) {
+        K.box(0.07, ST.low + 0.95, 7.75, 0.04, 0.12, 0.1, { tex: 'metal', color: '#3a3f3d' });
+        K.sign('FIRE\nEXTINGUISHER', 0.07, ST.low + 1.95, 7.75, 0.3, 0.2, { rotY: 90, style: 'shop', bg: '#a3231b', fg: '#ffffff' });
+        const ext2 = Kit.itemModel('extinguisher');
+        if (ext2) {
+          ext2.position.set(0.17, ST.low + 0.4, 7.75); ext2.rotation.y = Math.PI / 2; K.obj('c3s_ext', ext2); K.mesh(ext2, { name: 'c3s_ext' });
+          K.glint(ext2, { size: 0.3, strength: 1, when: spareExt });
+        }
+        K.interact(0.75, ST.low + 1.0, 7.75, async (G) => {
+          if (!spareExt()) return;
+          await G.think('Still charged. Nineteen seventy-something.');
+          await Script.builtins.pickup(G, { id: 'c3_stairs:extinguisher', item: 'extinguisher', obj: G.obj('c3s_ext') });
+        }, { id: 'c3_stairs:ext', r: 1.2, when: spareExt });
+        K.trigger([0, 5.9, 4, 9], (G) => G.cutscene('c3-ext2'), { id: 'c3_stairs:showExt', when: () => spareExt() && !done('c3:ext2Shown') && !Script.busy });
+      }
       K.prop('mop_bucket', 1.1, 8.5, 200, { y: ST.low });
       K.prop('exit_sign', 2.0, 0.075, 0, { mount: 2.45, text: 'EXIT' });
       K.prop('exit_sign', 0.075, ST.vault + 0.85, 90, { mount: 2.4, y: ST.low, text: 'EXIT' });
@@ -44438,6 +44557,27 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
     C3_noCord(W.raw);
     return W;
   }
+  // c3-ext / c3-ext2 (in-engine looks): the fire extinguisher on its bracket by the canteen door (under the emergency
+  // light), and — if he still has none — the one at the fire point beside the cable vault door
+  defineCutscene('c3-ext', async (G) => {
+    S.done['c3:extShown'] = true;
+    const A = G.aidan;
+    A.look([9.8, 0.7, 1.4]);
+    G.cam({ pos: [7.35, 1.5, 2.75], target: [9.78, 0.62, 1.4], fov: 36, to: { pos: [7.6, 1.4, 2.55], fov: 29 }, dur: 2.8 });
+    await G.wait(2.5);
+    A.look(null);
+    G.camRelease();
+  }, { letterbox: true, skippable: true });
+  defineCutscene('c3-ext2', async (G) => {
+    S.done['c3:ext2Shown'] = true;
+    const A = G.aidan;
+    A.look([0.2, ST.low + 0.7, 7.75]);
+    G.cam({ pos: [2.9, ST.low + 1.55, 6.55], target: [0.22, ST.low + 0.62, 7.75], fov: 36, to: { pos: [2.65, ST.low + 1.45, 6.7], fov: 29 }, dur: 2.8 });
+    await G.wait(2.5);
+    A.look(null);
+    G.camRelease();
+  }, { letterbox: true, skippable: true });
+
   defineCutscene('3-1', async (G) => {
     const A = G.aidan, W = C3_wai(G);
     const board = G.obj('c3_waiboard');
@@ -56026,7 +56166,8 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
 //                   The fog thins as he climbs; the mast's red light shows through it at the top.
 //   c8_compound     The mast compound (30 × 20 m chain-link, x 0–30, z 0–20) and the gate apron south of it. Gate: a
 //                   4-digit combination padlock (1961; Hard 1408), the Compound Diagram (map_mast) cable-tied to it, the
-//                   emergency phone on the fence (Wai if waiSaved, else the laminated gate card), a payphone booth, the
+//                   emergency phone on the fence (Wai if waiSaved, else the laminated gate card), the exchange's brass
+//                   plaque on a foundation stone by the east gate post ("Opened 14 August 1961": the code), a payphone booth, the
 //                   Borrowed "Luka" (badge LUAK) at the gate. Inside: the mast's inner enclosure (→ c8_mast:base), the
 //                   east hut (first aid kit, energy drink), the locked west hut, the Unread on the floodlight pole.
 //   c8_mast         The mast (60 m lattice, centre 0,0): the base yard, three ladder runs with cages (L1 south face 0→20,
@@ -56147,6 +56288,25 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
     tx(x, 'YOU ARE HERE ▲', 124, 290 - 44, 10, '#b3261e', { weight: 'bold' });
     age(x, w, h, r, 0.35);
     const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, 'rgba(255,255,255,0.18)'); g.addColorStop(0.4, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, w, h);
+  });
+  // the exchange's brass dedication plaque, repeated on the foundation stone by the compound gate — the mast went up
+  // with the exchange (the text is the Exchange Plaque document: the gate card's "see plaque", right beside the gate)
+  const plaqueTex = () => ctex('plaque', 512, 360, (x, w, h, r) => {
+    const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#9a7f45'); g.addColorStop(0.5, '#c8a860'); g.addColorStop(1, '#7c6232');
+    x.fillStyle = g; x.fillRect(0, 0, w, h);
+    x.strokeStyle = '#5a4520'; x.lineWidth = 8; x.strokeRect(12, 12, w - 24, h - 24);
+    x.strokeStyle = 'rgba(255,240,200,0.35)'; x.lineWidth = 2; x.strokeRect(22, 22, w - 44, h - 44);
+    const ink = '#3a2a10';
+    tx(x, 'SIGNAL HILL', w / 2, 74, 34, ink, { font: FN.serif, weight: 'bold', align: 'center', spacing: 4 });
+    tx(x, 'TRUNK EXCHANGE', w / 2, 114, 34, ink, { font: FN.serif, weight: 'bold', align: 'center', spacing: 4 });
+    tx(x, 'Opened 14 August 1961', w / 2, 168, 24, ink, { font: FN.serif, align: 'center' });
+    tx(x, '"Connecting the district to the world"', w / 2, 222, 21, ink, { font: FN.serif, align: 'center' });
+    tx(x, 'Dedicated to the operators', w / 2, 272, 21, ink, { font: FN.serif, align: 'center' });
+    tx(x, 'who keep us talking.', w / 2, 300, 21, ink, { font: FN.serif, align: 'center' });
+    for (const [a, b] of [[30, 30], [w - 30, 30], [30, h - 30], [w - 30, h - 30]]) { x.fillStyle = '#5a4520'; x.beginPath(); x.arc(a, b, 7, 0, Math.PI * 2); x.fill(); }
+    // weathered up here: verdigris, and the date rubbed bright
+    for (let i = 0; i < 90; i++) { x.fillStyle = `rgba(70,120,100,${r() * 0.22})`; x.beginPath(); x.arc(r() * w, r() * h, 3 + r() * 16, 0, Math.PI * 2); x.fill(); }
+    x.fillStyle = 'rgba(255,240,200,0.2)'; x.beginPath(); x.ellipse(w / 2, 162, 120, 20, 0, 0, Math.PI * 2); x.fill();
   });
   // the laminated card inside the emergency phone box (riddle-level wording, matching the gate_card docs)
   const gateCardTex = (lv) => ctex('gatecard|' + lv, 200, 280, (x, w, h, r) => {
@@ -57034,7 +57194,9 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
     A.look(null);
     if (r !== code) {
       const knows = flag('c8_phone') || !!(S.docs && S.docs[pickDoc('gate_card')]);
-      if (G.once('c8:padFail')) await G.think(knows ? 'The exchange. [beat] The plaque on the forecourt said when it opened.' : 'Four numbers. [beat] Somebody who worked up here would know them.');
+      // (one nudge before the clue — toward the emergency phone — and one after it, toward the plaque by the gate)
+      if (!knows) { if (G.once('c8:padFail')) await G.think('Four numbers. [beat] Somebody who worked up here would know them.'); }
+      else if (G.once('c8:padFailKnows')) await G.think('The exchange. [beat] The plaque by the gate says when it opened.');
       return;
     }
     G.set('c8_gate', true);
@@ -57066,7 +57228,7 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
       await G.wait(0.5);
       G.sfx('clunk', { pos: [px, 1.3, pz], vol: 0.7 });
       A.look(null);
-      await G.think(riddle() === 'easy' ? 'Nineteen sixty-one.' : riddle() === 'hard' ? 'The day and the month. [beat] The plaque on the exchange forecourt.' : 'The year the exchange opened. [beat] The plaque on the forecourt.');
+      await G.think(riddle() === 'easy' ? 'Nineteen sixty-one.' : riddle() === 'hard' ? 'The day and the month. [beat] There\'s a plaque by the gate.' : 'The year the exchange opened. [beat] There\'s a plaque by the gate.');
       note(G, riddle() === 'easy' ? 'Gate code: 1961.' : riddle() === 'hard' ? 'Gate code: the day and month the exchange opened.' : 'Gate code: the year the exchange opened.', 'c8_code');
       C8.inCall = false;
       return;
@@ -57256,7 +57418,12 @@ const DOC_pick = (base, lvl = DOC_level()) => (DOCUMENTS[`${base}_${lvl}`] ? `${
       for (const x of [4, 9.5, 21, 26.5]) K.prop('rf_sign', x, 20.06, 0, { variant: 'fence', mount: 1.45 });
       for (const z of [5, 15]) { K.prop('rf_sign', 0.06, z, 90, { variant: 'fence', mount: 1.45 }); K.prop('rf_sign', 29.94, z, -90, { variant: 'fence', mount: 1.45 }); }
       K.sign('SIGNAL HILL RADIO TERMINAL\nSITE 4401\nAUTHORISED PERSONNEL ONLY', 18.4, 1.75, 20.1, 1.0, 0.5, { style: 'council' });
-      K.examine(18.4, 1.6, 20.5, ['"Signal Hill Radio Terminal. Site 4401."', 'Authorised personnel only. [beat] Nobody authorised me to do anything.'], { id: 'c8c:plaque', r: 1.3 });
+      // the foundation stone at the east gate post, the exchange's brass plaque on it (the mast went up with the exchange):
+      // the gate card's "see plaque" is right here, so the code never needs anything from earlier in the game
+      K.box(17.6, 0, 20.42, 0.74, 0.82, 0.34, { tex: 'concrete', color: '#a19e95' }, { collide: true });
+      K.plane(17.6, 0.5, 20.595, 0.52, 0.365, plaqueTex(), { roughness: 0.35, emissive: 0.4, name: 'c8c:plaqueBrass' });
+      K.doc('plaque', 17.6, 0.5, 20.62, { id: 'c8_compound:plaque', model: 'none', r: 1.05 });
+      K.examine(19.0, 1.6, 20.5, ['"Signal Hill Radio Terminal. Site 4401."', 'Authorised personnel only. [beat] Nobody authorised me to do anything.'], { id: 'c8c:plaque', r: 1.1 });
       K.examine(4, 1.45, 20.5, '"Danger — RF radiation — keep out." [beat] The paint\'s gone chalky. Somebody\'s drawn a smiley face on it.', { id: 'c8c:rf', r: 1.3 });
       // the padlock and the diagram
       K.interact(15, 1.0, 20.35, (G) => C8_padlock(G), { id: 'c8_compound:padlock', r: 1.25, when: () => !flag('c8_gate') });
