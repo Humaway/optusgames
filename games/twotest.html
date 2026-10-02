@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TWO - A Cinematic Experience</title>
+    <style>
+        /* =========================================
+           GLOBAL RESET & TYPOGRAPHY
+           ========================================= */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body, html {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: black;
+            font-family: 'Courier New', Courier, monospace;
+            color: white;
+        }
+
+        /* =========================================
+           SCREEN 1: MAIN MENU
+           ========================================= */
+        #menu-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: url('twoscreen.jpg') no-repeat center center;
+            background-size: cover;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            transition: opacity 1s ease-out;
+        }
+
+        #start-btn {
+            background-color: #fbd304; 
+            color: #0b1a30;
+            border: 4px solid #0b1a30;
+            font-size: 8vw;
+            font-weight: bold;
+            padding: 2vh 5vw;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 6px 6px 0px black;
+            transition: transform 0.1s;
+        }
+
+        #start-btn:active {
+            transform: translate(4px, 4px);
+            box-shadow: 2px 2px 0px black;
+        }
+
+        @media (min-width: 768px) {
+            #start-btn { font-size: 3rem; }
+        }
+
+        /* =========================================
+           SCREEN 2: CUTSCENE ENGINE
+           ========================================= */
+        #cutscene-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: url('store.png') no-repeat center center;
+            background-size: cover;
+            display: none; 
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            z-index: 10;
+        }
+
+        /* Cinematic Letterboxing */
+        .letterbox {
+            width: 100%;
+            height: 0vh;
+            background-color: black;
+            z-index: 50;
+            transition: height 1.5s cubic-bezier(0.65, 0, 0.35, 1);
+        }
+
+        /* =========================================
+           CHARACTERS (Paper Cut-Out Charm)
+           ========================================= */
+        .stage {
+            position: absolute;
+            bottom: 15vh; 
+            width: 100vw;
+            height: 50vh;
+            display: flex;
+            z-index: 20;
+            pointer-events: none; 
+        }
+
+        .character {
+            position: absolute;
+            bottom: 0; 
+            width: 25vw;
+            max-width: 150px;
+            height: 50vw;
+            max-height: 300px;
+            /* FIXED: Changed to characters.jpg */
+            background-image: url('characters.jpg');
+            background-size: 200% 100%; 
+            transform-origin: bottom center;
+        }
+
+        /* Sprite Mapping */
+        .luka { background-position: 0% 0%; }
+        .chase { background-position: 100% 0%; }
+
+        /* Positioning */
+        #luka-present { left: 5%; }
+        #chase-present { left: 25%; }
+        #luka-future { right: 25%; display: none; }
+        #chase-future { right: 5%; display: none; }
+
+        /* Future Variant Arrow */
+        .older-arrow {
+            position: absolute;
+            top: -40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: red;
+            color: white;
+            font-weight: 900;
+            font-size: 14px;
+            padding: 4px 8px;
+            border: 2px solid black;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .older-arrow::after {
+            content: '';
+            position: absolute;
+            bottom: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 10px 10px 0;
+            border-style: solid;
+            border-color: red transparent transparent transparent;
+        }
+
+        /* =========================================
+           DIALOGUE BOX
+           ========================================= */
+        #dialogue-container {
+            position: absolute;
+            bottom: 16vh;
+            left: 5%;
+            width: 90%;
+            background: rgba(0, 0, 255, 0.8);
+            border: 4px solid white;
+            padding: 15px;
+            z-index: 60;
+            border-radius: 8px;
+            box-shadow: 5px 5px 0px rgba(255, 255, 255, 0.3);
+            display: none;
+            pointer-events: none;
+        }
+
+        #speaker-name {
+            font-weight: bold;
+            color: yellow;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            font-size: 1.2rem;
+        }
+
+        #dialogue-text {
+            font-size: 1rem;
+            line-height: 1.4;
+        }
+
+        .click-indicator {
+            position: absolute;
+            bottom: 10px;
+            right: 15px;
+            animation: blink 1s infinite;
+        }
+
+        /* =========================================
+           ANIMATIONS & EFFECTS
+           ========================================= */
+        @keyframes bob {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0); }
+            10%, 30%, 50%, 70%, 90% { transform: translate(-15px, -15px) rotate(-2deg); }
+            20%, 40%, 60%, 80% { transform: translate(15px, 15px) rotate(2deg); }
+        }
+
+        .shake-active {
+            animation: shake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        /* Explosion FX */
+        #explosion-fx {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 50px;
+            height: 50px;
+            background: radial-gradient(circle, #fff 10%, #ffeb3b 40%, #ff9800 80%, #f44336 100%);
+            border-radius: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            z-index: 30;
+            display: none;
+        }
+
+        @keyframes explode {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+            50% { opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(40); opacity: 0; }
+        }
+
+        /* Smoke FX */
+        #smoke-fx {
+            position: absolute;
+            bottom: 15vh;
+            left: 0;
+            width: 100vw;
+            height: 60vh;
+            background: radial-gradient(ellipse at bottom, rgba(128,128,128,0.9) 0%, rgba(128,128,128,0) 70%);
+            z-index: 15; 
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        @keyframes fade-smoke {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        @keyframes slide-in-left {
+            0% { transform: translateX(100vw); }
+            100% { transform: translateX(0); }
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SCREEN 1: MENU -->
+    <div id="menu-screen">
+        <button id="start-btn">Press Yes</button>
+    </div>
+
+    <!-- SCREEN 2: CUTSCENE -->
+    <div id="cutscene-screen">
+        <div class="letterbox top"></div>
+        
+        <!-- FX Layers -->
+        <div id="smoke-fx"></div>
+        <div id="explosion-fx"></div>
+
+        <div class="stage">
+            <div id="luka-present" class="character luka"></div>
+            <div id="chase-present" class="character chase"></div>
+            
+            <div id="luka-future" class="character luka future">
+                <div class="older-arrow">OLDER</div>
+            </div>
+            <div id="chase-future" class="character chase future">
+                <div class="older-arrow">OLDER</div>
+            </div>
+        </div>
+
+        <div id="dialogue-container">
+            <div id="speaker-name"></div>
+            <div id="dialogue-text"></div>
+            <div class="click-indicator">▼</div>
+        </div>
+
+        <div class="letterbox bottom"></div>
+    </div>
+
+    <!-- STATE LOGIC -->
+    <script>
+        const sequence = [
+            { speaker: "Luka", text: "Ayo, you remember that Rue thing we did that was crazy", action: "luka-talk" },
+            { speaker: "Chase", text: "OOOOOWEEE that was mad crazy with like time travel and all that dawg? sheesh!", action: "chase-talk" },
+            { speaker: "", text: "", action: "explosion" },
+            { speaker: "", text: "", action: "future-enter" },
+            { speaker: "Future Chase & Luka", text: "We need your help!", action: "future-both-talk" },
+            { speaker: "Present Chase & Luka", text: "Why", action: "present-both-talk" },
+            { speaker: "Future Chase", text: "We need to go.... back to the Rue-ture", action: "future-chase-talk" }
+        ];
+
+        let currentStep = -1;
+        let isAnimating = false;
+
+        const menuScreen = document.getElementById('menu-screen');
+        const cutsceneScreen = document.getElementById('cutscene-screen');
+        const dialogBox = document.getElementById('dialogue-container');
+        const speakerUI = document.getElementById('speaker-name');
+        const textUI = document.getElementById('dialogue-text');
+
+        const presentLuka = document.getElementById('luka-present');
+        const presentChase = document.getElementById('chase-present');
+        const futureLuka = document.getElementById('luka-future');
+        const futureChase = document.getElementById('chase-future');
+        const explosionFX = document.getElementById('explosion-fx');
+        const smokeFX = document.getElementById('smoke-fx');
+
+        function stopAllBobs() {
+            document.querySelectorAll('.character').forEach(el => {
+                el.style.animation = 'none';
+            });
+        }
+
+        function advanceCutscene() {
+            if (isAnimating) return; 
+
+            currentStep++;
+            if (currentStep >= sequence.length) return;
+
+            const step = sequence[currentStep];
+            stopAllBobs();
+
+            // Handle Dialogue UI visibility
+            if (step.text === "") {
+                dialogBox.style.display = 'none';
+            } else {
+                dialogBox.style.display = 'block';
+                speakerUI.innerText = step.speaker;
+                textUI.innerText = step.text;
+            }
+
+            // State Machine Actions
+            switch(step.action) {
+                case 'luka-talk':
+                    presentLuka.style.animation = 'bob 0.4s infinite';
+                    break;
+                case 'chase-talk':
+                    presentChase.style.animation = 'bob 0.4s infinite';
+                    break;
+                case 'explosion':
+                    isAnimating = true; 
+                    document.body.classList.add('shake-active');
+                    
+                    explosionFX.style.display = 'block';
+                    explosionFX.style.animation = 'explode 1.5s forwards ease-out';
+                    
+                    smokeFX.style.animation = 'fade-smoke 2s forwards ease-in';
+                    
+                    setTimeout(() => {
+                        document.body.classList.remove('shake-active');
+                        setTimeout(() => {
+                            isAnimating = false; 
+                            advanceCutscene(); 
+                        }, 800);
+                    }, 600);
+                    break;
+                case 'future-enter':
+                    futureLuka.style.display = 'block';
+                    futureChase.style.display = 'block';
+                    futureLuka.style.animation = 'slide-in-left 0.8s forwards ease-out';
+                    futureChase.style.animation = 'slide-in-left 1s forwards ease-out';
+                    break;
+                case 'future-both-talk':
+                    futureLuka.style.animation = 'bob 0.4s infinite';
+                    futureChase.style.animation = 'bob 0.4s infinite';
+                    break;
+                case 'present-both-talk':
+                    presentLuka.style.animation = 'bob 0.4s infinite';
+                    presentChase.style.animation = 'bob 0.4s infinite';
+                    break;
+                case 'future-chase-talk':
+                    futureChase.style.animation = 'bob 0.4s infinite';
+                    break;
+            }
+        }
+
+        // Initialize Engine
+        document.getElementById('start-btn').addEventListener('click', () => {
+            menuScreen.style.opacity = '0';
+            menuScreen.style.pointerEvents = 'none';
+            
+            setTimeout(() => {
+                menuScreen.style.display = 'none';
+                cutsceneScreen.style.display = 'flex';
+                
+                setTimeout(() => {
+                    document.querySelector('.letterbox.top').style.height = '15vh';
+                    document.querySelector('.letterbox.bottom').style.height = '15vh';
+                }, 100);
+
+                setTimeout(() => {
+                    advanceCutscene();
+                }, 1500);
+
+            }, 1000);
+        });
+
+        cutsceneScreen.addEventListener('click', advanceCutscene);
+        window.addEventListener('keydown', advanceCutscene);
+    </script>
+</body>
+</html>
