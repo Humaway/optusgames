@@ -8482,7 +8482,7 @@ SETS.reddy26 = (() => {
       zones,
       colliders: COL,
       props: E26 ? PROPLIST.slice() : PROPLIST.filter((n) => !/^(hero_|tinsel_|fairy|snow|aframe|tether_loose|alarm_beacon|glass_shards|blast_flash|plastic_heap|store_phone|cash_tray|monitor_screen|ladder|calendar|cust26|the_wall$|print4|kettle|rue_mug|laptop|remote_plugged|traffic|shimmer)/.test(n)).concat('the_wall40', ext.props || []),
-      ambience: ext.ambience || { loops: ['aircon', 'fluoro'], room: 'room' },
+      ambience: ext.ambience || { loops: ['aircon'], room: 'room' },   // (no fluoro tube buzz: it looped under every scene)
       update,
       dress: (s, o) => dress(s, o),
       get dressState() { return R.dressState; },
@@ -9917,7 +9917,7 @@ SETS.reddy40 = (() => {
       'led_string', 'front_doors', 'locals', 'local40_a', 'local40_b', 'local40_c', 'local40_d', 'counter_speaker', 'jordan_office_door', 'xmas_tree_floor',
       'machine', 'battery_leds', 'des', 'wall_phone40', 'door_wedge', 'drone_tower', 'skip_bin', 'hover_cars', 'hover_parked_yard', 'palm_lights', 'drone_ring',
       'pelican_glider', 'storm_clouds', 'sky_dome', 'bay_glints'],
-    ambience: { loops: ['aircon', 'fluoro'], room: 'room' },
+    ambience: { loops: ['aircon'], room: 'room' },   // (no fluoro tube buzz)
   };
   const def = SETS.reddy26.make('2040', EXT40);
   Object.assign(def, { ar: AR40, ar16: AR16, drones: DRONES40, paths: PATHS40, lure: LURE40, roam: ROAM, stealth: STEALTH });
@@ -48781,8 +48781,7 @@ try {
   const tick = (flag, quiet) => [{ flag }, ...(quiet ? [] : [{ sfx: 'pop', vol: 0.5 }]), { do: () => duties() }];
   const resumed = (s) => !!(s.flags.s11_polished || s.flags.s11_jordan_down || s.flags.s11_hold1 || s.flags.s11_door);
 
-  // the hold music: from the handset at Chase's ear, or from its base on the counter ("on speaker") after the first talk
-  const HOLD_EAR = { loop: 'hold', vol: 0.45, at: [6.78, 1.62, -7.95] }, HOLD_BASE = { loop: 'hold', vol: 0.5, at: [7.55, 1.1, -9.2] };
+  // the hold music is never heard in 1.1 (it doubled the store radio); HOLD_OFF still clears any left over
   const HOLD_OFF = { loop: 'hold', stop: true, fade: 0.25 };
 
   // the coil of tinsel Jordan holds ("a fistful"): the floor coil, shrunk into a hand while it's held
@@ -48848,11 +48847,8 @@ try {
     }
     if (l) { l.walkAnim = 'walk'; l.setExpr('neutral'); }
   }
-  // the hold music in the room while the roam lasts
-  function holdBed(c) {
-    const f = c.state.flags;
-    return c.runSteps([HOLD_OFF, ...(f.s11_offhold ? [] : [f.s11_hold1 ? HOLD_BASE : HOLD_EAR])]);
-  }
+  // the roam: only the store radio (no hold music under it)
+  function holdBed(c) { return c.runSteps([HOLD_OFF]); }
   // Luka steps behind the lens of an examine (so he is never in front of it) and turns to the thing
   // (world.anchor() gives Vector3s)
   const xyz = (v) => (Array.isArray(v) ? v : [v.x, v.y, v.z]);
@@ -49002,7 +48998,7 @@ try {
       if (l) { l.place([7.45, 0, -7.45, PI - 0.35]); l.play('idle'); }
       if (j && f.s11_jordan_down) { j.place(M11.jordanTill); j.play('idle'); j.face('chase', 0); }
     } },
-    HOLD_OFF, HOLD_BASE,
+    HOLD_OFF,
     { if: (s) => !!s.flags.s11_jordan_down, then: [CALC_THREE], else: [CALC_WIDE] },
     { wait: 1.4 },
     play('chase', 'give', { dur: 1.4, loop: false }),
@@ -49027,7 +49023,7 @@ try {
     { do: (c) => { const l = act(c, 'luka'), ch = act(c, 'chase'); if (l) { l.place(M11.lukaCounter); l.play('idle'); l.setExpr('neutral'); } if (ch) { ch.place(M11.chaseTill); ch.face([7.25, 0, -7.75], 0); ch.play('idle'); } } },
     // he picks the handset up off the counter, listens, and puts it back: click
     { hold: 'chase', prop: 'store_phone', hand: 'R' }, play('chase', 'phone_bare'), expr('chase', 'tired'),
-    HOLD_OFF, { loop: 'hold', vol: 0.4, at: [7.0, 1.6, -9.95] },
+    HOLD_OFF,
     CLOSE('chase', { dist: 1.05, fov: 38, push: 0.06, dur: 5, yaw: 0.45 }),
     { wait: 1.8 },
     { hold: 'chase', prop: null }, play('chase', 'idle'),
@@ -49324,7 +49320,6 @@ try {
       { place: 'chase', at: M11.chaseFront }, play('chase', 'phone_bare'), expr('chase', 'wince'),
       { music: null, fade: 0.9 },
       { loop: 'radio', vol: 0.28, fade: 0.9, at: [7.55, 1.1, -8.78] },
-      HOLD_EAR,
       COUNTER2,
       { wait: 1.8 },
       expr('chase', 'neutral'),
@@ -49337,7 +49332,7 @@ try {
       // [WIDE] The radio swings into a big chugging guitar chorus (instrumental).
       { loop: 'radio', stop: true, fade: 0.1 },
       { music: 'radio', cut: true },
-      HOLD_OFF, { loop: 'hold', vol: 0.3, at: [6.78, 1.62, -7.95] },
+      HOLD_OFF,
       WIDE,
       { wait: 1.8 },
       expr('chase', 'wince'),
@@ -49674,10 +49669,11 @@ try {
   // the phone rings (a 2026 landline: the double trill at the handset, every 1.6 s, four at most) until he answers
   const RING_O = { sfx: 'trill', every: 1.6, vol: 0.55, max: 4 };
   const ring = (on) => ({ prop: 'store_phone', fn: (o) => { if (o.userData.ring) { if (on && !flow.skipping) o.userData.ring(true, RING_O); else o.userData.ring(false); } } });
-  // BAM (1.2 step 16): the table goes, the flash, Luka launched, the alarms
+  // BAM (1.2 step 16): the table goes, the flash, Luka launched, the alarms; the music cuts dead on the blast
   function bam(c) {
     const t = P(c, 'hero_table'); if (t) t.userData.blast({ instant: sk(c), tree: false });   // (the tree goes over at the real-time wide)
-    const ra = P(c, 'store_radio'); if (ra) ra.userData.playing = true;   // the radio keeps playing
+    c.music(null, { cut: true });
+    const ra = P(c, 'store_radio'); if (ra) ra.userData.playing = false;
     const lo = P(c, 'tether_loose'); if (lo) lo.visible = true;           // one tether lands behind the counter
     const j = act(c, 'jordan'); if (j) { j.face([5.6, 0, -5.3], 0); j.play('duck'); j.setExpr('scared'); }
     const ch = act(c, 'chase'); if (ch) ch.setExpr('stunned');
@@ -49829,7 +49825,7 @@ try {
     BAM_WIDE,
     { wait: 0.35 },
     { do: (c) => bam(c) },
-    { loop: 'alarm', vol: 0.2, rate: 1.0 }, { loop: 'alarm', vol: 0.16, rate: 1.13 }, { loop: 'alarm', vol: 0.16, rate: 0.89 }, { loop: 'alarm', vol: 0.13, rate: 1.27 },
+    { loop: 'alarm', vol: 0.08, rate: 1.0 }, { loop: 'alarm', vol: 0.064, rate: 1.13 }, { loop: 'alarm', vol: 0.064, rate: 0.89 }, { loop: 'alarm', vol: 0.052, rate: 1.27 },
     { wait: 0.3 },
     // [SLOW MOTION · CLOSE · Luka mid-air, 1.5 s] His face as the display he polished for two hours disintegrates in the
     // background: from above the staff side, his upturned face low in frame, the blast beyond him, tracking him over
@@ -49857,7 +49853,7 @@ try {
     // Stare, 3 s. Luka upside down. Chase frozen with the receiver. The figure.
     { do: (c) => { const a = act(c, 'luka'); if (a) a.visible = true; } },
     STARE,
-    { par: [{ stare: 3 }, { do: async (c) => { await c.wait(0.3); c.music(null, { fade: 1.2 }); const r = P(c, 'store_radio'); if (r) r.userData.playing = false; } }] },
+    { stare: 3 },
     { music: null, cut: true },
     { do: (c) => { const r = P(c, 'store_radio'); if (r) r.userData.playing = false; } },
     // FIGURE (a silhouette until he turns his collar down): "…Sorry." (He looks down at the wreck.) "^ Was that new?"
@@ -49943,7 +49939,7 @@ try {
     { place: 'chase', at: [7.15, 0, -9.95, -0.45] },
     { place: 'luka', at: [5.4, 0, -7.9, 0.25] },
     WIDE_35,
-    { sfx: 'alarm', vol: 0.55 },
+    { sfx: 'alarm', vol: 0.22 },
     // he steps back off Luka and squares up to the pair of them (1.4 m out: room for the closes)
     { move: 'chase40', to: C40_GAP, nowait: true },
     { wait: 0.9 },
@@ -50206,7 +50202,7 @@ try {
   CUTSCENES['1.3_setup'] = [
     { do: (c) => nextTick().then(() => dress13(c)) },
     { do: (c) => { c.world.prebuild('reddy40'); } },   // the split's right half, built behind this cutscene
-    { loop: 'alarm', vol: 0.12, rate: 1.0, lp: 700 }, { loop: 'alarm', vol: 0.1, rate: 1.13, lp: 700 }, { loop: 'alarm', vol: 0.1, rate: 0.89, lp: 700 }, { loop: 'alarm', vol: 0.08, rate: 1.27, lp: 700 },
+    { loop: 'alarm', vol: 0.048, rate: 1.0, lp: 700 }, { loop: 'alarm', vol: 0.04, rate: 1.13, lp: 700 }, { loop: 'alarm', vol: 0.04, rate: 0.89, lp: 700 }, { loop: 'alarm', vol: 0.032, rate: 1.27, lp: 700 },
     { place: 'luka', at: M13.luka }, { place: 'chase', at: M13.chase }, { place: 'chase40', at: M13.c40 },
     { place: 'luke', at: M13.lukeStare }, { place: 'jordan', at: M13.jordan },
     play('jordan', 's13_ladder'),
@@ -50388,7 +50384,7 @@ try {
     { despawn: 'luka' }, { despawn: 'chase' }, { despawn: 'chase40' },
     { do: (c) => { const tt = P(c, 'hero_tethers'); if (tt) tt.userData.swing(0.55); const s = P(c, 'smoke_floor'); if (s && s.userData.amount) s.userData.amount(0.8, 0); } },
     { do: (c) => { const lk = act(c, 'luke'); if (lk) { lk.visible = true; lk.setExpr('stunned'); lk.place([6.4, 0, -13.5, 0]); } const j = act(c, 'jordan'); if (j) { j.place(M13.jordan); j.play('s13_ladder'); j.setExpr('worried'); } } },
-    { loop: 'alarm', vol: 0.16, rate: 1.0 }, { loop: 'alarm', vol: 0.13, rate: 1.13 }, { loop: 'alarm', vol: 0.13, rate: 0.89 }, { loop: 'alarm', vol: 0.1, rate: 1.27 },
+    { loop: 'alarm', vol: 0.064, rate: 1.0 }, { loop: 'alarm', vol: 0.052, rate: 1.13 }, { loop: 'alarm', vol: 0.052, rate: 0.89 }, { loop: 'alarm', vol: 0.04, rate: 1.27 },
     // [WIDE · locked, the store floor] Smoke over the wreck of the Hero Table, tinsel on the floor, four tethers swinging
     // slower and slower. Luke steps out of the corridor. Jordan stands holding the ladder.
     FLOOR_LOCK,
