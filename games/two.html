@@ -59792,6 +59792,8 @@ try {
 //   sections run in order (the bridge carries the laugh), the final chorus (D major, the 1987 melody) loops while Future
 //   Luka holds NO (MINIGAMES.hold_no, src/52-mg-hold.js), the outro (the restart chime) comes in at the end of a phrase
 //   once the Valley has lit up. Shots are cut to the song's bars. With no audio the conductor runs on the game clock.
+//   While he listens, his memories of the two of them cut in on the bars (the Parade 2026, the bench, the jetty 2033,
+//   the scooter on the laugh): held frames in the Parade / bridge sets, prebuilt under the opening black (liveMax 4).
 // Story flags: santa false (the hat and beard were dropped on the sleigh in 3.2), headphones (Chase, since L12); hurt +
 //   lanyard_snapped from the strike (3.5). Continue restarts a scene at step 0: each scene dresses itself from scratch.
 (() => {
@@ -61330,6 +61332,7 @@ try {
 
   // ==================================================================== 3.6 — "two"
   const CH_ASIDE = 's36_chase_side';               // Chase steps aside, beside him, once the song's on (out of the push)
+  const FB_SETS = ['parade', 'bridge'];             // the flashbacks' sets (prebuilt with the Valley)
   const C40_NEAR = [-1.35, 0, -13.75, -1.62];        // Chase (2040), inside the ring by the end (moved under the cutaway)
   function dress36(c) {
     storyFlags(c);
@@ -61347,14 +61350,17 @@ try {
     const cr = c.world.prop('wall_crack'); if (cr) cr.visible = true;
     if (SETS.hq_top.lamp) SETS.hq_top.lamp('ring');
   }
-  // the Valley set under the black at the start (steps 26–27 cut to it): prebuilt over three frames, capped
+  // the Valley (steps 26–27 cut to it) and the flashbacks' sets (the Parade, the bridge) under the black at the start:
+  // prebuilt over a few frames each, capped. Four sets stay live for this scene (the office, the Valley, two memories).
   function prebuildValley(c) {
-    if (!SETS.valley || sk(c)) return;
-    if ((c.world.liveIds || []).includes('valley')) return;
+    if (sk(c)) return;
+    c.world.liveMax = Math.max(c.world.liveMax, 4);
+    const ids = ['valley', ...FB_SETS].filter((id) => SETS[id] && !(c.world.liveIds || []).includes(id));
+    if (!ids.length) return;
     const t0 = clock.t;
-    let done = false;
-    c.world.prebuild('valley').then(() => { done = true; });
-    return waitUntil(() => done || c.flow.skipping || clock.t - t0 > 6);
+    let n = 0;
+    for (const id of ids) c.world.prebuild(id).then(() => { n++; });
+    return waitUntil(() => n >= ids.length || c.flow.skipping || clock.t - t0 > 10);
   }
   SCENES['3.6'] = {
     title: 'two', set: 'hq_top', env: 'yellow', time: '11:57', place: 'Optus Tower, the top floor', timeCard: false,
@@ -61371,6 +61377,100 @@ try {
   };
 
   const L40_PUSH = (o = {}) => ({ do: (c) => closeOn(c, 'luka40', Object.assign({ dist: 1.75, push: 1.0, dur: 26, dy: -0.03, yaw: -0.15 }, o)) });
+
+  // ---------------------------------------------------------- 3.6: the flashbacks (Future Luka listening)
+  // While "two" plays he remembers the two of them: held frames in other sets (prebuilt under the opening black), each
+  // in and out on a soft warm-white flash under a warm, slightly soft grade on the canvas. Young Luka and Chase are
+  // borrowed for the frames and put back where they stood. Skipping never goes in, and always comes back out.
+  function grade(kind) {
+    if (typeof renderer === 'undefined') return;
+    const el = renderer.domElement;
+    el.style.filter = !kind ? '' : 'sepia(0.5) saturate(1.05) brightness(1.1) contrast(0.88) blur(' + (kind === 'jetty' ? 1.3 : 0.75) + 'px)';
+    if (kind) { removeUpdate(gradeWatch); addUpdate(gradeWatch); }
+  }
+  function gradeWatch() {   // never leaks: off once the office is back on screen or the scene has gone
+    if (flow.sceneId === '3.6' && world.setId !== 'hq_top') return;
+    if (typeof renderer !== 'undefined') renderer.domElement.style.filter = '';
+    removeUpdate(gradeWatch);
+  }
+  function youngLook(c, santa) {   // as they were: no wounds, the lanyard whole, no headphones yet
+    const l = act(c, 'luka'), h = act(c, 'chase');
+    if (l) { for (const k of ['hurt', 'bandage', 'lanyard2']) l.rig.show(k, false); l.rig.show('lanyard', true); l.rig.show('santa', !!santa); l.rig.seated = false; }
+    if (h) { h.rig.show('headphones_neck', false); h.rig.show('tether', false); h.rig.show('phone', false); if (h.held) h.hold(null); h.rig.seated = false; }
+  }
+  // 2026, the Parade in the sun (1.7): the two of them at the foreshore plaque, Chase in fits, Luka grinning at him
+  function fbBeach(c) {
+    const S = SETS.parade; if (S && S.dress) S.dress('day17');
+    youngLook(c);
+    const l = act(c, 'luka'), h = act(c, 'chase');
+    if (l) { l.place([-2.75, 0, 7.2, 0.62]); l.play('idle'); l.setExpr('happy'); }
+    if (h) { h.place([-1.75, 0, 7.05, -0.45]); h.play('laugh_big'); h.setExpr('laugh'); }
+  }
+  // 2026, the bench at Woody Point (2.3), morning: side by side, nowhere to be
+  function fbBench(c) {
+    const S = SETS.parade; if (S && S.dress) S.dress('bench23');
+    youngLook(c);
+    for (const [id, m, e] of [['luka', 's23_seat_luka', 'happy'], ['chase', 's23_seat_chase', 'laugh']]) {
+      const a = act(c, id); if (!a) continue;
+      a.place(m); a.play('sit_bench', { h: 0.48 }); a.rig.seated = true; a.setExpr(e);
+    }
+  }
+  // 2033, Woody Point jetty at sunset: laughing so hard they blur (the photo he keeps face down)
+  function fbJetty(c) {
+    const S = SETS.parade; if (S && S.dress) S.dress('sunset33');
+    youngLook(c);
+    for (const id of ['luka', 'chase']) { const a = act(c, id); if (!a) continue; a.place('b1_33_' + id); a.play('laugh_big'); a.setExpr('laugh'); }
+  }
+  // 2026, the bridge at twenty-five kilometres an hour (2.5): the laugh, Chase on the back recording it
+  const FB_Z = 250;
+  function fbScooter(c) {
+    const SB = SETS.bridge; if (!SB) return;
+    if (SB.dress) SB.dress('chase25', { keepEnv: true });
+    youngLook(c, true);
+    const s1 = ud(c, 'scooter_1', 'bridge'); if (s1) { s1.pose(0, FB_Z, 0, 0.04); if (s1.glow) s1.glow(true); }
+    if (SB.mount) { SB.mount('luka', 'scooter_1', 'driver'); SB.mount('chase', 'scooter_1', 'pillion'); }
+    const l = act(c, 'luka'), h = act(c, 'chase');
+    if (l) { l.play('scooter_laugh'); l.setExpr('laugh'); const b = l.rig.attach.santa_beard; if (b && b.userData.state) b.userData.state('ear'); }
+    if (h) { h.rig.show('phone', true); h.play('scooter_pillion', { rec: true }); h.setExpr('laugh'); }
+  }
+  function fbScooterShot(c) {   // ahead and well to the right: Luka at the bars, Chase's face over his shoulder, the bridge behind
+    if (sk(c)) return;
+    const SB = SETS.bridge, y = SB && SB.deckY ? SB.deckY(FB_Z) : 0;
+    c.cam.shot({ shot: 'CAM', pos: [2.05, y + 1.62, FB_Z + 2.55], look: [0.1, y + 1.25, FB_Z - 0.2], fov: 42,
+      to: { pos: [1.92, y + 1.6, FB_Z + 2.3], look: [0.1, y + 1.25, FB_Z - 0.2], fov: 41 }, dur: 3, ease: 'linear' });
+  }
+  const FB = {
+    beach: { go: { set: 'parade', env: 'day', spawn: { luka: [-2.75, 0, 7.2, 0.62], chase: [-1.75, 0, 7.05, -0.45] } }, fn: fbBeach,
+      shot: glide([-1.6, 1.3, 10.6], [-2.25, 1.42, 7.1], 40, { pos: [-1.64, 1.31, 10.15], look: [-2.25, 1.42, 7.1], fov: 39 }, 5) },
+    bench: { go: { set: 'parade', env: 'wp_morning', spawn: { luka: 's23_seat_luka', chase: 's23_seat_chase' } }, fn: fbBench,
+      shot: glide([-299.62, 1.32, 3.15], [-299.68, 0.95, 0.05], 42, { pos: [-299.66, 1.22, 2.8], look: [-299.68, 0.93, 0.05], fov: 40 }, 5) },
+    jetty: { go: { set: 'parade', env: 'wp_sunset', spawn: { luka: 'b1_33_luka', chase: 'b1_33_chase' } }, fn: fbJetty,
+      shot: glide([-273.55, 0.62, 24.55], [-274.05, 0.42, 21.75], 40, { pos: [-273.6, 0.6, 24.3], look: [-274.05, 0.42, 21.75], fov: 38 }, 5) },
+    scooter: { go: { set: 'bridge', env: 'chase25', spawn: { luka: [0, 0, FB_Z, 0], chase: [0, 0, FB_Z - 0.4, 0] } }, fn: fbScooter,
+      shot: { do: fbScooterShot } },
+  };
+  const FLASH = (k) => ({ if: () => !flow.skipping, then: [
+    { do: (c) => { if (!sk(c)) c.ui.flash(0.7, '#fff6e6'); } },
+    { wait: 0.12 },
+    FB[k].go,
+    { do: FB[k].fn },
+    FB[k].shot,
+    { do: () => grade(k) },
+  ] });
+  // back to the office: the pair where they stood (dressed from the flags again), the ring light, the grade off
+  function fbBack(c, o = {}) {
+    grade(null);
+    const SB = SETS.bridge; if (SB && SB.unmount) SB.unmount();
+    const l = act(c, 'luka'), h = act(c, 'chase');
+    if (l) { l.rig.show('santa', false); l.rig.seated = false; l.rig.dress(c.state); l.place('s35_luka_up'); l.play('hurt_stand'); l.setExpr(o.luka || 'hurt'); l.walkAnim = 'limp'; }
+    if (h) { h.rig.seated = false; h.rig.dress(c.state); h.rig.show('headphones_neck', false); h.rig.show('phone', false); h.place(CH_ASIDE); h.play('idle'); h.face('luka40', 0); h.setExpr(o.chase || 'neutral'); }
+    if (SETS.hq_top.lamp) SETS.hq_top.lamp('ring');
+  }
+  const BACK = (o) => ({ if: () => world.setId !== 'hq_top', then: [
+    { do: (c) => { grade(null); if (!sk(c)) c.ui.flash(0.55, '#fff6e6'); } },
+    { set: 'hq_top', env: 'yellow', spawn: { luka: 's35_luka_up', chase: CH_ASIDE } },
+    { do: (c) => fbBack(c, o) },
+  ] });
   CUTSCENES['3.6_yet'] = [
     { fade: 'out', dur: 0 },
     { do: (c) => prebuildValley(c) },
@@ -61426,10 +61526,20 @@ try {
     { do: (c) => songStart(c) },
     play('chase', 'idle'),
     { move: 'chase', to: CH_ASIDE, nowait: true },
-    // [CLOSE · Future Luka, one unbroken slow push-in through the whole first verse] Nothing. He stands absolutely still
-    // and listens.
+    // [CLOSE · Future Luka, a slow push-in through the whole first verse] Nothing. He stands absolutely still and
+    // listens, and remembers: the push is cut with his memories of the two of them, and picks up where it was.
     expr('luka40', 'still'),
-    L40_PUSH(),
+    L40_PUSH({ push: 0.42, dur: 11.7 }),
+    atBar(4, 8),
+    FLASH('beach'),
+    atBar(6),
+    BACK(),
+    L40_PUSH({ dist: 1.33, push: 0.14, dur: 3.9 }),
+    atBar(7, 8),
+    FLASH('bench'),
+    atBar(9),
+    BACK(),
+    L40_PUSH({ dist: 1.19, push: 0.09, dur: 2.6 }),
     atBar(10),
     // [CLOSE · Chase (2040)] He realises what's coming. He closes his eyes.
     CLOSE('chase40', { dist: 1.0, push: 0.2, dur: 11 }),
@@ -61441,25 +61551,32 @@ try {
     // (still listening: the song goes on through the chorus and the second verse)
     { do: (c) => closeOn(c, 'luka40', { dist: 1.2, push: 0.25, dur: 11, yaw: -1.1, dy: 0.0 }) },
     atBar(18),
+    // (the jetty, 2033: the photo on his desk, as it was)
+    FLASH('jetty'),
+    atBar(20),
+    BACK(),
     { do: (c) => {
       const a = act(c, 'luka40');
       if (!a || sk(c)) return;
       a.eyePos(V1);
       c.cam.shot({ shot: 'CAM', pos: [V1.x - 1.4, V1.y + 2.3, V1.z - 1.6], look: [V1.x, V1.y - 0.3, V1.z], fov: 50,
-        to: { pos: [V1.x - 1.1, V1.y + 0.15, V1.z - 1.35], look: [V1.x, V1.y - 0.05, V1.z], fov: 44 }, dur: 12, ease: 'out' });
+        to: { pos: [V1.x - 1.1, V1.y + 0.15, V1.z - 1.35], look: [V1.x, V1.y - 0.05, V1.z], fov: 44 }, dur: 5.2, ease: 'out' });
     } },
     atBar(22),
     OTS('luka40', 'chase', { side: 0.3, dur: 8, push: 0.1 }),
     expr('chase', 'sad'),
     atBar(24),
     L40_PUSH({ dist: 1.05, push: 0.25, dur: 10, yaw: -0.1 }),
-    atBar(26),
     // The bridge. The song drops to almost nothing, and in the space, Luka's laugh, young and helpless on a hover-
-    // scooter at twenty-five kilometres an hour. [CLOSE · Future Luka] His face breaks. He tears up and can't stop it.
-    // He brings a gloved hand to his mouth.
-    atBar(26, 6),
+    // scooter at twenty-five kilometres an hour: the memory lands on the laugh (bar 26). [CLOSE · Future Luka] His face
+    // breaks. He tears up and can't stop it. He brings a gloved hand to his mouth.
+    atBar(25, 15),
+    FLASH('scooter'),
+    atBar(27),
+    BACK({ chase: 'sad' }),
     expr('luka40', 'tearful'),
-    atBar(27, 4),
+    { do: (c) => closeOn(c, 'luka40', { dist: 0.98, push: 0.14, dur: 5.2, yaw: -0.12, dy: -0.03 }) },
+    atBar(27, 10),
     play('luka40', 's36_mouth'),
     atBar(29),
     // [TOP-DOWN · Chase (2040)] His hands start to rise toward his head, the old reflex, and stop halfway, and come down.
@@ -61516,6 +61633,7 @@ try {
   ];
 
   CUTSCENES['3.6_cancel'] = [
+    { do: () => grade(null) },
     // NO pressed: the JARVIS restart chime. The final chorus plays on (it loops) until the Valley has had its moment.
     // [INSERT] NO.
     anchor('glass_popup_ecu', { push: 0.06, dur: 3 }),
@@ -61627,6 +61745,7 @@ try {
     { do: (c) => { const g = ud(c, 'galaxy'); if (g) g.land(4.2); } },
     { sfx: 'dock_clunk', vol: 0.12, rate: 1.5 },
     { wait: 5.0 },
+    { do: (c) => { c.world.liveMax = 3; } },   // (the flashbacks' extra live set: back to the usual three)
   ];
 })();
 
