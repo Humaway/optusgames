@@ -151,6 +151,12 @@ a { color: var(--teal); }
 .tile.show.miss { background: var(--miss); border-color: transparent; color: var(--tile-ink-miss); }
 body.contrast .tile.show { border: 2px solid var(--text); }
 .tile:not(.show):not(.empty) { color: transparent; }
+.tile { position: relative; }
+.tile.locked { background: repeating-linear-gradient(135deg, var(--surface) 0 6px, var(--surface-2) 6px 12px); border-style: dashed; }
+.tile.locked .v, .tile.locked .m { visibility: hidden; }
+.tile.locked::after { content: "🔒"; position: absolute; inset: 0; display: grid; place-items: center; font-size: .8rem; opacity: .75; color: var(--muted); }
+.colheads .lk { display: block; font-size: .55rem; line-height: 1; margin-top: 2px; }
+.locknote { font-size: .8rem; color: var(--muted); margin: 2px 0 6px; }
 .tile.flipping { animation: flip .5s ease both; }
 @keyframes flip { 0% { transform: rotateX(0); } 50% { transform: rotateX(90deg); } 100% { transform: rotateX(0); } }
 .guessrow.win .tile.show { animation: bounce .6s ease both; animation-delay: calc(var(--i) * 70ms); }
@@ -1033,6 +1039,17 @@ const Compare = (() => {
 
   const isWin = (cells) => cells.every((c) => c.verdict === 'hit');
 
+  /* Difficulty pacing (a deliberate change from doc 4.3, which showed all 7 columns from guess 1).
+     Measured on the 46 answers, showing everything at once let a careful player finish in ~2.4 guesses
+     (65% by guess 2) because one opener split the answers into 40 groups. Holding back the two most
+     informative columns until you've guessed a few times lifts that to ~2.9 with a long tail to 5-6.
+     LOCKS[col] = how many guesses you must have made before that column is revealed (on every row).
+     Set a value to 0 (or delete it) to show a column from the start. tools/difficulty.js re-measures. */
+  const LOCKS = { released: 3, price: 4 };
+  /* Is `col` hidden, given how many guesses have been made? A finished game shows everything. */
+  const isLocked = (col, guessesMade, finished) => !finished && (LOCKS[col] || 0) > guessesMade;
+  const lockedCols = (guessesMade, finished) => COLS.filter((c) => isLocked(c, guessesMade, finished));
+
   /* Hard mode (doc 4.7): every guess must stay consistent with all greens found so far.
      `history` = [{ guess }] of earlier guesses, `compareFn(guess)` yields cells vs the answer.
      Returns null when the guess is allowed, else a message. */
@@ -1041,6 +1058,7 @@ const Compare = (() => {
       const cells = compare(h.guess, answer);
       const against = compare(newGuess, h.guess);
       for (let i = 0; i < cells.length; i++) {
+        if (isLocked(cells[i].col, history.length, false)) continue;      // the player hasn't seen this column yet
         if (cells[i].verdict === 'hit' && against[i].verdict !== 'hit') {
           return 'Hard mode: ' + cells[i].label + ' has to match ' + cells[i].value + ' from an earlier guess.';
         }
@@ -1049,7 +1067,7 @@ const Compare = (() => {
     return null;
   }
 
-  return { COLS, LABELS, DIR_WORDS, compare, isWin, hardModeViolation, fmtReleased, fmtStorage, fmtPrice, fmtScreen, TYPE_NAMES };
+  return { COLS, LABELS, DIR_WORDS, LOCKS, isLocked, lockedCols, compare, isWin, hardModeViolation, fmtReleased, fmtStorage, fmtPrice, fmtScreen, TYPE_NAMES };
 })();
 
 
@@ -2058,13 +2076,15 @@ function renderPhonedle(root, mode, day) {
 
   const boardEl = h('div', { class: 'board', 'aria-label': 'Guesses' });
   const hintsEl = h('div', { class: 'hints' });
+  const lockNote = h('div', { class: 'locknote hidden' });
+  const headsEl = h('div', { class: 'colheads', 'aria-hidden': 'true' });
   const dockEl = h('div', { class: 'searchdock' });
 
   const back = h('a', { class: 'iconbtn', href: mode === 'archive' ? '#/archive' : '#/', 'aria-label': 'Back' }, '←');
   const head = h('div', { class: 'gamehead' }, back,
     h('div', { class: 'grow' }, h('h1', null, 'Phonedle ' + label), h('div', { class: 'sub' }, 'The Mystery Handset · ' + MAX_GUESSES + ' guesses')),
     h('button', { class: 'iconbtn', 'aria-label': 'How to play', onclick: () => openHowTo('phonedle') }, '?'));
-  clear(root).append(h('div', { class: 'wrap' }, head, hintsEl, h('div', { class: 'colheads', 'aria-hidden': 'true' }, Compare.COLS.map((c) => h('div', null, Compare.LABELS[c]))), boardEl), dockEl);
+  clear(root).append(h('div', { class: 'wrap' }, head, hintsEl, lockNote, headsEl, boardEl), dockEl);
   window.scrollTo(0, 0);
 
   /* ----- board ----- */
@@ -2074,14 +2094,43 @@ function renderPhonedle(root, mode, day) {
   }
   function buildRow(phone, i) {
     const cells = Compare.compare(phone, answer);
-    const tiles = cells.map((c, k) => h('div', { class: 'tile ' + c.verdict, role: 'img', 'aria-label': c.aria, style: { '--i': k } },
+    const tiles = cells.map((c, k) => h('div', { class: 'tile ' + c.verdict, role: 'img', 'aria-label': c.aria, 'data-col': c.col, style: { '--i': k } },
       h('span', { class: 'v' + (c.value.length >= 7 && c.col === 'brand' ? ' long' : '') }, c.value), h('span', { class: 'm' }, tileGlyph(c))));
     const sil = phoneSVG(phone);
     return { cells, tiles, el: h('div', { class: 'guessrow', 'data-i': i }, h('div', { class: 'guessname' }, sil, phone.name), h('div', { class: 'tiles' }, tiles)) };
   }
+  /* Locked columns (Compare.LOCKS) are held back until enough guesses are made, then appear on every row. */
+  function lockTile(tile, locked) {
+    const col = tile.dataset.col;
+    tile.classList.toggle('locked', locked);
+    if (locked) { tile.setAttribute('aria-label', Compare.LABELS[col] + ', locked until you have made ' + Compare.LOCKS[col] + ' guesses'); tile.classList.remove('show'); }
+  }
+  function unlockTile(row, k, delay) {
+    const t = row.tiles[k];
+    const go = () => {
+      if (destroyed) return;
+      t.classList.remove('locked'); t.setAttribute('aria-label', row.cells[k].aria);
+      if (reducedMotion()) { t.classList.add('show'); return; }
+      t.classList.add('flipping'); Sound.flip(); setTimeout(() => t.classList.add('show'), 250);
+    };
+    if (delay) setTimeout(go, delay); else go();
+  }
+  function drawHeads() {
+    const made = rec ? rec.guesses.length : 0, finished = !!(rec && rec.result);
+    clear(headsEl);
+    Compare.COLS.forEach((c) => {
+      const locked = Compare.isLocked(c, made, finished);
+      headsEl.append(h('div', { title: locked ? Compare.LABELS[c] + ' unlocks after ' + Compare.LOCKS[c] + ' guesses' : null }, Compare.LABELS[c], locked ? h('span', { class: 'lk' }, '🔒') : null));
+    });
+    const waiting = Compare.COLS.filter((c) => Compare.isLocked(c, made, finished));
+    lockNote.classList.toggle('hidden', !waiting.length);
+    clear(lockNote);
+    if (waiting.length) lockNote.append('🔒 ' + waiting.map((c) => Compare.LABELS[c] + ' unlocks after ' + Compare.LOCKS[c] + ' guesses').join(' · '));
+  }
   function reveal(row, animate, done) {
-    if (!animate || reducedMotion()) { row.tiles.forEach((t) => t.classList.add('show')); done && done(); return; }
+    if (!animate || reducedMotion()) { row.tiles.forEach((t) => { if (!t.classList.contains('locked')) t.classList.add('show'); }); done && done(); return; }
     row.tiles.forEach((t, k) => {
+      if (t.classList.contains('locked')) return;
       setTimeout(() => {
         if (destroyed) return;
         t.classList.add('flipping'); Sound.flip();
@@ -2093,15 +2142,26 @@ function renderPhonedle(root, mode, day) {
   function drawBoard(animateNewest, done) {
     clear(boardEl);
     const guesses = rec ? rec.guesses : [];
+    const made = guesses.length, finished = !!(rec && rec.result);
+    const before = animateNewest ? made - 1 : made;                       // guesses made before the one being revealed
     const rows = guesses.map((id, i) => ({ id, i })).reverse();            // newest on top
+    const unlocking = [];                                                  // columns that appear with this guess
+    Compare.COLS.forEach((c, k) => { if (animateNewest && Compare.isLocked(c, before, false) && !Compare.isLocked(c, made, finished)) unlocking.push(k); });
+    const newestDuration = Compare.COLS.length * FLIP_STEP + 520;
+    drawHeads();
     rows.forEach((r, idx) => {
       const row = buildRow(PHONE_BY_ID.get(r.id), r.i);
       boardEl.append(row.el);
       const isNew = animateNewest && idx === 0;
-      reveal(row, isNew, isNew ? () => {                     // only the newest row reports back
+      row.tiles.forEach((t, k) => {
+        if (Compare.isLocked(Compare.COLS[k], made, finished)) lockTile(t, true);
+        else if (!isNew && unlocking.includes(k)) lockTile(t, true);        // older rows stay hidden until the new row has flipped
+      });
+      reveal(row, isNew, isNew ? () => {                                   // only the newest row reports back
         if (rec.result === 'win') row.el.classList.add('win');
         done && done();
       } : null);
+      if (!isNew) unlocking.forEach((k) => { if (row.tiles[k].classList.contains('locked')) unlockTile(row, k, animateNewest ? newestDuration + idx * 70 : 0); });
     });
     for (let k = guesses.length; k < MAX_GUESSES; k++) {
       boardEl.append(h('div', { class: 'guessrow slots' }, h('div', { class: 'tiles' }, Compare.COLS.map(() => h('div', { class: 'tile empty' })))));
@@ -2200,7 +2260,7 @@ function renderPhonedle(root, mode, day) {
     Store.save();
     input.value = ''; matches = []; active = 0; closeList();
     busy = true;
-    const cells = Compare.compare(phone, answer);
+    const cells = Compare.compare(phone, answer).filter((c) => !Compare.isLocked(c.col, r.guesses.length, !!r.result));
     announce(phone.name + '. ' + cells.map((c) => c.aria).join('. ') + '.');
     drawHints();
     drawBoard(true, () => {
@@ -2859,10 +2919,11 @@ function howtoPhonedle(setStop) {
     h('div', { class: 'legendbox' },
       h('div', null, h('b', null, 'Brand'), ' Same brand is green. nubia and Optus X phones are both made by ZTE, so that’s yellow.'),
       h('div', null, h('b', null, 'Type'), ' Bar, Fold or Flip. Fold vs Flip is yellow.'),
-      h('div', null, h('b', null, 'Released'), ' Same month is green, same year is yellow.'),
+      h('div', null, h('b', null, 'Released 🔒'), ' Same month is green, same year is yellow, and arrows point towards the answer. This column unlocks after ' + Compare.LOCKS.released + ' guesses.'),
       h('div', null, h('b', null, 'Screen'), ' Same size is green, within 0.2″ is yellow.'),
       h('div', null, h('b', null, 'Storage and Cameras'), ' Exact match only.'),
-      h('div', null, h('b', null, 'Price'), ' Within $1 (the same Optus price tier) is green, within $200 is yellow. Different brands can share a tier, so a green price is a real clue.')),
+      h('div', null, h('b', null, 'Price 🔒'), ' Within $1 (the same Optus price tier) is green, within $200 is yellow. Different brands can share a tier, so a green price is a real clue. Unlocks after ' + Compare.LOCKS.price + ' guesses.')),
+    h('p', null, '🔒 Some columns stay locked until you’ve made a few guesses, then appear on every row. So your first guesses are about brand, type, screen, storage and cameras.'),
     h('p', { class: 'muted', style: { fontSize: '.88rem' } }, 'Stuck? Hints unlock after 3, 5 and 7 guesses. They add 💡 to your share text. Hard mode (⚡ in Settings) turns hints off and makes you keep your greens.'),
     h('div', { class: 'row' }, h('button', { class: 'btn primary', autofocus: true, onclick: (e) => e.target.closest('.overlay').querySelector('.close').click() }, 'Got it')));
 }
