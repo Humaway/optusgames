@@ -55,25 +55,20 @@ const THUMBS_DIR    = "thumbs";
    To put a game in the vault, add "Vault" to its tags:
        tags: ["Vault", "Arcade"],
    It disappears from the public shelf (and its count, search and filters)
-   and only shows up inside the vault. When the site deploys, the workflow
-   also cuts vault games out of the published page and its updates.json, so
-   they aren't sitting in the live page source either.
+   and only shows up inside the vault. Everything lives in this one file.
 
    Open the vault with the Konami code (↑ ↑ ↓ ↓ ← → ← → B A) or by tapping the
    "Optus Games" wordmark five times quickly (works on phones). It asks for an
-   access code. A code works if this file exists:
+   access code. Codes are stored below as hashes, so the code itself never
+   appears in the page. Only letters and digits count, so "Ollie After Dark",
+   "ollie-after-dark" and "OLLIEAFTERDARK" are the same code.
 
-       vault/<first 32 hex chars of sha256("optusgames-vault:" + code)>.json
-
-   so the code itself never appears anywhere in the site. Only letters and
-   digits count, so "Ollie After Dark", "ollie-after-dark" and "OLLIEAFTERDARK"
-   are the same code. To make a new one, type it into the vault prompt, open
-   the browser console (F12) and it prints the exact file name to create.
-   Vault files look like:  { "name": "...", "note": "...", "games": [] }
-   Every code shows all the Vault-tagged games, plus any games listed in its
-   own file (handy for something only one person should see).
+   To change or add a code: type the new one into the vault prompt, open the
+   browser console (F12) and it prints the hash to paste into VAULT_CODES.
 --------------------------------------------------------------------------- */
-const VAULT_DIR     = "vault";
+const VAULT_CODES = [
+  "40a3f2a03b7c6dd84a0d014e686eb250",   // starter code; swap it for your own
+];
 
 const GAMES = [
    {
@@ -2544,14 +2539,12 @@ setTimeout(shineWordmark, 1100);
 /* ============================================================================
    10. VAULT
    ============================================================================
-   The live page holds no codes and no file names, and once deployed no
-   secret games either (the workflow moves "Vault"-tagged games into the vault
-   files). A code is hashed in the browser and the hash *is* the file name, so
-   the only way to find a vault on the live site is to know its code. (Anyone
-   browsing a public GitHub repo can still see the files, so treat this as
-   "off the shelf", not "locked in a safe".)
+   Everything is in this file: the vault shows the "Vault"-tagged games from
+   GAMES, and a code is checked by hashing it in the browser and comparing it
+   with VAULT_CODES. No extra files, no network requests. The games are still
+   in the page source, so treat this as "off the shelf", not "locked in a safe".
    ========================================================================== */
-const VAULT_KEY  = "optusgames:vault";   // sessionStorage: which vault this tab has open
+const VAULT_KEY  = "optusgames:vault";   // sessionStorage: this tab has the vault open
 const gate       = document.getElementById("gate");
 const gateForm   = document.getElementById("gate-form");
 const gateInput  = document.getElementById("gate-code");
@@ -2566,38 +2559,25 @@ const vaultEmpty = document.getElementById("vault-empty");
 const vaultLock  = document.getElementById("vault-lock");
 
 let vaultEntries = [];
-let vaultUpdates = {};   // last-updated times the deploy workflow writes into the vault file
 let gateBusy = false;
 let vaultClosing = false;
 
-function sessionGet() { try { return sessionStorage.getItem(VAULT_KEY); } catch (e) { return null; } }
-function sessionSet(v) { try { v ? sessionStorage.setItem(VAULT_KEY, v) : sessionStorage.removeItem(VAULT_KEY); } catch (e) {} }
+function sessionGet() { try { return sessionStorage.getItem(VAULT_KEY) === "1"; } catch (e) { return false; } }
+function sessionSet(on) { try { on ? sessionStorage.setItem(VAULT_KEY, "1") : sessionStorage.removeItem(VAULT_KEY); } catch (e) {} }
 
-async function vaultPath(code) {
+async function codeHash(code) {
   // only letters and digits count, so "Ollie After Dark" = "ollie-after-dark"
   const norm = String(code).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
-  if (!norm) return null;
+  if (!norm) return "";
   const bytes = new TextEncoder().encode("optusgames-vault:" + norm);
   const hash = await crypto.subtle.digest("SHA-256", bytes);
-  const hex = [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, "0")).join("");
-  return VAULT_DIR.replace(/\/+$/, "") + "/" + hex.slice(0, 32) + ".json";
-}
-
-async function fetchVault(path) {
-  const res = await fetch(path + "?t=" + Date.now(), { cache: "no-store", signal: timeout(10000) });
-  if (res.status === 404) return { missing: true, path: path };
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  const json = await res.json();                     // a typo in the file throws SyntaxError
-  const games = Array.isArray(json) ? json : json && Array.isArray(json.games) ? json.games : null;
-  if (!games) throw new SyntaxError("no games array");
-  const obj = Array.isArray(json) ? {} : json;
-  return { path: path, name: obj.name || "The Vault", note: obj.note || "", games: games, updates: obj.updates || {} };
+  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 32);
 }
 
 function paintVault(files) {
+  if (!files) return;
   vaultEntries.forEach(e => {
-    const p = repoPath(e.game.url);
-    const info = (files && files[p]) || vaultUpdates[p];
+    const info = files[repoPath(e.game.url)];
     if (info) paintEntry(e, info);
   });
 }
@@ -2624,15 +2604,9 @@ wordmarkEl.addEventListener("click", () => {
   if (taps.length >= 5) { taps = []; enterVault(); }
 });
 
-async function enterVault() {
+function enterVault() {
   if (gate.open || !vaultEl.hidden) return;
-  const saved = sessionGet();
-  if (saved) {
-    const data = await fetchVault(saved).catch(() => null);
-    if (data && !data.missing) { openVault(data, null); return; }
-    sessionSet(null);
-  }
-  openGate();
+  if (sessionGet()) openVault(null); else openGate();
 }
 
 /* ---- gate ---------------------------------------------------------------- */
@@ -2680,44 +2654,36 @@ gateForm.addEventListener("submit", async e => {
   gateInput.readOnly = true;
   setGate("connecting", "Connecting…");
 
-  let result;
+  let hash = null;
   try {
-    const path = await vaultPath(code);
     // a short minimum so the "searching" moment reads, and guessing is slow
-    [result] = await Promise.all([
-      path ? fetchVault(path).catch(err => ({ error: err, path: path })) : { missing: true, path: "" },
-      wait(motionOK() ? 550 : 300)
-    ]);
+    [hash] = await Promise.all([codeHash(code), wait(motionOK() ? 550 : 300)]);
   } catch (err) {
-    result = { error: err };   // no crypto.subtle: the page isn't on https or localhost
+    // no crypto.subtle: only happens on plain http from another machine
   }
 
   gateBusy = false;
   gateInput.readOnly = false;
 
-  if (result.missing) {
-    if (result.path) console.info("[vault] No vault for that code. To create one, add the file:  " + result.path);
-    setGate("fail", "No signal for that code.");
+  if (hash === null) {
+    setGate("fail", "Open the site over https (or localhost) to use the vault.");
     gateInput.select();
     return;
   }
-  if (result.error) {
-    setGate("fail", result.error.name === "SyntaxError"
-      ? "Found it, but that vault file has a typo (invalid JSON)."
-      : !window.crypto || !crypto.subtle
-        ? "The vault only works on the live https site."
-        : "Couldn't connect. Try again in a sec.");
+  if (!VAULT_CODES.includes(hash)) {
+    if (hash) console.info('[vault] To use this code, add "' + hash + '" to VAULT_CODES in index.html');
+    setGate("fail", "No signal for that code.");
     gateInput.select();
     return;
   }
 
   setGate("ok", "Connected");
   scramble(gateTitle, "Access granted", 380);
-  sessionSet(result.path);
+  sessionSet(true);
   await wait(motionOK() ? 450 : 0);
 
   const r = gate.getBoundingClientRect();
-  openVault(result, { x: r.left + r.width / 2, y: r.top + r.height / 2 });
+  openVault({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
   // the modal keeps focus until it's gone, so hand it to the vault afterwards
   closeGate().then(() => { if (!vaultEl.hidden) vaultTitle.focus({ preventScroll: true }); });
 });
@@ -2738,21 +2704,9 @@ function lockPage(on) {
   }
 }
 
-function openVault(data, origin) {
+function openVault(origin) {
   vaultClosing = false;
-  vaultUpdates = data.updates || {};
-
-  // Vault-tagged games from this page, plus anything this code's file adds.
-  // (On the live site the deploy has already moved the tagged ones into the
-  // file, so the same game can arrive twice. Keep the first.)
-  const seen = new Set();
-  const games = GAMES.filter(isVault).concat(data.games).filter(g => {
-    const key = repoPath(g.url) || g.title;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  vaultEntries = games.map(g => {
+  vaultEntries = GAMES.filter(isVault).map(g => {
     const d = parseDate(g.releaseDate);
     return { game: g, time: d ? d.time : -Infinity, updated: 0, node: null };
   }).sort((a, b) => b.time - a.time);
@@ -2761,12 +2715,9 @@ function openVault(data, origin) {
   paintVault(shownFiles);
 
   const n = vaultEntries.length;
-  vaultSub.textContent = (n === 1 ? "1 game" : n + " games") + (data.note ? "  ·  " + data.note : " off the public shelf.");
+  vaultSub.textContent = (n === 1 ? "1 game" : n + " games") + " off the public shelf.";
   vaultEmpty.hidden = n > 0;
-  if (!n) {
-    vaultEmpty.innerHTML = 'Nothing in here yet. Add <code>"Vault"</code> to a game\'s tags in index.html, or list games in <code></code>.';
-    vaultEmpty.querySelectorAll("code")[1].textContent = data.path;
-  }
+  vaultEmpty.innerHTML = 'Nothing in here yet. Add <code>"Vault"</code> to a game\'s tags in index.html.';
 
   lockPage(true);
   vaultEl.hidden = false;
@@ -2798,20 +2749,19 @@ function openVault(data, origin) {
     anim(card, [{ opacity: 0, transform: "translateY(20px)" }, { opacity: 1, transform: "none" }],
          { duration: 500, delay: lead + 120 + Math.min(i, 10) * 50, fill: "backwards" });
   });
-  setTimeout(() => scramble(vaultTitle, data.name, 650), motionOK() ? lead : 0);
+  setTimeout(() => scramble(vaultTitle, "The Vault", 650), motionOK() ? lead : 0);
 }
 
 function closeVault() {
   if (vaultEl.hidden || vaultClosing) return;
   vaultClosing = true;
-  sessionSet(null);
+  sessionSet(false);
 
   const done = () => {
     vaultEl.hidden = true;
     vaultEl.getAnimations().forEach(a => a.cancel());
     vaultLib.replaceChildren();                 // don't leave the secret list sitting in the DOM
     vaultEntries = [];
-    vaultUpdates = {};
     lockPage(false);
     vaultClosing = false;
   };
@@ -2833,11 +2783,7 @@ applyFilters();
 requestAnimationFrame(() => { libraryLive = true; });
 
 // reopen the vault if this tab had it open before a refresh
-if (sessionGet()) {
-  fetchVault(sessionGet())
-    .then(data => { if (data.missing) sessionSet(null); else openVault(data, null); })
-    .catch(() => {});
-}
+if (sessionGet()) openVault(null);
 
 window.addEventListener("load", () => {
   const idle = window.requestIdleCallback || (fn => setTimeout(fn, 600));
