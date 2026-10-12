@@ -40,6 +40,41 @@ const RECHECK_SEC   = 60;              // an open tab re-reads updates.json this
 const API_TTL_MIN   = 30;              // live-API fallback only: reuse its result this long
 const FRESH_DAYS    = 7;               // "Updated" badge shows within this many days
 
+/* ---------------------------------------------------------------------------
+   THUMBNAILS — the deploy workflow makes small WebP copies of everything in
+   thumbnails/ (thumbs/sm/... for cards, thumbs/lg/... for the hero), so the
+   page downloads ~100 KB per game instead of several MB. Keep uploading full
+   size images as normal. If a small copy is missing the original is used, so
+   nothing breaks before the workflow has run. Set to "" to always use originals.
+--------------------------------------------------------------------------- */
+const THUMBS_DIR    = "thumbs";
+
+/* ---------------------------------------------------------------------------
+   VAULT — the hidden shelf. Nothing about it is listed on the page.
+
+   To put a game in the vault, add "Vault" to its tags:
+       tags: ["Vault", "Arcade"],
+   It disappears from the public shelf (and its count, search and filters)
+   and only shows up inside the vault. When the site deploys, the workflow
+   also cuts vault games out of the published page and its updates.json, so
+   they aren't sitting in the live page source either.
+
+   Open the vault with the Konami code (↑ ↑ ↓ ↓ ← → ← → B A) or by tapping the
+   "Optus Games" wordmark five times quickly (works on phones). It asks for an
+   access code. A code works if this file exists:
+
+       vault/<first 32 hex chars of sha256("optusgames-vault:" + code)>.json
+
+   so the code itself never appears anywhere in the site. Only letters and
+   digits count, so "Ollie After Dark", "ollie-after-dark" and "OLLIEAFTERDARK"
+   are the same code. To make a new one, type it into the vault prompt, open
+   the browser console (F12) and it prints the exact file name to create.
+   Vault files look like:  { "name": "...", "note": "...", "games": [] }
+   Every code shows all the Vault-tagged games, plus any games listed in its
+   own file (handy for something only one person should see).
+--------------------------------------------------------------------------- */
+const VAULT_DIR     = "vault";
+
 const GAMES = [
    {
     title: "CHASEGPT",
@@ -48,6 +83,16 @@ const GAMES = [
     url: "games/CHASEGPT.html",
     tags: ["Sandbox", "Horror"],
     releaseDate: "12th Oct, 2026",
+    version: "V 1",
+    creator: "Luka w/Opus 5.5"
+  },
+   {
+    title: "POSTPAID",
+    description: "Everyone's on a play, They just dont know it.",
+    image: "thumbnails/POSTPAID.png",
+    url: "games/POSTPAID.html",
+    tags: ["Sandbox", "Arcade", "Vault"],
+    releaseDate: "11th Oct, 2026",
     version: "V 1",
     creator: "Luka w/Opus 5.5"
   },
@@ -510,15 +555,29 @@ const GAMES = [
   }
 ];
 
+/* A "Vault" tag (any case) keeps a game off the public shelf. */
+function isVault(g) {
+  return (g.tags || []).some(function (t) { return String(t).toLowerCase() === "vault"; });
+}
+const PUBLIC_GAMES = GAMES.filter(function (g) { return !isVault(g); });
+
+/* "thumbnails/foo.png" -> "thumbs/sm/foo.webp" (made by the deploy workflow).
+   Anything outside thumbnails/ is used as-is. */
+function thumbSrc(path, size) {
+  if (!THUMBS_DIR || !path || !/^\.?\/?thumbnails\//i.test(path)) return path;
+  return THUMBS_DIR + "/" + size + "/" +
+         path.replace(/^\.?\/?thumbnails\//i, "").replace(/\.[a-z0-9]+$/i, "") + ".webp";
+}
+
 /* Start downloading the hero thumbnail before the browser has even parsed
    the stylesheet. This is the single biggest win for perceived load time. */
 (function preloadHero() {
-  var f = GAMES.find(function (g) { return g.title === FEATURED_GAME_TITLE; }) || GAMES[0];
+  var f = PUBLIC_GAMES.find(function (g) { return g.title === FEATURED_GAME_TITLE; }) || PUBLIC_GAMES[0];
   if (!f || !f.image) return;
   var l = document.createElement("link");
   l.rel = "preload";
   l.as = "image";
-  l.href = f.image;
+  l.href = thumbSrc(f.image, "lg");
   l.fetchPriority = "high";
   document.head.appendChild(l);
 })();
@@ -546,15 +605,20 @@ const GAMES = [
 
   --display: "Avenir Next", "Futura", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
   --body: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
 
   --pad: clamp(16px, 4vw, 48px);
   --r: 10px;
+
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);   /* fast out, soft landing — every entrance uses it */
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
+html.locked { overflow: hidden; }          /* while the vault is open */
 
 body {
+  position: relative;
   font-family: var(--body);
   background: var(--ink);
   color: var(--text);
@@ -564,6 +628,39 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+
+/* ambience: a dot grid that fades out under the masthead, and a soft teal glow.
+   Both are static on purpose: an always-moving full-screen layer costs GPU
+   time on every frame for as long as the tab is open. */
+body::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 760px;
+  z-index: -1;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(150, 236, 240, 0.085) 1px, transparent 1.4px);
+  background-size: 26px 26px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 10%, transparent);
+          mask-image: linear-gradient(to bottom, #000 10%, transparent);
+}
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(45% 40% at 14% 4%, rgba(0, 163, 173, 0.14), transparent 70%),
+    radial-gradient(32% 30% at 90% 0%, rgba(255, 209, 0, 0.05), transparent 70%);
+}
+
+/* shared entrances. All use `backwards` fill so hover transforms still work afterwards. */
+@keyframes fadeIn  { from { opacity: 0; } }
+@keyframes fadeOut { to   { opacity: 0; } }
+@keyframes fadeUp  { from { opacity: 0; transform: translateY(14px); } }
+@keyframes pop     { 0% { transform: scale(0.9); } 60% { transform: scale(1.05); } 100% { transform: none; } }
+@keyframes spin    { to { transform: rotate(1turn); } }
 
 a { color: inherit; text-decoration: none; }
 img { display: block; }
@@ -594,14 +691,40 @@ img { display: block; }
   letter-spacing: -0.035em;
   line-height: 0.95;
   color: var(--aqua);
+  -webkit-user-select: none;
+          user-select: none;
+  touch-action: manipulation;   /* fast repeat taps, no double-tap zoom */
 }
 .wordmark b { font-weight: 800; color: var(--yellow); }
+
+/* each word "acquires signal": rises out of a blur, one after the other */
+.wordmark .w {
+  display: inline-block;
+  animation: acquire 0.7s var(--ease) backwards;
+}
+.wordmark .w + .w { animation-delay: 0.1s; }
+@keyframes acquire { from { opacity: 0; transform: translateY(16px); filter: blur(8px); } }
+
+/* a light sweep across the letters, on load and on hover */
+.wordmark .t {
+  display: inline-block;
+  padding-right: 0.08em;          /* keeps the italic overhang inside the clip */
+  background: linear-gradient(110deg, var(--aqua) 42%, #E8FEFF 50%, var(--aqua) 58%) 100% 0 / 260% 100%;
+  -webkit-background-clip: text;
+          background-clip: text;
+  color: transparent;
+}
+.wordmark b.t { background-image: linear-gradient(110deg, var(--yellow) 42%, #FFF6C8 50%, var(--yellow) 58%); }
+.wordmark.shining .t { animation: shine 1.3s ease-in-out; }
+.wordmark.shining b.t { animation-delay: 0.09s; animation-fill-mode: backwards; }
+@keyframes shine { from { background-position: 100% 0; } to { background-position: 0 0; } }
 
 .shelf-note {
   font-size: 0.9rem;
   color: var(--dim);
   padding-bottom: 6px;
   font-variant-numeric: tabular-nums;
+  animation: fadeIn 0.5s ease 0.2s backwards;
 }
 .shelf-note strong { color: var(--text); font-weight: 600; }
 
@@ -619,7 +742,21 @@ img { display: block; }
   border: 1px solid var(--line);
   border-radius: var(--r);
   overflow: hidden;
+  animation: heroIn 0.7s var(--ease) 0.05s backwards;
 }
+@keyframes heroIn { from { opacity: 0; transform: translateY(18px) scale(0.99); } }
+
+/* copy lines arrive one after another, just behind the card */
+.hero-copy > * { animation: fadeUp 0.55s var(--ease) backwards; }
+.hero-copy > :nth-child(1) { animation-delay: 0.18s; }
+.hero-copy > :nth-child(2) { animation-delay: 0.22s; }
+.hero-copy > :nth-child(3) { animation-delay: 0.26s; }
+.hero-copy > :nth-child(4) { animation-delay: 0.3s; }
+.hero-copy > :nth-child(5) { animation-delay: 0.33s; }
+.hero-copy > :nth-child(6) { animation-delay: 0.36s; }
+
+/* infinite decorations stop once the hero scrolls out of view (class set by JS) */
+.hero.off .bars i, .hero.off .pulse { animation-play-state: paused; }
 
 .hero-copy {
   position: relative;
@@ -645,6 +782,12 @@ img { display: block; }
 .bars i:nth-child(2) { height: 55%; }
 .bars i:nth-child(3) { height: 78%; }
 .bars i:nth-child(4) { height: 100%; background: var(--yellow); }
+/* the kicker's bars behave like a live signal meter */
+.hero-kicker .bars i { transform-origin: bottom; animation: meter 2.2s ease-in-out infinite; }
+.hero-kicker .bars i:nth-child(2) { animation-delay: 0.15s; }
+.hero-kicker .bars i:nth-child(3) { animation-delay: 0.3s; }
+.hero-kicker .bars i:nth-child(4) { animation-delay: 0.45s; }
+@keyframes meter { 0%, 100% { transform: none; } 50% { transform: scaleY(0.5); } }
 
 .hero-copy h2 {
   font-family: var(--display);
@@ -678,30 +821,51 @@ img { display: block; }
 }
 
 .play {
+  position: relative;
+  overflow: hidden;
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   margin-top: 6px;
   background: var(--yellow);
   color: #000;
   font-weight: 700;
   font-size: 0.98rem;
-  padding: 13px 26px;
+  padding: 13px 24px 13px 26px;
   border-radius: 6px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: translate 0.2s var(--ease), box-shadow 0.2s ease;
 }
 .play:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 22px rgba(255, 209, 0, 0.22);
+  translate: 0 -2px;
+  box-shadow: 0 10px 26px rgba(255, 209, 0, 0.26);
 }
+.play:active { translate: 0; }
+.play svg { width: 14px; height: 14px; fill: currentColor; transition: translate 0.25s var(--ease); }
+.play:hover svg { translate: 3px 0; }
+/* glint that crosses the button on hover */
+.play::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.6) 50%, transparent 70%);
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+.play:hover::after { transform: translateX(120%); transition: transform 0.75s ease; }
 
-.hero-art { position: relative; }
+.hero-art { position: relative; overflow: hidden; }
 .hero-art img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   opacity: 0;
-  transition: opacity 0.5s ease;
+  scale: 1.05;                      /* a little slack so the pointer parallax never shows an edge */
+  transition: opacity 0.4s ease, translate 0.6s var(--ease);
+  will-change: transform;           /* own GPU layer: parallax moves it without repainting */
 }
-.hero-art img.ready { opacity: 1; }
+.hero-art img.ready { opacity: 1; animation: settle 1.6s var(--ease) backwards; }
+@keyframes settle { from { scale: 1.16; } }
 .hero-art::after {
   content: "";
   position: absolute;
@@ -736,21 +900,40 @@ img { display: block; }
 /* ============================================================================
    4. TOOLBAR
    ============================================================================ */
+/* 1px marker just above the toolbar; once it scrolls away the toolbar is stuck */
+.toolbar-sentinel { height: 1px; margin-top: clamp(23px, 3vw, 35px); }
+
 .toolbar {
   position: sticky;
   top: 0;
   z-index: 30;
-  margin-top: clamp(24px, 3vw, 36px);
   padding: 12px var(--pad);
-  background: rgba(6, 9, 10, 0.9);
-  backdrop-filter: blur(10px);
+  /* solid rather than a backdrop blur: a blur behind a sticky bar has to be
+     recalculated on every scroll frame, which is the classic cause of choppy scrolling */
+  background: rgba(6, 9, 10, 0.96);
   border-top: 1px solid var(--line-soft);
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  transition: border-color 0.3s ease;
+  animation: fadeIn 0.5s ease 0.25s backwards;
 }
+/* the "stuck" shadow is a gradient strip that only fades its opacity (GPU-only) */
+.toolbar::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  top: 100%;
+  height: 22px;
+  background: linear-gradient(rgba(0, 0, 0, 0.45), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.toolbar.stuck { border-bottom-color: rgba(43, 220, 232, 0.18); }
+.toolbar.stuck::after { opacity: 1; }
 
 .search {
   position: relative;
@@ -803,13 +986,15 @@ img { display: block; }
   border-radius: 999px;
   padding: 7px 14px;
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease, scale 0.15s ease;
 }
 .chip:hover { color: var(--text); background: var(--panel-lift); }
+.chip:active { scale: 0.95; }
 .chip[aria-pressed="true"] {
   background: var(--yellow);
   border-color: var(--yellow);
   color: #000;
+  animation: pop 0.35s var(--ease);
 }
 
 .tool-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
@@ -896,16 +1081,45 @@ main { flex: 1; padding: 22px var(--pad) 64px; }
 .library { display: flex; flex-direction: column; gap: 10px; }
 
 .card {
+  position: relative;
   background: var(--panel);
   border: 1px solid var(--line-soft);
   border-radius: 8px;
   overflow: hidden;
   content-visibility: auto;
   contain-intrinsic-size: auto 134px;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  /* hover uses `translate`, so it never fights the transform-based sort/filter animations.
+     No animated box-shadow: shadows repaint on every frame of a transition. */
+  transition: background 0.15s ease, border-color 0.2s ease, translate 0.25s var(--ease);
 }
-.card:hover { background: var(--panel-lift); border-color: rgba(43, 220, 232, 0.32); }
+.card:hover {
+  background: var(--panel-lift);
+  border-color: rgba(43, 220, 232, 0.32);
+  translate: 0 -3px;
+}
+.card:active { translate: 0 -1px; }
 .card.is-hidden { display: none; }
+.card.pre { opacity: 0; }   /* waiting for its scroll-in reveal */
+
+/* soft spotlight that follows the cursor. There is only one on the page: JS
+   drops it into whichever card is hovered and slides it with a transform,
+   so following the mouse never repaints anything. */
+.spot {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  top: 0;
+  width: 400px;
+  height: 400px;
+  margin: -200px 0 0 -200px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--spot, rgba(43, 220, 232, 0.1)), transparent);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  will-change: transform;
+}
+.card:hover .spot { opacity: 1; }
 
 .card-link { display: flex; height: 100%; }
 
@@ -922,20 +1136,44 @@ main { flex: 1; padding: 22px var(--pad) 64px; }
   height: 100%;
   object-fit: cover;
   opacity: 0;
-  transition: opacity 0.35s ease;
+  transition: opacity 0.35s ease, scale 0.7s var(--ease);
 }
 .thumb img.ready { opacity: 1; }
-/* shimmer placeholder, removed the moment the real pixels land */
+.card:hover .thumb img { scale: 1.05; }
+
+/* play button that blooms over the thumbnail on hover */
+.play-badge {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(6, 9, 10, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  opacity: 0;
+  scale: 0.7;
+  transition: opacity 0.2s ease, scale 0.3s var(--ease);
+  pointer-events: none;
+}
+.play-badge svg { width: 15px; height: 15px; fill: var(--yellow); margin-left: 3px; }
+.card:hover .play-badge { opacity: 1; scale: 1; }
+/* shimmer placeholder, removed the moment the real pixels land. The highlight
+   slides with transform (GPU) instead of repainting a moving gradient. */
 .thumb::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, #0A1214 30%, #142226 50%, #0A1214 70%);
-  background-size: 300% 100%;
+  background: linear-gradient(100deg, transparent 25%, rgba(150, 236, 240, 0.05) 50%, transparent 75%);
+  transform: translateX(-100%);
   animation: sweep 1.4s linear infinite;
 }
 .thumb.done::before { display: none; }
-@keyframes sweep { to { background-position: -300% 0; } }
+@keyframes sweep { to { transform: translateX(100%); } }
 
 .fresh {
   position: absolute;
@@ -948,6 +1186,7 @@ main { flex: 1; padding: 22px var(--pad) 64px; }
   border-radius: 4px;
   padding: 3px 7px;
   box-shadow: 0 2px 8px rgba(6, 9, 10, 0.5);
+  animation: pop 0.45s var(--ease) backwards;
 }
 
 .card-body {
@@ -1046,7 +1285,7 @@ main { flex: 1; padding: 22px var(--pad) 64px; }
   text-align: center;
   color: var(--dim);
 }
-.empty.show { display: block; }
+.empty.show { display: block; animation: fadeUp 0.45s var(--ease) backwards; }
 .empty h3 { font-family: var(--display); font-size: 1.3rem; color: var(--text); margin-bottom: 8px; }
 .empty button {
   margin-top: 16px;
@@ -1070,6 +1309,256 @@ footer {
   line-height: 1.6;
   max-width: 78ch;
 }
+
+/* ============================================================================
+   6b. VAULT — access-code gate + the hidden shelf
+   ============================================================================ */
+.gate {
+  width: min(380px, calc(100% - 32px));
+  max-width: none;
+  margin: auto;
+  padding: 0;
+  border: 1px solid rgba(255, 209, 0, 0.18);
+  border-radius: 14px;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(255, 209, 0, 0.07), transparent 60%),
+    var(--slate);
+  color: var(--text);
+  text-align: center;
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+}
+.gate::backdrop { background: rgba(3, 5, 6, 0.84); }   /* no blur: it would re-blur the live page every frame */
+.gate[open]           { animation: gateIn 0.4s var(--ease); }
+.gate[open]::backdrop { animation: fadeIn 0.3s ease; }
+.gate.closing           { animation: gateOut 0.25s ease forwards; }
+.gate.closing::backdrop { animation: fadeOut 0.25s ease forwards; }
+@keyframes gateIn  { from { opacity: 0; transform: translateY(14px) scale(0.96); } }
+@keyframes gateOut { to   { opacity: 0; transform: scale(0.94); } }
+
+.gate-body { padding: 30px 26px 24px; }
+.gate.fail .gate-body { animation: shake 0.45s ease; }
+@keyframes shake {
+  20% { transform: translateX(-9px); } 40% { transform: translateX(8px); }
+  60% { transform: translateX(-5px); } 80% { transform: translateX(3px); }
+}
+
+.gate-signal { position: relative; width: 88px; height: 88px; margin: 0 auto 16px; display: grid; place-items: center; }
+.gate-signal .ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 209, 0, 0.4);
+  opacity: 0;
+  animation: coverage 2.8s ease-out infinite;
+}
+.gate-signal .ring:nth-child(2) { animation-delay: 0.93s; }
+.gate-signal .ring:nth-child(3) { animation-delay: 1.86s; }
+.gate.ok .gate-signal .ring { border-color: rgba(255, 209, 0, 0.8); animation-duration: 1.2s; }
+
+.gate-bars { position: relative; display: flex; align-items: flex-end; gap: 4px; height: 30px; }
+.gate-bars i {
+  display: block;
+  width: 7px;
+  border-radius: 2px;
+  background: #96ECF0;
+  opacity: 0.18;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+.gate-bars i:nth-child(1) { height: 30%; }
+.gate-bars i:nth-child(2) { height: 55%; }
+.gate-bars i:nth-child(3) { height: 78%; }
+.gate-bars i:nth-child(4) { height: 100%; }
+/* "searching": a wave of opacity runs up the bars (opacity only, so it stays on the GPU) */
+.gate.connecting .gate-bars i { background: var(--aqua); animation: seek 0.7s ease-in-out infinite; }
+.gate.connecting .gate-bars i:nth-child(2) { animation-delay: 0.1s; }
+.gate.connecting .gate-bars i:nth-child(3) { animation-delay: 0.2s; }
+.gate.connecting .gate-bars i:nth-child(4) { animation-delay: 0.3s; }
+@keyframes seek { 40% { opacity: 1; } }
+.gate.ok .gate-bars i { background: var(--yellow); opacity: 1; }
+.gate.ok .gate-bars i:nth-child(2) { transition-delay: 0.07s; }
+.gate.ok .gate-bars i:nth-child(3) { transition-delay: 0.14s; }
+.gate.ok .gate-bars i:nth-child(4) { transition-delay: 0.21s; }
+.gate.fail .gate-bars i { background: #E5484D; opacity: 1; }
+
+.gate-label {
+  font: 600 0.7rem var(--mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--yellow);
+}
+.gate h2 {
+  margin-top: 8px;
+  font-family: var(--display);
+  font-weight: 800;
+  font-style: italic;
+  font-size: 1.55rem;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+.gate input {
+  width: 100%;
+  margin-top: 18px;
+  font: 600 1.05rem var(--mono);
+  letter-spacing: 0.22em;
+  text-align: center;
+  color: var(--text);
+  background: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 13px 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.gate input::placeholder { color: var(--faint); letter-spacing: 0.08em; }
+.gate input:focus { outline: none; border-color: var(--yellow); box-shadow: 0 0 0 3px rgba(255, 209, 0, 0.14); }
+.gate-msg { min-height: 1.4em; margin-top: 10px; font-size: 0.82rem; color: var(--dim); }
+.gate.fail .gate-msg { color: #F2777A; }
+.gate.ok .gate-msg { color: var(--yellow); }
+
+.gate-actions { display: flex; gap: 8px; margin-top: 12px; }
+.gate-actions button {
+  flex: 1;
+  font: 700 0.92rem var(--body);
+  border-radius: 7px;
+  padding: 11px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, scale 0.15s ease;
+}
+.gate-actions button:active { scale: 0.97; }
+.gate-cancel { color: var(--dim); background: none; border: 1px solid var(--line); }
+.gate-cancel:hover { color: var(--text); border-color: rgba(150, 236, 240, 0.3); }
+.gate-go { color: #000; background: var(--yellow); border: 1px solid var(--yellow); }
+.gate-go:hover { background: #FFDC3D; }
+.gate.connecting .gate-actions button { opacity: 0.55; pointer-events: none; }
+
+/* --- the hidden shelf ----------------------------------------------------- */
+.vault {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #040607;
+  color: var(--text);
+  overflow: hidden;
+}
+.vault[hidden] { display: none; }
+/* hazard tape along the top edge */
+.vault::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  z-index: 3;
+  background: repeating-linear-gradient(-45deg, var(--yellow) 0 10px, #0A0A0A 10px 20px);
+  opacity: 0.9;
+}
+/* slow radar sweep in the corner: painted once, then only rotated (GPU) */
+.vault-radar {
+  position: absolute;
+  width: 80vmax;
+  height: 80vmax;
+  top: -40vmax;
+  right: -40vmax;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    conic-gradient(from 0deg, transparent 0deg 290deg, rgba(255, 209, 0, 0.06) 340deg, rgba(255, 209, 0, 0.16) 360deg),
+    repeating-radial-gradient(circle, transparent 0 69px, rgba(255, 209, 0, 0.06) 70px 71px);
+  -webkit-mask-image: radial-gradient(circle, #000 15%, transparent 66%);
+          mask-image: radial-gradient(circle, #000 15%, transparent 66%);
+  animation: spin 9s linear infinite;
+  will-change: transform;
+}
+/* the burst of signal that blooms out from the gate as the vault opens */
+.vault-burst {
+  position: fixed;
+  z-index: 60;
+  width: 240px;
+  height: 240px;
+  margin: -120px 0 0 -120px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(255, 209, 0, 0.4), rgba(255, 209, 0, 0.12) 55%, transparent);
+}
+.vault-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: clamp(32px, 5vw, 60px) var(--pad) 56px;
+}
+.vault-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+.vault-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font: 600 0.72rem var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--yellow);
+}
+.vault-label .dot {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3DDC84;
+}
+/* beacon ring: grows and fades with transform + opacity only */
+.vault-label .dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #3DDC84;
+  animation: beacon 2s ease-out infinite;
+}
+@keyframes beacon {
+  0%   { transform: scale(1); opacity: 0.6; }
+  70%, 100% { transform: scale(3.2); opacity: 0; }
+}
+.vault-title {
+  margin-top: 10px;
+  font-family: var(--display);
+  font-weight: 800;
+  font-style: italic;
+  font-size: clamp(2.3rem, 6.5vw, 4rem);
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+  color: var(--yellow);
+  min-height: 0.95em;
+  text-shadow: 0 0 40px rgba(255, 209, 0, 0.18);
+}
+.vault-title:focus { outline: none; }
+.vault-sub { margin-top: 12px; color: var(--dim); font-size: 0.95rem; max-width: 60ch; }
+.vault-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 0.9rem var(--body);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.vault-lock:hover { color: var(--yellow); border-color: rgba(255, 209, 0, 0.45); background: rgba(255, 209, 0, 0.05); }
+.vault-lock svg { width: 15px; height: 15px; fill: currentColor; }
+
+.vault .card { --spot: rgba(255, 209, 0, 0.08); background: rgba(16, 26, 29, 0.85); }
+.vault .card:hover { border-color: rgba(255, 209, 0, 0.35); }
+.vault .tags li { color: var(--yellow); background: rgba(255, 209, 0, 0.07); border-color: rgba(255, 209, 0, 0.24); }
+.vault-empty { padding: 48px 0; color: var(--dim); text-align: center; }
+.vault-empty code { font-family: var(--mono); font-size: 0.85em; color: var(--text); }
+.vault-foot { margin-top: 36px; font-size: 0.78rem; color: var(--faint); }
 
 /* ============================================================================
    7. RESPONSIVE
@@ -1100,9 +1589,15 @@ footer {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
+  }
   html { scroll-behavior: auto; }
-  .thumb::before { background: #0A1214; }
+  .thumb::before, .vault-radar, .vault-label .dot::after { display: none; }
   .sync.working::before { opacity: 1; }
 }
 </style>
@@ -1110,13 +1605,14 @@ footer {
 <body>
 
 <header class="masthead">
-  <h1 class="wordmark">Optus <b>Games</b></h1>
+  <h1 class="wordmark" id="wordmark"><span class="w"><span class="t">Optus</span></span> <span class="w"><b class="t">Games</b></span></h1>
   <p class="shelf-note" id="shelf-note"></p>
 </header>
 
 <section class="hero" id="hero"></section>
 
-<div class="toolbar">
+<div class="toolbar-sentinel" id="toolbar-sentinel" aria-hidden="true"></div>
+<div class="toolbar" id="toolbar">
   <div class="search">
     <input id="search" type="search" placeholder="Search games, tags, people" autocomplete="off" aria-label="Search games">
     <kbd>/</kbd>
@@ -1158,6 +1654,44 @@ footer {
   endorsed by, or representing Singtel Optus Pty Ltd, and the games here parody other titles under fair dealing.
   All trademarks stay with their owners.
 </footer>
+
+<dialog class="gate" id="gate" aria-labelledby="gate-title">
+  <form class="gate-body" id="gate-form" autocomplete="off" novalidate>
+    <div class="gate-signal" aria-hidden="true">
+      <span class="ring"></span><span class="ring"></span><span class="ring"></span>
+      <span class="gate-bars"><i></i><i></i><i></i><i></i></span>
+    </div>
+    <p class="gate-label">Restricted network</p>
+    <h2 id="gate-title">Enter access code</h2>
+    <input id="gate-code" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"
+           placeholder="access code" aria-label="Access code" aria-describedby="gate-msg" autofocus>
+    <p class="gate-msg" id="gate-msg" aria-live="polite"></p>
+    <div class="gate-actions">
+      <button type="button" class="gate-cancel" id="gate-cancel">Cancel</button>
+      <button type="submit" class="gate-go">Connect</button>
+    </div>
+  </form>
+</dialog>
+
+<section class="vault" id="vault" hidden aria-labelledby="vault-title">
+  <div class="vault-radar" aria-hidden="true"></div>
+  <div class="vault-scroll">
+    <header class="vault-head">
+      <div>
+        <p class="vault-label"><span class="dot"></span> Restricted network &middot; connected</p>
+        <h2 class="vault-title" id="vault-title" tabindex="-1"></h2>
+        <p class="vault-sub" id="vault-sub"></p>
+      </div>
+      <button type="button" class="vault-lock" id="vault-lock">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2h.5A1.5 1.5 0 0 1 13.5 8.5v5A1.5 1.5 0 0 1 12 15H4a1.5 1.5 0 0 1-1.5-1.5v-5A1.5 1.5 0 0 1 4 7h.5Zm1.75 0h3.5V5a1.75 1.75 0 0 0-3.5 0v2Z"/></svg>
+        Lock &amp; leave
+      </button>
+    </header>
+    <div class="library grid" id="vault-library"></div>
+    <p class="vault-empty" id="vault-empty" hidden></p>
+    <p class="vault-foot">Not listed anywhere on the public shelf. Lock it before you hand the device to someone else.</p>
+  </div>
+</section>
 
 <script>
 /* ============================================================================
@@ -1249,10 +1783,24 @@ const noteEl    = document.getElementById("shelf-note");
 const sortEl    = document.getElementById("sort");
 const syncEl    = document.getElementById("sync");
 
+/* ---- motion helpers ------------------------------------------------------ */
+/* Every scripted animation goes through anim(), which does nothing for people
+   who've asked their OS for reduced motion (the CSS side handles itself). */
+const EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+const motionPref = window.matchMedia ? matchMedia("(prefers-reduced-motion: reduce)") : { matches: false };
+const motionOK = () => !motionPref.matches && typeof Element.prototype.animate === "function";
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+function anim(el, frames, opts) {
+  return motionOK() ? el.animate(frames, Object.assign({ easing: EASE }, opts)) : null;
+}
+
 /* Each game keeps a reference to its DOM node and a prebuilt search string, so
    filtering only toggles a class. The cards are never rebuilt, which means the
-   browser never re-fetches or re-decodes a thumbnail while you type. */
-const entries = GAMES.map(g => {
+   browser never re-fetches or re-decodes a thumbnail while you type.
+   Vault-tagged games never get an entry, so they can't leak into the count,
+   search, tag chips or "Latest". */
+const entries = PUBLIC_GAMES.map(g => {
   const d = parseDate(g.releaseDate);
   return {
     game: g,
@@ -1283,11 +1831,38 @@ function markReady(img) {
   img.parentElement.classList.add("done");
 }
 
+/* Every image tries the small WebP copy first, then the full-size original,
+   then the placeholder. The first time a small copy 404s we assume the deploy
+   workflow hasn't made them yet and every later image skips straight to the
+   original, so there's never a pile of failed requests. */
+let thumbMode = "";   // "" = not sure yet, "ok" = small copies exist, "missing" = they don't
+
+function loadInto(img, path, size, onReady) {
+  const small = thumbSrc(path, size);
+  const first = small !== path && thumbMode !== "missing" ? small : path;
+  const done = () => { img.onload = img.onerror = null; onReady(); };
+
+  img.onload = () => {
+    if (first === small && img.getAttribute("src") === small) thumbMode = "ok";
+    done();
+  };
+  img.onerror = () => {
+    if (img.getAttribute("src") === small && small !== path) {
+      if (thumbMode !== "ok") thumbMode = "missing";
+      img.src = path;              // full-size original
+      return;
+    }
+    img.src = FALLBACK;
+    done();
+  };
+  img.src = first || FALLBACK;
+  if (img.complete && img.naturalWidth) img.onload();
+}
+
 function loadImage(img) {
   if (img.dataset.started) return;
   img.dataset.started = "1";
-  img.src = img.dataset.src;
-  if (img.complete) markReady(img);
+  loadInto(img, img.dataset.path, "sm", () => markReady(img));
 }
 
 function makeThumb(game, eager) {
@@ -1301,17 +1876,18 @@ function makeThumb(game, eager) {
   img.decoding = "async";
   img.loading = eager ? "eager" : "lazy";
   if (eager) img.fetchPriority = "high";
-  img.dataset.src = game.image;
-
-  img.addEventListener("load", () => markReady(img), { once: true });
-  img.addEventListener("error", () => { img.src = FALLBACK; markReady(img); }, { once: true });
+  img.dataset.path = game.image || "";
 
   wrap.appendChild(img);
   if (eager || !io) loadImage(img); else io.observe(img);
   return wrap;
 }
 
+/* Once the page is idle, quietly fetch the rest of the small thumbnails so
+   scrolling never waits. Skipped while only full-size originals are available:
+   pre-fetching those would pull 100+ MB over the shop wifi. */
 function warmRemaining() {
+  if (thumbMode !== "ok") return;
   const pending = [...libraryEl.querySelectorAll("img:not([data-started])")];
   let i = 0;
   (function next() {
@@ -1320,13 +1896,13 @@ function warmRemaining() {
     const warm = new Image();
     if ("fetchPriority" in warm) warm.fetchPriority = "low";
     warm.onload = warm.onerror = () => setTimeout(next, 40);
-    warm.src = img.dataset.src;
+    warm.src = thumbSrc(img.dataset.path, "sm");
   })();
 }
 
 /* ---- hero ---------------------------------------------------------------- */
 function renderHero() {
-  const g = GAMES.find(x => x.title === FEATURED_GAME_TITLE) || GAMES[0];
+  const g = PUBLIC_GAMES.find(x => x.title === FEATURED_GAME_TITLE) || PUBLIC_GAMES[0];
   if (!g) return;
   const who = splitCreator(g.creator);
 
@@ -1347,18 +1923,37 @@ function renderHero() {
   card.querySelector(".lead").textContent = g.description || "No notes yet. Go in blind.";
   card.querySelector(".hero-meta").textContent =
     [prettyDate(g.releaseDate), g.version, who.people && "by " + who.people].filter(Boolean).join("  ·  ");
-  card.querySelector(".play").href = g.url;
+  const play = card.querySelector(".play");
+  play.href = g.url;
+  play.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.3 2.3 15 8l-5.7 5.7-1.4-1.4L11.2 9H1V7h10.2L7.9 3.7z"/></svg>');
 
   const art = card.querySelector(".hero-art");
   const img = document.createElement("img");
   img.alt = "";
   img.decoding = "async";
   img.fetchPriority = "high";
-  img.addEventListener("load", () => img.classList.add("ready"), { once: true });
-  img.addEventListener("error", () => { img.src = FALLBACK; img.classList.add("ready"); }, { once: true });
-  img.src = g.image;
-  if (img.complete) img.classList.add("ready");
+  loadInto(img, g.image, "lg", () => img.classList.add("ready"));
   art.appendChild(img);
+
+  // gentle parallax on the art while the pointer is over the card (one update per frame, max)
+  let px = 0, py = 0, parallaxRaf = 0;
+  card.addEventListener("pointermove", e => {
+    if (e.pointerType !== "mouse" || !motionOK()) return;
+    px = e.clientX; py = e.clientY;
+    if (parallaxRaf) return;
+    parallaxRaf = requestAnimationFrame(() => {
+      parallaxRaf = 0;
+      const r = card.getBoundingClientRect();
+      const nx = (px - r.left) / r.width - 0.5;
+      const ny = (py - r.top) / r.height - 0.5;
+      img.style.translate = (-nx * 16).toFixed(1) + "px " + (-ny * 10).toFixed(1) + "px";
+    });
+  }, { passive: true });
+  card.addEventListener("pointerleave", () => {
+    cancelAnimationFrame(parallaxRaf);
+    parallaxRaf = 0;
+    img.style.translate = "";
+  });
 
   heroEl.appendChild(card);
 }
@@ -1378,7 +1973,9 @@ function buildCard(entry, index) {
   link.rel = "noopener";
   link.setAttribute("aria-label", "Play " + g.title);
 
-  link.appendChild(makeThumb(g, index < 4));
+  const thumb = makeThumb(g, index < 4);
+  thumb.insertAdjacentHTML("beforeend", '<span class="play-badge" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M3 1.8v12.4L14 8z"/></svg></span>');
+  link.appendChild(thumb);
 
   const body = document.createElement("div");
   body.className = "card-body";
@@ -1397,6 +1994,7 @@ function buildCard(entry, index) {
   const ul = document.createElement("ul");
   ul.className = "tags";
   (g.tags || []).forEach(t => {
+    if (String(t).toLowerCase() === "vault") return;   // a switch, not a label
     const li = document.createElement("li");
     li.textContent = t;
     ul.appendChild(li);
@@ -1424,8 +2022,97 @@ function buildCard(entry, index) {
 
 function buildLibrary() {
   const frag = document.createDocumentFragment();
-  sorted().forEach((e, i) => frag.appendChild(buildCard(e, i)));
+  sorted().forEach((e, i) => {
+    const card = buildCard(e, i);
+    if (revealIO) { card.classList.add("pre"); revealIO.observe(card); }
+    frag.appendChild(card);
+  });
   libraryEl.appendChild(frag);
+}
+
+/* ---- scroll reveal ------------------------------------------------------- */
+/* Cards rise into place the first time they scroll into view. Each batch is
+   staggered top-to-bottom, left-to-right so a grid fills in like a wave. */
+const revealIO = "IntersectionObserver" in window && motionOK()
+  ? new IntersectionObserver(items => {
+      items
+        .filter(it => it.isIntersecting)
+        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top ||
+                        a.boundingClientRect.left - b.boundingClientRect.left)
+        .forEach((it, i) => reveal(it.target, Math.min(i, 8) * 45));
+    }, { rootMargin: "0px 0px -4% 0px" })
+  : null;
+
+/* Every scripted card animation only touches transform and opacity, which the
+   browser hands to the GPU, so they stay smooth even while images decode. */
+function reveal(card, delay) {
+  if (revealIO) revealIO.unobserve(card);
+  card.classList.remove("pre");
+  anim(card, [{ opacity: 0, transform: "translateY(16px)" }, { opacity: 1, transform: "none" }],
+       { duration: 500, delay: delay || 0, fill: "backwards" });
+}
+
+/* ---- FLIP: glide cards to their new spots on sort / filter --------------- */
+/* Measure where every visible card is, make the change, then animate each one
+   from its old spot to its new one. Cards that just appeared fade up instead.
+   Only cards near the viewport animate; everything else just snaps.
+   Reads and writes are done in separate passes so layout is only worked out
+   once, not once per card. */
+let libraryLive = false;   // the first sort happens before first paint and shouldn't animate
+
+function flip(mutate) {
+  if (!motionOK() || !libraryLive) { mutate(); return; }
+  const vh = window.innerHeight;
+  const near = r => r.bottom > -80 && r.top < vh + 80;
+  const visible = () => entries.filter(e => !e.node.classList.contains("is-hidden")).map(e => e.node);
+
+  // read: where everything is right now (including any glide still in flight)
+  const before = new Map();
+  visible().forEach(n => before.set(n, n.getBoundingClientRect()));
+
+  mutate();
+
+  // write: stop old glides so the next read gets real resting spots
+  const nodes = visible();
+  nodes.forEach(n => n.getAnimations().forEach(a => a.cancel()));
+
+  // read: new spots
+  const after = nodes.map(n => n.getBoundingClientRect());
+
+  // write: start the animations
+  let k = 0;
+  nodes.forEach((n, i) => {
+    const r = after[i];
+    if (!near(r)) return;
+    const b = before.get(n);
+    if (b && near(b) && !n.classList.contains("pre")) {
+      const dx = b.left - r.left, dy = b.top - r.top;
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+        anim(n, [{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }], { duration: 380 });
+      }
+    } else {
+      if (revealIO) revealIO.unobserve(n);
+      n.classList.remove("pre");
+      anim(n, [{ opacity: 0, transform: "scale(0.96)" }, { opacity: 1, transform: "none" }],
+           { duration: 340, delay: Math.min(k++, 10) * 22, fill: "backwards" });
+    }
+  });
+}
+
+/* list <-> grid: the visible cards re-deal themselves in a quick cascade */
+function cascade() {
+  const vh = window.innerHeight;
+  const nodes = [...libraryEl.children].filter(n => !n.classList.contains("is-hidden"));
+  nodes.forEach(n => n.getAnimations().forEach(a => a.cancel()));
+  const rects = nodes.map(n => n.getBoundingClientRect());
+  let k = 0;
+  nodes.forEach((n, i) => {
+    if (rects[i].bottom < 0 || rects[i].top > vh) return;
+    if (revealIO) revealIO.unobserve(n);
+    n.classList.remove("pre");
+    anim(n, [{ opacity: 0, transform: "translateY(10px) scale(0.98)" }, { opacity: 1, transform: "none" }],
+         { duration: 380, delay: Math.min(k++, 12) * 20, fill: "backwards" });
+  });
 }
 
 function sorted() {
@@ -1464,7 +2151,7 @@ function applyFilters() {
 
 /* ---- chips --------------------------------------------------------------- */
 function buildChips() {
-  const tags = ["All", ...[...new Set(GAMES.flatMap(g => g.tags || []))].sort()];
+  const tags = ["All", ...[...new Set(PUBLIC_GAMES.flatMap(g => g.tags || []))].sort()];
   tags.forEach(tag => {
     const b = document.createElement("button");
     b.className = "chip";
@@ -1474,7 +2161,7 @@ function buildChips() {
     b.addEventListener("click", () => {
       activeTag = tag;
       [...chipsEl.children].forEach(c => c.setAttribute("aria-pressed", String(c === b)));
-      applyFilters();
+      flip(applyFilters);
     });
     chipsEl.appendChild(b);
   });
@@ -1484,12 +2171,44 @@ function buildChips() {
 function renderNote() {
   const latest = entries.reduce((a, b) => (b.time > a.time ? b : a));
   noteEl.innerHTML = "";
-  noteEl.append(
-    document.createTextNode(GAMES.length + " games on the shelf. Latest: ")
-  );
+  const num = document.createElement("span");
+  num.textContent = entries.length;
+  noteEl.append(num, document.createTextNode(" games on the shelf. Latest: "));
   const strong = document.createElement("strong");
   strong.textContent = latest.game.title;
   noteEl.append(strong, document.createTextNode(", " + prettyDate(latest.game.releaseDate) + "."));
+  countUp(num, entries.length, 250, 800);
+}
+
+/* ticks a number up from zero, easing out as it lands */
+function countUp(el, to, delay, duration) {
+  if (!motionOK() || document.hidden) return;   // opened in a background tab: just show the number
+  el.textContent = "0";
+  setTimeout(() => {
+    const start = performance.now();
+    (function frame(now) {
+      const p = Math.min(1, (now - start) / duration);
+      el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) requestAnimationFrame(frame);
+    })(start);
+  }, delay);
+}
+
+/* letters cycle through noise before settling, like a signal locking on */
+function scramble(el, text, duration) {
+  if (!motionOK()) { el.textContent = text; return; }
+  const glyphs = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%&/<>";
+  const start = performance.now();
+  (function frame(now) {
+    const p = Math.min(1, (now - start) / duration);
+    const settled = Math.floor(p * text.length);
+    let out = text.slice(0, settled);
+    for (let i = settled; i < text.length; i++) {
+      out += text[i] === " " ? " " : glyphs[(Math.random() * glyphs.length) | 0];
+    }
+    el.textContent = out;
+    if (p < 1) requestAnimationFrame(frame);
+  })(start);
 }
 
 /* ============================================================================
@@ -1634,7 +2353,7 @@ function paintEntry(entry, info) {
 function paintHero(files) {
   const el = document.getElementById("hero-updated");
   if (!el) return;
-  const g = GAMES.find(x => x.title === FEATURED_GAME_TITLE) || GAMES[0];
+  const g = PUBLIC_GAMES.find(x => x.title === FEATURED_GAME_TITLE) || PUBLIC_GAMES[0];
   const info = g && files[repoPath(g.url)];
   const ms = Date.parse(info && info.date);
   if (!ms) return;
@@ -1676,8 +2395,9 @@ function applyUpdates(files) {
     hits++;
   });
   paintHero(files);
+  paintVault(files);
 
-  if (moved && sortMode === "upd") reorder();
+  if (moved && sortMode === "upd") flip(reorder);
   return hits;
 }
 
@@ -1744,34 +2464,365 @@ let raf = 0;
 searchEl.addEventListener("input", e => {
   query = e.target.value;
   cancelAnimationFrame(raf);
-  raf = requestAnimationFrame(applyFilters);
+  raf = requestAnimationFrame(() => flip(applyFilters));
 });
 
-sortEl.addEventListener("change", e => { sortMode = e.target.value; reorder(); });
+sortEl.addEventListener("change", e => { sortMode = e.target.value; flip(reorder); });
 
 document.getElementById("reset").addEventListener("click", () => {
   query = ""; activeTag = "All"; searchEl.value = "";
   [...chipsEl.children].forEach((c, i) => c.setAttribute("aria-pressed", String(i === 0)));
-  applyFilters();
+  flip(applyFilters);
   searchEl.focus();
 });
 
 const listBtn = document.getElementById("view-list");
 const gridBtn = document.getElementById("view-grid");
 function setView(grid) {
+  if (libraryEl.classList.contains("grid") === grid) return;
   libraryEl.classList.toggle("grid", grid);
   gridBtn.setAttribute("aria-pressed", String(grid));
   listBtn.setAttribute("aria-pressed", String(!grid));
+  cascade();
 }
 listBtn.addEventListener("click", () => setView(false));
 gridBtn.addEventListener("click", () => setView(true));
 
 document.addEventListener("keydown", e => {
+  if (gate.open) return;                                   // the dialog handles its own keys
+  if (!vaultEl.hidden) { if (e.key === "Escape") closeVault(); return; }
   if (e.key === "/" && document.activeElement !== searchEl) { e.preventDefault(); searchEl.focus(); }
   if (e.key === "Escape" && document.activeElement === searchEl) {
-    searchEl.value = ""; query = ""; applyFilters(); searchEl.blur();
+    searchEl.value = ""; query = ""; flip(applyFilters); searchEl.blur();
   }
+  konami(e);
 });
+
+/* ---- small touches -------------------------------------------------------- */
+// cursor spotlight: one shared element, dropped into whichever card is under
+// the mouse and slid around with a transform. At most one update per frame.
+const spot = document.createElement("span");
+spot.className = "spot";
+spot.setAttribute("aria-hidden", "true");
+let spotRaf = 0, spotX = 0, spotY = 0, spotCard = null;
+document.addEventListener("pointermove", e => {
+  if (e.pointerType !== "mouse") return;
+  spotX = e.clientX;
+  spotY = e.clientY;
+  spotCard = e.target.closest ? e.target.closest(".card") : null;
+  if (spotRaf || !spotCard) return;
+  spotRaf = requestAnimationFrame(() => {
+    spotRaf = 0;
+    if (!spotCard) return;
+    if (spot.parentNode !== spotCard) spotCard.appendChild(spot);
+    const r = spotCard.getBoundingClientRect();
+    spot.style.transform = "translate(" + (spotX - r.left) + "px," + (spotY - r.top) + "px)";
+  });
+}, { passive: true });
+
+if ("IntersectionObserver" in window) {
+  // toolbar picks up a shadow once it's pinned to the top
+  const toolbarEl = document.getElementById("toolbar");
+  new IntersectionObserver(([it]) => {
+    toolbarEl.classList.toggle("stuck", !it.isIntersecting && it.boundingClientRect.top < 0);
+  }).observe(document.getElementById("toolbar-sentinel"));
+
+  // the hero's looping signal bars rest while you're scrolled down the list
+  new IntersectionObserver(([it]) => heroEl.classList.toggle("off", !it.isIntersecting)).observe(heroEl);
+}
+
+// wordmark glint: once after the intro, then again whenever it's hovered
+const wordmarkEl = document.getElementById("wordmark");
+function shineWordmark() {
+  if (!motionOK() || wordmarkEl.classList.contains("shining")) return;
+  wordmarkEl.classList.add("shining");
+  wait(1500).then(() => wordmarkEl.classList.remove("shining"));
+}
+wordmarkEl.addEventListener("pointerenter", shineWordmark);
+setTimeout(shineWordmark, 1100);
+
+/* ============================================================================
+   10. VAULT
+   ============================================================================
+   The live page holds no codes and no file names, and once deployed no
+   secret games either (the workflow moves "Vault"-tagged games into the vault
+   files). A code is hashed in the browser and the hash *is* the file name, so
+   the only way to find a vault on the live site is to know its code. (Anyone
+   browsing a public GitHub repo can still see the files, so treat this as
+   "off the shelf", not "locked in a safe".)
+   ========================================================================== */
+const VAULT_KEY  = "optusgames:vault";   // sessionStorage: which vault this tab has open
+const gate       = document.getElementById("gate");
+const gateForm   = document.getElementById("gate-form");
+const gateInput  = document.getElementById("gate-code");
+const gateTitle  = document.getElementById("gate-title");
+const gateMsg    = document.getElementById("gate-msg");
+const vaultEl    = document.getElementById("vault");
+const vaultScrollEl = vaultEl.querySelector(".vault-scroll");
+const vaultLib   = document.getElementById("vault-library");
+const vaultTitle = document.getElementById("vault-title");
+const vaultSub   = document.getElementById("vault-sub");
+const vaultEmpty = document.getElementById("vault-empty");
+const vaultLock  = document.getElementById("vault-lock");
+
+let vaultEntries = [];
+let vaultUpdates = {};   // last-updated times the deploy workflow writes into the vault file
+let gateBusy = false;
+let vaultClosing = false;
+
+function sessionGet() { try { return sessionStorage.getItem(VAULT_KEY); } catch (e) { return null; } }
+function sessionSet(v) { try { v ? sessionStorage.setItem(VAULT_KEY, v) : sessionStorage.removeItem(VAULT_KEY); } catch (e) {} }
+
+async function vaultPath(code) {
+  // only letters and digits count, so "Ollie After Dark" = "ollie-after-dark"
+  const norm = String(code).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+  if (!norm) return null;
+  const bytes = new TextEncoder().encode("optusgames-vault:" + norm);
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  const hex = [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, "0")).join("");
+  return VAULT_DIR.replace(/\/+$/, "") + "/" + hex.slice(0, 32) + ".json";
+}
+
+async function fetchVault(path) {
+  const res = await fetch(path + "?t=" + Date.now(), { cache: "no-store", signal: timeout(10000) });
+  if (res.status === 404) return { missing: true, path: path };
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const json = await res.json();                     // a typo in the file throws SyntaxError
+  const games = Array.isArray(json) ? json : json && Array.isArray(json.games) ? json.games : null;
+  if (!games) throw new SyntaxError("no games array");
+  const obj = Array.isArray(json) ? {} : json;
+  return { path: path, name: obj.name || "The Vault", note: obj.note || "", games: games, updates: obj.updates || {} };
+}
+
+function paintVault(files) {
+  vaultEntries.forEach(e => {
+    const p = repoPath(e.game.url);
+    const info = (files && files[p]) || vaultUpdates[p];
+    if (info) paintEntry(e, info);
+  });
+}
+
+/* ---- the secret knocks --------------------------------------------------- */
+const KONAMI = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "b", "a"];
+let konamiAt = 0;
+function konami(e) {
+  if (e.target.closest && e.target.closest("input, textarea, select")) { konamiAt = 0; return; }
+  const k = e.key && e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  konamiAt = k === KONAMI[konamiAt] ? konamiAt + 1 : (k === KONAMI[0] ? 1 : 0);
+  if (konamiAt === KONAMI.length) {
+    konamiAt = 0;
+    e.preventDefault();          // otherwise the final "a" lands in the code box
+    enterVault();
+  }
+}
+
+let taps = [];
+wordmarkEl.addEventListener("click", () => {
+  const now = Date.now();
+  taps = taps.filter(t => now - t < 1800);
+  taps.push(now);
+  if (taps.length >= 5) { taps = []; enterVault(); }
+});
+
+async function enterVault() {
+  if (gate.open || !vaultEl.hidden) return;
+  const saved = sessionGet();
+  if (saved) {
+    const data = await fetchVault(saved).catch(() => null);
+    if (data && !data.missing) { openVault(data, null); return; }
+    sessionSet(null);
+  }
+  openGate();
+}
+
+/* ---- gate ---------------------------------------------------------------- */
+function setGate(state, msg) {
+  gate.classList.remove("connecting", "ok", "fail");
+  if (state) {
+    void gate.offsetWidth;           // restart the shake if it fails twice in a row
+    gate.classList.add(state);
+  }
+  gateMsg.textContent = msg || "";
+}
+
+function openGate() {
+  setGate("", "");
+  gateTitle.textContent = "Enter access code";
+  gateInput.value = "";
+  gateInput.readOnly = false;
+  gate.classList.remove("closing");
+  gate.showModal();
+  gateInput.focus();
+}
+
+function closeGate() {
+  if (!gate.open || gate.classList.contains("closing")) return Promise.resolve();
+  if (!motionOK()) { gate.close(); return Promise.resolve(); }
+  gate.classList.add("closing");
+  return wait(250).then(() => { gate.close(); gate.classList.remove("closing"); });
+}
+
+gate.addEventListener("cancel", e => { e.preventDefault(); if (!gateBusy) closeGate(); });
+document.getElementById("gate-cancel").addEventListener("click", () => { if (!gateBusy) closeGate(); });
+gate.addEventListener("click", e => {            // click on the dimmed backdrop
+  if (e.target !== gate || gateBusy) return;
+  const r = gate.getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closeGate();
+});
+gateInput.addEventListener("input", () => { if (gate.classList.contains("fail")) setGate("", ""); });
+
+gateForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  const code = gateInput.value;
+  if (gateBusy || !code.trim()) { gateInput.focus(); return; }
+
+  gateBusy = true;
+  gateInput.readOnly = true;
+  setGate("connecting", "Connecting…");
+
+  let result;
+  try {
+    const path = await vaultPath(code);
+    // a short minimum so the "searching" moment reads, and guessing is slow
+    [result] = await Promise.all([
+      path ? fetchVault(path).catch(err => ({ error: err, path: path })) : { missing: true, path: "" },
+      wait(motionOK() ? 550 : 300)
+    ]);
+  } catch (err) {
+    result = { error: err };   // no crypto.subtle: the page isn't on https or localhost
+  }
+
+  gateBusy = false;
+  gateInput.readOnly = false;
+
+  if (result.missing) {
+    if (result.path) console.info("[vault] No vault for that code. To create one, add the file:  " + result.path);
+    setGate("fail", "No signal for that code.");
+    gateInput.select();
+    return;
+  }
+  if (result.error) {
+    setGate("fail", result.error.name === "SyntaxError"
+      ? "Found it, but that vault file has a typo (invalid JSON)."
+      : !window.crypto || !crypto.subtle
+        ? "The vault only works on the live https site."
+        : "Couldn't connect. Try again in a sec.");
+    gateInput.select();
+    return;
+  }
+
+  setGate("ok", "Connected");
+  scramble(gateTitle, "Access granted", 380);
+  sessionSet(result.path);
+  await wait(motionOK() ? 450 : 0);
+
+  const r = gate.getBoundingClientRect();
+  openVault(result, { x: r.left + r.width / 2, y: r.top + r.height / 2 });
+  // the modal keeps focus until it's gone, so hand it to the vault afterwards
+  closeGate().then(() => { if (!vaultEl.hidden) vaultTitle.focus({ preventScroll: true }); });
+});
+
+/* ---- the vault page ------------------------------------------------------ */
+function lockPage(on) {
+  [...document.body.children].forEach(el => {
+    if (el !== vaultEl && el !== gate && el.tagName !== "SCRIPT") el.inert = on;
+  });
+  const root = document.documentElement;
+  if (on) {
+    // swap the page scrollbar for padding so nothing jumps underneath
+    root.style.paddingRight = (window.innerWidth - root.clientWidth) + "px";
+    root.classList.add("locked");
+  } else {
+    root.classList.remove("locked");
+    root.style.paddingRight = "";
+  }
+}
+
+function openVault(data, origin) {
+  vaultClosing = false;
+  vaultUpdates = data.updates || {};
+
+  // Vault-tagged games from this page, plus anything this code's file adds.
+  // (On the live site the deploy has already moved the tagged ones into the
+  // file, so the same game can arrive twice. Keep the first.)
+  const seen = new Set();
+  const games = GAMES.filter(isVault).concat(data.games).filter(g => {
+    const key = repoPath(g.url) || g.title;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  vaultEntries = games.map(g => {
+    const d = parseDate(g.releaseDate);
+    return { game: g, time: d ? d.time : -Infinity, updated: 0, node: null };
+  }).sort((a, b) => b.time - a.time);
+
+  vaultLib.replaceChildren(...vaultEntries.map(e => buildCard(e, 0)));
+  paintVault(shownFiles);
+
+  const n = vaultEntries.length;
+  vaultSub.textContent = (n === 1 ? "1 game" : n + " games") + (data.note ? "  ·  " + data.note : " off the public shelf.");
+  vaultEmpty.hidden = n > 0;
+  if (!n) {
+    vaultEmpty.innerHTML = 'Nothing in here yet. Add <code>"Vault"</code> to a game\'s tags in index.html, or list games in <code></code>.';
+    vaultEmpty.querySelectorAll("code")[1].textContent = data.path;
+  }
+
+  lockPage(true);
+  vaultEl.hidden = false;
+  vaultScrollEl.scrollTop = 0;
+  vaultTitle.textContent = "";
+  vaultTitle.focus({ preventScroll: true });
+
+  // Everything here is opacity + transform only, so the whole open runs on the GPU.
+  if (origin && motionOK()) {
+    // a soft burst of signal blooms out from where the gate was
+    const burst = document.createElement("span");
+    burst.className = "vault-burst";
+    burst.style.left = origin.x + "px";
+    burst.style.top = origin.y + "px";
+    document.body.appendChild(burst);
+    const reach = Math.hypot(Math.max(origin.x, innerWidth - origin.x), Math.max(origin.y, innerHeight - origin.y)) / 100;
+    const a = burst.animate([{ transform: "scale(0.3)", opacity: 1 }, { transform: "scale(" + reach.toFixed(2) + ")", opacity: 0 }],
+                            { duration: 700, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)", fill: "forwards" });
+    Promise.race([a.finished, wait(900)]).then(() => burst.remove(), () => burst.remove());
+  }
+  anim(vaultEl, [{ opacity: 0, transform: "scale(1.02)" }, { opacity: 1, transform: "none" }], { duration: origin ? 420 : 280 });
+
+  const lead = origin ? 120 : 60;
+  vaultEl.querySelectorAll(".vault-label, .vault-sub, .vault-lock").forEach((el, i) => {
+    anim(el, [{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }],
+         { duration: 450, delay: lead + i * 60, fill: "backwards" });
+  });
+  [...vaultLib.children].forEach((card, i) => {
+    anim(card, [{ opacity: 0, transform: "translateY(20px)" }, { opacity: 1, transform: "none" }],
+         { duration: 500, delay: lead + 120 + Math.min(i, 10) * 50, fill: "backwards" });
+  });
+  setTimeout(() => scramble(vaultTitle, data.name, 650), motionOK() ? lead : 0);
+}
+
+function closeVault() {
+  if (vaultEl.hidden || vaultClosing) return;
+  vaultClosing = true;
+  sessionSet(null);
+
+  const done = () => {
+    vaultEl.hidden = true;
+    vaultEl.getAnimations().forEach(a => a.cancel());
+    vaultLib.replaceChildren();                 // don't leave the secret list sitting in the DOM
+    vaultEntries = [];
+    vaultUpdates = {};
+    lockPage(false);
+    vaultClosing = false;
+  };
+
+  const a = anim(vaultEl, [{ opacity: 1, transform: "none" }, { opacity: 0, transform: "scale(0.985)" }],
+                 { duration: 240, easing: "ease-in", fill: "forwards" });
+  // the timer is a backstop in case the browser pauses animations (e.g. tab in the background)
+  a ? Promise.race([a.finished, wait(400)]).then(done, done) : done();
+}
+
+vaultLock.addEventListener("click", closeVault);
 
 /* ---- go ------------------------------------------------------------------ */
 renderHero();
@@ -1779,6 +2830,14 @@ renderNote();
 buildChips();
 buildLibrary();
 applyFilters();
+requestAnimationFrame(() => { libraryLive = true; });
+
+// reopen the vault if this tab had it open before a refresh
+if (sessionGet()) {
+  fetchVault(sessionGet())
+    .then(data => { if (data.missing) sessionSet(null); else openVault(data, null); })
+    .catch(() => {});
+}
 
 window.addEventListener("load", () => {
   const idle = window.requestIdleCallback || (fn => setTimeout(fn, 600));
