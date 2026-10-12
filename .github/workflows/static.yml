@@ -6,10 +6,7 @@
 #   1. Small WebP copies of every thumbnail (thumbs/sm, thumbs/lg). The page
 #      loads these instead of the multi-MB originals, which is most of what
 #      makes it fast. Keep uploading full-size images as normal.
-#   2. The vault: games tagged "Vault" in index.html are cut out of the
-#      published page and copied into every vault/*.json file, so they're not
-#      in the live page source.
-#   3. updates.json, the "last updated" manifest, minus any vault game.
+#   2. updates.json, the "last updated" manifest.
 #
 # This used to be two workflows. The manifest one committed updates.json back
 # to the repo, but GitHub never starts a workflow from a push made with the
@@ -91,15 +88,12 @@ jobs:
           print(f"Made small copies of {made} thumbnails.")
           EOF
 
-      - name: Build vault + updates.json
+      - name: Generate updates.json
         run: |
           node <<'EOF'
           const { execSync } = require("node:child_process");
           const fs = require("node:fs");
-          const path = require("node:path");
-          const vm = require("node:vm");
 
-          // ---- last commit for every game page --------------------------------
           // Every file the hub can link to. Widen the regex if you add folders.
           const tracked = execSync("git ls-files", { encoding: "utf8" })
             .split("\n")
@@ -116,72 +110,15 @@ jobs:
             files[f] = { date, sha, message };
           }
 
-          // ---- vault -----------------------------------------------------------
-          // Games tagged "Vault" come out of the published index.html and go into
-          // every vault/*.json, along with their "last updated" info. Any game in
-          // a vault (tagged or listed in a vault file) is left out of updates.json.
-          const repoPath = url => String(url || "").replace(/^\.?\//, "");
-          const isVault = g => (g.tags || []).some(t => String(t).toLowerCase() === "vault");
-          const vaultFiles = fs.existsSync("vault")
-            ? fs.readdirSync("vault").filter(f => /^[0-9a-f]{32}\.json$/.test(f)).map(f => path.join("vault", f))
-            : [];
-          const hidden = new Set();
-
-          try {
-            const html = fs.readFileSync("index.html", "utf8");
-            const m = html.match(/const\s+GAMES\s*=\s*(\[[\s\S]*?\r?\n\]);/);
-            if (!m) throw new Error("couldn't find `const GAMES = [ ... ];` in index.html");
-            const games = vm.runInNewContext("(" + m[1] + ")", {}, { timeout: 2000 });
-            if (!Array.isArray(games)) throw new Error("GAMES isn't a list");
-
-            const tagged = games.filter(isVault);
-            if (tagged.length && !vaultFiles.length) {
-              throw new Error(tagged.length + " game(s) are tagged Vault but there's no vault/*.json file to put them in");
-            }
-
-            // read every vault file first, so one typo can't leave things half-done
-            const vaults = vaultFiles.map(vf => {
-              try { return { vf, data: JSON.parse(fs.readFileSync(vf, "utf8")) }; }
-              catch (e) { throw new Error(vf + " isn't valid JSON (" + e.message + ")"); }
-            });
-
-            for (const { vf, data } of vaults) {
-              const own = Array.isArray(data) ? data : (Array.isArray(data.games) ? data.games : []);
-              const seen = new Set(own.map(g => repoPath(g.url)));
-              const merged = own.concat(tagged.filter(g => !seen.has(repoPath(g.url))));
-              const updates = {};
-              for (const g of merged) {
-                const p = repoPath(g.url);
-                hidden.add(p);
-                if (files[p]) updates[p] = files[p];
-              }
-              const out = Object.assign({}, Array.isArray(data) ? {} : data, { games: merged, updates });
-              fs.writeFileSync(vf, JSON.stringify(out, null, 2) + "\n");
-            }
-
-            if (tagged.length) {
-              const pub = games.filter(g => !isVault(g));
-              fs.writeFileSync("index.html",
-                html.replace(m[0], () => "const GAMES = " + JSON.stringify(pub, null, 2) + ";"));
-            }
-            console.log(`Vault: ${tagged.length} tagged game(s) moved into ${vaultFiles.length} vault file(s).`);
-          } catch (e) {
-            // Never block a deploy over this. The page still hides tagged games
-            // from the shelf; they're just readable in the page source until fixed.
-            console.log(`::warning::Vault step skipped: ${e.message}. Vault games are still hidden on the page but visible in its source.`);
-          }
-
-          // ---- updates.json ----------------------------------------------------
-          const pubFiles = Object.fromEntries(Object.entries(files).filter(([f]) => !hidden.has(f)));
           fs.writeFileSync(
             "updates.json",
             JSON.stringify({
               generated: new Date().toISOString(),
               commit: (process.env.GITHUB_SHA || "").slice(0, 7),
-              files: pubFiles
+              files
             }, null, 2) + "\n"
           );
-          console.log(`Wrote ${Object.keys(pubFiles).length} entries to updates.json (${hidden.size} vault path(s) left out).`);
+          console.log(`Wrote ${Object.keys(files).length} entries.`);
           EOF
 
       - name: Setup Pages
