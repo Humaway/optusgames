@@ -1,0 +1,1808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>JARVIS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  JARVIS trainer — a look-alike of the Amdocs CRM "JARVIS" client used in Optus stores,
+  built so new starters can get familiar with the layout.
+
+  HOW TO EXTEND (everything lives in the <script> at the bottom):
+    • CONFIG ............ user ID, dealer code, version etc. (title bar + notes prefix)
+    • MENUS ............. every menu, item, shortcut and submenu. Give an item an `action` id to wire it up.
+    • QUICK_ACTIONS ..... the Quick Actions list in the Interaction Toolbox.
+    • WINDOW_TYPES ...... windows that open in the work area (Find Caller CIM Search is the first one).
+                          Add a new entry with { title, render(body, win) } and open it with JARVIS.openWindow('id').
+    • ACTIONS ........... map of action id -> function. Anything without an entry shows a
+                          "not available yet" message in the status bar instead of doing nothing.
+-->
+<style>
+:root{
+  --ui: Arial, "Liberation Sans", Helvetica, sans-serif;          /* Java "Dialog" font on Windows = Arial */
+  --win: "Segoe UI", "Segoe UI Variable Text", Arial, sans-serif;  /* Windows 8 title bar */
+  --field: Verdana, "DejaVu Sans", Geneva, sans-serif;            /* Toolbox title / notes fields */
+  --teal-dark:#23434c;     /* menu text, menu highlight */
+  --cyan:#01afd1;          /* window headers, buttons */
+  --cyan-line:#1ab7d5;     /* button outlines */
+  --slate:#4c5563;         /* toolbox headers */
+  --panel:#f0f0ed;         /* toolbox background */
+  --form-panel:#d8dee2;    /* grouped form panels */
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#fff}
+body{font:13px/15px var(--ui);color:#222;-webkit-user-select:none;user-select:none;cursor:default}
+input,select,textarea,button{font:inherit;color:inherit}
+input,textarea{-webkit-user-select:text;user-select:text}
+svg{display:block}
+
+#app{display:flex;flex-direction:column;height:100vh;min-width:1100px}
+
+/* ---------- Title bar (Windows 8 style, maximised) ---------- */
+#titlebar{position:relative;flex:0 0 29px;height:29px;
+  background:linear-gradient(#5bbdcb 0 1px,#66d3e2 1px 27px,#5ec3d1 27px 28px,#85c6cf 28px)}
+#titlebar .app-ico{position:absolute;left:3px;top:4px;width:19px;height:19px}
+#tbTitle{position:absolute;left:0;right:0;top:0;height:28px;text-align:center;
+  font:15px/28px var(--win);color:#1b1b1b;white-space:pre;pointer-events:none}
+.cap-btn{position:absolute;top:0;height:23px}
+.cap-btn svg{margin:0 auto}
+.cap-min{right:95px;width:30px}
+.cap-max{right:63px;width:30px}
+.cap-min:hover,.cap-max:hover{background:rgba(255,255,255,.35)}
+.cap-close{right:4px;width:56px;background:#c75050;box-shadow:inset 0 1px 0 #b24747}
+.cap-close:hover{background:#e04343}
+
+/* ---------- Menu bar ---------- */
+#menubar{flex:0 0 25px;height:25px;background:#f2f2f2;box-shadow:inset 0 -2px #c9c9c9,inset 0 -1px #bcbcbc;
+  white-space:nowrap;position:relative;z-index:2}
+.mb-item{display:inline-block;vertical-align:top;height:23px;line-height:23px;padding:0 6px;color:var(--teal-dark)}
+.mb-item.open{background:var(--teal-dark);color:#fff}
+.mn{text-decoration:none}
+body.show-mn .mn{text-decoration:underline;text-underline-offset:2px}
+
+/* ---------- Dropdown menus ---------- */
+.menu{position:fixed;z-index:1000;background:#fafafa;border:1px solid #a0a0a0;padding:3px;
+  box-shadow:inset 0 0 0 1px #d7d7d7,inset 0 0 0 2px #f0f0f0,inset 0 0 0 3px #f2f2f2}
+.menu table{border-collapse:collapse;border-spacing:0}
+.menu tr.mi td{height:27.5px;line-height:27.5px;padding:0;white-space:nowrap;color:var(--teal-dark)}
+.menu tr.mi.chk td{height:24px;line-height:24px}
+.menu tr.mi.dis td{color:#a2a2a2}
+.menu tr.mi.armed:not(.dis) td{background:var(--teal-dark);color:#fff}
+.menu td.ic{width:38px;position:relative}
+.menu td.ic svg{position:absolute;left:10px;top:50%;transform:translateY(-50%)}
+.menu tr.mi td.lb{padding-right:14px}
+.menu tr.mi td.sc{padding-right:11px}
+.menu.has-sub tr.mi td.sc{padding-right:4px}
+.menu td.ar{width:0;position:relative}
+.menu.has-sub td.ar{width:17px}
+.menu td.ar i{position:absolute;left:6px;top:50%;margin-top:-4px;width:0;height:0;
+  border-left:4px solid #282828;border-top:4px solid transparent;border-bottom:4px solid transparent}
+.menu tr.mi.armed:not(.dis) td.ar i{border-left-color:#fff}
+.menu tr.sep td{height:2px;padding:0;font-size:0;line-height:0;background:linear-gradient(#b4b4b4 0 1px,#d6d6d6 1px)}
+.menu tr.mi.armed:not(.dis) td.ic svg .chk{stroke:#fff}
+
+/* ---------- Toolbar ---------- */
+#toolbar{position:relative;flex:0 0 128px;height:128px;border-bottom:1px solid #969696;background:#fff;overflow:hidden}
+#toolbar > *{position:absolute}
+.tb-sep{top:3px;height:122px;width:2px;border-left:1px solid #c9c9c9;border-right:1px solid #d8d8d8}
+.tb-sep.rev{border-left-color:#d8d8d8;border-right-color:#c9c9c9}
+.tb-sep.etched{width:3px;border-left:1px solid #e7e7e7;border-right:1px solid #f7f7f7;background:#b9b9b9}
+#phonePanel{left:11px;top:3px;width:273px;height:98px;background:#d6d6d6;border:1px solid #e2e2e2;border-top-color:#eaeaea}
+.st-btn{left:14px;top:5px;width:35px;height:28px;background:#e0e0e0;border-radius:5px 0 0 5px;
+  box-shadow:inset 1px 1px 0 #8f8f8f,inset -1px -1px 0 #a6a6a6,0 0 0 1px #cecece}
+.st-btn svg{position:absolute;left:6px;top:4px}
+.st-dd{left:49px;top:5px;width:15px;height:28px;background:#fff;border-radius:0 5px 5px 0}
+.st-dd i{position:absolute;left:4px;top:13px;border-top:4px solid var(--teal-dark);border-left:3px solid transparent;border-right:3px solid transparent}
+.ph-btn{top:5px;width:30px;height:27px;background:#fff;border-radius:6px;box-shadow:0 0 0 1px #e6e6e6}
+.ph-btn svg{position:absolute;left:4px;top:0}
+.hold-lbl{left:183px;top:13px;font-size:12px;line-height:14px;color:#111}
+.hold-time{left:230px;top:12px;width:37px;overflow:hidden;font-size:14px;line-height:16px;letter-spacing:1.2px;color:#111;white-space:nowrap}
+.hold-dash{left:271px;top:8px;width:11px;height:4px;border-radius:2px;background:var(--cyan)}
+.rdy-btn{left:81px;top:36px;width:32px;height:31px;background:#fff;border:1px solid var(--cyan-line);border-radius:6px}
+.rdy-btn svg{position:absolute;left:4px;top:2px}
+.home-btn{left:14px;top:73px;width:66px;height:27px;background:#fff;border-radius:5px}
+.home-btn svg{position:absolute;left:25px;top:3px}
+.ctx-combo{left:82px;top:73px;width:154px;height:27px;background:#fff;box-shadow:0 0 0 1px #e9e9e9}
+.ctx-combo select{-webkit-appearance:none;appearance:none;border:0;outline:0;background:transparent;width:100%;height:27px;
+  padding:0 22px 3px 5px;color:#464a57;font:13px var(--ui);cursor:default}
+.ctx-combo svg{position:absolute;right:6px;top:10px;pointer-events:none}
+.plus-btn{left:237px;top:72px;width:35px;height:28px;background:#fff;border:1px solid #41bad2;border-radius:6px}
+.plus-btn svg{position:absolute;left:8px;top:5px}
+.card{top:5px;height:85px;background:#d4d4d4;border-radius:5px;box-shadow:0 0 0 2px #efefec}
+.tb-lbl{top:101px;line-height:15px;color:var(--teal-dark)}
+.tb-btn{top:95px;height:27px;background:#fff;border:1px solid var(--cyan-line);border-radius:7px}
+.tb-btn.grey{border-color:#d8d8d8}
+.tb-btn svg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+.tb-btn:active,.rdy-btn:active,.plus-btn:active,.home-btn:active{background:#e8f7fb}
+#custField{left:875px;top:95px;width:113px;height:27px;border:1px solid #d8d8d8;border-right-color:#e0e0e0;outline:0;padding:0 4px;
+  box-shadow:0 0 0 1px #f2f2f2}
+#optusLogo{left:1287px;top:56px}
+
+/* ---------- Main area ---------- */
+#main{flex:1 1 auto;display:flex;min-height:0}
+#toolbox{flex:0 0 387px;width:387px;position:relative;display:flex;flex-direction:column;min-height:0;
+  background:var(--panel) linear-gradient(#848484 0 1px,#bcbcbc 1px 2px,#ecedef 2px 3px) no-repeat 0 0/100% 3px;padding-top:3px}
+#toolbox::before,#toolbox::after{content:"";position:absolute;top:0;bottom:0;pointer-events:none;z-index:3}
+#toolbox::before{left:0;width:2px;background:linear-gradient(90deg,#5e5e5e 0 1px,#8f8f8f 1px)}
+#toolbox::after{right:0;width:3px;background:linear-gradient(90deg,#9a9a9a 0 1px,#6e6e6e 1px 2px,#d1d1d1 2px)}
+.tbx-in{flex:1 1 auto;display:flex;flex-direction:column;margin:0 3px 0 2px;min-height:0;border-bottom:1px solid #a9a9a9}
+.sec-hd{flex:0 0 25px;height:25px;line-height:28px;overflow:hidden;position:relative;background:var(--slate);
+  color:#fff;font:bold 17px/29px var(--ui);letter-spacing:.7px;padding-left:7px;
+  box-shadow:inset 0 1px #5e6672,inset 0 -1px #545c69}
+.sec-hd.h26{flex-basis:26px;height:26px}
+.sec-hd .sec-ic{position:absolute;right:4px;top:0;width:16px;height:100%;cursor:default}
+.sec-hd .sec-ic svg{position:absolute;left:2px;top:50%;transform:translateY(-50%)}
+.sec-gap{flex:0 0 2px;background:linear-gradient(#979899 0 1px,#d7d7d5 1px)}
+.sec-gap.lt{background:linear-gradient(#f1f1ee 0 1px,#fdfdfd 1px)}
+.sec-body{position:relative;min-height:0;overflow:hidden}
+.sec.collapsed .sec-body{display:none}
+
+/* Interaction Toolbox body */
+#itBody{flex:547 1 0;min-height:250px}
+.it-lbl{position:absolute;left:3px;line-height:15px;color:#222}
+.it-title{position:absolute;left:3px;top:16px;width:377px;height:25px;border:1px solid #a7a7a7;background:#f0f0f0;
+  box-shadow:0 0 0 1px #d0d0ce;font:14px/23px var(--field);color:#8d8a8a;padding-left:4px;white-space:nowrap;overflow:hidden}
+.reasons{position:absolute;left:254px;top:44px;line-height:15px;color:#7b7778;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.reasons-ic{position:absolute;left:347px;top:42px;cursor:pointer}
+.qa{position:absolute;left:10px;top:72px;width:362px;height:124px;background:#fff;border:1px solid #d9d9d7;border-left-color:#e2e2e0;
+  box-shadow:inset 1px 0 #d8dcde}
+.qa-hd{position:absolute;left:1px;top:0;width:337px;height:26px;line-height:26px;background:#becbd3;color:#71878f;
+  font:bold 13px/26px var(--ui);letter-spacing:.5px;padding-left:6px;box-shadow:inset -1px 0 #90a9b8}
+.qa-hdline{position:absolute;left:1px;top:26px;width:337px;height:1px;background:#e4e9ec}
+.qa-list{position:absolute;left:1px;top:27px;width:337px;bottom:0;overflow:hidden}
+.qa-row{height:34px;border-bottom:1px solid #d9d9d9;border-right:1px solid #d7d7d7;padding:2px 0 0 3px;line-height:30px;color:#222;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qa-row:nth-child(even){background:#fafafa}
+.qa-sb{position:absolute;right:0;top:26px;bottom:0;width:22px}
+.sb-btn{position:absolute;left:0;width:21px;height:22px;background:#fff;border:1px solid #a9a9a9;border-radius:7px}
+.sb-btn svg{position:absolute;left:5px;top:6px}
+.sb-up{top:0}
+.sb-dn{bottom:0;border-color:#909090}
+.sb-track{position:absolute;left:0;top:21px;bottom:21px;width:21px;background:#e0e0e0;border:1px solid #a2a2a2;border-radius:6px}
+.sb-thumb{position:absolute;left:-1px;width:21px;height:12px;background:#fff;border:1px solid #8f8f8f;border-radius:6px;box-shadow:inset 0 -1px #c3c3c3}
+.notes{position:absolute;left:3px;top:219px;width:377px;bottom:0;border:1px solid #a3a3a3;box-shadow:inset 0 0 0 1px #c9c9c7;
+  background:#f0f0f0;font:14px/19px var(--field);color:#7a7a7a;padding:8px 7px 6px;resize:none;outline:0;margin:0}
+.notes[readonly]{cursor:default}
+
+/* Open Windows */
+#owBody{flex:308 1 0;min-height:60px;padding:2px 2px 0 3px;background:linear-gradient(#c8c8c6 0 1px,#ced0d1 1px 2px,transparent 2px)}
+.ow-list{height:100%;background:#fff;border:1px solid #8e939b;box-shadow:inset 0 0 0 1px #f2f2f3;overflow:auto;padding:1px}
+.ow-item{height:20px;line-height:20px;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#222}
+.ow-item.active{background:var(--teal-dark);color:#fff}
+.ow-item.min{color:#7a7a7a}
+
+/* Collapsed sections */
+.sec.extra .sec-body{flex:250 1 0;min-height:60px;padding:2px 2px 0 3px}
+.sec.extra .sec-body .ow-list{height:100%}
+.tbx-foot{flex:0 0 21px;height:21px;background:var(--slate);position:relative;box-shadow:inset 0 1px #86898d,inset 0 -1px #656b75}
+.tbx-foot i{position:absolute;right:7px;top:5px;border-left:6px solid #000;border-top:5px solid transparent;border-bottom:5px solid transparent}
+
+/* Work area + internal windows */
+#workarea{flex:1 1 auto;position:relative;overflow:hidden;background:#fff;border-top:1px solid #b4b4b4}
+.iwin{position:absolute;display:flex;flex-direction:column;background:#fff;border-right:2px solid #61c9d7;border-bottom:2px solid #61c9d7}
+.iwin.max{left:0;top:0;right:0;bottom:0}
+.iwin:not(.max){border:2px solid #61c9d7;border-top:0;box-shadow:2px 3px 8px rgba(0,0,0,.25)}
+.iwin.minimised{display:none}
+.iwin-hd{flex:0 0 31px;height:31px;line-height:31px;background:var(--cyan);box-shadow:inset 0 -1px #6dd1e4;color:#fff;
+  font:bold 17px/31px var(--ui);letter-spacing:.6px;padding-left:2px;position:relative;white-space:nowrap}
+.iwin:not(.active) .iwin-hd{background:#7fcfe0}
+.iwin-btns{position:absolute;right:13px;top:0;display:flex;gap:15px}
+.iwin-btns span{width:28px;height:31px;position:relative}
+.iwin-btns svg{position:absolute;left:7px;top:50%;transform:translateY(-50%)}
+.iwin-btns span:hover{background:rgba(255,255,255,.18)}
+.iwin-body{flex:1 1 auto;overflow:auto;position:relative}
+
+/* Find Caller CIM Search form */
+.fc{position:relative;padding:3px 0 12px 2px;width:1300px}
+.fc-sec{height:15px;line-height:15px;margin:5px 0 4px;color:#222}
+.fc-sec:first-child{margin-top:0}
+.fc-panel{width:1167px;background:var(--form-panel);border-radius:5px;padding:8px 0 5px 8px}
+.fc-row{display:flex;gap:6px;height:51px}
+.fc-row.tall{height:58px}
+.fc-cell{position:relative}
+.fc-cell label,.fc-cell .lbl{display:block;height:15px;line-height:15px;margin-bottom:5px;color:#222;white-space:nowrap}
+.fc-row.tall .lbl{height:22px;line-height:22px}
+.fc input[type=text]{display:block;width:100%;height:27px;border:1px solid #dcdcdc;border-top-color:#dddddd;border-bottom-color:#d4d4d4;
+  background:#fff;outline:0;padding:0 5px;font:13px var(--ui);color:#222}
+.fc .sel{position:relative;height:28px}
+.fc .sel select{-webkit-appearance:none;appearance:none;display:block;width:100%;height:28px;border:1px solid #dcdcdc;background:#fff;
+  outline:0;padding:0 26px 0 5px;font:13px var(--ui);color:#222;border-radius:0}
+.fc .sel svg{position:absolute;right:4px;top:10px;pointer-events:none}
+.fc .sel select:disabled{background:#e0e0e0;border-color:#949494;color:#8b8b8b;box-shadow:inset 0 0 0 1px #dbdbdb}
+.fc .sel.dis svg path{stroke:#8b8b8b}
+.fc .chk{position:absolute;top:0;height:22px;line-height:22px;display:flex;align-items:center;gap:7px;color:#222;white-space:nowrap}
+.fc .chk input{-webkit-appearance:none;appearance:none;width:14px;height:14px;margin:0;background:#fff;border:1px solid #ececec;border-radius:3px;position:relative}
+.fc .chk input:checked::after{content:"";position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid var(--teal-dark);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.fc-btns{position:absolute;left:1186px;top:22px;display:flex;flex-direction:column;gap:2px}
+.jbtn{width:97px;height:29px;border:1px solid #3bc1db;border-radius:6px;background:#fff;color:#03afd1;font:bold 14px var(--ui);
+  letter-spacing:.2px;padding:0;cursor:default}
+.jbtn:hover{background:#f0fafd}
+.jbtn:active{background:#dff4fa}
+
+/* ---------- Status bar ---------- */
+#statusbar{flex:0 0 30px;height:30px;position:relative;background:#fff}
+#statusbar.hidden{display:none}
+.sb-grip{position:absolute;top:3px;height:24px;width:2px;border-left:1px solid #c9c9c9;border-right:1px solid #d8d8d8}
+.sb-red{position:absolute;left:16px;top:9px;width:14px;height:13px;border:1px solid #ff7f7f;padding:1px;background:#fff}
+.sb-red::after{content:"";display:block;width:100%;height:100%;background:#f00}
+#statusText{position:absolute;left:35px;right:32px;top:4px;height:22px;border:1px solid #b9b9b9;border-right-color:#c9c9c9;
+  box-shadow:0 0 0 1px #e7e7e7;line-height:20px;padding-left:5px;color:#222;white-space:nowrap;overflow:hidden}
+.sb-etch{position:absolute;top:4px;height:22px;width:3px;border-left:1px solid #e7e7e7;border-right:1px solid #f7f7f7;background:#b9b9b9}
+
+/* Maximise work area (View menu) */
+body.max-work #toolbar,body.max-work #toolbox{display:none}
+
+/* ---------- Customer context (toolbar panels after authentication) ---------- */
+.home-btn{color:#bdbdbd}
+.home-btn.on{box-shadow:0 0 0 1px var(--cyan-line);color:var(--cyan)}
+.card.sel{background:#eeeeee;box-shadow:0 0 0 2px #e9b54a}
+.card .cc{position:absolute;inset:0;overflow:hidden;font-size:13px;line-height:17px;color:#1f3550}
+.cc-person svg{position:absolute;left:12px;top:22px}
+.cc-person .tx{position:absolute;left:58px;right:8px;top:14px}
+.cc-person .tx div,.cc-bill .tx div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-bill svg{position:absolute;left:12px;top:22px}
+.cc-bill .tx{position:absolute;left:62px;right:8px;top:14px;color:#222}
+.cc-svc{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;padding:12px 10px 0 14px;color:#222}
+.cc-svc span{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.cc-svc svg{flex:0 0 16px}
+.tb-link{top:101px;line-height:15px;color:#1f3b73;text-decoration:underline;text-underline-offset:2px;cursor:pointer;white-space:nowrap;display:none}
+body.has-ctx .tb-link{display:block}
+.it-req{position:absolute;left:0;color:#e03030;font-size:12px;line-height:10px;display:none}
+body.has-ctx .it-req{display:block}
+.req::before{content:"*";position:absolute;left:-3px;top:-4px;color:#e03030;font-size:11px}
+
+/* ---------- Generic grid (search results, interaction lists) ---------- */
+.jbtn.sm{width:auto;height:23px;padding:0 9px;font-size:12px;border-radius:5px;letter-spacing:0;white-space:nowrap}
+.jbtn.ic{width:44px;height:23px;padding:0;border-radius:5px;display:inline-flex;align-items:center;justify-content:center}
+.jbtn.ic svg{display:block}
+.gtool{display:flex;align-items:center;gap:6px;height:33px;padding:0 5px}
+.gtool .sp{flex:1}
+.gsel{height:23px;border:1px solid #c8c8c8;background:#fff;font:12px var(--ui);color:#222;padding:0 4px;border-radius:2px}
+.gear{display:inline-flex;align-items:center;height:23px;border:1px solid #c8c8c8;border-radius:3px;background:#fff}
+.gear span{display:flex;align-items:center;justify-content:center;width:30px;height:21px;border-right:1px solid #ddd}
+.gear i{display:block;width:12px;height:21px;position:relative}
+.gear i::after{content:"";position:absolute;left:3px;top:9px;border-top:4px solid #555;border-left:3px solid transparent;border-right:3px solid transparent}
+.grid{border:1px solid #d5d5d5;background:#fff;overflow:auto;position:relative}
+.grid table{border-collapse:collapse;min-width:100%;table-layout:fixed}
+.grid th{position:sticky;top:0;z-index:1;background:#f1f1f1;height:26px;text-align:left;font:bold 12px var(--ui);color:#333;padding:0 6px;white-space:nowrap;
+  border-bottom:1px solid #e2e2e2}
+.grid th i{display:inline-block;margin-left:6px;vertical-align:1px;border-top:6px solid var(--cyan);border-left:4px solid transparent;border-right:4px solid transparent}
+.grid td{height:30px;padding:0 6px;font-size:12px;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid #ececec}
+.grid tbody tr:nth-child(even) td{background:#f9f9f9}
+.grid tr.on td{background:#f5b73a !important}
+.grid td.lnk span{text-decoration:underline;color:#1f3b73;cursor:pointer}
+.grid .flt td{height:27px;background:#fff !important;padding:1px 2px;border-bottom:1px solid #e2e2e2}
+.grid .flt select,.grid .flt input{width:100%;height:23px;border:1px solid #d0d0d0;font:12px var(--ui);background:#fff;padding:0 3px;outline:0}
+.grid .rad{width:26px;padding:0;text-align:center}
+.grid .rad b{display:inline-block;width:11px;height:11px;border-radius:50%;border:1px solid #888;background:#fff;vertical-align:middle;position:relative}
+.grid tr.on .rad b::after{content:"";position:absolute;left:2px;top:2px;width:5px;height:5px;border-radius:50%;background:#222}
+
+/* Search: Contact and Subscription */
+.srch{position:absolute;inset:0;display:flex;flex-direction:column;background:#fcfcfc}
+.srch .grid{flex:1 1 auto;margin:0 5px}
+.srch-foot{flex:0 0 74px;position:relative;padding:6px 5px}
+.srch-foot .cancel{position:absolute;right:8px;bottom:12px}
+.srch-empty{padding:14px 8px;color:#555}
+
+/* ---------- Modal dialog (Windows 8 style) ---------- */
+#modalLayer{position:fixed;inset:0;z-index:1500;display:none}
+#modalLayer.on{display:block}
+/* Multi-factor Authentication dialog — all child positions are measured from the real screen (dialog-relative px) */
+.mfa{position:absolute;width:1793px;height:1193px;max-width:calc(100vw - 4px);max-height:calc(100vh - 4px);
+  background:#66d3e2;box-shadow:0 0 0 1px #4ea1ad,inset 0 0 0 1px #5ec3d2,0 8px 30px rgba(0,0,0,.28);font:13.5px/16px var(--ui);color:#222}
+.mfa-tb{position:absolute;left:0;right:0;top:0;height:37px;text-align:center;font:15px/34px var(--win);color:#1b1b1b;white-space:nowrap;overflow:hidden}
+.mfa-tb .app-ico2{position:absolute;left:9px;top:9px;width:19px;height:19px}
+.mfa-x{position:absolute;right:6px;top:1px;width:39px;height:26px;background:#c75050;box-shadow:-1px 0 #969199}
+.mfa-x:hover{background:#e04343}
+.mfa-x svg{position:absolute;left:15px;top:9px}
+.mfa-client{position:absolute;left:7px;top:40px;right:10px;bottom:12px;background:#fff;overflow:auto;
+  box-shadow:0 0 0 1px #d9dadd,0 0 0 2px #7d8b94,0 0 0 3px #5bafbb,0 0 0 4px #61c9d7}
+.mfa-canvas{position:relative;width:1776px;height:1141px}
+.mfa-canvas > *, .mfa-tabbody > *{position:absolute;box-sizing:border-box}
+.mfa .t{white-space:nowrap;line-height:16px}
+.mfa .b{font-weight:bold;font-size:14px}
+.mfa .slate{color:#4a6170}
+.mfa .lg{font-size:15px}
+.mfa .fs{border:1px solid #e2e2e2}
+.mfa .fs-outer{border:1px solid #e7e7e7;box-shadow:inset 0 0 0 1px #eeeeee}
+.mfa .legend{background:#fff;padding:0 3px}
+.mfa .panel{background:#f0f0ed;border-radius:5px}
+.mfa input.in{border:1px solid #d9d9d9;background:#fff;outline:0;padding:0 5px;font:13.5px var(--ui);color:#222;border-radius:0}
+.mfa input.in:focus{border-color:#7fcfe0}
+.mfa input.in:disabled{background:#d6d6d6;border-color:#d4d4d4;color:#898989}
+.mfa input.in.dark:disabled{background:#d7d7d7;border-color:#959595;box-shadow:inset 0 0 0 1px #c4c4c4}
+.mfa .sel{background:#fff;border:1px solid #d6d6d6}
+.mfa .sel select{-webkit-appearance:none;appearance:none;width:100%;height:100%;border:0;outline:0;background:transparent;padding:0 26px 0 5px;font:13.5px var(--ui);color:#222;border-radius:0}
+.mfa .sel svg{position:absolute;right:6px;top:50%;margin-top:-4px;pointer-events:none}
+.mfa .mbtn{border:1px solid #1ab7d5;border-radius:5px;background:#fff;color:#01afd1;font:bold 14px var(--ui);padding:0;white-space:nowrap;cursor:default}
+.mfa .mbtn:hover:not(:disabled){background:#f0fafd}
+.mfa .mbtn:active:not(:disabled){background:#dff4fa}
+.mfa .mbtn:disabled{border-color:#d8d8d8;color:#d4d4d4}
+.mfa .cal{background:#fff;border:1px solid #d4d4d4;padding:0;display:flex;align-items:center;justify-content:center}
+.mfa .cal svg{width:20px;height:19px}
+.mfa .rad{-webkit-appearance:none;appearance:none;margin:0;width:14px;height:14px;border-radius:50%;border:1px solid #c6c6c6;background:#fff}
+.mfa .rad:checked{background:radial-gradient(circle,#23434c 0 3.5px,#fff 4px)}
+.mfa .msg{font-size:13px;line-height:16px;white-space:nowrap}
+.mfa .msg.err{color:#d02020}
+.mfa .msg.ok{color:#178a2d}
+.mfa .tab{border-radius:4px 4px 0 0;text-align:center;font:bold 13.5px/27px var(--ui);color:#888;background:#e0e0e0;border:1px solid #c5c5c5;border-top-color:#afafaf;border-bottom:0;cursor:default}
+.mfa .tab.on{background:#fbb836;border-color:#ffac0c;color:#29434b;font-size:14px;line-height:30px}
+.mfa .tabbox{border-top:1px solid #feab0d;border-left:1px solid #fdaf18;border-right:2px solid #808080;border-bottom:2px solid #808080;background:#fff;
+  box-shadow:inset 0 1px #f2e5cc,inset 0 4px #f1f1f1}
+.mfa-tabbody{position:absolute;inset:0}
+.mfa .ph{color:#666;font-size:13px}
+.mfa .qmark{border:1.5px solid #222;border-radius:50%;text-align:center;font:bold 15px/19px var(--ui);color:#222;cursor:default}
+
+/* ---------- Interaction Home ---------- */
+.ih{position:absolute;inset:0;display:flex;flex-direction:column;background:#fcfcfc;font-size:12px}
+.ih-top{flex:0 0 auto;position:relative;height:276px}
+.ih .lbl{font-size:12px;color:#222;height:16px;line-height:16px}
+.ih .b{font-weight:bold;font-size:13px}
+.ih select.js{height:26px;border:1px solid #c8c8c8;background:#fff;font:13px var(--ui);color:#222;padding:0 4px;width:100%}
+.ih select.js:disabled{background:#d6d6d6;color:#444}
+.ih .topics{position:absolute;left:5px;top:94px;right:128px;height:145px;border:1px solid #dcdcdc;background:#fff}
+.ih .topics table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ih .topics th{height:26px;background:#dde1e5;text-align:left;font:bold 12px var(--ui);color:#333;padding:0 6px}
+.ih .topics td{height:30px;background:#f5b73a;padding:0 6px;font-size:12px;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ih .topics td u{color:#1f3b73;cursor:pointer}
+.ih .side-btns{position:absolute;right:8px;top:94px;width:112px;display:flex;flex-direction:column;gap:5px}
+.ih .side-btns .jbtn{width:100%;padding:0}
+.ih-tabs{position:absolute;left:5px;right:5px;top:270px;height:30px;display:flex;gap:3px;border-bottom:2px solid #f5b63e}
+.ih-tab{height:28px;line-height:28px;padding:0 20px;border:1px solid #d6d6d6;border-bottom:0;background:#fff;font-size:13px;color:#222;border-radius:3px 3px 0 0;cursor:default}
+.ih-tab.on{background:#f5b63e;border-color:#f5b63e;font-weight:bold;color:#3b2b00}
+.ih-tab.dim{background:#e0e0e0;color:#8a8a8a}
+.ih-body{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;padding:0 5px 6px}
+.ih-ci{flex:0 0 auto;position:relative;height:110px}
+.ih .ro{height:26px;line-height:26px;background:#d7d7d7;padding:0 6px;font-size:13px;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ih .sec{font-size:13px;color:#555;height:22px;line-height:22px;margin-top:4px}
+.ih .grid{flex:1 1 0;min-height:90px}
+.ih-empty{padding:30px 10px;color:#666}
+
+/* Tooltip */
+#tip{position:fixed;z-index:2000;display:none;background:#ffffe1;border:1px solid #393939;color:#000;font:13px var(--ui);
+  line-height:19px;padding:0 4px;white-space:nowrap;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== Title bar ===== -->
+  <div id="titlebar">
+    <svg class="app-ico" viewBox="0 0 19 19"><rect width="19" height="19" fill="#a9b200"/>
+      <path d="M5.4 6.4C6.6 4.7 8.4 4 10.3 4c3.1 0 4.9 1.4 4.9 4.3V16.4M15.2 10.4c-1.4-.6-3.2-.9-5-.9-3.5 0-5.6 1.3-5.6 3.6 0 2.1 1.7 3.2 4 3.2 2.8 0 5.1-1.2 6.6-3.4"
+        fill="none" stroke="#fff" stroke-width="2.1"/></svg>
+    <div id="tbTitle"></div>
+    <div class="cap-btn cap-min" title=""><svg width="10" height="23" viewBox="0 0 10 23"><rect x="0" y="13" width="10" height="2" fill="#2b2b2b"/></svg></div>
+    <div class="cap-btn cap-max" id="capMax"><svg width="13" height="23" viewBox="0 0 13 23"><g fill="none" stroke="#2b2b2b" stroke-width="1.6">
+      <path d="M3.5 7.3V5.3h8.7v8.2h-2"/><rect x="0.8" y="8.3" width="9" height="8.2"/></g><rect x="0" y="7.5" width="10.6" height="2.2" fill="#2b2b2b"/><rect x="2.8" y="4.5" width="10.2" height="2" fill="#2b2b2b"/></svg></div>
+    <div class="cap-btn cap-close" id="capClose"><svg width="10" height="23" viewBox="0 0 10 23"><path d="M1 7.5l8 8M9 7.5l-8 8" stroke="#fff" stroke-width="2"/></svg></div>
+  </div>
+
+  <!-- ===== Menu bar (built from MENUS) ===== -->
+  <div id="menubar"></div>
+
+  <!-- ===== Toolbar ===== -->
+  <div id="toolbar">
+    <div class="tb-sep" style="left:6px"></div>
+
+    <div id="phonePanel"></div>
+    <div class="st-btn" data-action="toolbar.agentState"><svg width="22" height="22" viewBox="0 0 22 22">
+      <defs><radialGradient id="gSph" cx="45%" cy="40%" r="60%"><stop offset="0" stop-color="#a9a9a9"/><stop offset="1" stop-color="#939393"/></radialGradient></defs>
+      <circle cx="11" cy="11" r="10" fill="url(#gSph)"/><path d="M6 15c2-3 6-3 9-1" stroke="#9f9f9f" stroke-width="1.2" fill="none" opacity=".7"/></svg></div>
+    <div class="st-dd" data-action="toolbar.agentStateMenu"><i></i></div>
+    <div class="ph-btn" style="left:82px" data-ico="phone"></div>
+    <div class="ph-btn" style="left:113px" data-ico="phoneX"></div>
+    <div class="ph-btn" style="left:144px" data-ico="phoneHold"></div>
+    <div class="hold-lbl">Hold :</div>
+    <div class="hold-time" id="holdTime">00:00:00</div>
+    <div class="hold-dash"></div>
+    <div class="rdy-btn" data-ico="phoneStar" data-action="toolbar.ready"></div>
+    <div class="home-btn" data-ico="home" data-action="toolbar.home"></div>
+    <div class="ctx-combo"><select id="ctxSelect"><option>Private Context</option></select>
+      <svg width="12" height="8" viewBox="0 0 12 8"><path d="M1 1l5 5 5-5" fill="none" stroke="#314f58" stroke-width="2"/></svg></div>
+    <div class="plus-btn" data-ico="plus" data-action="toolbar.newContext"></div>
+
+    <div class="tb-sep rev" style="left:292px"></div>
+
+    <div class="card" id="card1" style="left:300px;width:220px"></div>
+    <div class="card" id="card2" style="left:525px;width:245px"></div>
+    <div class="card" id="card3" style="left:775px;width:261px"></div>
+    <div class="card" id="card4" style="left:1042px;width:225px"></div>
+
+    <div class="tb-lbl" style="left:300px">Account:</div>
+    <div class="tb-btn" style="left:525px;width:37px" data-ico="list" data-action="toolbar.accountList"></div>
+    <div class="tb-lbl" style="left:568px">Customer:</div>
+    <div class="tb-link" id="custLink" style="left:634px;max-width:118px;overflow:hidden;text-overflow:ellipsis" data-action="toolbar.customerLink"></div>
+    <div class="tb-link" id="viewProducts" style="left:760px" data-action="toolbar.viewProducts">View Products</div>
+    <input id="custField" type="text" spellcheck="false" autocomplete="off" title="">
+    <div class="tb-btn" style="left:1041px;width:94px" data-ico="phoneSearch" data-tip="Search" data-action="toolbar.findCaller"></div>
+    <div class="tb-btn" style="left:1140px;width:38px" data-ico="personSearch" data-action="toolbar.contactSearch"></div>
+    <div class="tb-btn" style="left:1183px;width:36px" data-ico="bankSearch" data-action="toolbar.accountSearch"></div>
+    <div class="tb-btn grey" style="left:1224px;width:40px" data-ico="binoculars" data-action="toolbar.lookup"></div>
+
+    <div class="tb-sep etched" style="left:1278px"></div>
+    <svg id="optusLogo" width="123" height="24" viewBox="0 0 123 24" aria-label="OPTUS">
+      <g fill="none" stroke="#00a3ab" stroke-width="6">
+        <ellipse cx="13.5" cy="12" rx="10.5" ry="9"/>
+        <path d="M33 3H42.5A4.5 5 0 0 1 42.5 13H33"/>
+        <path d="M80 0V14.5A7.5 6.5 0 0 0 95 14.5V0"/>
+        <path stroke-width="5.6" d="M120.2 6.2C118.6 3.2 115.6 2.4 112.4 2.4C107.8 2.4 105 4.3 105 7.2C105 10.6 108.6 11.3 112 11.9C116.4 12.6 119.6 13.6 119.6 17.1C119.6 20.3 116.6 21.7 112.2 21.7C108 21.7 104.8 20.3 103 17.4"/>
+      </g>
+      <g fill="#00a3ab"><rect x="30" y="0" width="6" height="24"/><rect x="52" y="0" width="21" height="6"/><rect x="59.5" y="0" width="6" height="24"/></g>
+    </svg>
+    <div class="tb-sep rev" style="left:1422px"></div>
+  </div>
+
+  <!-- ===== Main: Interaction Toolbox + work area ===== -->
+  <div id="main">
+    <div id="toolbox">
+      <div class="tbx-in" id="tbxIn">
+
+        <div class="sec" id="secIT" style="display:contents">
+          <div class="sec-hd">Interaction Toolbox<span class="sec-ic" data-sec="secIT"></span></div>
+          <div class="sec-gap"></div>
+          <div class="sec-body" id="itBody">
+            <div class="it-lbl" style="top:1px">Title:</div>
+            <span class="it-req" style="top:17px">*</span>
+            <div class="it-title" id="itTitle">Please Specify_Please Specify_Please Specify_None</div>
+            <div class="reasons" data-action="toolbox.goToReasons">go to Reasons</div>
+            <svg class="reasons-ic" data-action="toolbox.goToReasons" width="24" height="24" viewBox="0 0 24 24">
+              <rect x="1.5" y="1.5" width="18" height="14" fill="none" stroke="#b6b6b5" stroke-width="2"/>
+              <path d="M1 15.5h11l2 3h9V22H8.5L6 19H1z" fill="#8f8f8f"/><path d="M18 13h4v6h-4z" fill="#a3a3a2"/></svg>
+            <div class="qa">
+              <div class="qa-hd">Quick Actions</div>
+              <div class="qa-hdline"></div>
+              <div class="qa-list" id="qaList"></div>
+              <div class="qa-sb">
+                <div class="sb-btn sb-up" id="qaUp"><svg width="10" height="7" viewBox="0 0 10 7"><path d="M1 6l4-4 4 4" fill="none" stroke="#335059" stroke-width="2"/></svg></div>
+                <div class="sb-track" id="qaTrack"><div class="sb-thumb" id="qaThumb"></div></div>
+                <div class="sb-btn sb-dn" id="qaDown"><svg width="10" height="7" viewBox="0 0 10 7"><path d="M1 1l4 4 4-4" fill="none" stroke="#405c64" stroke-width="2"/></svg></div>
+              </div>
+            </div>
+            <div class="it-lbl" style="top:204px">Notes:</div>
+            <span class="it-req" style="top:206px">*</span>
+            <textarea class="notes" id="notes" readonly spellcheck="false"></textarea>
+          </div>
+        </div>
+
+        <div class="sec-gap lt"></div>
+
+        <div class="sec" id="secOW" style="display:contents">
+          <div class="sec-hd h26">Open Windows<span class="sec-ic" data-sec="secOW"></span></div>
+          <div class="sec-body" id="owBody"><div class="ow-list" id="owList"></div></div>
+        </div>
+
+        <div class="sec-gap lt" style="background:linear-gradient(#e4e5e3 0 1px,#fafaf9 1px)"></div>
+        <div class="sec extra collapsed" id="secMF" style="display:contents">
+          <div class="sec-hd h26">My Folders<span class="sec-ic" data-sec="secMF"></span></div>
+          <div class="sec-body"><div class="ow-list"></div></div>
+        </div>
+        <div class="sec-gap" style="background:linear-gradient(#bcbcbc 0 1px,#ecedef 1px)"></div>
+        <div class="sec extra collapsed" id="secAH" style="display:contents">
+          <div class="sec-hd">Account Hierarchy<span class="sec-ic" data-sec="secAH"></span></div>
+          <div class="sec-body"><div class="ow-list"></div></div>
+        </div>
+        <div class="sec-gap"></div>
+        <div class="sec extra collapsed" id="secNP" style="display:contents">
+          <div class="sec-hd h26">Negotiation Path<span class="sec-ic" data-sec="secNP"></span></div>
+          <div class="sec-body"><div class="ow-list"></div></div>
+        </div>
+        <div class="tbx-foot"><i></i></div>
+      </div>
+    </div>
+
+    <div id="workarea"></div>
+  </div>
+
+  <!-- ===== Status bar ===== -->
+  <div id="statusbar">
+    <div class="sb-grip" style="left:6px"></div>
+    <div class="sb-red"></div>
+    <div id="statusText"></div>
+    <div class="sb-etch" style="right:19px"></div>
+    <div class="sb-etch" style="right:5px"></div>
+  </div>
+</div>
+
+<div id="modalLayer"></div>
+<div id="tip"></div>
+
+<script>
+/* =====================================================================
+   CONFIG — values shown in the title bar and the Notes prefix
+   ===================================================================== */
+const CONFIG = {
+  appName: 'JARVIS',
+  version: '9.2.9.1',
+  server: 'CRMServer_14_1',
+  userId: 'DE00000000',
+  dealerCode: 'W0405',
+  role: 'Sales and Service (Retail) - Leader',
+  interactionTitle: 'Please Specify_Please Specify_Please Specify_None',
+  statusMessageMs: 6000,
+};
+
+/* =====================================================================
+   MENUS — '&' marks the underlined (Alt) letter. Use '-' for a separator.
+   Item fields: label, shortcut, disabled, action, submenu:[...], icon, check
+   ===================================================================== */
+const MENUS = [
+  { label: '&File', items: [
+    { label: 'New Desktop', action: 'file.newDesktop' },
+    { label: 'Preferences', shortcut: 'Ctrl+F3', disabled: true },
+    { label: 'Update Desktop', shortcut: 'Ctrl+Shift+U', action: 'file.updateDesktop' },
+    '-',
+    { label: 'Spell Check', shortcut: 'F7', action: 'file.spellCheck' },
+    '-',
+    { label: 'Copy Form Link', shortcut: 'Ctrl+Shift+C', disabled: true },
+    { label: 'Paste Form Link', shortcut: 'Ctrl+Shift+V', disabled: true },
+    '-',
+    { label: 'Page Setup', action: 'file.pageSetup' },
+    { label: 'Print Preview', disabled: true },
+    { label: 'Print...', shortcut: 'Ctrl+P', disabled: true },
+    '-',
+    { label: 'Exit', shortcut: 'Ctrl+F4', action: 'file.exit' },
+  ]},
+  { label: '&Connect', items: [
+    { label: 'Phone', submenu: [] },
+    { label: 'Email', submenu: [] },
+    { label: 'Chat', submenu: [] },
+  ]},
+  { label: '&View', items: [
+    { label: 'Notifier', shortcut: 'Ctrl+F2', action: 'view.notifier' },
+    '-',
+    { label: 'Commitment Logs', disabled: true },
+    { label: 'Time and Expenses Logs', disabled: true },
+    '-',
+    { label: 'Summary', disabled: true },
+    '-',
+    { label: 'Windows Browser', disabled: true },
+    { label: 'Log Browser', action: 'view.logBrowser' },
+    '-',
+    { label: 'Restore Default Settings', action: 'view.restoreDefaults' },
+    { label: 'Maximize Workarea / Restore Workarea', shortcut: 'Ctrl+Shift+F5', action: 'view.maximizeWorkarea' },
+    { label: 'Toolbox', submenu: [] },
+    { label: 'Toolbar', submenu: [] },
+    { label: 'Statusbar', check: true, checked: true, action: 'view.statusbar' },
+    '-',
+    { label: 'Window', submenu: [] },
+  ]},
+  { label: 'C&reate', items: [
+    { label: 'Customer Interaction', action: 'create.customerInteraction' },
+    '-',
+    { label: 'Action Item', disabled: true },
+    { label: 'Contact', shortcut: 'Ctrl+O', icon: 'contact', action: 'create.contact' },
+    { label: 'Literature Request', disabled: true },
+    { label: 'Distribution List', disabled: true },
+    { label: 'Billing Profile', action: 'create.billingProfile' },
+    { label: 'Customer', action: 'create.customer' },
+    '-',
+    { label: 'Dialogue', action: 'create.dialogue' },
+    '-',
+    { label: 'Support', submenu: [] },
+    { label: 'Billing Manager', submenu: [] },
+  ]},
+  { label: '&Search', items: [
+    { label: 'Customer Interactions', disabled: true },
+    { label: 'Social Dialogues', disabled: true },
+    '-',
+    { label: 'Search by ID', shortcut: 'Ctrl+Shift+D', action: 'search.byId' },
+    { label: 'Accounts', shortcut: 'Ctrl+Shift+T', disabled: true },
+    { label: 'Action Items', shortcut: 'Ctrl+Shift+J', action: 'search.actionItems' },
+    { label: 'Address', disabled: true },
+    { label: 'Contacts', shortcut: 'Ctrl+Shift+O', disabled: true },
+    { label: 'Customers', shortcut: 'Ctrl+Shift+R', disabled: true },
+    { label: 'Distribution Lists', action: 'search.distributionLists' },
+    { label: 'Subscriptions', disabled: true },
+    '-',
+    { label: 'Employees', disabled: true },
+    { label: 'Audit Users Footprint', disabled: true },
+    { label: 'Communications', submenu: [] },
+    '-',
+    { label: 'Administrator', submenu: [] },
+    { label: 'Support', submenu: [] },
+    { label: 'Billing Manager', submenu: [] },
+    { label: 'Ordering', submenu: [
+      { label: '&Assigned Products', action: 'search.ordering.assignedProducts' },
+      { label: '&Orders', action: 'search.ordering.orders' },
+      { label: 'Order &Pool', action: 'search.ordering.orderPool' },
+      { label: 'Search Mass Request', action: 'search.ordering.massRequest' },
+      { label: 'Device Prices', action: 'search.ordering.devicePrices' },
+      { label: 'Fair Market Value', action: 'search.ordering.fairMarketValue' },
+    ]},
+  ]},
+  { label: '&Workflow', items: [
+    { label: 'Accept', shortcut: 'Ctrl+W', disabled: true },
+    { label: 'Dispatch', shortcut: 'Ctrl+D', disabled: true },
+    { label: 'Assign', shortcut: 'Ctrl+G', disabled: true },
+    { label: 'Move', shortcut: 'Ctrl+M', disabled: true },
+    { label: 'Return', shortcut: 'Ctrl+U', disabled: true },
+    { label: 'Forward', shortcut: 'Ctrl+F', disabled: true },
+    { label: 'Retrieve', shortcut: 'Ctrl+Y', action: 'workflow.retrieve' },
+    { label: 'Manage Work Folders', action: 'workflow.manageWorkFolders' },
+  ]},
+  { label: 'Actio&ns', items: [
+    { label: 'Play Script', shortcut: 'Ctrl+Shift+Y', disabled: true },
+    { label: 'Log', submenu: [] },
+    '-',
+    { label: 'Support', submenu: [] },
+    { label: 'Billing Manager', submenu: [] },
+    { label: 'Ordering', submenu: [
+      { label: '&Provide', action: 'actions.ordering.provide' },
+      { label: 'Provide Enterprise', disabled: true },
+      { label: 'Provide Wireless', action: 'actions.ordering.provideWireless' },
+      '-',
+      { label: '&Change', disabled: true },
+      { label: '&Suspend', disabled: true },
+      { label: '&Resume', disabled: true },
+      { label: 'Move', disabled: true },
+      { label: 'C&ease', disabled: true },
+      { label: 'Reestablish', disabled: true },
+      { label: 'Replace Offers and Products', disabled: true },
+      { label: 'Add Product to O&ffer', disabled: true },
+      { label: 'Cease Offer', disabled: true },
+      { label: 'Change Ownership', action: 'actions.ordering.changeOwnership' },
+      { label: 'Merge Fetch TV', disabled: true },
+      '-',
+      { label: 'A&mend', disabled: true },
+      { label: 'Cancel', disabled: true },
+      { label: 'Cancel Offer', disabled: true },
+      { label: 'Cancel Replace', disabled: true },
+      { label: 'Relinquish', disabled: true },
+      { label: '&Take Over', disabled: true },
+      '-',
+      { label: 'Resume &Negotiation', disabled: true },
+    ]},
+  ]},
+  { label: '&Help', items: [
+    { label: 'Amdocs CRM Help', shortcut: 'Ctrl+H', action: 'help.crmHelp' },
+    { label: 'About Amdocs CRM', action: 'help.about' },
+    { label: 'Tools', submenu: [] },
+  ]},
+];
+
+/* =====================================================================
+   QUICK ACTIONS — Interaction Toolbox list (scrolls 3 rows per wheel notch)
+   ===================================================================== */
+const QUICK_ACTIONS = [
+  { label: 'Change Contact Info',          action: 'qa.changeContactInfo' },
+  { label: 'Change Account Details',       action: 'qa.changeAccountDetails' },
+  { label: 'Add New Contact',              action: 'qa.addNewContact' },
+  { label: 'Change Customer Info',         action: 'qa.changeCustomerInfo' },
+  { label: 'Create Customer',              action: 'qa.createCustomer' },
+  { label: 'Provide Device',               action: 'qa.provideDevice' },
+  { label: 'Provide Wireless',             action: 'qa.provideWireless' },
+  { label: 'Provide',                      action: 'qa.provide' },
+  { label: 'Change Ownership',             action: 'qa.changeOwnership' },
+  { label: 'Change Marketing Preferences', action: 'qa.changeMarketingPreferences' },
+  { label: 'Personal Details Update',      action: 'qa.personalDetailsUpdate' },
+  { label: 'Reload promotions',            action: 'qa.reloadPromotions' },
+];
+
+/* =====================================================================
+   ICONS
+   ===================================================================== */
+const HANDSET = 'M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z';
+const V_HANDSET = 'M7.6 1.2C4.2 2 1.2 6.1 1.2 10.5s3 8.5 6.4 9.3l2-2.6-2.2-3.4-1.8.8c-.9-2.3-.9-5 0-7.3l1.8.8 2.2-3.4z';
+const MAG = (x, y, c) => `<circle cx="${x}" cy="${y}" r="3.6" fill="none" stroke="${c}" stroke-width="1.7"/><path d="M${x-2.5} ${y+2.5}l-3.2 3.4" stroke="${c}" stroke-width="2" stroke-linecap="round"/>`;
+const ICONS = {
+  phone:     `<svg width="20" height="25" viewBox="0 0 24 24" preserveAspectRatio="none"><path d="${HANDSET}" fill="#9a9a9a" stroke="#9a9a9a" stroke-width=".6"/></svg>`,
+  phoneX:    `<svg width="20" height="25" viewBox="0 0 24 24" preserveAspectRatio="none"><path d="${HANDSET}" fill="#9a9a9a" stroke="#9a9a9a" stroke-width=".6"/><path d="M14.6 0.8l6.6 6.2M21.2 0.8l-6.6 6.2" stroke="#9a9a9a" stroke-width="2.4"/></svg>`,
+  phoneHold: `<svg width="20" height="25" viewBox="0 0 24 24" preserveAspectRatio="none"><path d="${HANDSET}" fill="#9a9a9a" stroke="#9a9a9a" stroke-width=".6"/><path d="M15.4 0.3v8.8M20.6 0.3v8.8" stroke="#9a9a9a" stroke-width="3"/></svg>`,
+  phoneStar: `<svg width="21" height="25" viewBox="0 0 24 24" preserveAspectRatio="none"><path d="${HANDSET}" fill="#01afd1"/><path d="M17.6 0l1.7 3.4 3.7.5-2.7 2.6.7 3.7-3.4-1.8-3.3 1.8.6-3.7-2.7-2.6 3.7-.5z" fill="#01afd1"/></svg>`,
+  home:      `<svg width="16" height="18" viewBox="0 0 16 18"><path d="M8 1.8L.6 9.4h2.2V18h4V12.6h2.4V18h4V9.4h2.2z" fill="currentColor"/><rect x="11.4" y="0" width="1.6" height="5" fill="currentColor"/></svg>`,
+  plus:      `<svg width="17" height="16" viewBox="0 0 17 16"><path d="M8.5 0v16M0 8h17" stroke="#01afd1" stroke-width="4"/></svg>`,
+  list:      `<svg width="21" height="19" viewBox="0 0 21 19"><g fill="#4b5563"><rect x="0" y="1" width="2.4" height="2"/><rect x="0" y="6" width="2.4" height="2"/><rect x="0" y="11" width="2.4" height="2"/><rect x="0" y="16" width="2.4" height="2"/>
+              <rect x="4.5" y="1" width="16.5" height="2.2"/><rect x="4.5" y="6" width="16.5" height="2.2"/><rect x="4.5" y="11" width="16.5" height="2.2"/><rect x="4.5" y="16" width="16.5" height="2.2"/></g></svg>`,
+  phoneSearch:  `<svg width="22" height="20" viewBox="0 0 22 20"><path d="${V_HANDSET}" fill="#0d3e6b"/>${MAG(15.5, 9, '#a3abb1')}</svg>`,
+  personSearch: `<svg width="23" height="20" viewBox="0 0 23 20"><circle cx="5.8" cy="5" r="3.6" fill="#0d3e6b"/><path d="M0.6 18.5v-3.2c0-3 2.4-5 5.2-5s5.2 2 5.2 5v3.2z" fill="#0d3e6b"/>${MAG(17, 10.5, '#a3abb1')}</svg>`,
+  bankSearch:   `<svg width="24" height="20" viewBox="0 0 24 20"><g fill="#0d3e6b"><path d="M0.5 5.5L7 1.5l6.5 4z"/><rect x="0.5" y="5.6" width="13" height="1.7"/>
+                   <rect x="1.6" y="8" width="2.2" height="7.5"/><rect x="5.9" y="8" width="2.2" height="7.5"/><rect x="10.2" y="8" width="2.2" height="7.5"/><rect x="0.5" y="16" width="13" height="2.4"/></g>${MAG(18.5, 9.5, '#a3abb1')}</svg>`,
+  binoculars:   `<svg width="22" height="15" viewBox="0 0 22 15"><g fill="none" stroke="#1d3f66" stroke-width="1.8"><path d="M7.2 1.4H4.2L1.6 9M14.8 1.4h3l2.6 7.6"/>
+                   <rect x="1.4" y="8.4" width="8" height="5.4" rx="2"/><rect x="12.6" y="8.4" width="8" height="5.4" rx="2"/></g><rect x="1" y="8.2" width="20" height="2.6" fill="#1d3f66"/></svg>`,
+  contact:   `<svg width="18" height="18" viewBox="0 0 18 18"><path d="M2 17.5v-4.2c0-2.3 1.8-3.8 4-3.8h1.6c2.2 0 4 1.5 4 3.8v4.2z" fill="#2f74c2"/><path d="M5.2 9.5l1.6 3 1.6-3z" fill="#fff"/>
+              <circle cx="6.8" cy="5.4" r="3.5" fill="#f2c89a"/><path d="M3.2 5.2c0-3.2 2-4.4 3.8-4.4 2.2 0 3.6 1.3 3.6 3.6-1.2-.2-3-1-4.2-2.4-.8 1.6-2 2.6-3.2 3.2z" fill="#9a4b1e"/>
+              <path d="M13.5 9.6v8M9.5 13.6h8" stroke="#22b322" stroke-width="2.6"/></svg>`,
+  check:     `<svg width="12" height="10" viewBox="0 0 12 10"><path class="chk" d="M1 5.2l3.3 3.3L11 1.5" fill="none" stroke="#657b81" stroke-width="2"/></svg>`,
+  secMin:    `<svg width="12" height="3" viewBox="0 0 12 3"><rect width="12" height="3" fill="#fff"/></svg>`,
+  secPop:    `<svg width="11" height="11" viewBox="0 0 11 11"><g fill="none" stroke="#fff" stroke-width="1.2"><path d="M3 3.2V.9h7.4v5.9H8.2"/><rect x=".6" y="4" width="7.4" height="6.4"/></g>
+              <rect x="0" y="3.4" width="8.6" height="2" fill="#fff"/><rect x="2.4" y=".3" width="8.6" height="1.8" fill="#fff"/></svg>`,
+  winMin:    `<svg width="14" height="3" viewBox="0 0 14 3"><rect width="14" height="3" fill="#fff"/></svg>`,
+  winRestore:`<svg width="14" height="13" viewBox="0 0 14 13"><g fill="none" stroke="#fff" stroke-width="1.4"><path d="M3.7 3.5V1h9.6v7.6h-2.6"/><rect x=".7" y="4.6" width="9.6" height="7.7"/></g>
+              <rect x="0" y="4" width="11" height="2.4" fill="#fff"/><rect x="3" y=".3" width="11" height="2.2" fill="#fff"/></svg>`,
+  winMax:    `<svg width="14" height="13" viewBox="0 0 14 13"><rect x=".7" y=".7" width="12.6" height="11.6" fill="none" stroke="#fff" stroke-width="1.4"/><rect x="0" y="0" width="14" height="3" fill="#fff"/></svg>`,
+  winClose:  `<svg width="15" height="15" viewBox="0 0 15 15"><path d="M2.6 2.6l9.8 9.8M12.4 2.6l-9.8 9.8" stroke="#fff" stroke-width="4.4" stroke-linecap="round"/></svg>`,
+  calendar:  `<svg width="16" height="15" viewBox="0 0 16 15"><g fill="none" stroke="#1aa6c6" stroke-width="1.2"><rect x=".6" y="1.6" width="14.8" height="12.8"/><path d="M.6 5h14.8M4.3 5v9.4M8 5v9.4M11.7 5v9.4M.6 8.2h14.8M.6 11.3h14.8"/></g><rect x=".6" y="1.6" width="14.8" height="3.4" fill="#1aa6c6"/></svg>`,
+  chevron:   `<svg width="13" height="8" viewBox="0 0 13 8"><path d="M1 1l5.5 5.5L12 1" fill="none" stroke="#2d4b54" stroke-width="1.8"/></svg>`,
+};
+
+/* =====================================================================
+   WINDOW TYPES — windows that open inside the work area
+   ===================================================================== */
+const FIND_CALLER_FORM = [
+  { title: 'Subscription:', cols: [573, 571], padBottom: 5, rows: [
+    [{ label: 'Service ID:', name: 'serviceId' }, { label: 'IMEI No:', name: 'imei' }],
+    [{ label: 'SIM Serial No:', name: 'simSerial' }, null],
+    [{ label: 'Street Number:', name: 'streetNumber' }, { label: 'Street Name:', name: 'streetName' }],
+    [{ label: 'Suburb:', name: 'suburb' }, { label: 'Postal Code:', name: 'postcode' }],
+    [{ label: 'State:', name: 'state', type: 'select', options: [''], disabled: true },
+     { label: 'Country:', name: 'country', type: 'select', options: ['Please Specify', 'Australia'] }],
+  ]},
+  { title: 'Contact:', cols: [573, 571], padBottom: 4, rows: [
+    [{ label: 'First Name:', name: 'firstName' }, { label: 'Last Name:', name: 'lastName' }],
+    [{ label: 'Phone:', name: 'phone' }, { label: 'Email:', name: 'email' }],
+    [{ label: 'Contact ID:', name: 'contactId' }, null],
+    [{ label: 'Alternate Contact Method:', name: 'altMethod', type: 'select', options: ['Email'] },
+     { label: '', name: 'altValue' }],
+  ]},
+  { title: 'Business Account:', cols: [573, 571], padBottom: 3, rows: [
+    [{ label: 'Account ID:', name: 'accountId' }, { label: 'Account Name:', name: 'accountName' }],
+    [{ label: 'ABN:', name: 'abn' }, { label: 'ACN/ARBN:', name: 'acn' }],
+  ]},
+  { title: 'Billing Entities:', cols: [578, 566], padBottom: 14, rows: [
+    [{ label: 'Customer ID:', name: 'customerId' }, { label: 'Customer Name:', name: 'customerName' }],
+    { tall: true, cells: [
+      { label: 'Billing Arrangement ID:', name: 'billingArrangementId' },
+      { label: 'Financial Account ID:', name: 'financialAccountId',
+        checkbox: { name: 'findBarContacts', label: 'Find Bar level contacts using FA ID', left: 206 } }]},
+  ]},
+];
+const AU_STATES = ['', 'ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
+
+/* =====================================================================
+   DUMMY ACCOUNTS — fake customers for training. Nothing here is real:
+   • mobiles are from ACMA's list of numbers reserved for fiction (0491 570 xxx – 0491 579 xxx),
+     so no real phone can ever receive a code
+   • emails use example.com, which is reserved and can't receive mail
+   • ABNs fail the ABN checksum, IMEIs use the 001 test prefix, IDs are made up
+   ===================================================================== */
+const DUMMY_ACCOUNTS = [
+  { customerId: '9100000101', customerName: 'Jordan Ellis', billingArrangementId: '7100000101', financialAccountId: '6100000101',
+    address: { streetNumber: '12', streetName: 'Signal Street', suburb: 'Redcliffe', postcode: '4020', state: 'QLD', country: 'Australia' },
+    contacts: [{ contactId: '5100000101', role: 'Subscriber', firstName: 'Jordan', lastName: 'Ellis', dob: '14/03/1991', otp: '482913',
+                 phone: '0491 570 156', email: 'jordan.ellis@example.com', altMethod: 'Email', altValue: 'jordan.ellis@example.com' }],
+    services: [{ serviceId: '0491 570 156', type: 'Mobile', status: 'Active', contactId: '5100000101', imei: '001017000000101', simSerial: '8961020000000000101' }] },
+
+  { customerId: '9100000102', customerName: 'Priya Nandakumar', billingArrangementId: '7100000102', financialAccountId: '6100000102',
+    address: { streetNumber: '7', streetName: 'Coverage Court', suburb: 'Scarborough', postcode: '4020', state: 'QLD', country: 'Australia' },
+    contacts: [{ contactId: '5100000102', role: 'Subscriber', firstName: 'Priya', lastName: 'Nandakumar', dob: '02/11/1987', otp: '715204',
+                 phone: '0491 570 157', email: 'priya.n@example.com', altMethod: 'Email', altValue: 'priya.n@example.com' }],
+    services: [{ serviceId: '0491 570 157', type: 'Mobile', status: 'Active', contactId: '5100000102', imei: '001017000000102', simSerial: '8961020000000000102' },
+               { serviceId: '0491 570 158', type: 'Tablet', status: 'Active', contactId: '5100000102', imei: '001017000000112', simSerial: '8961020000000000112' }] },
+
+  { customerId: '9100000103', customerName: 'Tom Whitfield', billingArrangementId: '7100000103', financialAccountId: '6100000103',
+    address: { streetNumber: '48', streetName: 'Tower View Drive', suburb: 'Margate', postcode: '4019', state: 'QLD', country: 'Australia' },
+    contacts: [{ contactId: '5100000103', role: 'Subscriber', firstName: 'Tom', lastName: 'Whitfield', dob: '23/07/1975', otp: '360478',
+                 phone: '0491 570 159', email: 'tom.whitfield@example.com', altMethod: 'Email', altValue: 'tom.whitfield@example.com' },
+               { contactId: '5100000113', role: 'Authorised Representative', firstName: 'Sarah', lastName: 'Whitfield', dob: '09/05/1978', otp: '529061',
+                 phone: '0491 570 110', email: 'sarah.whitfield@example.com', altMethod: 'Email', altValue: 'sarah.whitfield@example.com' }],
+    services: [{ serviceId: '0491 570 159', type: 'Mobile', status: 'Active', contactId: '5100000103', imei: '001017000000103', simSerial: '8961020000000000103' },
+               { serviceId: '0491 570 110', type: 'Mobile', status: 'Active', contactId: '5100000113', imei: '001017000000113', simSerial: '8961020000000000113' }] },
+
+  { customerId: '9100000104', customerName: 'Mei-Lin Zhou', billingArrangementId: '7100000104', financialAccountId: '6100000104',
+    address: { streetNumber: '3', streetName: 'Bandwidth Avenue', suburb: 'Clontarf', postcode: '4019', state: 'QLD', country: 'Australia' },
+    contacts: [{ contactId: '5100000104', role: 'Subscriber', firstName: 'Mei-Lin', lastName: 'Zhou', dob: '30/01/1999', otp: '804352',
+                 phone: '0491 570 313', email: 'meilin.zhou@example.com', altMethod: 'Email', altValue: 'meilin.zhou@example.com' }],
+    services: [{ serviceId: '0491 570 313', type: 'Mobile', status: 'Active', contactId: '5100000104', imei: '001017000000104', simSerial: '8961020000000000104' }] },
+
+  { customerId: '9100000105', customerName: 'Bayside Plumbing Co Pty Ltd', billingArrangementId: '7100000105', financialAccountId: '6100000105',
+    accountId: '4100000105', accountName: 'Bayside Plumbing Co Pty Ltd', abn: '12 345 678 901', acn: '123 456 789',
+    address: { streetNumber: '2/19', streetName: 'Handset Lane', suburb: 'Kippa-Ring', postcode: '4021', state: 'QLD', country: 'Australia' },
+    contacts: [{ contactId: '5100000105', role: 'Business Owner', firstName: 'Dean', lastName: 'Kowalski', dob: '18/09/1969', otp: '193746',
+                 phone: '0491 570 737', email: 'dean@baysideplumbing.example.com', altMethod: 'Email', altValue: 'dean@baysideplumbing.example.com' }],
+    services: [{ serviceId: '0491 570 737', type: 'Mobile', status: 'Active', contactId: '5100000105', imei: '001017000000105', simSerial: '8961020000000000105' },
+               { serviceId: '0491 571 266', type: 'Mobile', status: 'Active', contactId: '5100000105', imei: '001017000000115', simSerial: '8961020000000000115' },
+               { serviceId: '0491 571 491', type: 'Mobile', status: 'Active', contactId: '5100000105', imei: '001017000000125', simSerial: '8961020000000000125' }] },
+
+  { customerId: '9100000106', customerName: 'Aroha Ngata', billingArrangementId: '7100000106', financialAccountId: '6100000106',
+    address: { streetNumber: '91', streetName: 'Roaming Road', suburb: 'Kippa-Ring', postcode: '4021', state: 'QLD', country: 'Australia' },
+    contacts: [{ contactId: '5100000106', role: 'Subscriber', firstName: 'Aroha', lastName: 'Ngata', dob: '05/12/1994', otp: '648205',
+                 phone: '0491 571 804', email: 'aroha.ngata@example.com', altMethod: 'Email', altValue: 'aroha.ngata@example.com' }],
+    services: [{ serviceId: '0491 571 804', type: 'Mobile', status: 'Active', contactId: '5100000106', imei: '001017000000106', simSerial: '8961020000000000106' }] },
+
+  { customerId: '9100000107', customerName: "Liam O'Connor", billingArrangementId: '7100000107', financialAccountId: '6100000107',
+    address: { streetNumber: '26', streetName: 'Network Close', suburb: 'Woody Point', postcode: '4019', state: 'QLD', country: 'Australia' },
+    contacts: [{ contactId: '5100000107', role: 'Subscriber', firstName: 'Liam', lastName: "O'Connor", dob: '11/06/2003', otp: '271839',
+                 phone: '0491 572 549', email: 'liam.oconnor@example.com', altMethod: 'Email', altValue: 'liam.oconnor@example.com' }],
+    services: [{ serviceId: '0491 572 549', type: 'Mobile', status: 'Active', contactId: '5100000107', imei: '001017000000107', simSerial: '8961020000000000107' },
+               { serviceId: '0491 572 983', type: 'Mobile', status: 'Ceased', contactId: '5100000107', imei: '001017000000117', simSerial: '8961020000000000117' }] },
+
+  { customerId: '9100000108', customerName: 'Grace Abernethy', billingArrangementId: '7100000108', financialAccountId: '6100000108',
+    address: { streetNumber: '5', streetName: 'Antenna Street', suburb: 'Rothwell', postcode: '4022', state: 'QLD', country: 'Australia' },
+    contacts: [{ contactId: '5100000108', role: 'Subscriber', firstName: 'Grace', lastName: 'Abernethy', dob: '27/02/1952', otp: '935117',
+                 phone: '0491 572 665', email: 'grace.abernethy@example.com', altMethod: 'Email', altValue: 'grace.abernethy@example.com' }],
+    services: [{ serviceId: '0491 572 665', type: 'Mobile', status: 'Active', contactId: '5100000108', imei: '001017000000108', simSerial: '8961020000000000108' }] },
+];
+
+/* Interaction / Work history shown on Interaction Home (made up, shared shape for every dummy account). */
+const HISTORY_TEMPLATES = {
+  interactions: [
+    ['Mobile - Postpaid_Billing Enquiry / Action_Balance Educated', 'IVR'],
+    ['Mobile - Postpaid_Sales Enquiry / Action_Plan Options Discussed', 'Retail'],
+    ['Mobile - Postpaid_Technical / Action_Network Troubleshooting', 'Phone'],
+    ['Mobile - Postpaid_Billing Enquiry / Action_Adjustment Applied', 'IVR'],
+    ['Mobile - Postpaid_Order_Provide Device_None', 'Retail'],
+    ['Mobile - Postpaid_Account Update / Action_Contact Details Updated', 'Email'],
+  ],
+  work: [['Order/Quote', 'Closed'], ['Order/Quote', 'Closed'], ['Order/Quote', 'Open']],
+};
+function accountHistory(a) {
+  const n = DUMMY_ACCOUNTS.indexOf(a), name = a.customerName;
+  const day = k => { const d = new Date(2026, 9, 18 - k * 9 - n); return d; };
+  const fmt = (d, h, m) => `${d.getDate()}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${h}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`.replace(/ (1[3-9]|2\d):/, (x, hh) => ` ${hh - 12}:`);
+  const ints = HISTORY_TEMPLATES.interactions.filter((_, i) => (i + n) % 3 !== 0).map(([title, media], i) =>
+    ({ created: fmt(day(i), 9 + ((i * 3 + n) % 8), (i * 17 + n * 7) % 60), title, media, direction: 'Inbound' }));
+  const work = HISTORY_TEMPLATES.work.slice(0, 1 + (n % 3)).map(([type, status], i) =>
+    ({ modified: fmt(day(i * 2), 10 + i, (n * 11 + i * 23) % 60), type, id: `24${String(n + 1).padStart(2, '0')}${310 + i * 7}A`, title: `Order for '${name}'`, status: i === 0 && n % 3 === 2 ? 'Open' : status }));
+  return { ints, work };
+}
+
+/* Find Caller lookup: every filled field must match. IDs/numbers ignore spaces,
+   names match from the start (case-insensitive), address/email match case-insensitively. */
+function searchDummyAccounts(c) {
+  const digits = s => String(s || '').replace(/\D/g, '');
+  const low = s => String(s || '').trim().toLowerCase();
+  const tests = [];
+  const add = (val, fn) => { if (String(val || '').trim()) tests.push(fn); };
+  add(c.serviceId,  a => a.services.some(s => digits(s.serviceId) === digits(c.serviceId)));
+  add(c.imei,       a => a.services.some(s => digits(s.imei) === digits(c.imei)));
+  add(c.simSerial,  a => a.services.some(s => digits(s.simSerial) === digits(c.simSerial)));
+  add(c.streetNumber, a => low(a.address.streetNumber) === low(c.streetNumber));
+  add(c.streetName, a => low(a.address.streetName).startsWith(low(c.streetName)));
+  add(c.suburb,     a => low(a.address.suburb) === low(c.suburb));
+  add(c.postcode,   a => a.address.postcode === String(c.postcode).trim());
+  add(c.state,      a => a.address.state === c.state);
+  add(c.firstName,  a => a.contacts.some(p => low(p.firstName).startsWith(low(c.firstName))));
+  add(c.lastName,   a => a.contacts.some(p => low(p.lastName).startsWith(low(c.lastName))));
+  add(c.phone,      a => a.contacts.some(p => digits(p.phone) === digits(c.phone)));
+  add(c.email,      a => a.contacts.some(p => low(p.email) === low(c.email)));
+  add(c.contactId,  a => a.contacts.some(p => p.contactId === digits(c.contactId)));
+  add(c.altValue,   a => a.contacts.some(p => low(p.altValue) === low(c.altValue)));
+  add(c.accountId,  a => a.accountId === digits(c.accountId));
+  add(c.accountName, a => low(a.accountName).startsWith(low(c.accountName)));
+  add(c.abn,        a => digits(a.abn) === digits(c.abn));
+  add(c.acn,        a => digits(a.acn) === digits(c.acn));
+  add(c.customerId, a => a.customerId === digits(c.customerId));
+  add(c.customerName, a => low(a.customerName).startsWith(low(c.customerName)));
+  add(c.billingArrangementId, a => a.billingArrangementId === digits(c.billingArrangementId));
+  add(c.financialAccountId, a => a.financialAccountId === digits(c.financialAccountId));
+  if (!tests.length) return null;   // nothing entered
+  return DUMMY_ACCOUNTS.filter(a => tests.every(t => t(a)));
+}
+
+const WINDOW_TYPES = {
+  findCaller: {
+    title: 'Find Caller CIM Search',
+    render(body, win) {
+      const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      const control = f => {
+        if (f.type === 'select') {
+          return `<div class="sel${f.disabled ? ' dis' : ''}"><select name="${f.name}"${f.disabled ? ' disabled' : ''}>` +
+            f.options.map(o => `<option>${esc(o)}</option>`).join('') + `</select>${ICONS.chevron}</div>`;
+        }
+        return `<input type="text" name="${f.name}" spellcheck="false" autocomplete="off">`;
+      };
+      let html = '<form class="fc" autocomplete="off" onsubmit="return false">';
+      for (const sec of FIND_CALLER_FORM) {
+        html += `<div class="fc-sec">${esc(sec.title)}</div><div class="fc-panel" style="padding-bottom:${sec.padBottom}px">`;
+        for (const r of sec.rows) {
+          const cells = Array.isArray(r) ? r : r.cells;
+          html += `<div class="fc-row${r.tall ? ' tall' : ''}">`;
+          cells.forEach((f, i) => {
+            html += `<div class="fc-cell" style="width:${sec.cols[i]}px">`;
+            if (f) {
+              html += `<div class="lbl">${esc(f.label)}</div>`;
+              if (f.checkbox) html += `<label class="chk" style="left:${f.checkbox.left}px"><input type="checkbox" name="${f.checkbox.name}">${esc(f.checkbox.label)}</label>`;
+              html += control(f);
+            }
+            html += '</div>';
+          });
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+      html += `<div class="fc-btns"><button type="button" class="jbtn" data-act="search">Search Now</button>
+               <button type="button" class="jbtn" data-act="cancel">Cancel</button></div></form>`;
+      body.innerHTML = html;
+
+      const form = body.querySelector('form');
+      const country = form.elements.country, state = form.elements.state;
+      country.addEventListener('change', () => {               // State unlocks once Country = Australia
+        const au = country.value === 'Australia';
+        state.disabled = !au;
+        state.parentElement.classList.toggle('dis', !au);
+        state.innerHTML = (au ? AU_STATES : ['']).map(o => `<option>${o}</option>`).join('');
+      });
+      const search = () => {
+        const values = Object.fromEntries(new FormData(form).entries());
+        values.state = state.value;
+        JARVIS.run('findCaller.searchNow', { label: 'Search Now', values, win });
+      };
+      form.querySelector('[data-act=search]').onclick = search;
+      form.querySelector('[data-act=cancel]').onclick = () => JARVIS.closeWindow(win);
+      form.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); search(); } });
+      setTimeout(() => form.elements.serviceId.focus(), 0);
+    },
+  },
+};
+
+/* =====================================================================
+   ACTIONS — action id -> function(ctx). Unlisted ids show a status message.
+   ===================================================================== */
+const ACTIONS = {
+  'toolbar.findCaller': () => JARVIS.openWindow('findCaller'),
+  'view.statusbar': (ctx) => JARVIS.setStatusbar(!JARVIS.state.statusbar),
+  'view.maximizeWorkarea': () => document.body.classList.toggle('max-work'),
+  'view.restoreDefaults': () => {
+    JARVIS.setStatusbar(true);
+    document.body.classList.remove('max-work');
+    ['secIT', 'secOW'].forEach(id => JARVIS.setSection(id, false));
+    ['secMF', 'secAH', 'secNP'].forEach(id => JARVIS.setSection(id, true));
+  },
+  'file.exit': () => { if (confirm('Exit JARVIS?')) location.reload(); },
+  // Find Caller → results in "Search: Contact and Subscription"
+  'findCaller.searchNow': ({ values }) => {
+    const found = searchDummyAccounts(values);
+    if (found === null) return JARVIS.status('Please enter at least one search value.');
+    JARVIS.openWindow('contactSearch', { refresh: true, rows: recordsFor(found) });
+  },
+  'toolbar.quickSearch': () => quickSearch($('#custField').value),
+  'toolbar.home': () => { const ih = JARVIS.windows.find(w => w.type === 'interactionHome'); if (ih) JARVIS.focusWindow(ih); else JARVIS.status('There is no active customer interaction.'); },
+  'toolbar.customerLink': () => ACTIONS['toolbar.home'](),
+  'interaction.end': () => endInteraction(false),
+  'interaction.endAndNew': () => endInteraction(true),
+};
+
+/* =====================================================================
+   CUSTOMER SEARCH → MULTI-FACTOR AUTHENTICATION → INTERACTION HOME
+   Quick Search (field next to "Customer:") + Enter looks up a service number.
+   An active number opens Multi-factor Authentication:
+     Step 1 — answer two questions (Name, DOB, Postcode, My Account Username)
+     Step 2 — Generate Code, then enter that contact's fixed code (`otp` in DUMMY_ACCOUNTS)
+   ===================================================================== */
+const MFA_RULES = {
+  questionsNeeded: 2,   // how many Step 1 questions must be answered correctly (Name = First + Last together)
+};
+const digitsOf = s => String(s || '').replace(/\D/g, '');
+const escHTML = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// One row per subscription, paired with the contact who uses it.
+function recordsFor(accounts) {
+  const rows = [];
+  for (const a of accounts) for (const s of a.services) {
+    rows.push({ account: a, contact: a.contacts.find(p => p.contactId === s.contactId) || a.contacts[0], service: s });
+  }
+  return rows;
+}
+function quickSearch(value) {
+  const q = digitsOf(value);
+  if (!q) return;
+  const rows = recordsFor(DUMMY_ACCOUNTS).filter(r => digitsOf(r.service.serviceId) === q);
+  JARVIS.openWindow('contactSearch', { refresh: true, rows });
+  const active = rows.filter(r => r.service.status === 'Active');
+  if (!rows.length) JARVIS.status(`No records found for ${value.trim()}.`);
+  else if (!active.length) JARVIS.status(`Service ${rows[0].service.serviceId} is ${rows[0].service.status}. Customer authentication is only available for active services.`);
+  else if (active.length === 1) openMfaDialog(active[0]);
+}
+
+const SEARCH_COLS = [
+  ['Contact ID',    r => r.contact.contactId, 100, 'link'],
+  ['Type',          r => r.service.type, 100, 'nofilter'],
+  ['Service ID',    r => r.service.serviceId, 104],
+  ['Status',        r => r.service.status, 100, 'nofilter'],
+  ['IMEI',          r => r.service.imei, 130],
+  ['SIM Serial No', r => r.service.simSerial, 150],
+  ['First Name',    r => r.contact.firstName, 136],
+  ['Last Name',     r => r.contact.lastName, 136],
+  ['Phone',         r => r.contact.phone, 110],
+  ['Role',          r => r.contact.role, 150],
+  ['Account Name',  r => r.account.accountName || '', 170],
+  ['Account ID',    r => r.account.accountId || '', 120],
+  ['Customer ID',   r => r.account.customerId, 120],
+  ['Customer Name', r => r.account.customerName, 190],
+];
+const GRID_ICONS = {
+  cols: `<svg width="26" height="14" viewBox="0 0 26 14"><g fill="none" stroke="#1aa6c6" stroke-width="1.4"><rect x=".7" y=".7" width="18" height="12.6"/><path d="M.7 5h18M.7 9h18M6.7.7v12.6M12.7.7v12.6"/></g><path d="M22.5 2v9M20 8.5l2.5 3 2.5-3" fill="none" stroke="#1aa6c6" stroke-width="1.6"/></svg>`,
+  find: `<svg width="30" height="14" viewBox="0 0 30 14"><circle cx="5.5" cy="5.5" r="4" fill="none" stroke="#1aa6c6" stroke-width="1.8"/><path d="M8.5 8.5l3.5 3.5" stroke="#1aa6c6" stroke-width="2"/><g fill="#1aa6c6"><circle cx="17" cy="11" r="1.3"/><circle cx="22" cy="11" r="1.3"/><circle cx="27" cy="11" r="1.3"/></g></svg>`,
+  gear: `<svg width="16" height="16" viewBox="0 0 24 24"><path fill="#1aa6c6" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1l-.4-2.6h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L4.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>`,
+};
+const gearBtn = () => `<span class="gear"><span>${GRID_ICONS.gear}</span><i></i></span>`;
+
+Object.assign(WINDOW_TYPES, {
+  /* ---------- Search: Contact and Subscription ---------- */
+  contactSearch: {
+    title: 'Search: Contact and Subscription',
+    render(body, win, opts = {}) {
+      win.rows = opts.rows || [];
+      win.sel = win.rows.length ? 0 : -1;
+      body.innerHTML = `<div class="srch">
+        <div class="gtool"><button class="jbtn sm" data-a="search">Search Now</button>
+          <button class="jbtn ic" data-a="cols">${GRID_ICONS.cols}</button><button class="jbtn ic" data-a="find">${GRID_ICONS.find}</button>
+          <select class="gsel" style="width:120px"><option>Unsaved Search</option></select>${gearBtn()}
+          <span class="sp"></span><button class="jbtn sm" data-a="viewall">View All</button><button class="jbtn sm" data-a="count"></button></div>
+        <div class="grid"><table><colgroup><col style="width:26px">${SEARCH_COLS.map(c => `<col style="width:${c[2]}px">`).join('')}</colgroup>
+          <thead><tr><th class="rad"></th>${SEARCH_COLS.map(c => `<th>${c[0]}<i></i></th>`).join('')}</tr></thead>
+          <tbody class="flt"><tr><td></td>${SEARCH_COLS.map(c => c[3] === 'nofilter' ? '<td></td>' :
+            '<td><select><option>Starts with</option><option>Contains</option><option>Equals</option></select></td>').join('')}</tr>
+            <tr><td></td>${SEARCH_COLS.map((c, i) => `<td><input data-col="${i}" spellcheck="false"></td>`).join('')}</tr></tbody>
+          <tbody class="res"></tbody></table></div>
+        <div class="srch-foot"><button class="jbtn sm" data-a="select">Select</button> <button class="jbtn sm" data-a="products" style="margin-left:6px">View Assigned Products</button>
+          <button class="jbtn sm cancel" data-a="cancel">Cancel</button></div></div>`;
+      const tb = body.querySelector('tbody.res'), count = body.querySelector('[data-a=count]');
+      const draw = () => {
+        tb.innerHTML = win.rows.map((r, i) => `<tr data-i="${i}" class="${i === win.sel ? 'on' : ''}"><td class="rad"><b></b></td>` +
+          SEARCH_COLS.map(c => `<td class="${c[3] === 'link' ? 'lnk' : ''}">${c[3] === 'link' ? `<span>${escHTML(c[1](r))}</span>` : escHTML(c[1](r))}</td>`).join('') + '</tr>').join('');
+        count.textContent = `${win.rows.length} Record(s)`;
+      };
+      draw();
+      const select = () => {
+        const r = win.rows[win.sel];
+        if (!r) return JARVIS.status('Please select a record.');
+        if (r.service.status !== 'Active') return JARVIS.status(`Service ${r.service.serviceId} is ${r.service.status}. Customer authentication is only available for active services.`);
+        openMfaDialog(r);
+      };
+      const filterSearch = () => {
+        const inputs = [...body.querySelectorAll('.flt input')], modes = [...body.querySelectorAll('.flt select')];
+        const crit = inputs.map(inp => inp.value.trim().toLowerCase());
+        if (!crit.some(Boolean)) return JARVIS.status('Please enter at least one search value.');
+        let m = 0;
+        const modeFor = SEARCH_COLS.map(c => c[3] === 'nofilter' ? 'Starts with' : modes[m++].value);
+        const norm = (v, i) => /ID|Serial|IMEI|Phone/.test(SEARCH_COLS[i][0]) ? digitsOf(v) : String(v).toLowerCase();
+        win.rows = recordsFor(DUMMY_ACCOUNTS).filter(r => crit.every((q, i) => {
+          if (!q) return true;
+          const v = norm(SEARCH_COLS[i][1](r), i), qq = norm(q, i);
+          return modeFor[i] === 'Equals' ? v === qq : modeFor[i] === 'Contains' ? v.includes(qq) : v.startsWith(qq);
+        }));
+        win.sel = win.rows.length ? 0 : -1;
+        draw();
+      };
+      const mark = () => tb.querySelectorAll('tr').forEach(tr => tr.classList.toggle('on', +tr.dataset.i === win.sel));
+      tb.addEventListener('click', e => {
+        const tr = e.target.closest('tr'); if (!tr) return;
+        win.sel = +tr.dataset.i; mark();
+        if (e.target.closest('.lnk span')) select();
+      });
+      tb.addEventListener('dblclick', e => { if (e.target.closest('tr')) select(); });
+      body.querySelector('.flt').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); filterSearch(); } });
+      body.querySelector('.srch').addEventListener('keydown', e => {
+        if (e.target.closest('.flt')) return;
+        if (e.key === 'Enter') { e.preventDefault(); select(); }
+        if (e.key === 'ArrowDown' && win.sel < win.rows.length - 1) { win.sel++; mark(); }
+        if (e.key === 'ArrowUp' && win.sel > 0) { win.sel--; mark(); }
+      });
+      body.querySelector('.srch').tabIndex = -1;
+      body.querySelector('[data-a=search]').onclick = filterSearch;
+      body.querySelector('[data-a=select]').onclick = select;
+      body.querySelector('[data-a=cancel]').onclick = () => JARVIS.closeWindow(win);
+      body.querySelector('[data-a=products]').onclick = () => JARVIS.run('search.viewAssignedProducts', { label: 'View Assigned Products' });
+      body.querySelector('[data-a=viewall]').onclick = () => JARVIS.run('search.viewAll', { label: 'View All' });
+      body.querySelector('[data-a=cols]').onclick = () => JARVIS.run('search.columns', { label: 'Columns' });
+      body.querySelector('[data-a=find]').onclick = () => JARVIS.run('search.advanced', { label: 'Advanced Search' });
+    },
+  },
+
+  /* ---------- Interaction Home ---------- */
+  interactionHome: {
+    title: 'Interaction Home',
+    render(body, win) {
+      const ctx = JARVIS.ctx; if (!ctx) return;
+      const { a, c } = ctx, hist = accountHistory(a);
+      const tabs = ['Contact Information', 'Account Information', 'Billing Items', 'Subscriptions', 'Collection FA', 'Billing Summary'];
+      body.innerHTML = `<div class="ih">
+        <div class="ih-top">
+          <div class="lbl b" style="position:absolute;left:5px;top:8px">Current Interaction Details:</div>
+          <div style="position:absolute;left:5px;top:31px;width:237px"><div class="lbl">Type:</div><select class="js" disabled><option>Retail</option></select></div>
+          <div style="position:absolute;left:250px;top:31px;width:240px"><div class="lbl">Direction:</div><select class="js"><option>Inbound</option><option>Outbound</option></select></div>
+          <div style="position:absolute;left:497px;top:31px;width:236px"><div class="lbl">Media:</div><select class="js"><option>Retail</option></select></div>
+          <div style="position:absolute;left:742px;top:31px;width:240px"><div class="lbl">Channel:</div><select class="js"><option>Branded Retail</option></select></div>
+          <div style="position:absolute;right:12px;top:31px"><div class="lbl">Save Interaction And</div>
+            <div style="display:flex;gap:6px;margin-top:2px"><button class="jbtn sm" data-a="interaction.keepWorking">Keep Working</button>
+            <button class="jbtn sm" data-a="interaction.endAndNew">End and New</button><button class="jbtn sm" style="width:61px" data-a="interaction.end">End</button></div></div>
+          <div class="lbl" style="position:absolute;left:5px;top:78px;color:#555">&#9662; Current Topics and Actions</div>
+          <div class="topics" style="top:95px;height:120px"><table><colgroup><col style="width:26px"><col><col><col><col><col><col></colgroup>
+            <tr><th></th><th>Product</th><th>Interaction Type</th><th>Action</th><th>Cause</th><th>Link To</th><th>Agent Name</th></tr>
+            <tr><td style="text-align:center">&#9679;</td><td>Please Specify</td><td>Please Specify</td><td>Please Specify</td><td>None</td><td><u data-a="interaction.linkTo">Please Select</u></td><td>${escHTML(CONFIG.userId)}</td></tr></table></div>
+          <div class="side-btns" style="top:95px"><button class="jbtn sm" data-a="interaction.actionItem">Action Item</button><button class="jbtn sm" data-a="interaction.case">Case</button>
+            <button class="jbtn sm" data-a="interaction.outboundComms">Outbound Comms</button><button class="jbtn sm" data-a="interaction.promotions">Promotions</button></div>
+          <label class="lbl" style="position:absolute;left:5px;top:222px;display:flex;align-items:center;gap:6px;color:#666"><input type="checkbox" style="margin:0">Repeat Caller</label>
+          <div class="ih-tabs" style="top:244px">${tabs.map((t, i) => `<div class="ih-tab${i === 0 ? ' on' : ''}${i === 1 ? ' dim' : ''}" data-t="${i}">${t}</div>`).join('')}</div>
+        </div>
+        <div class="ih-body"></div></div>`;
+      const ihBody = body.querySelector('.ih-body');
+      const grid = (cols, rows) => `<div class="grid"><table><colgroup>${cols.map(() => '<col>').join('')}</colgroup>
+        <thead><tr>${cols.map(h => `<th>${h}<i></i></th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(v => `<td>${escHTML(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+      const tool = (n, id) => `<div class="gtool" style="padding:0"><button class="jbtn sm" data-a="${id}.search">Search Now</button><button class="jbtn ic" data-a="${id}.cols">${GRID_ICONS.cols}</button>
+        <select class="gsel" style="width:120px"><option>Show All</option></select>${gearBtn()}<span class="sp"></span>
+        <button class="jbtn sm" data-a="${id}.viewAll">View All</button><button class="jbtn sm" data-a="${id}.count">${n} Record(s)</button></div>`;
+      const showTab = i => {
+        body.querySelectorAll('.ih-tab').forEach(t => t.classList.toggle('on', +t.dataset.t === i));
+        if (i !== 0) { ihBody.innerHTML = `<div class="ih-empty">The ${tabs[i]} tab isn't built in the JARVIS trainer yet.</div>`; return; }
+        const alt = c.altValue && c.altValue !== c.email ? 1 : 0;
+        ihBody.innerHTML = `<div class="ih-ci">
+            <div style="display:flex;gap:5px;position:absolute;left:0;right:0;top:8px">
+              <div style="flex:568"><div class="lbl">Full Name:</div><div class="ro">${escHTML(c.firstName + ' ' + c.lastName)}</div></div>
+              <div style="flex:230"><div class="lbl">Preferred Name:</div><div class="ro">${escHTML(c.preferredName || '')}</div></div>
+              <div style="flex:238"><div class="lbl">Phone:</div><div class="ro">${escHTML(c.phone.replace(/\s/g, ''))}</div></div>
+              <div style="flex:270"><div class="lbl">Email:</div><div class="ro">${escHTML(c.email)}</div></div>
+              <div style="flex:85"><div class="lbl">Birth Date:</div><div class="ro">${escHTML(c.dob)}</div></div>
+              <div style="flex:0 0 92px;padding-top:16px"><button class="jbtn sm" style="width:100%;height:26px;padding:0" data-a="contact.viewDetails">View Details</button></div></div>
+            <div style="display:flex;gap:5px;position:absolute;left:0;right:0;top:57px">
+              <div style="flex:568"><div class="lbl">Preferred Contact Time:</div><div class="ro">${escHTML(c.contactTime || 'Business Hours (9am-5pm)')}</div></div>
+              <div style="flex:230"><div class="lbl">Preferred Contact Method:</div><div class="ro">${escHTML(c.contactMethod || 'Mobile Phone')}</div></div>
+              <div style="flex:681;padding:24px 0 0 56px;font-size:12px">Alternate Contact Methods:&nbsp; ${alt}</div></div></div>
+          <div class="sec">Interaction</div>${tool(hist.ints.length, 'ints')}
+          ${grid(['Created On', 'Title', 'Media', 'Direction'], hist.ints.map(r => [r.created, r.title, r.media, r.direction]))}
+          <div class="sec">Work</div>${tool(hist.work.length, 'work')}
+          ${grid(['Modified', 'Type', 'ID', 'Title', 'Status'], hist.work.map(r => [r.modified, r.type, r.id, r.title, r.status]))}`;
+      };
+      showTab(0);
+      body.querySelector('.ih-tabs').addEventListener('click', e => { const t = e.target.closest('.ih-tab'); if (t) showTab(+t.dataset.t); });
+      body.addEventListener('click', e => {
+        const b = e.target.closest('[data-a]'); if (!b) return;
+        JARVIS.run(b.dataset.a, { label: b.textContent.trim() || null });
+      });
+    },
+  },
+});
+
+/* ---------- Multi-factor Authentication dialog (Step 1 → Step 2) ----------
+   Coordinates below are measured from the real JARVIS screens, in pixels from the
+   dialog's top-left corner (title bar included). at()/tx() convert them for the canvas. */
+const at = (x, y, w, h) => `left:${x - 7}px;top:${y - 40}px;width:${w}px;height:${h}px`;
+const tx = (x, y) => `left:${x - 7}px;top:${y - 40}px`;
+const maskNumber = p => { const d = digitsOf(p); return `${d.slice(0, 3)}XXXX${d.slice(-3)}`; };
+const maskEmailUC = e => {
+  const [u, dom] = String(e).split('@');
+  const m = u.length <= 3 ? u[0] + 'X'.repeat(Math.max(1, u.length - 1)) : u[0] + 'X'.repeat(u.length - 3) + u.slice(-2);
+  return `${m}@${dom}`.toUpperCase();
+};
+const normDate = s => {
+  const t = String(s).trim();
+  let m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (m) return `${m[1].padStart(2, '0')}/${m[2].padStart(2, '0')}/${m[3]}`;
+  m = t.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : t;
+};
+const CHECK_ICON = `<svg width="22" height="21" viewBox="0 0 22 21"><path d="M16.6 3.6A9 9 0 1 0 19.8 9.4" fill="none" stroke="#45a326" stroke-width="1.7"/>
+  <path d="M5.6 9.8l4 4.6L20.6 2.4" fill="none" stroke="#2c8912" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const MFA_SELECT = (style, name) => `<div class="sel" style="${style}"><select name="${name}"><option>Please Specify</option></select>${ICONS.chevron}</div>`;
+
+function closeModal() { const l = $('#modalLayer'); l.classList.remove('on'); l.innerHTML = ''; }
+function centreModal() {
+  const d = $('#modalLayer .mfa'); if (!d) return;
+  d.style.left = Math.max(2, (innerWidth - d.offsetWidth) / 2) + 'px';
+  d.style.top = Math.max(2, (innerHeight - d.offsetHeight) / 2) + 'px';
+}
+addEventListener('resize', centreModal);
+
+function openMfaDialog(rec) {
+  const { account: a, contact: c } = rec;
+  const st = { step: 1, ref: '', tab: 0, via: 'num', sent: false, code: '' };
+  const layer = $('#modalLayer');
+  layer.innerHTML = `<div class="mfa" role="dialog" aria-label="Multi-factor Authentication">
+    <div class="mfa-tb"><svg class="app-ico2" viewBox="0 0 19 19"><rect width="19" height="19" fill="#a9b200"/><path d="M5.4 6.4C6.6 4.7 8.4 4 10.3 4c3.1 0 4.9 1.4 4.9 4.3V16.4M15.2 10.4c-1.4-.6-3.2-.9-5-.9-3.5 0-5.6 1.3-5.6 3.6 0 2.1 1.7 3.2 4 3.2 2.8 0 5.1-1.2 6.6-3.4" fill="none" stroke="#fff" stroke-width="2.1"/></svg>
+      Search: Contact and Subscription &gt; Multi-factor Authentication
+      <div class="mfa-x" data-a="cancel"><svg width="9" height="8" viewBox="0 0 9 8"><path d="M.5 0l8 8M8.5 0l-8 8" stroke="#fff" stroke-width="1.7"/></svg></div></div>
+    <div class="mfa-client"><div class="mfa-canvas"></div></div></div>`;
+  layer.classList.add('on');
+  const dlg = layer.querySelector('.mfa'), cv = dlg.querySelector('.mfa-canvas');
+  centreModal();
+  const q = sel => cv.querySelector(sel);
+  const say = (sel, text, cls = 'err') => { const m = q(sel); if (m) { m.textContent = text; m.className = `t msg ${cls}`; } };
+
+  const frame = n => `<div class="fs-outer" style="${at(11, 49, 1763, 1098)}"></div>
+    <span class="t legend" style="${tx(17, 41)};font-size:14px">Multi-factor Authentication (Step ${n})</span>
+    <button type="button" class="mbtn" data-a="cancel" style="${at(1676, 1151, 101, 30)}">Cancel</button>`;
+
+  /* ----- Step 1: questions ----- */
+  function renderStep1() {
+    st.step = 1;
+    cv.innerHTML = frame(1) + `
+      <span class="t" style="${tx(56, 68)}">Reference</span>
+      <input class="in" name="ref" style="${at(160, 63, 1607, 25)}" autocomplete="off" spellcheck="false">
+      <span class="t b" style="${tx(20, 117)}">My Optus App Authentication</span>
+      <div class="qmark" data-a="help" style="${at(255, 114, 22, 22)}">?</div>
+      <div class="panel" style="${at(19, 140, 355, 124)}"></div>
+      <span style="${at(33, 149, 22, 21)}">${CHECK_ICON}</span>
+      <span class="t" style="${tx(70, 151)}">Eligible</span>
+      <button type="button" class="mbtn" data-a="app" style="${at(254, 228, 113, 30)}">Authenticator</button>
+      <span class="t msg" data-m="app" style="${at(19, 270, 355, 34)};white-space:normal"></span>
+      <span class="t" style="${tx(380, 392)};font-size:13px">OR</span>
+
+      <span class="t b" style="${tx(440, 117)}">Mutli-Factor Authentication</span>
+      <div class="fs" style="${at(405, 149, 543, 508)}"></div>
+      <span class="t legend" style="${tx(411, 139)};color:#0c0b07">Please answer two of the following questions</span>
+      <div class="fs" style="${at(410, 169, 533, 109)}"></div>
+      <span class="t legend lg" style="${tx(417, 162)}">Name</span>
+      <label class="t" style="${tx(419, 196)}" for="mfaFirst">First Name</label>
+      <input class="in" id="mfaFirst" name="first" style="${at(417, 225, 257, 29)}" autocomplete="off" spellcheck="false">
+      <label class="t" style="${tx(680, 196)}" for="mfaLast">Last Name</label>
+      <input class="in" id="mfaLast" name="last" style="${at(679, 225, 256, 29)}" autocomplete="off" spellcheck="false">
+      <label class="t" style="${tx(411, 303)}" for="mfaDob">DOB</label>
+      <input class="in" id="mfaDob" name="dob" style="${at(410, 328, 228, 44)}" autocomplete="off" spellcheck="false">
+      <button type="button" class="cal" data-a="cal" style="${at(637, 328, 40, 44)}">${ICONS.calendar}</button>
+      <input type="date" class="dpick" tabindex="-1" style="${at(410, 371, 1, 1)};opacity:0;border:0;padding:0">
+      <label class="t" style="${tx(411, 381)}" for="mfaPc">Postcode</label>
+      <input class="in" id="mfaPc" name="pc" style="${at(410, 406, 267, 43)}" autocomplete="off" inputmode="numeric">
+      <label class="t" style="${tx(411, 459)}" for="mfaUser">My Account Username (email address used to log in to My Account)</label>
+      <input class="in" id="mfaUser" name="user" style="${at(410, 484, 267, 44)}" autocomplete="off" spellcheck="false">
+      <span class="t" style="${tx(410, 537)}">Account Number (FA)</span>
+      <input class="in" name="fa" style="${at(410, 563, 267, 42)}" disabled>
+      <button type="button" class="mbtn" data-a="submit1" style="${at(867, 605, 76, 46)}">Submit</button>
+      <span class="t msg" data-m="q" style="${tx(405, 664)}"></span>
+      <span class="t" style="${tx(956, 392)};font-size:13px">OR</span>
+
+      <div class="panel" style="${at(978, 140, 775, 133)}"></div>
+      <span class="t b slate" style="${tx(990, 148)}">Transfer Existing Customer Multi-Factor Authentication</span>
+      <span class="t" style="${tx(996, 179)}">Reason Code</span>
+      ${MFA_SELECT(at(995, 199, 479, 29), 'trReason')}
+      <span class="t" style="${tx(1480, 179)}">Reference</span>
+      <input class="in" name="trRef" style="${at(1479, 199, 257, 29)}" autocomplete="off">
+      <button type="button" class="mbtn" style="${at(1479, 230, 257, 29)}" disabled>Verify</button>
+      <div class="panel" style="${at(978, 276, 775, 137)}"></div>
+      <span class="t b slate" style="${tx(990, 283)}">Exemption from Multi-Factor Authentication</span>
+      <span class="t" style="${tx(989, 306)}">Reason Code</span>
+      ${MFA_SELECT(at(988, 335, 758, 29), 'exReason')}
+      <button type="button" class="mbtn" style="${at(1672, 376, 74, 30)}" disabled>Submit</button>`;
+    q('[name=ref]').value = st.ref;
+    q('[data-a=cal]').onclick = () => { const dp = q('.dpick'); try { dp.showPicker(); } catch (e) { q('[name=dob]').focus(); } };
+    q('.dpick').onchange = e => { if (e.target.value) q('[name=dob]').value = normDate(e.target.value); };
+    q('[data-a=app]').onclick = () => say('[data-m=app]', "My Optus App authentication isn't available in the JARVIS trainer yet. Answer the questions instead.");
+    q('[data-a=help]').onclick = () => say('[data-m=app]', 'My Optus App Authentication: if the customer is eligible, click Authenticator to approve the request in their My Optus app.', 'ok');
+    q('[data-a=submit1]').onclick = submitStep1;
+    setTimeout(() => q('[name=first]').focus(), 0);
+  }
+  function submitStep1() {
+    const v = n => q(`[name=${n}]`).value.trim();
+    const low = s => s.toLowerCase();
+    st.ref = v('ref');
+    const first = v('first'), last = v('last');
+    if (!!first !== !!last) { (first ? q('[name=last]') : q('[name=first]')).focus(); return say('[data-m=q]', 'Please enter both the First Name and Last Name.'); }
+    const answers = [];
+    if (first) answers.push(low(first) === low(c.firstName) && low(last) === low(c.lastName));
+    if (v('dob')) answers.push(normDate(v('dob')) === c.dob);
+    if (v('pc')) answers.push(v('pc') === a.address.postcode);
+    if (v('user')) answers.push(low(v('user')) === low(c.email));
+    if (answers.length < MFA_RULES.questionsNeeded) return say('[data-m=q]', 'Please answer two of the following questions.');
+    if (answers.some(ok => !ok)) return say('[data-m=q]', 'The details entered do not match our records.');
+    renderStep2();
+  }
+
+  /* ----- Step 2: one time code ----- */
+  function renderStep2() {
+    st.step = 2;
+    const tabs = ['Send Code', 'DVS', 'Visual ID Inspection'];
+    const tabPos = [[18, 108, 132, 32], [151, 111, 80, 29], [232, 111, 188, 29]];
+    cv.innerHTML = frame(2) + `
+      <div class="panel" style="${at(19, 63, 1726, 42)}"></div>
+      <span class="t" style="${tx(37, 77)}">Reference</span>
+      <input class="in dark" style="${at(115, 69, 250, 30)}" value="${escHTML(st.ref)}" disabled>
+      <div class="tabbox" style="${at(19, 139, 1726, 994)}"></div>
+      <div class="mfa-tabbody" style="pointer-events:none"></div>
+      ${tabs.map((t, i) => `<div class="tab${i === st.tab ? ' on' : ''}" data-tab="${i}" style="${at(...(i === st.tab ? [tabPos[i][0], 108, tabPos[i][2], 32] : [tabPos[i][0], 111, tabPos[i][2], 29]))}">${t}</div>`).join('')}`;
+    cv.querySelectorAll('[data-tab]').forEach(t => t.onclick = () => { st.tab = +t.dataset.tab; renderStep2(); });
+    const body = q('.mfa-tabbody');
+    if (st.tab !== 0) {
+      body.innerHTML = `<span class="t ph" style="${tx(36, 160)};pointer-events:auto">The ${tabs[st.tab]} tab isn't built in the JARVIS trainer yet.</span>`;
+      return;
+    }
+    body.innerHTML = `
+      <div class="panel" style="${at(24, 145, 770, 297)}"></div>
+      <span class="t b slate" style="${tx(36, 153)}">Send Code</span>
+      <div class="fs" style="${at(32, 182, 758, 123)};border-color:#e1e1e0"></div>
+      <span class="t legend lg" style="${tx(40, 176)};background:#f0f0ed;color:#050505">1. Select "One Time Code" Delivery Method</span>
+      <input type="radio" class="rad" id="mfaViaNum" name="via" value="num" style="${at(56, 209, 14, 14)}"${st.via === 'num' ? ' checked' : ''}>
+      <label class="t" for="mfaViaNum" style="${tx(77, 208)};font-size:13px;color:#050505">Contact Number</label>
+      <input type="radio" class="rad" id="mfaViaEmail" name="via" value="email" style="${at(303, 209, 14, 14)}"${st.via === 'email' ? ' checked' : ''}>
+      <label class="t" for="mfaViaEmail" style="${tx(325, 208)};font-size:13px;color:#050505">Contact Email</label>
+      <input class="in dark" style="${at(47, 230, 243, 30)};font-size:14px" value="${escHTML(maskNumber(c.phone))}" disabled>
+      <input class="in dark" style="${at(294, 230, 279, 30)};font-size:14px" value="${escHTML(maskEmailUC(c.email))}" disabled>
+      <button type="button" class="mbtn" data-a="gen" style="${at(40, 269, 119, 29)}">Generate Code</button>
+      <span class="t msg" data-m="sent" style="${tx(168, 275)}"></span>
+      <div class="fs" style="${at(32, 322, 758, 112)};border-color:#e0e0e0"></div>
+      <span class="t legend lg" style="${tx(39, 316)};background:#f0f0ed;color:#000">2. Validate</span>
+      <label class="t" for="mfaCode" style="${tx(41, 343)}">Enter Code (as provided by customer)</label>
+      <input class="in dark" id="mfaCode" name="code" maxlength="6" inputmode="numeric" autocomplete="off" style="${at(40, 366, 250, 28)};letter-spacing:1px">
+      <button type="button" class="mbtn" data-a="submit2" style="${at(40, 399, 174, 28)}">Submit One Time Code</button>
+      <span class="t msg" data-m="code" style="${tx(222, 404)}"></span>
+      <span class="t" style="${tx(369, 340)};font:bold 20px/22px var(--ui);color:#23434c">OR</span>
+      <span class="t" style="${tx(475, 340)};font-size:13px">Validate One Time Code</span>
+      <button type="button" class="mbtn" style="${at(475, 367, 254, 29)}" disabled>Validate Customer One Time Code</button>
+
+      <div class="panel" style="${at(24, 444, 773, 133)}"></div>
+      <span class="t b slate" style="${tx(35, 452)}">Transfer Existing Customer Multi-Factor Authentication</span>
+      <span class="t" style="${tx(41, 483)}">Reason Code</span>
+      ${MFA_SELECT(at(40, 503, 478, 28), 'trReason')}
+      <span class="t" style="${tx(525, 483)}">Reference</span>
+      <input class="in" name="trRef" style="${at(524, 503, 257, 29)}" autocomplete="off">
+      <button type="button" class="mbtn" style="${at(524, 534, 257, 29)}" disabled>Verify</button>
+      <div class="panel" style="${at(24, 580, 773, 137)}"></div>
+      <span class="t b slate" style="${tx(35, 587)}">Exemption from Multi-Factor Authentication</span>
+      <span class="t" style="${tx(34, 610)}">Reason Code</span>
+      ${MFA_SELECT(at(32, 639, 759, 29), 'exReason')}
+      <button type="button" class="mbtn" style="${at(717, 681, 74, 28)}" disabled>Submit</button>`;
+    body.querySelectorAll(':scope > *').forEach(el => el.style.pointerEvents = 'auto');
+    const code = q('[name=code]'), sub = q('[data-a=submit2]');
+    const sync = () => { code.disabled = !st.sent; sub.disabled = !st.sent; code.value = st.code; };
+    sync();
+    cv.querySelectorAll('[name=via]').forEach(r => r.onchange = () => { st.via = r.value; });
+    q('[data-a=gen]').onclick = () => {
+      const to = st.via === 'num' ? maskNumber(c.phone) : maskEmailUC(c.email);
+      say('[data-m=sent]', `One Time Code ${st.sent ? 're-sent' : 'sent'} to ${to}.`, 'ok');
+      st.sent = true; sync(); say('[data-m=code]', '');
+      code.focus();
+    };
+    code.oninput = () => { st.code = code.value; };
+    sub.onclick = submitStep2;
+  }
+  function submitStep2() {
+    const code = q('[name=code]');
+    if (!code || code.disabled) return;
+    const v = digitsOf(code.value);
+    if (!v) { code.focus(); return say('[data-m=code]', 'Please enter the code provided by the customer.'); }
+    if (v !== c.otp) { code.select(); return say('[data-m=code]', 'The one time code entered is incorrect.'); }
+    closeModal();
+    const s = JARVIS.windows.find(w => w.type === 'contactSearch'); if (s) JARVIS.closeWindow(s);
+    setCustomerContext(a, c);
+  }
+
+  dlg.addEventListener('click', e => { if (e.target.closest('[data-a=cancel]')) closeModal(); });
+  dlg.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); return closeModal(); }
+    if (e.key !== 'Enter' || e.target.matches('button, select')) return;
+    e.preventDefault();
+    if (st.step === 1) {
+      if (e.target.closest('[name=trRef]')) return;
+      submitStep1();
+    } else if (st.tab === 0 && e.target.name === 'code') submitStep2();
+  });
+  renderStep1();
+}
+
+/* ---------- Customer context (toolbar panels, toolbox, Interaction Home) ---------- */
+const CTX_ICONS = {
+  person: `<svg width="34" height="40" viewBox="0 0 34 40"><circle cx="17" cy="9" r="8" fill="#333"/><path d="M1 40c0-11 6-18 16-18s16 7 16 18z" fill="#333"/><path d="M15 22l2 9 2-9z" fill="#888"/></svg>`,
+  bill: `<svg width="36" height="32" viewBox="0 0 36 32"><g transform="rotate(-28 18 16)"><rect x="3" y="7" width="30" height="18" rx="2" fill="#3a3a3a"/><rect x="6" y="10" width="24" height="12" rx="1" fill="none" stroke="#aaa" stroke-width="1"/>
+         <text x="18" y="20.5" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="11" fill="#ddd">$</text></g></svg>`,
+  Mobile: `<svg width="16" height="16" viewBox="0 0 16 16"><rect x="4" y="1" width="8" height="14" rx="1.5" fill="none" stroke="#333" stroke-width="1.6"/><rect x="7" y="12" width="2" height="1.4" fill="#333"/></svg>`,
+  Voice: `<svg width="16" height="16" viewBox="0 0 16 16"><path d="M1 6c2-3 12-3 14 0l-1 2-3-1V5.5H5V7L2 8z" fill="#333"/><rect x="3" y="9" width="10" height="5" rx="1" fill="#333"/><circle cx="8" cy="11.5" r="1.4" fill="#ccc"/></svg>`,
+  TV: `<svg width="16" height="16" viewBox="0 0 16 16"><rect x="1" y="4" width="14" height="9" rx="1" fill="none" stroke="#333" stroke-width="1.8"/><path d="M5 1l3 3 3-3" fill="none" stroke="#333" stroke-width="1.4"/></svg>`,
+  Broadband: `<svg width="16" height="16" viewBox="0 0 16 16"><g fill="none" stroke="#333" stroke-width="1.3"><circle cx="8" cy="8" r="6.5"/><ellipse cx="8" cy="8" rx="3" ry="6.5"/><path d="M1.5 8h13M2.5 4.5h11M2.5 11.5h11"/></g></svg>`,
+  Group: `<svg width="16" height="16" viewBox="0 0 16 16"><g fill="#333"><circle cx="5" cy="5" r="2.6"/><circle cx="11" cy="5" r="2.6"/><path d="M0 15c0-4 2-6 5-6s5 2 5 6zM8 15c0-3 1-5.5 3-6 3 0 5 2 5 6z"/></g></svg>`,
+  Others: `<svg width="16" height="16" viewBox="0 0 24 24"><path fill="#333" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1l-.4-2.6h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L4.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/></svg>`,
+};
+function setCustomerContext(a, c) {
+  if (JARVIS.ctx) endInteraction(false, true);
+  const n = (JARVIS._ctxN = (JARVIS._ctxN || 0) + 1);
+  JARVIS.ctx = { a, c, n };
+  document.body.classList.add('has-ctx');
+  const ad = a.address, addr = `${ad.streetNumber} ${ad.streetName}, ${ad.suburb.toUpperCase()}`;
+  const card1 = $('#card1');
+  card1.classList.add('sel');
+  card1.innerHTML = `<div class="cc cc-person">${CTX_ICONS.person}<div class="tx"><div>${escHTML(c.firstName + ' ' + c.lastName)}</div><div>${escHTML(addr)}</div><div>${escHTML(c.dob)}</div></div></div>`;
+  $('#card2').innerHTML = `<div class="cc cc-bill">${CTX_ICONS.bill}<div class="tx"><div>Total Due:</div><div>Last Bill Amt:</div><div>Due Date:</div></div></div>`;
+  const live = a.services.filter(s => s.status !== 'Ceased');
+  const cnt = { Mobile: live.filter(s => /Mobile|Tablet/.test(s.type)).length, Voice: 0, TV: 0, Broadband: 0, Group: 0, Others: 0 };
+  $('#card4').innerHTML = `<div class="cc cc-svc">${['Mobile', 'Broadband', 'Voice', 'Group', 'TV', 'Others'].map(k => `<span>${CTX_ICONS[k]}${cnt[k]} ${k}</span>`).join('')}</div>`;
+  $('#custLink').textContent = a.customerName;
+  $('#ctxSelect').innerHTML = `<option>Private Context</option><option selected>[${n}] ${escHTML(c.firstName + ' ' + c.lastName)}</option>`;
+  $('.home-btn').classList.add('on');
+  $('#itTitle').style.color = '#222';
+  const notes = $('#notes'); notes.readOnly = false; notes.style.background = '#fff'; notes.style.color = '#222'; notes.value = `[${CONFIG.userId}]: `;
+  $('#custField').value = '';
+  JARVIS.openWindow('interactionHome', { refresh: true, title: `Interaction Home [${n}]*` });
+}
+function endInteraction(startNew, silent) {
+  const ih = JARVIS.windows.find(w => w.type === 'interactionHome'); if (ih) JARVIS.closeWindow(ih);
+  JARVIS.ctx = null;
+  document.body.classList.remove('has-ctx');
+  ['#card1', '#card2', '#card3', '#card4'].forEach(s => { $(s).innerHTML = ''; $(s).classList.remove('sel'); });
+  $('#ctxSelect').innerHTML = '<option>Private Context</option>';
+  $('.home-btn').classList.remove('on');
+  $('#itTitle').style.color = '';
+  const notes = $('#notes'); notes.readOnly = true; notes.style.background = ''; notes.style.color = ''; notes.value = `[${CONFIG.userId}]: `;
+  if (!silent) JARVIS.status('Interaction ended.');
+  if (startNew) { const q = $('#custField'); q.value = ''; q.focus(); }
+}
+
+/* =====================================================================
+   APP
+   ===================================================================== */
+const $ = (s, r = document) => r.querySelector(s);
+const JARVIS = {
+  state: { statusbar: true },
+  windows: [],
+  run(id, ctx = {}) {
+    const fn = id && ACTIONS[id];
+    if (fn) return fn(ctx);
+    JARVIS.status(`${ctx.label ? '"' + ctx.label + '"' : 'This function'} is not available in the JARVIS trainer yet.`);
+  },
+  status(msg) {
+    const el = $('#statusText');
+    el.textContent = msg;
+    clearTimeout(JARVIS._st);
+    if (msg) JARVIS._st = setTimeout(() => { el.textContent = ''; }, CONFIG.statusMessageMs);
+  },
+  setStatusbar(on) {
+    JARVIS.state.statusbar = on;
+    $('#statusbar').classList.toggle('hidden', !on);
+    const item = findItem(MENUS, it => it.action === 'view.statusbar');
+    if (item) item.checked = on;
+  },
+  setSection(id, collapsed) {
+    const sec = document.getElementById(id);
+    sec.classList.toggle('collapsed', collapsed);
+    sec.querySelector('.sec-ic').innerHTML = collapsed ? ICONS.secPop : ICONS.secMin;
+  },
+
+  /* ---------- Window manager ---------- */
+  openWindow(type, opts = {}) {
+    const def = WINDOW_TYPES[type];
+    if (!def) return JARVIS.status(`Window "${type}" has not been built yet.`);
+    if (def.single !== false) {
+      const existing = JARVIS.windows.find(w => w.type === type);
+      if (existing) {
+        if (opts.refresh) {                       // re-use the open window with new content
+          existing.title = opts.title || def.title;
+          existing.el.querySelector('.iwin-title').textContent = existing.title;
+          def.render(existing.el.querySelector('.iwin-body'), existing, opts);
+        }
+        JARVIS.focusWindow(existing);
+        return existing;
+      }
+    }
+    const el = document.createElement('div');
+    el.className = 'iwin max';
+    el.innerHTML = `<div class="iwin-hd"><span class="iwin-title"></span><div class="iwin-btns">
+        <span data-b="min">${ICONS.winMin}</span><span data-b="max">${ICONS.winRestore}</span><span data-b="close">${ICONS.winClose}</span></div></div>
+      <div class="iwin-body"></div>`;
+    const win = { id: ++JARVIS._wid, type, title: opts.title || def.title, el, max: true, min: false };
+    el.querySelector('.iwin-title').textContent = win.title;
+    $('#workarea').appendChild(el);
+    JARVIS.windows.push(win);
+    el.addEventListener('mousedown', () => JARVIS.focusWindow(win));
+    el.querySelector('[data-b=min]').onclick = e => { e.stopPropagation(); JARVIS.minimiseWindow(win); };
+    el.querySelector('[data-b=max]').onclick = e => { e.stopPropagation(); JARVIS.toggleMaxWindow(win); };
+    el.querySelector('[data-b=close]').onclick = e => { e.stopPropagation(); JARVIS.closeWindow(win); };
+    const hd = el.querySelector('.iwin-hd');
+    hd.addEventListener('dblclick', e => { if (!e.target.closest('.iwin-btns')) JARVIS.toggleMaxWindow(win); });
+    hd.addEventListener('mousedown', e => startDrag(e, win));
+    def.render(el.querySelector('.iwin-body'), win, opts);
+    JARVIS.focusWindow(win);
+    return win;
+  },
+  focusWindow(win) {
+    win.min = false;
+    win.el.classList.remove('minimised');
+    JARVIS.windows.forEach(w => w.el.classList.toggle('active', w === win));
+    win.el.style.zIndex = ++JARVIS._z;
+    JARVIS.activeWindow = win;
+    JARVIS.renderOpenWindows();
+  },
+  minimiseWindow(win) {
+    win.min = true;
+    win.el.classList.add('minimised');
+    win.el.classList.remove('active');
+    const next = JARVIS.windows.filter(w => !w.min).sort((a, b) => b.el.style.zIndex - a.el.style.zIndex)[0];
+    if (next) JARVIS.focusWindow(next); else { JARVIS.activeWindow = null; JARVIS.renderOpenWindows(); }
+  },
+  toggleMaxWindow(win) {
+    win.max = !win.max;
+    win.el.classList.toggle('max', win.max);
+    win.el.querySelector('[data-b=max]').innerHTML = win.max ? ICONS.winRestore : ICONS.winMax;
+    if (!win.max) {
+      const wa = $('#workarea').getBoundingClientRect();
+      const n = JARVIS.windows.indexOf(win);
+      const w = Math.min(1320, wa.width - 40), h = Math.min(760, wa.height - 40);
+      Object.assign(win.el.style, { left: (20 + n * 24) + 'px', top: (12 + n * 24) + 'px', width: w + 'px', height: h + 'px' });
+    } else {
+      Object.assign(win.el.style, { left: '', top: '', width: '', height: '' });
+    }
+  },
+  closeWindow(win) {
+    win.el.remove();
+    JARVIS.windows = JARVIS.windows.filter(w => w !== win);
+    if (JARVIS.activeWindow === win) {
+      JARVIS.activeWindow = null;
+      const next = JARVIS.windows.filter(w => !w.min).pop();
+      if (next) return JARVIS.focusWindow(next);
+    }
+    JARVIS.renderOpenWindows();
+  },
+  renderOpenWindows() {
+    const list = $('#owList');
+    list.innerHTML = '';
+    for (const w of JARVIS.windows) {
+      const d = document.createElement('div');
+      d.className = 'ow-item' + (w === JARVIS.activeWindow ? ' active' : '') + (w.min ? ' min' : '');
+      d.textContent = w.title;
+      d.onclick = () => JARVIS.focusWindow(w);
+      list.appendChild(d);
+    }
+  },
+  _wid: 0, _z: 10,
+};
+window.JARVIS = JARVIS;
+
+function startDrag(e, win) {
+  if (win.max || e.button !== 0 || e.target.closest('.iwin-btns')) return;
+  const sx = e.clientX, sy = e.clientY, ox = win.el.offsetLeft, oy = win.el.offsetTop;
+  const move = ev => { win.el.style.left = (ox + ev.clientX - sx) + 'px'; win.el.style.top = Math.max(0, oy + ev.clientY - sy) + 'px'; };
+  const up = () => { removeEventListener('mousemove', move); removeEventListener('mouseup', up); };
+  addEventListener('mousemove', move); addEventListener('mouseup', up);
+  e.preventDefault();
+}
+
+/* ---------- Title bar ---------- */
+function renderTitle() {
+  $('#tbTitle').textContent =
+    `${CONFIG.appName} - Version - ${CONFIG.version} -  ${CONFIG.server} - ${CONFIG.userId} - ${CONFIG.dealerCode} - ${CONFIG.role}`;
+  document.title = CONFIG.appName;
+  $('#notes').value = `[${CONFIG.userId}]: `;
+  $('#itTitle').textContent = CONFIG.interactionTitle;
+}
+$('#capMax').onclick = () => {
+  if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.();
+};
+$('#capClose').onclick = () => JARVIS.run('file.exit', { label: 'Exit' });
+
+/* ---------- Toolbar icons + actions ---------- */
+document.querySelectorAll('[data-ico]').forEach(el => { el.insertAdjacentHTML('beforeend', ICONS[el.dataset.ico]); });
+document.querySelectorAll('[data-action]').forEach(el => {
+  el.addEventListener('click', () => JARVIS.run(el.dataset.action, { label: el.dataset.tip || el.textContent.trim() || null }));
+});
+
+/* ---------- Toolbox sections ---------- */
+document.querySelectorAll('.sec-ic').forEach(ic => {
+  const sec = document.getElementById(ic.dataset.sec);
+  ic.innerHTML = sec.classList.contains('collapsed') ? ICONS.secPop : ICONS.secMin;
+  ic.addEventListener('click', () => JARVIS.setSection(sec.id, !sec.classList.contains('collapsed')));
+});
+
+/* ---------- Quick Actions list with custom scrollbar ---------- */
+const QA_ROW = 34;
+const qaList = $('#qaList'), qaThumb = $('#qaThumb'), qaTrack = $('#qaTrack');
+QUICK_ACTIONS.forEach(q => {
+  const r = document.createElement('div');
+  r.className = 'qa-row';
+  r.textContent = q.label;
+  r.onclick = () => JARVIS.run(q.action, { label: q.label });
+  qaList.appendChild(r);
+});
+function qaMax() { return Math.max(0, qaList.scrollHeight - qaList.clientHeight); }
+function qaSet(top) {
+  qaList.scrollTop = Math.max(0, Math.min(qaMax(), top));
+  const travel = qaTrack.clientHeight - qaThumb.offsetHeight + 2;
+  const m = qaMax();
+  qaThumb.style.top = (-1 + (m ? qaList.scrollTop / m : 0) * travel) + 'px';
+}
+qaList.parentElement.addEventListener('wheel', e => { e.preventDefault(); qaSet(qaList.scrollTop + Math.sign(e.deltaY) * QA_ROW * 3); }, { passive: false });
+function repeatPress(el, fn) {
+  let t1, t2;
+  el.addEventListener('mousedown', e => { e.preventDefault(); fn(); t1 = setTimeout(() => { t2 = setInterval(fn, 60); }, 350); });
+  const stop = () => { clearTimeout(t1); clearInterval(t2); };
+  el.addEventListener('mouseup', stop); el.addEventListener('mouseleave', stop);
+}
+repeatPress($('#qaUp'), () => qaSet(qaList.scrollTop - QA_ROW));
+repeatPress($('#qaDown'), () => qaSet(qaList.scrollTop + QA_ROW));
+qaTrack.addEventListener('mousedown', e => {
+  if (e.target === qaThumb) return;
+  const below = e.clientY > qaThumb.getBoundingClientRect().top;
+  qaSet(qaList.scrollTop + (below ? 1 : -1) * QA_ROW * 3);
+});
+qaThumb.addEventListener('mousedown', e => {
+  e.preventDefault(); e.stopPropagation();
+  const sy = e.clientY, st = qaList.scrollTop;
+  const travel = qaTrack.clientHeight - qaThumb.offsetHeight + 2;
+  const move = ev => {
+    const raw = st + (ev.clientY - sy) / travel * qaMax();
+    qaSet(Math.round(raw / QA_ROW) * QA_ROW);
+  };
+  const up = () => { removeEventListener('mousemove', move); removeEventListener('mouseup', up); };
+  addEventListener('mousemove', move); addEventListener('mouseup', up);
+});
+
+/* ---------- Menus ---------- */
+function mnemonicHTML(label) {
+  const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const i = label.indexOf('&');
+  if (i < 0) return esc(label);
+  return esc(label.slice(0, i)) + `<span class="mn">${esc(label[i + 1])}</span>` + esc(label.slice(i + 2));
+}
+const plain = l => l.replace('&', '');
+function findItem(list, pred) {
+  for (const m of list) {
+    for (const it of (m.items || m.submenu || [])) {
+      if (it === '-') continue;
+      if (pred(it)) return it;
+      if (it.submenu) { const f = findItem([{ items: it.submenu }], pred); if (f) return f; }
+    }
+  }
+  return null;
+}
+
+const mb = $('#menubar');
+const menuState = { top: -1, stack: [] };   // stack: [{el, items, armed, rows}]
+MENUS.forEach((m, i) => {
+  const el = document.createElement('div');
+  el.className = 'mb-item';
+  el.innerHTML = mnemonicHTML(m.label);
+  el.addEventListener('mousedown', e => { e.preventDefault(); menuState.top === i ? closeMenus() : openTop(i); });
+  el.addEventListener('mouseenter', () => { if (menuState.top >= 0 && menuState.top !== i) openTop(i); });
+  mb.appendChild(el);
+});
+
+function buildMenu(items, x, y, level) {
+  const box = document.createElement('div');
+  box.className = 'menu';
+  if (items.some(it => it !== '-' && it.submenu)) box.classList.add('has-sub');
+  const tbl = document.createElement('table');
+  const rows = [];
+  items.forEach((it, idx) => {
+    const tr = document.createElement('tr');
+    if (it === '-') { tr.className = 'sep'; tr.innerHTML = '<td colspan="4"></td>'; tbl.appendChild(tr); rows.push(null); return; }
+    tr.className = 'mi' + (it.disabled ? ' dis' : '') + (it.check ? ' chk' : '');
+    const icon = it.check ? (it.checked ? ICONS.check : '') : (it.icon ? ICONS[it.icon] : '');
+    tr.innerHTML = `<td class="ic">${icon}</td><td class="lb">${mnemonicHTML(it.label)}</td><td class="sc">${it.shortcut || ''}</td><td class="ar">${it.submenu ? '<i></i>' : ''}</td>`;
+    tr.addEventListener('mouseenter', () => armItem(level, idx, true));
+    tr.addEventListener('mousedown', e => e.preventDefault());
+    tr.addEventListener('click', () => activateItem(level, idx));
+    tbl.appendChild(tr);
+    rows.push(tr);
+  });
+  box.appendChild(tbl);
+  box.style.left = x + 'px'; box.style.top = y + 'px';
+  document.body.appendChild(box);
+  // keep on screen
+  const r = box.getBoundingClientRect();
+  if (r.right > innerWidth) box.style.left = Math.max(0, innerWidth - r.width) + 'px';
+  if (r.bottom > innerHeight) box.style.top = Math.max(0, innerHeight - r.height) + 'px';
+  return { el: box, items, rows, armed: -1 };
+}
+
+function openTop(i) {
+  closeMenus(true);
+  menuState.top = i;
+  const item = mb.children[i];
+  item.classList.add('open');
+  document.body.classList.add('show-mn');
+  const r = item.getBoundingClientRect();
+  menuState.stack = [buildMenu(MENUS[i].items, r.left, r.bottom + 1, 0)];
+}
+function closeMenus(keepMn) {
+  menuState.stack.forEach(m => m.el.remove());
+  menuState.stack = [];
+  if (menuState.top >= 0) mb.children[menuState.top].classList.remove('open');
+  menuState.top = -1;
+  if (!keepMn && !altMode) document.body.classList.remove('show-mn');
+}
+function closeFrom(level) {
+  while (menuState.stack.length > level) menuState.stack.pop().el.remove();
+}
+function armItem(level, idx, fromMouse) {
+  const m = menuState.stack[level];
+  if (!m) return;
+  closeFrom(level + 1);
+  m.rows.forEach((tr, j) => tr && tr.classList.toggle('armed', j === idx));
+  m.armed = idx;
+  const it = m.items[idx];
+  if (it && it !== '-' && it.submenu && it.submenu.length && !it.disabled && fromMouse) openSub(level, idx);
+}
+function openSub(level, idx) {
+  const m = menuState.stack[level];
+  const tr = m.rows[idx];
+  const tr_r = tr.getBoundingClientRect(), box_r = m.el.getBoundingClientRect();
+  closeFrom(level + 1);
+  menuState.stack.push(buildMenu(m.items[idx].submenu, box_r.right - 6, tr_r.top - 4, level + 1));
+}
+function activateItem(level, idx) {
+  const m = menuState.stack[level];
+  const it = m && m.items[idx];
+  if (!it || it === '-' || it.disabled) return;
+  if (it.submenu) { if (it.submenu.length) { openSub(level, idx); armItem(level + 1, firstEnabled(menuState.stack[level + 1], 0, 1)); } return; }
+  altMode = false;
+  closeMenus();
+  JARVIS.run(it.action, { label: plain(it.label), item: it });
+}
+function firstEnabled(m, from, dir) {
+  const n = m.items.length;
+  for (let k = 0, i = from; k < n; k++, i = (i + dir + n) % n) if (m.items[i] !== '-') return i;
+  return -1;
+}
+document.addEventListener('mousedown', e => {
+  if (menuState.top >= 0 && !e.target.closest('.menu') && !e.target.closest('#menubar')) closeMenus();
+}, true);
+addEventListener('blur', () => { closeMenus(); altMode = false; document.body.classList.remove('show-mn'); });
+
+/* ---------- Keyboard: Alt mnemonics, menu navigation, accelerators ---------- */
+let altMode = false, altDown = false;
+const ACCEL = {};
+(function collect(list) {
+  for (const it of list) {
+    if (it === '-') continue;
+    if (it.items) collect(it.items);
+    if (it.submenu) collect(it.submenu);
+    if (it.shortcut && !it.disabled && it.action) ACCEL[it.shortcut.toLowerCase()] = it;
+  }
+})(MENUS);
+function comboOf(e) {
+  let k = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+  return [(e.ctrlKey ? 'ctrl+' : ''), (e.shiftKey ? 'shift+' : ''), (e.altKey ? 'alt+' : ''), k].join('').toLowerCase();
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Alt') { altDown = true; return; }
+  altDown = false;
+  const acc = ACCEL[comboOf(e)];
+  if (acc) { e.preventDefault(); closeMenus(); JARVIS.run(acc.action, { label: plain(acc.label), item: acc }); return; }
+
+  // Alt+letter or (alt mode) letter opens a menu
+  if ((e.altKey || altMode) && menuState.top < 0 && e.key.length === 1) {
+    const i = MENUS.findIndex(m => { const p = m.label.indexOf('&'); return p >= 0 && m.label[p + 1].toLowerCase() === e.key.toLowerCase(); });
+    if (i >= 0) { e.preventDefault(); openTop(i); armItem(0, firstEnabled(menuState.stack[0], 0, 1)); return; }
+  }
+  if (menuState.top < 0) { if (e.key === 'Escape' && altMode) { altMode = false; document.body.classList.remove('show-mn'); } return; }
+
+  const level = menuState.stack.length - 1, m = menuState.stack[level];
+  const move = dir => { const start = m.armed < 0 ? (dir > 0 ? 0 : m.items.length - 1) : (m.armed + dir + m.items.length) % m.items.length; armItem(level, firstEnabled(m, start, dir)); };
+  switch (e.key) {
+    case 'ArrowDown': e.preventDefault(); move(1); break;
+    case 'ArrowUp': e.preventDefault(); move(-1); break;
+    case 'ArrowRight': {
+      e.preventDefault();
+      const it = m.items[m.armed];
+      if (it && it !== '-' && it.submenu && it.submenu.length && !it.disabled) { openSub(level, m.armed); armItem(level + 1, firstEnabled(menuState.stack[level + 1], 0, 1)); }
+      else { const i = (menuState.top + 1) % MENUS.length; openTop(i); armItem(0, firstEnabled(menuState.stack[0], 0, 1)); }
+      break;
+    }
+    case 'ArrowLeft':
+      e.preventDefault();
+      if (level > 0) closeFrom(level);
+      else { const i = (menuState.top - 1 + MENUS.length) % MENUS.length; openTop(i); armItem(0, firstEnabled(menuState.stack[0], 0, 1)); }
+      break;
+    case 'Enter': e.preventDefault(); if (m.armed >= 0) activateItem(level, m.armed); break;
+    case 'Escape': e.preventDefault(); if (level > 0) closeFrom(level); else { altMode = false; closeMenus(); } break;
+    default:
+      if (e.key.length === 1) {   // mnemonic inside an open menu
+        const idx = m.items.findIndex(it => it !== '-' && it.label.includes('&') && it.label[it.label.indexOf('&') + 1].toLowerCase() === e.key.toLowerCase());
+        if (idx >= 0) { e.preventDefault(); armItem(level, idx); activateItem(level, idx); }
+      }
+  }
+}, true);
+document.addEventListener('keyup', e => {
+  if (e.key === 'Alt' && altDown) {   // tap Alt on its own: toggle underlines like Windows
+    e.preventDefault();
+    altDown = false;
+    if (menuState.top >= 0) { closeMenus(); altMode = false; }
+    else { altMode = !altMode; document.body.classList.toggle('show-mn', altMode); }
+  }
+});
+document.addEventListener('mousedown', () => {
+  if (altMode && menuState.top < 0) { altMode = false; document.body.classList.remove('show-mn'); }
+});
+
+/* ---------- Tooltips (data-tip) ---------- */
+const tip = $('#tip');
+let tipTimer;
+document.addEventListener('mouseover', e => {
+  const t = e.target.closest('[data-tip]');
+  clearTimeout(tipTimer);
+  if (!t) { tip.style.display = 'none'; return; }
+  tipTimer = setTimeout(() => {
+    tip.textContent = t.dataset.tip;
+    tip.style.display = 'block';
+    tip.style.left = Math.min(innerWidth - tip.offsetWidth - 2, lastMouse.x - 6) + 'px';
+    tip.style.top = (lastMouse.y + 20) + 'px';
+  }, 700);
+});
+const lastMouse = { x: 0, y: 0 };
+document.addEventListener('mousemove', e => { lastMouse.x = e.clientX; lastMouse.y = e.clientY; });
+document.addEventListener('mousedown', () => { clearTimeout(tipTimer); tip.style.display = 'none'; });
+
+/* ---------- Start ---------- */
+$('#custField').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); JARVIS.run('toolbar.quickSearch'); } });
+renderTitle();
+qaSet(0);
+addEventListener('resize', () => qaSet(qaList.scrollTop));
+</script>
+</body>
+</html>
