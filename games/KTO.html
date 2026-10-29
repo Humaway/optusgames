@@ -1,0 +1,2586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>KICK THE OLLIE | Telco Stress Testing Lab</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Matter.js 0.19.0 Physics Engine CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <!-- Google Fonts: Inter & Space Grotesk -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&family=Space+Grotesk:wght@700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --telco-teal: #00A3AD;
+      --telco-teal-dark: #006E75;
+      --telco-yellow: #FDDA24;
+      --telco-yellow-bright: #FFF066;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #071318;
+      font-family: 'Inter', sans-serif;
+      color: #ffffff;
+    }
+
+    .font-display {
+      font-family: 'Space Grotesk', 'Inter', sans-serif;
+    }
+
+    /* Custom Horizontal Scrollbar for Weapon Dock */
+    .weapon-scroll::-webkit-scrollbar {
+      height: 6px;
+    }
+    .weapon-scroll::-webkit-scrollbar-track {
+      background: rgba(0, 35, 42, 0.6);
+      border-radius: 9999px;
+    }
+    .weapon-scroll::-webkit-scrollbar-thumb {
+      background: #00A3AD;
+      border-radius: 9999px;
+    }
+    .weapon-scroll::-webkit-scrollbar-thumb:hover {
+      background: #FDDA24;
+    }
+
+    /* Weapon Card Transitions */
+    .weapon-card {
+      transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s ease, border-color 0.16s ease;
+    }
+    .weapon-card:hover {
+      transform: translateY(-3px);
+    }
+    .weapon-card:active {
+      transform: translateY(1px) scale(0.98);
+    }
+    .weapon-card.active-weapon {
+      border-color: #FDDA24;
+      box-shadow: 0 0 20px rgba(253, 218, 36, 0.45), inset 0 0 12px rgba(253, 218, 36, 0.2);
+      background: linear-gradient(145deg, rgba(0, 163, 173, 0.38), rgba(0, 72, 82, 0.85));
+    }
+
+    /* Coin Pop Animation */
+    @keyframes popScale {
+      0% { transform: scale(1); }
+      40% { transform: scale(1.22); }
+      100% { transform: scale(1); }
+    }
+    .coin-bump {
+      animation: popScale 0.22s ease-out;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+  </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden flex flex-col justify-between select-none">
+
+  <!-- TOP RETAIL TELECOM HUD BAR -->
+  <header class="relative z-20 w-full bg-gradient-to-r from-[#005B63] via-[#00828B] to-[#005B63] border-b-4 border-[#FDDA24] shadow-2xl px-3 py-2 sm:px-5 sm:py-2.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+      
+      <!-- Brand Title & Status -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-10 h-10 rounded-xl bg-[#FDDA24] flex items-center justify-center shadow-md border-2 border-white/40 shrink-0">
+          <!-- Mini Ollie Icon -->
+          <svg class="w-7 h-7" viewBox="0 0 64 64" fill="none">
+            <path d="M18 14 C14 8, 22 6, 28 11 C44 8, 56 20, 56 36 C56 50, 44 58, 30 58 C16 58, 8 48, 8 34 C8 25, 13 18, 18 14 Z" fill="#FFA800" stroke="#111" stroke-width="3"/>
+            <path d="M22 22 C22 15, 48 15, 48 25 L48 31 C48 35, 22 35, 22 30 Z" fill="#FFFFFF" stroke="#111" stroke-width="2.5"/>
+            <circle cx="29" cy="27" r="3" fill="#111"/>
+            <circle cx="41" cy="26" r="3" fill="#111"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-display font-black text-lg sm:text-xl tracking-tight text-white drop-shadow">
+              KICK THE <span class="text-[#FDDA24]">OLLIE</span>
+            </h1>
+            <span class="hidden md:inline-block text-[10px] font-extrabold uppercase tracking-widest bg-[#FDDA24] text-slate-950 px-2 py-0.5 rounded-full">
+              YES! STRESS LAB
+            </span>
+          </div>
+          <p class="text-[11px] text-cyan-100/90 hidden sm:block font-medium">
+            Slam, zap, or drop roaming bills on Ollie to harvest kinetic YES Coins!
+          </p>
+        </div>
+      </div>
+
+      <!-- Telemetry Stats: YES Coins, Combo Multiplier, Peak G-Force -->
+      <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
+        
+        <!-- YES Coins Counter -->
+        <div class="bg-slate-950/80 border-2 border-[#FDDA24] rounded-xl px-3 py-1 flex items-center gap-2 shadow-inner">
+          <div class="w-6 h-6 rounded-full bg-[#FDDA24] text-slate-950 font-black text-xs flex items-center justify-center shadow">
+            YES
+          </div>
+          <div>
+            <div class="text-[9px] uppercase tracking-wider text-amber-200/80 font-bold leading-none">Balance</div>
+            <div id="coinDisplay" class="font-display font-extrabold text-base sm:text-lg text-[#FDDA24] leading-tight">
+              0
+            </div>
+          </div>
+          <button id="btnAddBudget" title="Grant +5,000 YES Test Budget" class="ml-1 bg-[#FDDA24] hover:bg-[#FFF066] active:scale-95 text-slate-950 font-extrabold text-[11px] px-2 py-1 rounded-lg transition shadow">
+            +5K YES
+          </button>
+        </div>
+
+        <!-- Combo Multiplier Box -->
+        <div class="bg-slate-950/80 border border-cyan-400/40 rounded-xl px-3 py-1 min-w-[105px]">
+          <div class="flex items-center justify-between text-[9px] uppercase tracking-wider text-cyan-200 font-bold">
+            <span>Combo</span>
+            <span id="comboHitsText" class="text-[#FDDA24]">0 Hits</span>
+          </div>
+          <div class="flex items-baseline justify-between gap-1">
+            <span id="comboDisplay" class="font-display font-black text-base sm:text-lg text-white">1.0x</span>
+            <span id="activeWeaponBadge" class="text-[10px] text-cyan-300 font-semibold truncate max-w-[70px]">Grab & Slam</span>
+          </div>
+          <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-0.5">
+            <div id="comboBar" class="h-full bg-gradient-to-r from-[#00A3AD] to-[#FDDA24] w-0 transition-all duration-75"></div>
+          </div>
+        </div>
+
+        <!-- Peak G-Force Meter -->
+        <div class="hidden lg:flex bg-slate-950/80 border border-cyan-400/40 rounded-xl px-3 py-1 items-center gap-2">
+          <div>
+            <div class="text-[9px] uppercase tracking-wider text-cyan-200 font-bold">Peak Impact</div>
+            <div class="flex items-baseline gap-1.5">
+              <span id="peakGDisplay" class="font-display font-extrabold text-base sm:text-lg text-rose-400">0.0 G</span>
+              <span id="currentGDisplay" class="text-[11px] text-slate-400 font-semibold">(0.0 G)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ollie Posture State Machine Badge -->
+        <div class="bg-slate-950/80 border border-cyan-400/40 rounded-xl px-3 py-1 flex items-center gap-2">
+          <span id="postureDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
+          <div>
+            <div class="text-[9px] uppercase tracking-wider text-cyan-200 font-bold leading-none">Posture</div>
+            <div id="postureBadgeText" class="font-display font-extrabold text-xs sm:text-sm text-emerald-300 leading-tight">
+              STANDING
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Utility Controls -->
+      <div class="flex items-center gap-1.5 sm:gap-2">
+        <button id="btnSlowMo" class="bg-slate-900/90 hover:bg-slate-800 border border-cyan-400/40 text-cyan-100 text-xs font-bold px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 transition shadow active:scale-95">
+          <span id="slowMoIndicator" class="w-2 h-2 rounded-full bg-slate-500"></span>
+          <span>Slow-Mo</span>
+        </button>
+        <button id="btnClearProps" class="bg-slate-900/90 hover:bg-slate-800 border border-cyan-400/40 text-cyan-100 text-xs font-bold px-2.5 py-1.5 rounded-xl transition shadow active:scale-95">
+          Clear Props
+        </button>
+        <button id="btnFactoryReset" class="bg-[#FDDA24] hover:bg-[#FFF066] text-slate-950 text-xs font-extrabold px-2.5 py-1.5 rounded-xl transition shadow active:scale-95">
+          Heal / Reset Ollie
+        </button>
+        <button id="btnMute" title="Toggle Audio Synthesizer" class="bg-slate-900/90 hover:bg-slate-800 border border-cyan-400/40 text-cyan-100 p-1.5 rounded-xl transition shadow active:scale-95">
+          <svg id="iconSoundOn" class="w-4 h-4 text-[#FDDA24]" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"/>
+          </svg>
+          <svg id="iconSoundOff" class="w-4 h-4 text-rose-400 hidden" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/>
+          </svg>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- MAIN INTERACTIVE ARENA CANVAS CONTAINER -->
+  <main id="arenaContainer" class="relative flex-1 w-full overflow-hidden bg-[#081920]">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Floating Context Hint Banner -->
+    <div id="weaponHintBanner" class="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-slate-950/85 border border-[#00A3AD]/60 backdrop-blur-md px-4 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-xs sm:text-sm text-cyan-50 font-medium whitespace-nowrap">
+      <span class="w-2.5 h-2.5 rounded-full bg-[#FDDA24] animate-pulse"></span>
+      <span id="weaponHintText">Grab Ollie with your cursor and slam him into the padded walls!</span>
+    </div>
+  </main>
+
+  <!-- BOTTOM RETAIL WEAPON DOCK -->
+  <footer class="relative z-20 w-full bg-slate-950/95 border-t-4 border-[#00A3AD] px-3 pt-2 pb-2.5 sm:px-5 shadow-[0_-10px_30px_rgba(0,0,0,0.7)]">
+    <div class="max-w-7xl mx-auto flex flex-col gap-2">
+      
+      <!-- Category Tabs & Dock Header -->
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <div class="flex items-center gap-1 sm:gap-1.5 overflow-x-auto">
+          <button data-cat="ALL" class="cat-tab bg-[#FDDA24] text-slate-950 font-extrabold text-[11px] px-3 py-1 rounded-lg transition">
+            ALL GADGETS (7)
+          </button>
+          <button data-cat="Melee" class="cat-tab bg-slate-800/90 hover:bg-slate-700 text-cyan-100 font-bold text-[11px] px-3 py-1 rounded-lg transition">
+            MELEE
+          </button>
+          <button data-cat="Projectiles" class="cat-tab bg-slate-800/90 hover:bg-slate-700 text-cyan-100 font-bold text-[11px] px-3 py-1 rounded-lg transition">
+            PROJECTILES
+          </button>
+          <button data-cat="Explosives" class="cat-tab bg-slate-800/90 hover:bg-slate-700 text-cyan-100 font-bold text-[11px] px-3 py-1 rounded-lg transition">
+            EXPLOSIVES
+          </button>
+          <button data-cat="Corporate" class="cat-tab bg-slate-800/90 hover:bg-slate-700 text-cyan-100 font-bold text-[11px] px-3 py-1 rounded-lg transition">
+            CORPORATE
+          </button>
+        </div>
+
+        <div class="hidden sm:flex items-center gap-3 text-[11px] text-cyan-300/80 font-medium">
+          <span>Shortcuts: Keys <strong class="text-[#FDDA24]">1 - 7</strong> select weapons</span>
+          <span>•</span>
+          <span>Scuffs & Band-Aids stay until <strong class="text-[#FDDA24]">Heal / Reset</strong></span>
+        </div>
+      </div>
+
+      <!-- Horizontal Weapon Cards Container -->
+      <div id="weaponDock" class="weapon-scroll flex items-stretch gap-2.5 overflow-x-auto pb-1 pt-0.5">
+        <!-- Populated dynamically via JS -->
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- MAIN GAME SCRIPT -->
+  <script>
+    /*************************************************************************
+     * 1. PROCEDURAL WEB AUDIO SYNTHESIZER (Zero External Assets)
+     *************************************************************************/
+    class SoundSynth {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+        this.lastSqueakTime = 0;
+        this.lastTaserTime = 0;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            this.ctx = new AudioCtx();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playImpact(intensity = 0.5) {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const clamped = Math.min(1, Math.max(0.1, intensity));
+
+        // 1. Low-pass filtered noise burst for padded thud
+        const bufferSize = Math.floor(this.ctx.sampleRate * (0.06 + clamped * 0.09));
+        const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.4));
+        }
+
+        const whiteNoise = this.ctx.createBufferSource();
+        whiteNoise.buffer = noiseBuffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(180 + clamped * 650, now);
+        filter.frequency.exponentialRampToValueAtTime(55, now + 0.12);
+
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(clamped * 0.55, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+        whiteNoise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(this.ctx.destination);
+        whiteNoise.start(now);
+
+        // 2. Sub-bass punch sine drop
+        const osc = this.ctx.createOscillator();
+        const oscGain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(110 + clamped * 90, now);
+        osc.frequency.exponentialRampToValueAtTime(34, now + 0.15);
+
+        oscGain.gain.setValueAtTime(clamped * 0.6, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+        osc.connect(oscGain);
+        oscGain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.17);
+      }
+
+      playOllieSqueak(force = 0.5) {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        if (now - this.lastSqueakTime < 0.14) return;
+        this.lastSqueakTime = now;
+
+        // FM-synthesized rubbery mascot "Oof!" / "Yikes!" squeak
+        const carrier = this.ctx.createOscillator();
+        const modulator = this.ctx.createOscillator();
+        const modGain = this.ctx.createGain();
+        const mainGain = this.ctx.createGain();
+
+        const basePitch = 360 + Math.random() * 220 + Math.min(300, force * 18);
+        carrier.type = 'triangle';
+        carrier.frequency.setValueAtTime(basePitch, now);
+        // Pitch contour: quick rise then comedic drop
+        carrier.frequency.linearRampToValueAtTime(basePitch * 1.35, now + 0.045);
+        carrier.frequency.exponentialRampToValueAtTime(basePitch * 0.55, now + 0.19);
+
+        modulator.type = 'sine';
+        modulator.frequency.setValueAtTime(45, now);
+        modGain.gain.setValueAtTime(110, now);
+
+        mainGain.gain.setValueAtTime(0.01, now);
+        mainGain.gain.linearRampToValueAtTime(Math.min(0.32, 0.12 + force * 0.012), now + 0.02);
+        mainGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+        modulator.connect(modGain);
+        modGain.connect(carrier.frequency);
+        carrier.connect(mainGain);
+        mainGain.connect(this.ctx.destination);
+
+        modulator.start(now);
+        carrier.start(now);
+        modulator.stop(now + 0.21);
+        carrier.stop(now + 0.21);
+      }
+
+      playStandUpChirp() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        // Cute rubbery upward effort chirp ("Hup!")
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(260, now);
+        osc.frequency.exponentialRampToValueAtTime(540, now + 0.13);
+        osc.frequency.exponentialRampToValueAtTime(480, now + 0.18);
+
+        gain.gain.setValueAtTime(0.01, now);
+        gain.gain.linearRampToValueAtTime(0.16, now + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.2);
+      }
+
+      playCoinChime(combo = 1) {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        // Pentatonic scale step based on combo
+        const notes = [587.33, 659.25, 783.99, 880.0, 1046.5, 1174.66, 1318.5, 1567.98];
+        const idx = Math.min(notes.length - 1, Math.floor(combo) % notes.length);
+        const freq = notes[idx];
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+        osc.frequency.setValueAtTime(freq * 1.25, now + 0.045);
+
+        gain.gain.setValueAtTime(0.11, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.17);
+      }
+
+      playUnlockFanfare() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const freqs = [523.25, 659.25, 783.99, 1046.5];
+        freqs.forEach((f, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(f, now + i * 0.055);
+          gain.gain.setValueAtTime(0.18, now + i * 0.055);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.055 + 0.28);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + i * 0.055);
+          osc.stop(now + i * 0.055 + 0.3);
+        });
+      }
+
+      playShoot(type = 'pin') {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        if (type === 'pin') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(1200, now);
+          osc.frequency.exponentialRampToValueAtTime(280, now + 0.08);
+          gain.gain.setValueAtTime(0.16, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+        } else {
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(320, now);
+          osc.frequency.exponentialRampToValueAtTime(110, now + 0.07);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        }
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.09);
+      }
+
+      playTaserZap() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        if (now - this.lastTaserTime < 0.055) return;
+        this.lastTaserTime = now;
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140 + Math.random() * 520, now);
+        osc.frequency.linearRampToValueAtTime(90 + Math.random() * 180, now + 0.05);
+
+        gain.gain.setValueAtTime(0.11, now);
+        gain.gain.exponentialRampToValueAtTime(0.005, now + 0.055);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.06);
+      }
+
+      playBeep(freq = 880) {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.09);
+      }
+
+      playExplosion() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const bufferSize = Math.floor(this.ctx.sampleRate * 0.55);
+        const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.28));
+        }
+
+        const whiteNoise = this.ctx.createBufferSource();
+        whiteNoise.buffer = noiseBuffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(950, now);
+        filter.frequency.exponentialRampToValueAtTime(42, now + 0.5);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.75, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.54);
+
+        whiteNoise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        whiteNoise.start(now);
+      }
+    }
+
+    const sfx = new SoundSynth();
+
+    /*************************************************************************
+     * 2. WEAPON CATALOG DEFINITION
+     *************************************************************************/
+    const WEAPONS = [
+      {
+        id: 'grab',
+        key: '1',
+        name: 'Cursor Grab & Slam',
+        category: 'Melee',
+        cost: 0,
+        unlocked: true,
+        hint: 'Click & drag Ollie by his head or limbs and whip him into the padded walls!',
+        desc: 'Direct physics ragdoll manipulation',
+        svg: `<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>`
+      },
+      {
+        id: 'pins',
+        key: '2',
+        name: 'SIM Ejector Pins',
+        category: 'Projectiles',
+        cost: 100,
+        unlocked: false,
+        hint: 'Click anywhere to fire sharp metallic SIM ejector needles that can pin Ollie to the room!',
+        desc: 'Pins limbs to background padding',
+        svg: `<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="7" cy="7" r="4"/><path d="M10 10L21 21"/><path d="M14 6l4 4"/></svg>`
+      },
+      {
+        id: 'handsets',
+        key: '3',
+        name: 'Dummy Handset Hail',
+        category: 'Projectiles',
+        cost: 350,
+        unlocked: false,
+        hint: 'Click & hold to rapid-fire indestructible brick phones with high angular spin!',
+        desc: 'Rapid-fire heavy brick phones',
+        svg: `<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2"/><rect x="9" y="5" width="6" height="5" rx="0.5"/><path d="M9 14h.01M12 14h.01M15 14h.01M9 17h.01M12 17h.01M15 17h.01"/></svg>`
+      },
+      {
+        id: 'taser',
+        key: '4',
+        name: '5G Ultra-Wave Taser',
+        category: 'Melee',
+        cost: 800,
+        unlocked: false,
+        hint: 'Hold mouse button down to fire a continuous 5G millimeter-wave lightning beam & X-Ray Ollie!',
+        desc: 'Continuous beam + X-Ray skeleton',
+        svg: `<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`
+      },
+      {
+        id: 'modem',
+        key: '5',
+        name: 'Modem Grenade',
+        category: 'Explosives',
+        cost: 1500,
+        unlocked: false,
+        hint: 'Click to toss a blinking Wi-Fi router with a 2-second fuse and radial shockwave!',
+        desc: '2s fuse + flying plastic shrapnel',
+        svg: `<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 13V6M17 13V6"/><path d="M9.5 4.5a4 4 0 0 1 5 0"/><circle cx="7" cy="16.5" r="1"/><circle cx="11" cy="16.5" r="1"/></svg>`
+      },
+      {
+        id: 'bill',
+        key: '6',
+        name: '$9,999 Roaming Bill',
+        category: 'Corporate',
+        cost: 3000,
+        unlocked: false,
+        hint: 'Click to drop a colossal 10-ton OVERSEAS DATA CHARGE concrete anvil from the ceiling!',
+        desc: 'Massive ceiling-drop concrete anvil',
+        svg: `<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18h16l-2-8H6l-2 8z"/><path d="M2 18h20v3H2z"/><path d="M12 3v7"/><path d="M9 6l3 4 3-4"/></svg>`
+      },
+      {
+        id: 'blackhole',
+        key: '7',
+        name: 'The Outage Black Hole',
+        category: 'Corporate',
+        cost: 7500,
+        unlocked: false,
+        hint: 'Click to spawn a gravitational network singularity that sucks in Ollie & props before imploding!',
+        desc: 'Gravitational vortex + supernova',
+        svg: `<svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 22a10 10 0 0 1-10-10"/><path d="M2 12a10 10 0 0 1 10-10"/><path d="M22 12a10 10 0 0 1-10 10"/></svg>`
+      }
+    ];
+
+    /*************************************************************************
+     * 3. GAME STATE & MATTER.JS PHYSICS SETUP
+     *************************************************************************/
+    const { Engine, World, Bodies, Body, Composite, Constraint, Mouse, MouseConstraint, Events, Vector } = Matter;
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const arenaContainer = document.getElementById('arenaContainer');
+
+    let width = arenaContainer.clientWidth;
+    let height = arenaContainer.clientHeight;
+    canvas.width = width;
+    canvas.height = height;
+
+    // Physics Engine
+    const engine = Engine.create({
+      positionIterations: 8,
+      velocityIterations: 6
+    });
+    const world = engine.world;
+    world.gravity.y = 1.15;
+
+    // Game State
+    const state = {
+      coins: 250, // Start with 250 YES coins so player can immediately buy SIM pins or earn more
+      combo: 1.0,
+      comboHits: 0,
+      comboTimer: 0,
+      peakG: 0.0,
+      currentG: 0.0,
+      activeWeaponId: 'grab',
+      selectedCategory: 'ALL',
+      slowMo: false,
+      screenShake: 0,
+      wallFlash: { top: 0, bottom: 0, left: 0, right: 0 },
+      pointer: { x: width / 2, y: height / 2, down: false },
+      lastHailFire: 0,
+      isTasing: false,
+      props: [],         // Dynamic weapon props (pins, phones, modems, bills)
+      pinConstraints: [],// Active SIM pin constraints pinning Ollie
+      singularities: [], // Active Black Hole singularities
+      particles: [],     // Confetti, sparks, shrapnel
+      floatingTexts: []  // "-450 Mbps!", "+120 YES", etc.
+    };
+
+    // Arena Boundary Walls
+    let walls = [];
+    const WALL_THICKNESS = 120;
+    const PAD_INSET = 18;
+
+    function buildWalls() {
+      if (walls.length > 0) {
+        World.remove(world, walls);
+      }
+      const w = width;
+      const h = height;
+      const opts = { isStatic: true, restitution: 0.75, friction: 0.3, label: 'wall' };
+
+      const floor = Bodies.rectangle(w / 2, h - PAD_INSET + WALL_THICKNESS / 2, w + WALL_THICKNESS * 2, WALL_THICKNESS, { ...opts, wallSide: 'bottom' });
+      const ceiling = Bodies.rectangle(w / 2, PAD_INSET - WALL_THICKNESS / 2, w + WALL_THICKNESS * 2, WALL_THICKNESS, { ...opts, wallSide: 'top' });
+      const leftWall = Bodies.rectangle(PAD_INSET - WALL_THICKNESS / 2, h / 2, WALL_THICKNESS, h + WALL_THICKNESS * 2, { ...opts, wallSide: 'left' });
+      const rightWall = Bodies.rectangle(w - PAD_INSET + WALL_THICKNESS / 2, h / 2, WALL_THICKNESS, h + WALL_THICKNESS * 2, { ...opts, wallSide: 'right' });
+
+      walls = [floor, ceiling, leftWall, rightWall];
+      World.add(world, walls);
+    }
+
+    /*************************************************************************
+     * 4. OLLIE RAGDOLL RIG & PROCEDURAL RENDERING STATE
+     *************************************************************************/
+    let ollie = null;
+
+    // Normalize any angle into [-Math.PI, Math.PI] to prevent multi-turn helicopter unwinding
+    function normalizeAngle(angle) {
+      return Math.atan2(Math.sin(angle), Math.cos(angle));
+    }
+
+    function createOllie(x, y) {
+      if (ollie && ollie.composite) {
+        World.remove(world, ollie.composite);
+      }
+
+      // Clear any pin constraints attached to old Ollie
+      state.pinConstraints.forEach(c => World.remove(world, c));
+      state.pinConstraints = [];
+
+      const ollieGroup = Body.nextGroup(true);
+      const R = 52; // Exact torso radius matched to standing leg geometry
+      const segLen = 34; // Exact limb segment length (joint-to-joint distance = 28px)
+      const segThick = 12;
+
+      const floorY = height - PAD_INSET;
+      const startX = x !== undefined ? x : width / 2;
+      const startY = y !== undefined ? y : floorY - 100;
+
+      // Core Circular Rigid Body (Torso/Head)
+      const head = Bodies.circle(startX, startY, R, {
+        restitution: 0.05, // Low bounce while standing; restored to 0.72 when ragdolled
+        friction: 0.25,
+        frictionAir: 0.012,
+        density: 0.0028,
+        collisionFilter: { group: ollieGroup },
+        label: 'ollie_head'
+      });
+
+      const limbOpts = {
+        restitution: 0.1,
+        friction: 0.6,
+        frictionAir: 0.02,
+        density: 0.0008,
+        collisionFilter: { group: ollieGroup },
+        label: 'ollie_limb'
+      };
+
+      // Left 2-segment Arm (upperArmL, lowerArmL)
+      const armLU = Bodies.rectangle(startX - 54, startY + 14, segLen, segThick, limbOpts);
+      const armLL = Bodies.rectangle(startX - 66, startY + 38, segLen, segThick, limbOpts);
+
+      // Right 2-segment Arm (upperArmR, lowerArmR)
+      const armRU = Bodies.rectangle(startX + 54, startY + 14, segLen, segThick, limbOpts);
+      const armRL = Bodies.rectangle(startX + 66, startY + 38, segLen, segThick, limbOpts);
+
+      // Left 2-segment Leg (thighL, calfL) positioned at exact standing geometry
+      const legLU = Bodies.rectangle(startX - 23, startY + 54, segThick, segLen, limbOpts);
+      const legLL = Bodies.rectangle(startX - 25, startY + 84, segThick, segLen, limbOpts);
+
+      // Right 2-segment Leg (thighR, calfR) positioned at exact standing geometry
+      const legRU = Bodies.rectangle(startX + 23, startY + 54, segThick, segLen, limbOpts);
+      const legRL = Bodies.rectangle(startX + 25, startY + 84, segThick, segLen, limbOpts);
+
+      // Damped Ragdoll Constraints with exact 28px joint spacing on 34px segments
+      const jointOpts = { stiffness: 0.65, damping: 0.18, length: 0, render: { visible: false } };
+
+      const constraints = [
+        // Left Arm: shoulder at (-42, 8) -> elbow -> hand
+        Constraint.create({ bodyA: head, pointA: { x: -42, y: 8 }, bodyB: armLU, pointB: { x: 14, y: 0 }, ...jointOpts }),
+        Constraint.create({ bodyA: armLU, pointA: { x: -14, y: 0 }, bodyB: armLL, pointB: { x: 14, y: 0 }, ...jointOpts }),
+        // Right Arm: shoulder at (42, 8) -> elbow -> hand
+        Constraint.create({ bodyA: head, pointA: { x: 42, y: 8 }, bodyB: armRU, pointB: { x: -14, y: 0 }, ...jointOpts }),
+        Constraint.create({ bodyA: armRU, pointA: { x: 14, y: 0 }, bodyB: armRL, pointB: { x: -14, y: 0 }, ...jointOpts }),
+        // Left Leg: hip at (-20, 40) -> knee -> foot
+        Constraint.create({ bodyA: head, pointA: { x: -20, y: 40 }, bodyB: legLU, pointB: { x: 0, y: -14 }, ...jointOpts }),
+        Constraint.create({ bodyA: legLU, pointA: { x: 0, y: 14 }, bodyB: legLL, pointB: { x: 0, y: -14 }, ...jointOpts }),
+        // Right Leg: hip at (20, 40) -> knee -> foot
+        Constraint.create({ bodyA: head, pointA: { x: 20, y: 40 }, bodyB: legRU, pointB: { x: 0, y: -14 }, ...jointOpts }),
+        Constraint.create({ bodyA: legRU, pointA: { x: 0, y: 14 }, bodyB: legRL, pointB: { x: 0, y: -14 }, ...jointOpts })
+      ];
+
+      // Include all 9 bodies in the composite
+      const allBodies = [head, armLU, armLL, armRU, armRL, legLU, legLL, legRU, legRL];
+
+      const composite = Composite.create({
+        bodies: allBodies,
+        constraints
+      });
+
+      World.add(world, composite);
+
+      ollie = {
+        composite,
+        head,
+        limbs: { armLU, armLL, armRU, armRL, legLU, legLL, legRU, legRL },
+        allBodies,
+        radius: R,
+        segLen,
+        // Active Ragdoll Posture State Machine ('STANDING' | 'LIMP_RAGDOLL' | 'GETTING_UP')
+        postureState: 'STANDING',
+        muscleStrength: 1.0,
+        ragdollRecoveryTimer: 0,
+        idleBobPhase: 0,
+        isCrushed: false,
+        // Squash and stretch animation state
+        scaleX: 1,
+        scaleY: 1,
+        squashAngle: 0,
+        // Eye & Facial expression state
+        blinkTimer: 0,
+        isBlinking: false,
+        knockoutTimer: 0,     // >0 means eyes are X X or spinning spirals
+        knockoutStyle: 'XX',  // 'XX' or 'SPIRAL'
+        // Persistent Battle Damage (scuffs, band-aids, scorch marks)
+        damages: []
+      };
+
+      updatePostureHUD();
+    }
+
+    // Force Ollie into completely limp ragdoll mode and restore high bounce restitution
+    function triggerOllieRagdoll(recoveryFrames = 45) {
+      if (!ollie) return;
+      ollie.postureState = 'LIMP_RAGDOLL';
+      ollie.muscleStrength = 0.0;
+      ollie.head.restitution = 0.72;
+      ollie.ragdollRecoveryTimer = Math.max(ollie.ragdollRecoveryTimer, recoveryFrames);
+      updatePostureHUD();
+    }
+
+    // Check if any heavy $9,999 Roaming Bill is resting on top of Ollie
+    function checkOllieCrushedByBill() {
+      if (!ollie) return false;
+      const hp = ollie.head.position;
+      for (let i = 0; i < state.props.length; i++) {
+        const p = state.props[i];
+        if (p.propType === 'roaming_bill') {
+          const dx = Math.abs(p.position.x - hp.x);
+          const dy = hp.y - p.position.y;
+          // Bill is directly above or pressing down on Ollie near the floor
+          if (dx < 125 && dy > -35 && dy < ollie.radius + 75) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    // Critically-Damped Kinematic-Blended Active Standing Controller (runs inside beforeUpdate)
+    Events.on(engine, 'beforeUpdate', () => {
+      if (!ollie || !ollie.head) return;
+
+      const head = ollie.head;
+      const { armLU, armLL, armRU, armRL, legLU, legLL, legRU, legRL } = ollie.limbs;
+      const floorY = height - PAD_INSET;
+
+      const torsoSpeed = Vector.magnitude(head.velocity);
+      const isGrabbed = Boolean(mouseConstraint.body && ollie.allBodies.includes(mouseConstraint.body));
+      const isPinned = state.pinConstraints.length > 0;
+      const inBlackHole = state.singularities.length > 0;
+      ollie.isCrushed = checkOllieCrushedByBill();
+
+      // 1. External disruptions immediately force Ollie into LIMP_RAGDOLL
+      if (isGrabbed || state.isTasing || inBlackHole || isPinned || ollie.isCrushed) {
+        triggerOllieRagdoll(45);
+        return;
+      }
+
+      // 2. Handle LIMP_RAGDOLL State (Zero active muscle forces; wait until settled near floor)
+      if (ollie.postureState === 'LIMP_RAGDOLL') {
+        ollie.muscleStrength = 0.0;
+        ollie.head.restitution = 0.72;
+
+        const isNearFloor = head.position.y > floorY - 220;
+        const isSettled = torsoSpeed < 4.5;
+
+        if (isNearFloor && isSettled) {
+          ollie.ragdollRecoveryTimer--;
+          if (ollie.ragdollRecoveryTimer <= 0) {
+            // Normalize all body angles before standing up to prevent helicopter spin!
+            ollie.allBodies.forEach(b => {
+              Body.setAngle(b, normalizeAngle(b.angle));
+            });
+            ollie.postureState = 'GETTING_UP';
+            ollie.muscleStrength = 0.05;
+            ollie.head.restitution = 0.05;
+            ollie.knockoutTimer = 0; // Switch to determined > < eyes
+            sfx.playStandUpChirp();
+            updatePostureHUD();
+          }
+        } else {
+          // Reset settle timer to 0.75 seconds (45 frames) while still flying/bouncing
+          ollie.ragdollRecoveryTimer = Math.max(ollie.ragdollRecoveryTimer, 45);
+        }
+        return;
+      }
+
+      // 3. Handle GETTING_UP -> STANDING Ramp (0.0 -> 1.0 over ~0.55 seconds / 33 frames)
+      if (ollie.postureState === 'GETTING_UP') {
+        ollie.muscleStrength = Math.min(1.0, ollie.muscleStrength + 1 / 33);
+      } else {
+        ollie.muscleStrength = 1.0;
+      }
+
+      const m = ollie.muscleStrength;
+      ollie.head.restitution = 0.05;
+
+      // Normalize all angles every frame in GETTING_UP / STANDING
+      ollie.allBodies.forEach(b => {
+        Body.setAngle(b, normalizeAngle(b.angle));
+      });
+
+      // 4. Cancel gravity on all 9 of Ollie's bodies scaled by muscleStrength
+      const gravY = engine.gravity.y * engine.gravity.scale;
+      ollie.allBodies.forEach(b => {
+        b.force.y -= b.mass * gravY * m;
+      });
+
+      // 5. Compute ideal standing coordinates relative to torso.position.x and floorY
+      const perfTime = performance.now() * 0.001;
+      const standBob = ollie.postureState === 'STANDING' ? Math.sin(perfTime * 4.5) * 3.0 : 0;
+      const targetTorsoY = floorY - 100 + standBob;
+      const tx = Math.max(PAD_INSET + 70, Math.min(width - PAD_INSET - 70, head.position.x));
+
+      // Drive torso vertical velocity smoothly & damp horizontal drift
+      const desiredVy = (targetTorsoY - head.position.y) * 0.22;
+      const newVy = head.velocity.y * (1 - 0.35 * m) + desiredVy * (0.35 * m);
+      const newVx = head.velocity.x * (1 - 0.18 * m);
+      Body.setVelocity(head, { x: newVx, y: newVy });
+
+      // Drive torso upright with shortest-path angular velocity blending
+      const targetTorsoAngle = Math.sin(perfTime * 2.2) * 0.03;
+      const torsoAngleDiff = normalizeAngle(targetTorsoAngle - head.angle);
+      const desiredAngVel = torsoAngleDiff * 0.28;
+      Body.setAngularVelocity(
+        head,
+        head.angularVelocity * (1 - 0.45 * m) + desiredAngVel * (0.45 * m)
+      );
+
+      // Helper to guide each limb segment smoothly to its exact standing pose
+      const guideLimb = (part, targetX, targetY, targetAngle) => {
+        const dvx = (targetX - part.position.x) * 0.25;
+        const dvy = (targetY - part.position.y) * 0.25;
+        Body.setVelocity(part, {
+          x: part.velocity.x * (1 - 0.4 * m) + dvx * (0.4 * m),
+          y: part.velocity.y * (1 - 0.4 * m) + dvy * (0.4 * m)
+        });
+
+        const angDiff = normalizeAngle(targetAngle - part.angle);
+        const dAngVel = angDiff * 0.28;
+        Body.setAngularVelocity(
+          part,
+          part.angularVelocity * (1 - 0.45 * m) + dAngVel * (0.45 * m)
+        );
+      };
+
+      // Guide legs so hips (floorY - 60), knees (floorY - 32), and feet (floorY - 16) have zero constraint tension
+      guideLimb(legLU, tx - 23, floorY - 46 + standBob * 0.5, -0.12);
+      guideLimb(legLL, tx - 25, floorY - 16, 0.06);
+      guideLimb(legRU, tx + 23, floorY - 46 + standBob * 0.5, 0.12);
+      guideLimb(legRL, tx + 25, floorY - 16, -0.06);
+
+      // Guide arms to hang naturally at Ollie's sides with a cheerful idle sway
+      const armSway = Math.cos(perfTime * 3.2) * 2.5;
+      guideLimb(armLU, tx - 55, targetTorsoY + 16 + armSway, -0.55);
+      guideLimb(armLL, tx - 66, targetTorsoY + 38 + armSway, -0.85);
+      guideLimb(armRU, tx + 55, targetTorsoY + 16 - armSway, 0.55);
+      guideLimb(armRL, tx + 66, targetTorsoY + 38 - armSway, 0.85);
+
+      // 6. Complete transition from GETTING_UP -> STANDING once upright and at standing height
+      if (
+        ollie.postureState === 'GETTING_UP' &&
+        ollie.muscleStrength >= 0.98 &&
+        Math.abs(torsoAngleDiff) < 0.22 &&
+        Math.abs(targetTorsoY - head.position.y) < 18
+      ) {
+        ollie.postureState = 'STANDING';
+        ollie.muscleStrength = 1.0;
+        updatePostureHUD();
+      }
+    });
+
+    // Add persistent procedural damage mark onto Ollie's body local coordinates
+    function addOllieDamage(type, impactForce = 15) {
+      if (!ollie || ollie.damages.length >= 28) return;
+      const r = ollie.radius * (0.2 + Math.random() * 0.58);
+      const angle = Math.random() * Math.PI * 2;
+      ollie.damages.push({
+        type, // 'scuff', 'bandaid', 'scorch'
+        x: Math.cos(angle) * r,
+        y: Math.sin(angle) * r,
+        rot: Math.random() * Math.PI * 2,
+        size: 10 + Math.min(14, impactForce * 0.4)
+      });
+    }
+
+    /*************************************************************************
+     * 5. MOUSE CONSTRAINT (CURSOR GRAB & SLAM)
+     *************************************************************************/
+    const mouse = Mouse.create(canvas);
+    const mouseConstraint = MouseConstraint.create(engine, {
+      mouse: mouse,
+      constraint: {
+        stiffness: 0.25,
+        damping: 0.1,
+        render: { visible: false }
+      }
+    });
+    World.add(world, mouseConstraint);
+
+    // Keep mouse synced with high-DPI or resized canvas
+    mouse.pixelRatio = 1;
+
+    /*************************************************************************
+     * 6. COLLISION DETECTION, YES COINS & TELECO CALLOUTS
+     *************************************************************************/
+    const TELCO_CALLOUTS = [
+      '-450 Mbps!',
+      'DROPPED CALL!',
+      'THROTTLED!',
+      'NO SERVICE!',
+      'SIM ERROR!',
+      'ROAMING FEE!',
+      'LATENCY 999ms!',
+      'DATA CAP HIT!',
+      'CONNECTION RESET!',
+      'BUFFERING...'
+    ];
+
+    let lastImpactTimestamp = 0;
+
+    Events.on(engine, 'collisionStart', (event) => {
+      const pairs = event.pairs;
+      const now = performance.now();
+
+      for (let i = 0; i < pairs.length; i++) {
+        const pair = pairs[i];
+        const bodyA = pair.bodyA;
+        const bodyB = pair.bodyB;
+
+        const isOllieA = bodyA.label && bodyA.label.startsWith('ollie_');
+        const isOllieB = bodyB.label && bodyB.label.startsWith('ollie_');
+
+        if (!isOllieA && !isOllieB) continue;
+
+        const olliePart = isOllieA ? bodyA : bodyB;
+        const otherBody = isOllieA ? bodyB : bodyA;
+
+        // Calculate relative impact speed
+        const relVel = Vector.sub(olliePart.velocity, otherBody.velocity);
+        const speed = Vector.magnitude(relVel);
+        const isWallOrFloor = otherBody.label === 'wall';
+        const isWeaponProp = Boolean(otherBody.propType);
+
+        // Check SIM Ejector Pin impaling logic
+        if (otherBody.label === 'sim_pin' && !otherBody.hasPinned && speed > 7) {
+          otherBody.hasPinned = true;
+          // Pin Ollie's part to the background room at impact location for 5 seconds
+          const pinPoint = { x: olliePart.position.x, y: olliePart.position.y };
+          const pinConstraint = Constraint.create({
+            pointA: pinPoint,
+            bodyB: olliePart,
+            pointB: { x: 0, y: 0 },
+            stiffness: 0.85,
+            damping: 0.2,
+            length: 2,
+            createdAt: now,
+            pinVisualAngle: otherBody.angle
+          });
+          World.add(world, pinConstraint);
+          state.pinConstraints.push(pinConstraint);
+          triggerOllieRagdoll(60);
+          spawnFloatingText(pinPoint.x, pinPoint.y - 25, 'PINNED TO WALL!', '#00E5FF', 15);
+        }
+
+        // Prevent self-triggered ragdolling from floor/wall contacts while Ollie is GETTING_UP or STANDING
+        if (isWallOrFloor) {
+          if (ollie.postureState === 'GETTING_UP') continue;
+          if (ollie.postureState === 'STANDING' && speed <= 13.0) continue;
+        }
+
+        // Ignore micro-jitters below threshold
+        if (speed < 5.0 && !isWeaponProp) continue;
+        if (isWeaponProp && speed < 3.5) continue;
+
+        // Trigger limp ragdoll when hit by a weapon prop or slammed into a wall/floor at high speed
+        triggerOllieRagdoll(45);
+
+        if (now - lastImpactTimestamp < 45) continue;
+        lastImpactTimestamp = now;
+
+        // Compute G-Force equivalent (speed * 2.4)
+        const gForce = +(speed * 2.35).toFixed(1);
+        state.currentG = gForce;
+        if (gForce > state.peakG) {
+          state.peakG = gForce;
+        }
+
+        // Squash & stretch deformation on Ollie's main body
+        const impactAngle = Math.atan2(relVel.y, relVel.x);
+        const deform = Math.min(0.42, speed * 0.018);
+        ollie.squashAngle = impactAngle;
+        ollie.scaleX = 1 - deform;
+        ollie.scaleY = 1 + deform * 0.85;
+
+        // Flash wall if collided with arena boundary
+        if (otherBody.wallSide) {
+          state.wallFlash[otherBody.wallSide] = 1.0;
+        }
+
+        // High Impact (>15 m/s) triggers X X or Spiral eyes + persistent battle damage
+        if (speed > 14.5) {
+          ollie.knockoutTimer = 95; // ~1.5 seconds at 60fps
+          ollie.knockoutStyle = Math.random() > 0.45 ? 'XX' : 'SPIRAL';
+
+          if (otherBody.label === 'roaming_bill') {
+            // Extra flat squash from $9,999 Roaming Bill
+            ollie.squashAngle = Math.PI / 2;
+            ollie.scaleX = 0.48;
+            ollie.scaleY = 1.55;
+            addOllieDamage('bandaid', speed);
+          } else {
+            addOllieDamage(Math.random() > 0.45 ? 'scuff' : 'bandaid', speed);
+          }
+        } else if (speed > 9 && Math.random() < 0.45) {
+          addOllieDamage('scuff', speed);
+        }
+
+        // Increment Combo & Calculate YES Coins
+        state.comboHits++;
+        state.comboTimer = 180; // 3 seconds decay window
+        state.combo = +(1 + Math.min(24, state.comboHits * 0.25)).toFixed(1);
+
+        const baseForceCoins = Math.max(2, Math.round(speed * 1.45));
+        const earnedCoins = Math.round(baseForceCoins * state.combo);
+        awardCoins(earnedCoins, olliePart.position.x, olliePart.position.y);
+
+        // Screen shake & Confetti burst on strong impacts
+        if (speed > 10) {
+          state.screenShake = Math.min(22, speed * 0.75);
+          spawnConfetti(olliePart.position.x, olliePart.position.y, Math.min(24, Math.floor(speed * 1.1)));
+
+          const callout = TELCO_CALLOUTS[Math.floor(Math.random() * TELCO_CALLOUTS.length)];
+          spawnFloatingText(
+            olliePart.position.x + (Math.random() - 0.5) * 40,
+            olliePart.position.y - 35,
+            callout,
+            '#FDDA24',
+            Math.min(22, 13 + speed * 0.3)
+          );
+        }
+
+        // Play procedural impact & Ollie vocal squeak
+        sfx.playImpact(Math.min(1, speed / 28));
+        if (speed > 8.5) {
+          sfx.playOllieSqueak(speed);
+        }
+      }
+    });
+
+    function awardCoins(amount, x, y) {
+      state.coins += amount;
+      sfx.playCoinChime(state.combo);
+
+      if (x !== undefined && y !== undefined) {
+        spawnFloatingText(
+          x + (Math.random() - 0.5) * 30,
+          y - 12,
+          `+${amount.toLocaleString()} YES`,
+          '#00F5D4',
+          14
+        );
+      }
+      updateHUD();
+    }
+
+    /*************************************************************************
+     * 7. ARSENAL & WEAPON MECHANICS
+     *************************************************************************/
+    function triggerWeaponAt(targetX, targetY) {
+      const wId = state.activeWeaponId;
+      if (wId === 'grab') return; // Handled by Matter.MouseConstraint
+
+      if (wId === 'pins') {
+        fireSimPin(targetX, targetY);
+      } else if (wId === 'handsets') {
+        fireBrickHandset(targetX, targetY);
+      } else if (wId === 'modem') {
+        tossModemGrenade(targetX, targetY);
+      } else if (wId === 'bill') {
+        dropRoamingBill(targetX);
+      } else if (wId === 'blackhole') {
+        spawnBlackHole(targetX, targetY);
+      }
+    }
+
+    // WEAPON 2: SIM Ejector Pins
+    function fireSimPin(tx, ty) {
+      sfx.playShoot('pin');
+      // Spawn from top-left or top-right corner furthest from target for dramatic trajectory
+      const spawnX = tx < width * 0.5 ? width - 55 : 55;
+      const spawnY = 65;
+      const angle = Math.atan2(ty - spawnY, tx - spawnX);
+
+      const pin = Bodies.rectangle(spawnX, spawnY, 54, 6, {
+        angle,
+        restitution: 0.4,
+        friction: 0.3,
+        density: 0.004,
+        label: 'sim_pin',
+        propType: 'sim_pin'
+      });
+
+      const speed = 34;
+      Body.setVelocity(pin, {
+        x: Math.cos(angle) * speed,
+        y: Math.sin(angle) * speed
+      });
+
+      World.add(world, pin);
+      registerProp(pin);
+    }
+
+    // WEAPON 3: Dummy Handset Hail
+    function fireBrickHandset(tx, ty) {
+      sfx.playShoot('phone');
+      const spawnX = tx + (Math.random() - 0.5) * 260;
+      const clampedX = Math.max(60, Math.min(width - 60, spawnX));
+      const spawnY = 48;
+
+      const angle = Math.atan2(ty - spawnY, tx - clampedX);
+      const phone = Bodies.rectangle(clampedX, spawnY, 34, 64, {
+        chamfer: { radius: 6 },
+        restitution: 0.65,
+        friction: 0.25,
+        density: 0.0065,
+        label: 'brick_phone',
+        propType: 'brick_phone',
+        colorSeed: Math.random() > 0.5 ? '#1E293B' : '#0F172A'
+      });
+
+      const speed = 25 + Math.random() * 6;
+      Body.setVelocity(phone, {
+        x: Math.cos(angle) * speed,
+        y: Math.sin(angle) * speed
+      });
+      Body.setAngularVelocity(phone, (Math.random() - 0.5) * 0.65);
+
+      World.add(world, phone);
+      registerProp(phone);
+    }
+
+    // WEAPON 4: 5G Ultra-Wave Taser (Continuous in update loop)
+    function apply5GTaserStep() {
+      if (!ollie || !state.isTasing) return;
+      sfx.playTaserZap();
+
+      // Apply erratic jitter forces to every ragdoll body
+      ollie.allBodies.forEach((b) => {
+        const fx = (Math.random() - 0.5) * 0.065 * b.mass;
+        const fy = (Math.random() - 0.55) * 0.075 * b.mass;
+        Body.applyForce(b, b.position, { x: fx, y: fy });
+      });
+
+      // Keep Ollie jittering & award periodic coins
+      if (Math.random() < 0.28) {
+        state.comboHits++;
+        state.comboTimer = 180;
+        state.combo = +(1 + Math.min(24, state.comboHits * 0.25)).toFixed(1);
+        const earned = Math.round(8 * state.combo);
+        awardCoins(earned, ollie.head.position.x, ollie.head.position.y - 30);
+        spawnConfetti(ollie.head.position.x, ollie.head.position.y, 3);
+      }
+
+      if (Math.random() < 0.08) {
+        addOllieDamage('scorch', 18);
+        sfx.playOllieSqueak(16);
+      }
+    }
+
+    // WEAPON 5: Modem Grenade
+    function tossModemGrenade(tx, ty) {
+      sfx.playShoot('phone');
+      const spawnX = width * 0.5 + (Math.random() - 0.5) * 140;
+      const spawnY = 60;
+      const modem = Bodies.rectangle(spawnX, spawnY, 62, 26, {
+        chamfer: { radius: 5 },
+        restitution: 0.6,
+        friction: 0.3,
+        density: 0.004,
+        label: 'modem_grenade',
+        propType: 'modem_grenade',
+        fuseFrames: 120, // 2 seconds at 60fps
+        maxFuse: 120
+      });
+
+      const angle = Math.atan2(ty - spawnY, tx - spawnX);
+      Body.setVelocity(modem, {
+        x: Math.cos(angle) * 16,
+        y: Math.sin(angle) * 16
+      });
+      Body.setAngularVelocity(modem, (Math.random() - 0.5) * 0.25);
+
+      World.add(world, modem);
+      registerProp(modem);
+    }
+
+    function detonateModem(modem) {
+      const pos = { x: modem.position.x, y: modem.position.y };
+      World.remove(world, modem);
+      state.props = state.props.filter(p => p !== modem);
+
+      sfx.playExplosion();
+      state.screenShake = 26;
+
+      // Radial blast force on Ollie and all props
+      const targets = [...ollie.allBodies, ...state.props];
+      targets.forEach(b => {
+        const diff = Vector.sub(b.position, pos);
+        const dist = Math.max(30, Vector.magnitude(diff));
+        if (dist < 480) {
+          const dir = Vector.normalise(diff);
+          const strength = (1 - dist / 480) * 0.34 * b.mass;
+          Body.applyForce(b, b.position, {
+            x: dir.x * strength,
+            y: (dir.y - 0.35) * strength
+          });
+        }
+      });
+
+      // Scorch Ollie & trigger knockout eyes
+      addOllieDamage('scorch', 25);
+      addOllieDamage('bandaid', 22);
+      ollie.knockoutTimer = 110;
+      ollie.knockoutStyle = 'SPIRAL';
+      triggerOllieRagdoll(115);
+      sfx.playOllieSqueak(28);
+
+      // Award explosive YES coins
+      state.comboHits += 3;
+      state.comboTimer = 180;
+      state.combo = +(1 + Math.min(24, state.comboHits * 0.25)).toFixed(1);
+      awardCoins(Math.round(180 * state.combo), pos.x, pos.y);
+
+      spawnFloatingText(pos.x, pos.y - 30, 'WI-FI DETONATION! -999 Mbps', '#FF5252', 20);
+      spawnShrapnel(pos.x, pos.y, 42);
+    }
+
+    // WEAPON 6: $9,999 Roaming Bill
+    function dropRoamingBill(tx) {
+      sfx.playBeep(260);
+      const dropX = Math.max(130, Math.min(width - 130, tx || ollie.head.position.x));
+      const bill = Bodies.rectangle(dropX, 75, 195, 105, {
+        chamfer: { radius: 8 },
+        restitution: 0.2,
+        friction: 0.7,
+        density: 0.045, // Ultra-heavy concrete block!
+        label: 'roaming_bill',
+        propType: 'roaming_bill'
+      });
+
+      Body.setVelocity(bill, { x: 0, y: 18 });
+      World.add(world, bill);
+      registerProp(bill);
+
+      spawnFloatingText(dropX, 115, 'INCOMING $9,999 ROAMING BILL!', '#FDDA24', 17);
+    }
+
+    // WEAPON 7: The Outage Black Hole
+    function spawnBlackHole(tx, ty) {
+      sfx.playBeep(140);
+      const cx = Math.max(140, Math.min(width - 140, tx || width / 2));
+      const cy = Math.max(140, Math.min(height - 140, ty || height / 2));
+
+      state.singularities.push({
+        x: cx,
+        y: cy,
+        radius: 12,
+        maxRadius: 85,
+        life: 240, // 4 seconds vortex before supernova implosion
+        maxLife: 240,
+        angle: 0
+      });
+
+      spawnFloatingText(cx, cy - 65, 'NATIONAL NETWORK OUTAGE DETECTED!', '#C084FC', 18);
+    }
+
+    function registerProp(body) {
+      state.props.push(body);
+      // Cap total dynamic props at 35 for smooth 60fps performance
+      if (state.props.length > 35) {
+        const oldest = state.props.shift();
+        World.remove(world, oldest);
+      }
+    }
+
+    /*************************************************************************
+     * 8. PARTICLES & FLOATING COMBAT TEXT
+     *************************************************************************/
+    function spawnConfetti(x, y, count = 14) {
+      const colors = ['#FDDA24', '#00A3AD', '#FFF066', '#00F5D4', '#FFFFFF'];
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2 + Math.random() * 9;
+        state.particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 2,
+          size: 5 + Math.random() * 6,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rot: Math.random() * Math.PI * 2,
+          vRot: (Math.random() - 0.5) * 0.25,
+          life: 40 + Math.floor(Math.random() * 30),
+          maxLife: 70
+        });
+      }
+    }
+
+    function spawnShrapnel(x, y, count = 35) {
+      const colors = ['#1E293B', '#00E5FF', '#FDDA24', '#FF5252', '#94A3B8'];
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 4 + Math.random() * 16;
+        state.particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          size: 6 + Math.random() * 8,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rot: Math.random() * Math.PI * 2,
+          vRot: (Math.random() - 0.5) * 0.35,
+          life: 45 + Math.floor(Math.random() * 35),
+          maxLife: 80
+        });
+      }
+    }
+
+    function spawnFloatingText(x, y, text, color = '#FDDA24', size = 16) {
+      state.floatingTexts.push({
+        x,
+        y,
+        text,
+        color,
+        size,
+        life: 55,
+        maxLife: 55
+      });
+    }
+
+    /*************************************************************************
+     * 9. PROCEDURAL CANVAS RENDERING (ARENA, OLLIE, PROPS, FX)
+     *************************************************************************/
+    function drawArenaBackground() {
+      ctx.save();
+      // Deep Telco Padded Testing Room Gradient
+      const bgGrad = ctx.createRadialGradient(width * 0.5, height * 0.45, 50, width * 0.5, height * 0.5, Math.max(width, height) * 0.75);
+      bgGrad.addColorStop(0, '#0E2E38');
+      bgGrad.addColorStop(0.6, '#081C24');
+      bgGrad.addColorStop(1, '#041014');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Padded Cushion Grid & Tuft Buttons
+      const cellSize = 84;
+      ctx.strokeStyle = 'rgba(0, 163, 173, 0.14)';
+      ctx.lineWidth = 1.5;
+
+      for (let x = PAD_INSET; x < width - PAD_INSET; x += cellSize) {
+        for (let y = PAD_INSET; y < height - PAD_INSET; y += cellSize) {
+          // Diagonal quilted seams
+          ctx.beginPath();
+          ctx.strokeRect(x, y, cellSize, cellSize);
+
+          // Cushion button tuft in center of tile
+          const cx = x + cellSize * 0.5;
+          const cy = y + cellSize * 0.5;
+          ctx.fillStyle = 'rgba(0, 163, 173, 0.22)';
+          ctx.beginPath();
+          ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Subtle Watermark in Center of Stress Room
+      ctx.save();
+      ctx.translate(width / 2, height / 2);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+      ctx.font = '900 44px "Space Grotesk", sans-serif';
+      ctx.fillText('TELCO ACOUSTIC & STRESS TEST CHAMBER', 0, -10);
+      ctx.font = '700 18px "Inter", sans-serif';
+      ctx.fillText('YES! QUALITY ASSURANCE DIVISION • MAX RATING 100G', 0, 24);
+      ctx.restore();
+
+      // Padded Perimeter Bumpers + Impact Flash
+      const b = PAD_INSET;
+      ctx.strokeStyle = '#00A3AD';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(b, b, width - b * 2, height - b * 2);
+
+      // Flash sides on impact
+      if (state.wallFlash.bottom > 0.01) {
+        ctx.fillStyle = `rgba(253, 218, 36, ${state.wallFlash.bottom * 0.55})`;
+        ctx.fillRect(b, height - b - 12, width - b * 2, 12);
+      }
+      if (state.wallFlash.top > 0.01) {
+        ctx.fillStyle = `rgba(253, 218, 36, ${state.wallFlash.top * 0.55})`;
+        ctx.fillRect(b, b, width - b * 2, 12);
+      }
+      if (state.wallFlash.left > 0.01) {
+        ctx.fillStyle = `rgba(253, 218, 36, ${state.wallFlash.left * 0.55})`;
+        ctx.fillRect(b, b, 12, height - b * 2);
+      }
+      if (state.wallFlash.right > 0.01) {
+        ctx.fillStyle = `rgba(253, 218, 36, ${state.wallFlash.right * 0.55})`;
+        ctx.fillRect(width - b - 12, b, 12, height - b * 2);
+      }
+
+      ctx.restore();
+    }
+
+    // Draw Ollie's Procedural Ragdoll (Matching the Attached Reference Image)
+    function drawOllie() {
+      if (!ollie) return;
+      const head = ollie.head;
+      const R = ollie.radius;
+      const { armLU, armLL, armRU, armRL, legLU, legLL, legRU, legRL } = ollie.limbs;
+
+      // 0. Dynamic Floor Drop Shadow beneath Ollie
+      const floorY = height - PAD_INSET;
+      const distToFloor = Math.max(0, floorY - head.position.y);
+      const shadowScale = Math.max(0.25, 1 - distToFloor / 520);
+      ctx.save();
+      ctx.fillStyle = `rgba(0, 0, 0, ${0.42 * shadowScale})`;
+      ctx.beginPath();
+      ctx.ellipse(head.position.x, floorY - 4, R * 0.85 * shadowScale, 8 * shadowScale, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Helper to compute limb endpoints
+      const getEnd = (body, dir) => ({
+        x: body.position.x + Math.cos(body.angle) * (ollie.segLen * 0.46 * dir),
+        y: body.position.y + Math.sin(body.angle) * (ollie.segLen * 0.46 * dir)
+      });
+      const getVertEnd = (body, dir) => ({
+        x: body.position.x - Math.sin(body.angle) * (ollie.segLen * 0.46 * dir),
+        y: body.position.y + Math.cos(body.angle) * (ollie.segLen * 0.46 * dir)
+      });
+
+      // 1. Draw Back/Right Limbs first (behind body)
+      ctx.save();
+      ctx.strokeStyle = '#09090B';
+      ctx.fillStyle = '#09090B';
+      ctx.lineWidth = 10;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      // Right Arm Bezier
+      const rShoulder = {
+        x: head.position.x + Math.cos(head.angle) * 42 - Math.sin(head.angle) * 8,
+        y: head.position.y + Math.sin(head.angle) * 42 + Math.cos(head.angle) * 8
+      };
+      const rElbow = getEnd(armRU, 1);
+      const rHand = getEnd(armRL, 1);
+      ctx.beginPath();
+      ctx.moveTo(rShoulder.x, rShoulder.y);
+      ctx.quadraticCurveTo(rElbow.x, rElbow.y, rHand.x, rHand.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(rHand.x, rHand.y, 7, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Left & Right Legs Bezier (matching exact hip offsets (-20, 40) and (20, 40))
+      const lHip = {
+        x: head.position.x + Math.cos(head.angle) * -20 - Math.sin(head.angle) * 40,
+        y: head.position.y + Math.sin(head.angle) * -20 + Math.cos(head.angle) * 40
+      };
+      const lKnee = getVertEnd(legLU, 1);
+      const lFoot = getVertEnd(legLL, 1);
+      ctx.beginPath();
+      ctx.moveTo(lHip.x, lHip.y);
+      ctx.quadraticCurveTo(lKnee.x, lKnee.y, lFoot.x, lFoot.y);
+      ctx.stroke();
+      // Rounded foot
+      ctx.beginPath();
+      ctx.ellipse(lFoot.x - 4, lFoot.y, 10, 6, legLL.angle, 0, Math.PI * 2);
+      ctx.fill();
+
+      const rHip = {
+        x: head.position.x + Math.cos(head.angle) * 20 - Math.sin(head.angle) * 40,
+        y: head.position.y + Math.sin(head.angle) * 20 + Math.cos(head.angle) * 40
+      };
+      const rKnee = getVertEnd(legRU, 1);
+      const rFoot = getVertEnd(legRL, 1);
+      ctx.beginPath();
+      ctx.moveTo(rHip.x, rHip.y);
+      ctx.quadraticCurveTo(rKnee.x, rKnee.y, rFoot.x, rFoot.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(rFoot.x + 4, rFoot.y, 10, 6, legRL.angle, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // 2. Draw Ollie's Core Body with Squash-and-Stretch & Signature Top-Left Tuft
+      ctx.save();
+      ctx.translate(head.position.x, head.position.y);
+
+      // Apply impact squash-and-stretch matrix transform
+      ctx.rotate(ollie.squashAngle);
+      ctx.scale(ollie.scaleX, ollie.scaleY);
+      ctx.rotate(-ollie.squashAngle);
+
+      // Rotate to head's physics orientation
+      ctx.rotate(head.angle);
+
+      // Create Ollie's Silhouette Path (Sphere + Top-Left Curved Teardrop Tuft + Lower-Left Arm Indent)
+      ctx.beginPath();
+      // Start at top-left base of tuft
+      ctx.moveTo(-R * 0.48, -R * 0.86);
+      // Curved inner scoop of the top-left horn/tuft (matching reference image)
+      ctx.quadraticCurveTo(-R * 0.72, -R * 0.65, -R * 0.56, -R * 0.96);
+      // Top-left tuft sweeps smoothly over the crown of the head
+      ctx.bezierCurveTo(-R * 0.12, -R * 1.12, R * 0.65, -R * 1.0, R * 0.92, -R * 0.42);
+      // Right cheek curve
+      ctx.bezierCurveTo(R * 1.1, R * 0.1, R * 0.95, R * 0.82, R * 0.32, R * 0.98);
+      // Bottom curve
+      ctx.bezierCurveTo(-R * 0.25, R * 1.08, -R * 0.82, R * 0.82, -R * 0.96, R * 0.28);
+      // Left cheek up to the tuft base
+      ctx.bezierCurveTo(-R * 1.06, -R * 0.22, -R * 0.85, -R * 0.66, -R * 0.48, -R * 0.86);
+      ctx.closePath();
+
+      // Golden-Yellow 3D Sphere Gradient (#FFF066 -> #FFD000 -> #E68A00)
+      const bodyGrad = ctx.createRadialGradient(-R * 0.25, -R * 0.45, R * 0.1, R * 0.1, R * 0.15, R * 1.25);
+      bodyGrad.addColorStop(0, '#FFF580');
+      bodyGrad.addColorStop(0.32, '#FFDF2B');
+      bodyGrad.addColorStop(0.72, '#FFA800');
+      bodyGrad.addColorStop(1, '#D97700');
+
+      ctx.fillStyle = bodyGrad;
+      ctx.fill();
+
+      // Clip to Ollie's body silhouette for internal shading & battle damage
+      ctx.save();
+      ctx.clip();
+
+      // Subtle warm bottom-right shading crescent (like in the reference image)
+      ctx.fillStyle = 'rgba(210, 95, 0, 0.24)';
+      ctx.beginPath();
+      ctx.arc(R * 0.28, R * 0.35, R * 0.95, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Subtle orange drop shadow under the left arm attachment point (matches reference image!)
+      ctx.fillStyle = 'rgba(180, 75, 0, 0.55)';
+      ctx.beginPath();
+      ctx.moveTo(-R * 0.78, R * 0.25);
+      ctx.lineTo(-R * 0.52, R * 0.75);
+      ctx.lineTo(-R * 0.92, R * 0.65);
+      ctx.closePath();
+      ctx.fill();
+
+      // Persistent Battle Damage Overlays (Scuffs, Scorches, Band-Aids)
+      for (let i = 0; i < ollie.damages.length; i++) {
+        const d = ollie.damages[i];
+        ctx.save();
+        ctx.translate(d.x, d.y);
+        ctx.rotate(d.rot);
+
+        if (d.type === 'scuff') {
+          ctx.strokeStyle = 'rgba(60, 40, 20, 0.52)';
+          ctx.lineWidth = 2.2;
+          ctx.beginPath();
+          ctx.moveTo(-d.size * 0.5, -3);
+          ctx.lineTo(d.size * 0.5, -1);
+          ctx.moveTo(-d.size * 0.35, 3);
+          ctx.lineTo(d.size * 0.4, 4);
+          ctx.stroke();
+        } else if (d.type === 'scorch') {
+          const rad = ctx.createRadialGradient(0, 0, 2, 0, 0, d.size);
+          rad.addColorStop(0, 'rgba(20, 20, 25, 0.75)');
+          rad.addColorStop(0.6, 'rgba(65, 45, 30, 0.45)');
+          rad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = rad;
+          ctx.beginPath();
+          ctx.arc(0, 0, d.size, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (d.type === 'bandaid') {
+          // Crossed adhesive band-aid
+          ctx.fillStyle = '#F3C69F';
+          ctx.strokeStyle = '#B57C4E';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(-13, -5, 26, 10, 4);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#E6A972';
+          ctx.fillRect(-4, -4, 8, 8);
+        }
+        ctx.restore();
+      }
+
+      ctx.restore(); // End body clip
+
+      // 3. Inset White Dome Face Visor (positioned like the reference image)
+      ctx.save();
+      ctx.beginPath();
+      // Rounded dome top + gently curved bottom visor
+      ctx.moveTo(-R * 0.46, -R * 0.04);
+      ctx.bezierCurveTo(-R * 0.48, -R * 0.68, R * 0.64, -R * 0.72, R * 0.74, -R * 0.14);
+      ctx.quadraticCurveTo(R * 0.76, R * 0.02, R * 0.60, R * 0.04);
+      ctx.quadraticCurveTo(R * 0.08, R * 0.10, -R * 0.34, R * 0.08);
+      ctx.quadraticCurveTo(-R * 0.46, R * 0.08, -R * 0.46, -R * 0.04);
+      ctx.closePath();
+
+      // Golden-orange outer rim around visor recess
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = state.isTasing ? '#00FFFF' : '#F4A226';
+      ctx.stroke();
+
+      // Fill visor (turns neon cyan during 5G Ultra-Wave Taser!)
+      ctx.fillStyle = state.isTasing ? '#80FFFF' : '#FFFFFF';
+      ctx.fill();
+
+      // Inner recessed top shadow inside visor (grey-blue/warm bevel like reference image)
+      ctx.save();
+      ctx.clip();
+      ctx.strokeStyle = state.isTasing ? '#00B8D4' : 'rgba(205, 212, 224, 0.9)';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(-R * 0.5, -R * 0.02);
+      ctx.bezierCurveTo(-R * 0.46, -R * 0.64, R * 0.62, -R * 0.68, R * 0.75, -R * 0.1);
+      ctx.stroke();
+
+      // 4. Reactive Eyes inside Visor
+      const speed = Vector.magnitude(head.velocity);
+      const isGrabbed = mouseConstraint.body && ollie.allBodies.includes(mouseConstraint.body);
+
+      // Compute eye look offset toward cursor (or incoming projectile) in head-local space
+      const worldTarget = state.pointer;
+      const dx = worldTarget.x - head.position.x;
+      const dy = worldTarget.y - head.position.y;
+      const localAngle = Math.atan2(dy, dx) - head.angle;
+      const lookDist = Math.min(R * 0.08, Math.hypot(dx, dy) * 0.02);
+      const lookX = Math.cos(localAngle) * lookDist;
+      const lookY = Math.sin(localAngle) * lookDist;
+
+      const leftEyePos = { x: -R * 0.16 + lookX, y: -R * 0.16 + lookY };
+      const rightEyePos = { x: R * 0.42 + lookX, y: -R * 0.21 + lookY };
+      const eyeRadius = R * 0.095;
+
+      if (ollie.knockoutTimer > 0) {
+        // High Impact (>15 m/s): X X or Spinning Spirals
+        [leftEyePos, rightEyePos].forEach((ep) => {
+          ctx.save();
+          ctx.translate(ep.x, ep.y);
+          ctx.strokeStyle = '#111111';
+          ctx.lineWidth = 3.2;
+          ctx.lineCap = 'round';
+          if (ollie.knockoutStyle === 'XX') {
+            const s = eyeRadius * 1.15;
+            ctx.beginPath();
+            ctx.moveTo(-s, -s);
+            ctx.lineTo(s, s);
+            ctx.moveTo(s, -s);
+            ctx.lineTo(-s, s);
+            ctx.stroke();
+          } else {
+            // Spinning spiral eye
+            ctx.rotate(performance.now() * 0.018);
+            ctx.beginPath();
+            for (let a = 0; a < Math.PI * 3.5; a += 0.3) {
+              const sr = (a / (Math.PI * 3.5)) * eyeRadius * 1.4;
+              const sx = Math.cos(a) * sr;
+              const sy = Math.sin(a) * sr;
+              if (a === 0) ctx.moveTo(sx, sy);
+              else ctx.lineTo(sx, sy);
+            }
+            ctx.stroke();
+          }
+          ctx.restore();
+        });
+      } else if (ollie.postureState === 'GETTING_UP') {
+        // Getting Up: Determined squinting eyes (> <) as Ollie pushes himself upright!
+        [leftEyePos, rightEyePos].forEach((ep, idx) => {
+          ctx.save();
+          ctx.translate(ep.x, ep.y);
+          ctx.strokeStyle = '#111111';
+          ctx.lineWidth = 3.2;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          const s = eyeRadius * 1.15;
+          ctx.beginPath();
+          if (idx === 0) {
+            // Left eye '>'
+            ctx.moveTo(-s * 0.8, -s * 0.75);
+            ctx.lineTo(s * 0.7, 0);
+            ctx.lineTo(-s * 0.8, s * 0.75);
+          } else {
+            // Right eye '<'
+            ctx.moveTo(s * 0.8, -s * 0.75);
+            ctx.lineTo(-s * 0.7, 0);
+            ctx.lineTo(s * 0.8, s * 0.75);
+          }
+          ctx.stroke();
+          ctx.restore();
+        });
+      } else if (isGrabbed || speed > 10.5 || state.isTasing || ollie.postureState === 'LIMP_RAGDOLL') {
+        // Grabbed / High Velocity / Tased / Limp: Wide hollow pupils shaking rapidly
+        [leftEyePos, rightEyePos].forEach((ep) => {
+          const jitterScale = (isGrabbed || state.isTasing || speed > 10.5) ? 3.2 : 1.0;
+          const jitterX = (Math.random() - 0.5) * jitterScale;
+          const jitterY = (Math.random() - 0.5) * jitterScale;
+          ctx.fillStyle = '#111111';
+          ctx.beginPath();
+          ctx.arc(ep.x + jitterX, ep.y + jitterY, eyeRadius * 1.25, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#FFFFFF';
+          ctx.beginPath();
+          ctx.arc(ep.x + jitterX, ep.y + jitterY, eyeRadius * 0.52, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      } else {
+        // Idle / Standing: Cheerful black dot eyes with periodic blink
+        [leftEyePos, rightEyePos].forEach((ep) => {
+          ctx.fillStyle = '#0A0A0A';
+          ctx.beginPath();
+          if (ollie.isBlinking) {
+            ctx.ellipse(ep.x, ep.y, eyeRadius * 1.1, eyeRadius * 0.18, -0.08, 0, Math.PI * 2);
+          } else {
+            ctx.arc(ep.x, ep.y, eyeRadius, 0, Math.PI * 2);
+          }
+          ctx.fill();
+        });
+      }
+
+      ctx.restore(); // End visor clip
+      ctx.restore(); // End visor group
+
+      // 5. Skeletal X-Ray Overlay when 5G Ultra-Wave Taser is active!
+      if (state.isTasing && Math.random() > 0.18) {
+        ctx.save();
+        ctx.strokeStyle = '#00FFFF';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = '#00FFFF';
+        ctx.shadowBlur = 12;
+        // Skull ring & teeth inside Ollie
+        ctx.beginPath();
+        ctx.arc(0, -R * 0.1, R * 0.52, 0, Math.PI * 2);
+        ctx.stroke();
+        // Cheekbone jaw
+        ctx.strokeRect(-R * 0.22, R * 0.35, R * 0.44, R * 0.22);
+        ctx.restore();
+      }
+
+      ctx.restore(); // End Ollie Head Transform
+
+      // 6. Draw Front Left Arm (overlaps lower-left body with little black stub just like reference image!)
+      ctx.save();
+      ctx.strokeStyle = state.isTasing ? '#00FFFF' : '#09090B';
+      ctx.fillStyle = state.isTasing ? '#00FFFF' : '#09090B';
+      ctx.lineWidth = 10;
+      ctx.lineCap = 'round';
+
+      const lShoulder = {
+        x: head.position.x + Math.cos(head.angle) * -42 - Math.sin(head.angle) * 8,
+        y: head.position.y + Math.sin(head.angle) * -42 + Math.cos(head.angle) * 8
+      };
+      const lElbow = getEnd(armLU, -1);
+      const lHand = getEnd(armLL, -1);
+
+      ctx.beginPath();
+      ctx.moveTo(lShoulder.x, lShoulder.y);
+      ctx.quadraticCurveTo(lElbow.x, lElbow.y, lHand.x, lHand.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(lHand.x, lHand.y, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Draw Active Telco Props, Pins, Singularities, and Taser Beam
+    function drawPropsAndWeapons() {
+      // 1. Draw Black Hole Singularities
+      for (let i = state.singularities.length - 1; i >= 0; i--) {
+        const bh = state.singularities[i];
+        ctx.save();
+        ctx.translate(bh.x, bh.y);
+        ctx.rotate(bh.angle);
+
+        // Swirling accretion disk
+        const grad = ctx.createRadialGradient(0, 0, bh.radius * 0.2, 0, 0, bh.radius * 2.4);
+        grad.addColorStop(0, '#000000');
+        grad.addColorStop(0.35, '#3B0764');
+        grad.addColorStop(0.65, '#00A3AD');
+        grad.addColorStop(1, 'rgba(0, 163, 173, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, bh.radius * 2.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Spiral arms
+        ctx.strokeStyle = '#FDDA24';
+        ctx.lineWidth = 2.5;
+        for (let arm = 0; arm < 3; arm++) {
+          ctx.save();
+          ctx.rotate((arm * Math.PI * 2) / 3);
+          ctx.beginPath();
+          ctx.arc(bh.radius * 0.5, 0, bh.radius * 0.9, 0, Math.PI * 1.1);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Event horizon core
+        ctx.fillStyle = '#020617';
+        ctx.strokeStyle = '#C084FC';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, bh.radius * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 2. Draw Physics Props (SIM Pins, Brick Phones, Modem Grenades, $9,999 Bills)
+      for (let i = 0; i < state.props.length; i++) {
+        const p = state.props[i];
+        ctx.save();
+        ctx.translate(p.position.x, p.position.y);
+        ctx.rotate(p.angle);
+
+        if (p.propType === 'sim_pin') {
+          // Metallic SIM Ejector Needle
+          ctx.strokeStyle = '#E2E8F0';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(-18, 0, 7, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(-11, 0);
+          ctx.lineTo(26, 0);
+          ctx.stroke();
+        } else if (p.propType === 'brick_phone') {
+          // Classic Indestructible Brick Phone
+          ctx.fillStyle = p.colorSeed || '#1E293B';
+          ctx.strokeStyle = '#64748B';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.roundRect(-17, -32, 34, 64, 6);
+          ctx.fill();
+          ctx.stroke();
+          // Green monochrome LCD screen
+          ctx.fillStyle = '#84CC16';
+          ctx.fillRect(-12, -24, 24, 18);
+          ctx.fillStyle = '#0F172A';
+          ctx.font = 'bold 7px "Inter", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('NO SIM', 0, -13);
+          // Keypad buttons
+          ctx.fillStyle = '#94A3B8';
+          for (let r = 0; r < 3; r++) {
+            for (let c = -1; c <= 1; c++) {
+              ctx.fillRect(c * 8 - 3, 2 + r * 7, 6, 4);
+            }
+          }
+        } else if (p.propType === 'modem_grenade') {
+          // Blinking Wi-Fi Router with Dual Antennas
+          ctx.strokeStyle = '#334155';
+          ctx.lineWidth = 4;
+          ctx.lineCap = 'round';
+          // Antennas
+          ctx.beginPath();
+          ctx.moveTo(-20, -12);
+          ctx.lineTo(-26, -34);
+          ctx.moveTo(20, -12);
+          ctx.lineTo(26, -34);
+          ctx.stroke();
+
+          // Router Box
+          ctx.fillStyle = '#0F172A';
+          ctx.strokeStyle = '#00A3AD';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.roundRect(-31, -13, 62, 26, 5);
+          ctx.fill();
+          ctx.stroke();
+
+          // Blinking Fuse LED
+          const blink = Math.floor(p.fuseFrames / 6) % 2 === 0;
+          ctx.fillStyle = blink ? '#FF1744' : '#FDDA24';
+          ctx.beginPath();
+          ctx.arc(-18, 0, 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#00E5FF';
+          ctx.font = 'bold 8px "Inter", sans-serif';
+          ctx.fillText('5G MODEM', -4, 3);
+        } else if (p.propType === 'roaming_bill') {
+          // Massive Concrete Anvil ($9,999 Roaming Bill)
+          const grad = ctx.createLinearGradient(0, -52, 0, 52);
+          grad.addColorStop(0, '#475569');
+          grad.addColorStop(1, '#1E293B');
+          ctx.fillStyle = grad;
+          ctx.strokeStyle = '#FDDA24';
+          ctx.lineWidth = 3.5;
+          ctx.beginPath();
+          ctx.roundRect(-97, -52, 194, 104, 8);
+          ctx.fill();
+          ctx.stroke();
+
+          // Warning Header Bar
+          ctx.fillStyle = '#FDDA24';
+          ctx.fillRect(-90, -44, 180, 24);
+          ctx.fillStyle = '#0F172A';
+          ctx.font = '900 12px "Space Grotesk", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('OVERSEAS DATA CHARGE', 0, -28);
+
+          // Giant $9,999.00 Stamp
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = '900 26px "Space Grotesk", sans-serif';
+          ctx.fillText('$9,999.00', 0, 10);
+
+          ctx.fillStyle = '#F87171';
+          ctx.font = '800 10px "Inter", sans-serif';
+          ctx.fillText('AUTO-DEBIT IMMEDIATE • 10 TONS', 0, 34);
+        }
+
+        ctx.restore();
+      }
+
+      // 3. Draw Active Wall-Pin Constraints (from SIM Ejector Pins)
+      for (let i = 0; i < state.pinConstraints.length; i++) {
+        const c = state.pinConstraints[i];
+        const pA = c.pointA;
+        ctx.save();
+        ctx.translate(pA.x, pA.y);
+        ctx.fillStyle = '#00E5FF';
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 4. Draw 5G Ultra-Wave Taser Raycast Lightning Beam
+      if (state.isTasing && ollie) {
+        const start = state.pointer;
+        const end = ollie.head.position;
+
+        ctx.save();
+        ctx.strokeStyle = '#00FFFF';
+        ctx.lineWidth = 4;
+        ctx.shadowColor = '#00FFFF';
+        ctx.shadowBlur = 18;
+
+        for (let bolt = 0; bolt < 2; bolt++) {
+          ctx.beginPath();
+          ctx.moveTo(start.x, start.y);
+          const segments = 9;
+          for (let s = 1; s < segments; s++) {
+            const t = s / segments;
+            const bx = start.x + (end.x - start.x) * t + (Math.random() - 0.5) * 34;
+            const by = start.y + (end.y - start.y) * t + (Math.random() - 0.5) * 34;
+            ctx.lineTo(bx, by);
+          }
+          ctx.lineTo(end.x, end.y);
+          ctx.stroke();
+          ctx.strokeStyle = '#FDDA24';
+          ctx.lineWidth = 2;
+        }
+        ctx.restore();
+      }
+    }
+
+    function drawParticlesAndTexts() {
+      // Confetti & Shrapnel Particles
+      for (let i = state.particles.length - 1; i >= 0; i--) {
+        const pt = state.particles[i];
+        ctx.save();
+        ctx.translate(pt.x, pt.y);
+        ctx.rotate(pt.rot);
+        ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+        ctx.fillStyle = pt.color;
+        ctx.fillRect(-pt.size / 2, -pt.size / 2, pt.size, pt.size * 0.65);
+        ctx.restore();
+      }
+
+      // Floating Damage & Coin Callouts
+      for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
+        const ft = state.floatingTexts[i];
+        ctx.save();
+        const alpha = Math.max(0, ft.life / ft.maxLife);
+        ctx.globalAlpha = alpha;
+        ctx.font = `900 ${ft.size}px "Space Grotesk", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.strokeStyle = '#020617';
+        ctx.lineWidth = 4;
+        ctx.strokeText(ft.text, ft.x, ft.y);
+        ctx.fillStyle = ft.color;
+        ctx.fillText(ft.text, ft.x, ft.y);
+        ctx.restore();
+      }
+    }
+
+    /*************************************************************************
+     * 10. MAIN SIMULATION & ANIMATION LOOP
+     *************************************************************************/
+    function updateSimulation() {
+      // Step Matter.js Physics Engine (beforeUpdate runs Ollie's active ragdoll controller)
+      const dt = state.slowMo ? 1000 / 60 * 0.28 : 1000 / 60;
+      Engine.update(engine, dt);
+
+      // Keep Ollie inside room bounds if extreme force ever pushes him out
+      if (ollie && ollie.head) {
+        const hp = ollie.head.position;
+        if (hp.x < -80 || hp.x > width + 80 || hp.y < -80 || hp.y > height + 80) {
+          Body.setPosition(ollie.head, { x: width / 2, y: height / 2 });
+          Body.setVelocity(ollie.head, { x: 0, y: 0 });
+        }
+
+        // Relax squash & stretch back to 1.0
+        ollie.scaleX += (1 - ollie.scaleX) * 0.16;
+        ollie.scaleY += (1 - ollie.scaleY) * 0.16;
+
+        // Blink timer
+        ollie.blinkTimer++;
+        if (ollie.blinkTimer > 150) {
+          ollie.isBlinking = true;
+          if (ollie.blinkTimer > 160) {
+            ollie.isBlinking = false;
+            ollie.blinkTimer = 0;
+          }
+        }
+
+        // Knockout eyes countdown
+        if (ollie.knockoutTimer > 0) {
+          ollie.knockoutTimer--;
+        }
+      }
+
+      // Combo decay timer
+      if (state.comboTimer > 0) {
+        state.comboTimer--;
+        if (state.comboTimer === 0) {
+          state.combo = 1.0;
+          state.comboHits = 0;
+        }
+        updateComboBarUI();
+      }
+
+      // Rapid-fire Dummy Handset Hail while holding pointer
+      if (state.pointer.down && state.activeWeaponId === 'handsets') {
+        const now = performance.now();
+        if (now - state.lastHailFire > 125) {
+          state.lastHailFire = now;
+          fireBrickHandset(state.pointer.x, state.pointer.y);
+        }
+      }
+
+      // Continuous 5G Ultra-Wave Taser while holding pointer
+      state.isTasing = state.pointer.down && state.activeWeaponId === 'taser';
+      if (state.isTasing) {
+        apply5GTaserStep();
+      }
+
+      // Update Modem Grenade fuses
+      for (let i = state.props.length - 1; i >= 0; i--) {
+        const p = state.props[i];
+        if (p.propType === 'modem_grenade') {
+          p.fuseFrames--;
+          if (p.fuseFrames % 22 === 0 && p.fuseFrames > 0) {
+            sfx.playBeep(720 + (120 - p.fuseFrames) * 5);
+          }
+          if (p.fuseFrames <= 0) {
+            detonateModem(p);
+          }
+        }
+      }
+
+      // Expire SIM Pin Constraints after 5.5 seconds so Ollie doesn't stay stuck forever
+      const now = performance.now();
+      for (let i = state.pinConstraints.length - 1; i >= 0; i--) {
+        const c = state.pinConstraints[i];
+        if (now - c.createdAt > 5500) {
+          World.remove(world, c);
+          state.pinConstraints.splice(i, 1);
+        }
+      }
+
+      // Update Outage Black Hole Singularities
+      for (let i = state.singularities.length - 1; i >= 0; i--) {
+        const bh = state.singularities[i];
+        bh.life--;
+        bh.angle += 0.14;
+        bh.radius = Math.min(bh.maxRadius, bh.radius + 2.2);
+
+        const pos = { x: bh.x, y: bh.y };
+        const targets = [...ollie.allBodies, ...state.props];
+
+        // Gravitational vortex suction + tangential spin
+        targets.forEach(b => {
+          const diff = Vector.sub(pos, b.position);
+          const dist = Math.max(25, Vector.magnitude(diff));
+          const dir = Vector.normalise(diff);
+          const tangent = { x: -dir.y, y: dir.x };
+          const pullStrength = 0.0042 * b.mass;
+          const spinStrength = 0.0028 * b.mass;
+
+          Body.applyForce(b, b.position, {
+            x: (dir.x * pullStrength + tangent.x * spinStrength),
+            y: (dir.y * pullStrength + tangent.y * spinStrength)
+          });
+        });
+
+        if (bh.life % 18 === 0) {
+          awardCoins(Math.round(35 * state.combo), bh.x, bh.y);
+        }
+
+        // Implode with supernova shockwave when timer finishes
+        if (bh.life <= 0) {
+          sfx.playExplosion();
+          state.screenShake = 30;
+          spawnShrapnel(bh.x, bh.y, 55);
+          spawnFloatingText(bh.x, bh.y, 'OUTAGE RESOLVED! SUPERNOVA!', '#FDDA24', 22);
+
+          targets.forEach(b => {
+            const diff = Vector.sub(b.position, pos);
+            const dir = Vector.normalise(diff.x === 0 && diff.y === 0 ? { x: 1, y: -1 } : diff);
+            Body.applyForce(b, b.position, {
+              x: dir.x * 0.42 * b.mass,
+              y: dir.y * 0.42 * b.mass
+            });
+          });
+
+          ollie.knockoutTimer = 120;
+          ollie.knockoutStyle = 'SPIRAL';
+          triggerOllieRagdoll(120);
+          addOllieDamage('scorch', 28);
+          state.singularities.splice(i, 1);
+        }
+      }
+
+      // Update Particles
+      for (let i = state.particles.length - 1; i >= 0; i--) {
+        const pt = state.particles[i];
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        pt.vy += 0.25;
+        pt.rot += pt.vRot;
+        pt.life--;
+        if (pt.life <= 0) state.particles.splice(i, 1);
+      }
+
+      // Update Floating Texts
+      for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
+        const ft = state.floatingTexts[i];
+        ft.y -= 1.3;
+        ft.life--;
+        if (ft.life <= 0) state.floatingTexts.splice(i, 1);
+      }
+
+      // Decay Wall Flash & Screen Shake
+      ['top', 'bottom', 'left', 'right'].forEach(side => {
+        state.wallFlash[side] *= 0.86;
+      });
+      state.screenShake *= 0.85;
+    }
+
+    function renderLoop() {
+      updateSimulation();
+
+      ctx.save();
+      // Apply Screen Shake
+      if (state.screenShake > 0.4) {
+        const sx = (Math.random() - 0.5) * state.screenShake;
+        const sy = (Math.random() - 0.5) * state.screenShake;
+        ctx.translate(sx, sy);
+      }
+
+      drawArenaBackground();
+      drawPropsAndWeapons();
+      drawOllie();
+      drawParticlesAndTexts();
+
+      ctx.restore();
+      requestAnimationFrame(renderLoop);
+    }
+
+    /*************************************************************************
+     * 11. UI DOCK, HUD UPDATES & INPUT EVENT LISTENERS
+     *************************************************************************/
+    const coinDisplay = document.getElementById('coinDisplay');
+    const comboDisplay = document.getElementById('comboDisplay');
+    const comboHitsText = document.getElementById('comboHitsText');
+    const comboBar = document.getElementById('comboBar');
+    const peakGDisplay = document.getElementById('peakGDisplay');
+    const currentGDisplay = document.getElementById('currentGDisplay');
+    const activeWeaponBadge = document.getElementById('activeWeaponBadge');
+    const weaponHintText = document.getElementById('weaponHintText');
+    const weaponDock = document.getElementById('weaponDock');
+    const postureDot = document.getElementById('postureDot');
+    const postureBadgeText = document.getElementById('postureBadgeText');
+
+    function updatePostureHUD() {
+      if (!ollie || !postureBadgeText || !postureDot) return;
+
+      if (state.pinConstraints.length > 0) {
+        postureBadgeText.textContent = 'PINNED';
+        postureBadgeText.className = 'font-display font-extrabold text-xs sm:text-sm text-cyan-300 leading-tight';
+        postureDot.className = 'w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] animate-pulse';
+      } else if (ollie.isCrushed) {
+        postureBadgeText.textContent = 'CRUSHED!';
+        postureBadgeText.className = 'font-display font-extrabold text-xs sm:text-sm text-rose-400 leading-tight';
+        postureDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e] animate-ping';
+      } else if (ollie.postureState === 'STANDING') {
+        postureBadgeText.textContent = 'STANDING';
+        postureBadgeText.className = 'font-display font-extrabold text-xs sm:text-sm text-emerald-300 leading-tight';
+        postureDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]';
+      } else if (ollie.postureState === 'GETTING_UP') {
+        postureBadgeText.textContent = 'GETTING UP...';
+        postureBadgeText.className = 'font-display font-extrabold text-xs sm:text-sm text-[#FDDA24] leading-tight';
+        postureDot.className = 'w-2.5 h-2.5 rounded-full bg-[#FDDA24] shadow-[0_0_8px_#FDDA24] animate-bounce';
+      } else {
+        postureBadgeText.textContent = 'RAGDOLLED';
+        postureBadgeText.className = 'font-display font-extrabold text-xs sm:text-sm text-amber-400 leading-tight';
+        postureDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 shadow-[0_0_8px_#fbbf24]';
+      }
+    }
+
+    function updateHUD() {
+      coinDisplay.textContent = state.coins.toLocaleString();
+      coinDisplay.classList.remove('coin-bump');
+      void coinDisplay.offsetWidth;
+      coinDisplay.classList.add('coin-bump');
+
+      comboDisplay.textContent = `${state.combo.toFixed(1)}x`;
+      comboHitsText.textContent = `${state.comboHits} Hits`;
+      peakGDisplay.textContent = `${state.peakG.toFixed(1)} G`;
+      currentGDisplay.textContent = `(${state.currentG.toFixed(1)} G)`;
+
+      // Refresh affordability states on weapon cards
+      renderWeaponDock();
+    }
+
+    function updateComboBarUI() {
+      const pct = Math.max(0, Math.min(100, (state.comboTimer / 180) * 100));
+      comboBar.style.width = `${pct}%`;
+      if (state.comboTimer === 0) {
+        comboDisplay.textContent = '1.0x';
+        comboHitsText.textContent = '0 Hits';
+      }
+    }
+
+    function selectOrUnlockWeapon(weaponId) {
+      const weapon = WEAPONS.find(w => w.id === weaponId);
+      if (!weapon) return;
+
+      if (!weapon.unlocked) {
+        if (state.coins >= weapon.cost) {
+          state.coins -= weapon.cost;
+          weapon.unlocked = true;
+          sfx.playUnlockFanfare();
+          spawnConfetti(width / 2, height - 60, 26);
+          spawnFloatingText(width / 2, height - 90, `UNLOCKED ${weapon.name.toUpperCase()}!`, '#FDDA24', 19);
+        } else {
+          sfx.playBeep(190);
+          spawnFloatingText(
+            width / 2,
+            height - 90,
+            `NEED ${(weapon.cost - state.coins).toLocaleString()} MORE YES COINS! (OR CLICK +5K YES)`,
+            '#FF5252',
+            15
+          );
+          return;
+        }
+      }
+
+      state.activeWeaponId = weapon.id;
+      activeWeaponBadge.textContent = weapon.name.split(' ')[0];
+      weaponHintText.textContent = weapon.hint;
+
+      // Enable/Disable Matter.js MouseConstraint depending on whether Cursor Grab is active
+      if (weapon.id === 'grab') {
+        mouseConstraint.collisionFilter.mask = 0xFFFFFFFF;
+      } else {
+        mouseConstraint.collisionFilter.mask = 0x00000000;
+      }
+
+      updateHUD();
+    }
+
+    function renderWeaponDock() {
+      weaponDock.innerHTML = '';
+      const filtered = WEAPONS.filter(w => state.selectedCategory === 'ALL' || w.category === state.selectedCategory);
+
+      filtered.forEach(w => {
+        const isActive = state.activeWeaponId === w.id;
+        const canAfford = state.coins >= w.cost;
+
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = `weapon-card shrink-0 w-44 sm:w-48 rounded-xl p-2.5 border-2 text-left flex flex-col justify-between gap-1.5 ${
+          isActive
+            ? 'active-weapon'
+            : w.unlocked
+            ? 'bg-slate-900/90 border-cyan-500/40 hover:border-cyan-300'
+            : canAfford
+            ? 'bg-slate-900/80 border-amber-400/70 hover:border-[#FDDA24]'
+            : 'bg-slate-900/50 border-slate-800 opacity-75 hover:opacity-100'
+        }`;
+
+        let statusBadge = '';
+        if (isActive) {
+          statusBadge = `<span class="bg-[#FDDA24] text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-md">EQUIPPED</span>`;
+        } else if (w.unlocked) {
+          statusBadge = `<span class="bg-cyan-500/20 text-cyan-200 font-bold text-[10px] px-2 py-0.5 rounded-md">READY</span>`;
+        } else {
+          statusBadge = `<span class="${canAfford ? 'bg-[#FDDA24] text-slate-950' : 'bg-slate-800 text-amber-300'} font-extrabold text-[10px] px-2 py-0.5 rounded-md">${w.cost.toLocaleString()} YES</span>`;
+        }
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between w-full">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg ${isActive ? 'bg-[#FDDA24] text-slate-950' : 'bg-slate-800 text-[#FDDA24]'} flex items-center justify-center">
+                ${w.svg}
+              </div>
+              <div>
+                <div class="text-[9px] uppercase tracking-wider text-cyan-300/80 font-bold">[${w.key}] ${w.category}</div>
+                <div class="font-display font-bold text-xs text-white leading-tight">${w.name}</div>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center justify-between w-full pt-1 border-t border-white/10">
+            <span class="text-[10px] text-slate-300 truncate max-w-[105px]">${w.desc}</span>
+            ${statusBadge}
+          </div>
+        `;
+
+        card.addEventListener('click', () => selectOrUnlockWeapon(w.id));
+        weaponDock.appendChild(card);
+      });
+    }
+
+    // Category Filter Tabs
+    document.querySelectorAll('.cat-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        state.selectedCategory = tab.dataset.cat;
+        document.querySelectorAll('.cat-tab').forEach(t => {
+          t.className = 'cat-tab bg-slate-800/90 hover:bg-slate-700 text-cyan-100 font-bold text-[11px] px-3 py-1 rounded-lg transition';
+        });
+        tab.className = 'cat-tab bg-[#FDDA24] text-slate-950 font-extrabold text-[11px] px-3 py-1 rounded-lg transition';
+        renderWeaponDock();
+      });
+    });
+
+    // Pointer Events on Arena Canvas
+    function getCanvasCoords(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+      };
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      sfx.init();
+      const pt = getCanvasCoords(e);
+      state.pointer.x = pt.x;
+      state.pointer.y = pt.y;
+      state.pointer.down = true;
+
+      // Allow clicking directly on an active SIM pin point to unpin Ollie immediately
+      for (let i = state.pinConstraints.length - 1; i >= 0; i--) {
+        const c = state.pinConstraints[i];
+        if (Math.hypot(pt.x - c.pointA.x, pt.y - c.pointA.y) < 24) {
+          World.remove(world, c);
+          state.pinConstraints.splice(i, 1);
+          sfx.playBeep(640);
+          spawnFloatingText(c.pointA.x, c.pointA.y - 15, 'UNPINNED!', '#00F5D4', 14);
+          updatePostureHUD();
+          return;
+        }
+      }
+
+      if (state.activeWeaponId !== 'grab') {
+        triggerWeaponAt(pt.x, pt.y);
+      } else {
+        // Check if grabbing Ollie right away
+        setTimeout(() => {
+          if (mouseConstraint.body && ollie && ollie.allBodies.includes(mouseConstraint.body)) {
+            triggerOllieRagdoll(75);
+          }
+        }, 16);
+      }
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      state.pointer.x = e.clientX - rect.left;
+      state.pointer.y = e.clientY - rect.top;
+    });
+
+    window.addEventListener('pointerup', () => {
+      state.pointer.down = false;
+      state.isTasing = false;
+    });
+
+    // Keyboard Shortcuts (1 - 7)
+    window.addEventListener('keydown', (e) => {
+      const w = WEAPONS.find(item => item.key === e.key);
+      if (w) {
+        selectOrUnlockWeapon(w.id);
+      }
+    });
+
+    // Utility Control Buttons
+    document.getElementById('btnAddBudget').addEventListener('click', () => {
+      awardCoins(5000, width / 2, 95);
+      sfx.playUnlockFanfare();
+    });
+
+    document.getElementById('btnSlowMo').addEventListener('click', () => {
+      state.slowMo = !state.slowMo;
+      const ind = document.getElementById('slowMoIndicator');
+      ind.className = state.slowMo ? 'w-2 h-2 rounded-full bg-[#FDDA24] animate-ping' : 'w-2 h-2 rounded-full bg-slate-500';
+      spawnFloatingText(width / 2, 90, state.slowMo ? 'SLOW-MO MATRIX (0.25x)' : 'REALTIME SPEED (1.0x)', '#00E5FF', 16);
+    });
+
+    document.getElementById('btnClearProps').addEventListener('click', () => {
+      state.props.forEach(p => World.remove(world, p));
+      state.props = [];
+      state.pinConstraints.forEach(c => World.remove(world, c));
+      state.pinConstraints = [];
+      state.singularities = [];
+      updatePostureHUD();
+      sfx.playBeep(520);
+      spawnFloatingText(width / 2, height / 2, 'PROPS CLEARED!', '#00F5D4', 18);
+    });
+
+    document.getElementById('btnFactoryReset').addEventListener('click', () => {
+      state.props.forEach(p => World.remove(world, p));
+      state.props = [];
+      state.singularities = [];
+      createOllie(width / 2, height - PAD_INSET - 100);
+      sfx.playUnlockFanfare();
+      spawnConfetti(width / 2, height * 0.5, 22);
+      spawnFloatingText(width / 2, height * 0.35, 'FACTORY RESET COMPLETE! FRESH OLLIE!', '#FDDA24', 18);
+    });
+
+    document.getElementById('btnMute').addEventListener('click', () => {
+      sfx.muted = !sfx.muted;
+      document.getElementById('iconSoundOn').classList.toggle('hidden', sfx.muted);
+      document.getElementById('iconSoundOff').classList.toggle('hidden', !sfx.muted);
+    });
+
+    // Responsive Window Resize Handler
+    window.addEventListener('resize', () => {
+      width = arenaContainer.clientWidth;
+      height = arenaContainer.clientHeight;
+      canvas.width = width;
+      canvas.height = height;
+      buildWalls();
+      if (ollie && ollie.head) {
+        Body.setPosition(ollie.head, {
+          x: Math.min(width - 90, Math.max(90, ollie.head.position.x)),
+          y: Math.min(height - 90, Math.max(90, ollie.head.position.y))
+        });
+      }
+    });
+
+    // Initialize Game on Window Load
+    window.onload = function () {
+      buildWalls();
+      createOllie(width / 2, height - PAD_INSET - 100);
+      updateHUD();
+      renderLoop();
+    };
+  </script>
+</body>
+</html>
