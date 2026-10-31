@@ -1,5 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<!-- ==========================================================================
+     THEME SWITCHER: Change data-theme below (or SITE_THEME in <script>) to:
+     "default" | "halloween" | "christmas" | "newyears" | "valentines" | "easter" | "synthwave" | "auto"
+     ========================================================================== -->
+<html lang="en" data-theme="default">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,8 +16,70 @@
    1. CONFIG + LIBRARY  (kept in <head> so the hero image can preload instantly)
    ============================================================================ */
 
+// Active theme: "default" | "halloween" | "christmas" | "newyears" | "valentines" | "easter" | "synthwave" | "auto"
+const SITE_THEME = "default";
+
 // Title of the game shown in the big hero panel.
 const FEATURED_GAME_TITLE = "TWO";
+
+/* Resolve and apply the active theme immediately so the first paint uses it. */
+const ACTIVE_THEME = (function resolveTheme() {
+  var param = "";
+  try { param = new URLSearchParams(location.search).get("theme") || ""; } catch (e) {}
+  var htmlAttr = document.documentElement.getAttribute("data-theme") || "default";
+  var raw = (param || (SITE_THEME !== "default" ? SITE_THEME : htmlAttr) || "default").toLowerCase().trim();
+
+  if (raw === "auto") {
+    var now = new Date();
+    var m = now.getMonth() + 1; // 1-12
+    var d = now.getDate();
+    if ((m === 10 && d >= 15) || (m === 11 && d <= 2)) raw = "halloween";
+    else if (m === 12 && d >= 1 && d <= 26)            raw = "christmas";
+    else if ((m === 12 && d >= 27) || (m === 1 && d <= 5)) raw = "newyears";
+    else if (m === 2 && d >= 10 && d <= 16)            raw = "valentines";
+    else                                               raw = "default";
+  }
+
+  document.documentElement.setAttribute("data-theme", raw);
+  return raw;
+})();
+
+const THEME_CONFIG = {
+  default: {
+    kicker: "Playing this week",
+    badge: ""
+  },
+  halloween: {
+    kicker: "Haunting the floor this week",
+    badge: "🎃",
+    particles: ["🎃", "🦇", "👻", "🕸️", "✦"]
+  },
+  christmas: {
+    kicker: "Festive signal this week",
+    badge: "🎄",
+    particles: ["❄", "❅", "❆", "✦"]
+  },
+  newyears: {
+    kicker: "Ringing in the New Year",
+    badge: "🎆",
+    particles: ["✦", "✧", "🥂", "✨"]
+  },
+  valentines: {
+    kicker: "Full bars of love this week",
+    badge: "💘",
+    particles: ["♥", "♡", "✦", "✨"]
+  },
+  easter: {
+    kicker: "Egg-cellent coverage this week",
+    badge: "🥚",
+    particles: ["🥚", "🐣", "🌸", "✦"]
+  },
+  synthwave: {
+    kicker: "Arcade overdrive this week",
+    badge: "🕹️",
+    particles: ["✦", "▸", "◈"]
+  }
+};
 
 /* ---------------------------------------------------------------------------
    GITHUB — fill these two in and the page starts showing real "last updated"
@@ -620,7 +686,7 @@ function thumbSrc(path, size) {
 
 <style>
 /* ============================================================================
-   2. TOKENS
+   2. TOKENS + THEMES
    ============================================================================ */
 :root {
   --ink:        #06090A;   /* page */
@@ -629,6 +695,7 @@ function thumbSrc(path, size) {
   --panel-lift: #17262A;   /* card hover */
   --line:       rgba(150, 236, 240, 0.10);
   --line-soft:  rgba(150, 236, 240, 0.05);
+  --line-strong:rgba(43, 220, 232, 0.18);
 
   --teal:   #00A3AD;
   --aqua:   #2BDCE8;
@@ -638,6 +705,19 @@ function thumbSrc(path, size) {
   --dim:    #8FA5A9;
   --faint:  #5E7276;
 
+  --grid-dot:          rgba(150, 236, 240, 0.085);
+  --glow-1:            rgba(0, 163, 173, 0.14);
+  --glow-2:            rgba(255, 209, 0, 0.05);
+  --shine-1:           #E8FEFF;
+  --shine-2:           #FFF6C8;
+  --play-glow:         rgba(255, 209, 0, 0.26);
+  --toolbar-bg:        rgba(6, 9, 10, 0.96);
+  --card-hover-border: rgba(43, 220, 232, 0.32);
+  --spot:              rgba(43, 220, 232, 0.10);
+  --tag-bg:            rgba(0, 163, 173, 0.12);
+  --tag-border:        rgba(0, 163, 173, 0.28);
+  --thumb-bg:          #0A1214;
+
   --display: "Avenir Next", "Futura", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
   --body: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
@@ -646,6 +726,198 @@ function thumbSrc(path, size) {
   --r: 10px;
 
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);   /* fast out, soft landing — every entrance uses it */
+}
+
+/* --- HALLOWEEN ----------------------------------------------------------- */
+html[data-theme="halloween"] {
+  --ink:        #08050B;
+  --slate:      #120B18;
+  --panel:      #180F21;
+  --panel-lift: #231630;
+  --line:       rgba(255, 117, 24, 0.14);
+  --line-soft:  rgba(255, 117, 24, 0.07);
+  --line-strong:rgba(255, 117, 24, 0.28);
+
+  --teal:   #B84DFF;
+  --aqua:   #FF7518;
+  --yellow: #FFB800;
+
+  --text:   #F5EAE6;
+  --dim:    #B59CA8;
+  --faint:  #78616E;
+
+  --grid-dot:          rgba(255, 117, 24, 0.09);
+  --glow-1:            rgba(255, 117, 24, 0.16);
+  --glow-2:            rgba(184, 77, 255, 0.10);
+  --shine-1:           #FFE5D0;
+  --shine-2:           #FFF3C4;
+  --play-glow:         rgba(255, 117, 24, 0.34);
+  --toolbar-bg:        rgba(8, 5, 11, 0.96);
+  --card-hover-border: rgba(255, 117, 24, 0.40);
+  --spot:              rgba(255, 117, 24, 0.12);
+  --tag-bg:            rgba(184, 77, 255, 0.13);
+  --tag-border:        rgba(255, 117, 24, 0.32);
+  --thumb-bg:          #120919;
+}
+
+/* --- CHRISTMAS ----------------------------------------------------------- */
+html[data-theme="christmas"] {
+  --ink:        #050C09;
+  --slate:      #0A1711;
+  --panel:      #0E2018;
+  --panel-lift: #152E23;
+  --line:       rgba(120, 235, 185, 0.13);
+  --line-soft:  rgba(120, 235, 185, 0.06);
+  --line-strong:rgba(255, 77, 94, 0.28);
+
+  --teal:   #199E68;
+  --aqua:   #5CE6B8;
+  --yellow: #FFD15C;
+
+  --text:   #ECF7F2;
+  --dim:    #93B5A5;
+  --faint:  #5D7E6F;
+
+  --grid-dot:          rgba(255, 255, 255, 0.09);
+  --glow-1:            rgba(25, 158, 104, 0.18);
+  --glow-2:            rgba(255, 68, 85, 0.11);
+  --shine-1:           #E8FFF6;
+  --shine-2:           #FFF6D6;
+  --play-glow:         rgba(255, 209, 92, 0.30);
+  --toolbar-bg:        rgba(5, 12, 9, 0.96);
+  --card-hover-border: rgba(92, 230, 184, 0.36);
+  --spot:              rgba(255, 77, 94, 0.11);
+  --tag-bg:            rgba(25, 158, 104, 0.16);
+  --tag-border:        rgba(92, 230, 184, 0.30);
+  --thumb-bg:          #08140F;
+}
+
+/* --- NEW YEARS ----------------------------------------------------------- */
+html[data-theme="newyears"] {
+  --ink:        #06060C;
+  --slate:      #0D0E1A;
+  --panel:      #131526;
+  --panel-lift: #1C1F38;
+  --line:       rgba(255, 229, 143, 0.14);
+  --line-soft:  rgba(255, 229, 143, 0.06);
+  --line-strong:rgba(255, 215, 0, 0.28);
+
+  --teal:   #8C7AE6;
+  --aqua:   #FFE58F;
+  --yellow: #FFD000;
+
+  --text:   #F5F3FF;
+  --dim:    #A5A2C2;
+  --faint:  #6B688A;
+
+  --grid-dot:          rgba(255, 229, 143, 0.09);
+  --glow-1:            rgba(255, 208, 0, 0.14);
+  --glow-2:            rgba(140, 122, 230, 0.12);
+  --shine-1:           #FFFDF2;
+  --shine-2:           #FFF7CC;
+  --play-glow:         rgba(255, 208, 0, 0.34);
+  --toolbar-bg:        rgba(6, 6, 12, 0.96);
+  --card-hover-border: rgba(255, 229, 143, 0.38);
+  --spot:              rgba(255, 215, 0, 0.12);
+  --tag-bg:            rgba(255, 215, 0, 0.10);
+  --tag-border:        rgba(255, 229, 143, 0.28);
+  --thumb-bg:          #0A0B15;
+}
+
+/* --- VALENTINES ---------------------------------------------------------- */
+html[data-theme="valentines"] {
+  --ink:        #0B0508;
+  --slate:      #160A10;
+  --panel:      #1F0E17;
+  --panel-lift: #2C1421;
+  --line:       rgba(255, 92, 147, 0.14);
+  --line-soft:  rgba(255, 92, 147, 0.07);
+  --line-strong:rgba(255, 92, 147, 0.28);
+
+  --teal:   #D92662;
+  --aqua:   #FF5C93;
+  --yellow: #FFC2D4;
+
+  --text:   #FBE9F0;
+  --dim:    #BD95A4;
+  --faint:  #7F5B69;
+
+  --grid-dot:          rgba(255, 92, 147, 0.09);
+  --glow-1:            rgba(217, 38, 98, 0.17);
+  --glow-2:            rgba(255, 194, 212, 0.08);
+  --shine-1:           #FFEBF2;
+  --shine-2:           #FFF0F5;
+  --play-glow:         rgba(255, 92, 147, 0.32);
+  --toolbar-bg:        rgba(11, 5, 8, 0.96);
+  --card-hover-border: rgba(255, 92, 147, 0.38);
+  --spot:              rgba(255, 92, 147, 0.12);
+  --tag-bg:            rgba(217, 38, 98, 0.14);
+  --tag-border:        rgba(255, 92, 147, 0.30);
+  --thumb-bg:          #13080D;
+}
+
+/* --- EASTER -------------------------------------------------------------- */
+html[data-theme="easter"] {
+  --ink:        #080910;
+  --slate:      #101320;
+  --panel:      #161A2C;
+  --panel-lift: #1F253D;
+  --line:       rgba(200, 158, 255, 0.14);
+  --line-soft:  rgba(200, 158, 255, 0.07);
+  --line-strong:rgba(200, 158, 255, 0.26);
+
+  --teal:   #4CE0B3;
+  --aqua:   #C89EFF;
+  --yellow: #FFE066;
+
+  --text:   #F2EFFB;
+  --dim:    #A39EC0;
+  --faint:  #696487;
+
+  --grid-dot:          rgba(200, 158, 255, 0.09);
+  --glow-1:            rgba(200, 158, 255, 0.15);
+  --glow-2:            rgba(76, 224, 179, 0.09);
+  --shine-1:           #F9F2FF;
+  --shine-2:           #FFF8D6;
+  --play-glow:         rgba(255, 224, 102, 0.30);
+  --toolbar-bg:        rgba(8, 9, 16, 0.96);
+  --card-hover-border: rgba(200, 158, 255, 0.36);
+  --spot:              rgba(200, 158, 255, 0.12);
+  --tag-bg:            rgba(76, 224, 179, 0.12);
+  --tag-border:        rgba(200, 158, 255, 0.30);
+  --thumb-bg:          #0D101B;
+}
+
+/* --- SYNTHWAVE ----------------------------------------------------------- */
+html[data-theme="synthwave"] {
+  --ink:        #090414;
+  --slate:      #120826;
+  --panel:      #1A0C36;
+  --panel-lift: #26124D;
+  --line:       rgba(0, 240, 255, 0.15);
+  --line-soft:  rgba(255, 42, 133, 0.08);
+  --line-strong:rgba(0, 240, 255, 0.30);
+
+  --teal:   #FF2A85;
+  --aqua:   #00F0FF;
+  --yellow: #FFE600;
+
+  --text:   #F6EEFF;
+  --dim:    #B49CD6;
+  --faint:  #775D9E;
+
+  --grid-dot:          rgba(0, 240, 255, 0.11);
+  --glow-1:            rgba(255, 42, 133, 0.18);
+  --glow-2:            rgba(0, 240, 255, 0.12);
+  --shine-1:           #E5FFFF;
+  --shine-2:           #FFF9C4;
+  --play-glow:         rgba(255, 42, 133, 0.36);
+  --toolbar-bg:        rgba(9, 4, 20, 0.96);
+  --card-hover-border: rgba(0, 240, 255, 0.42);
+  --spot:              rgba(255, 42, 133, 0.14);
+  --tag-bg:            rgba(255, 42, 133, 0.15);
+  --tag-border:        rgba(0, 240, 255, 0.32);
+  --thumb-bg:          #110622;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -664,7 +936,7 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* ambience: a dot grid that fades out under the masthead, and a soft teal glow.
+/* ambience: a dot grid that fades out under the masthead, and a soft theme glow.
    Both are static on purpose: an always-moving full-screen layer costs GPU
    time on every frame for as long as the tab is open. */
 body::before {
@@ -674,7 +946,7 @@ body::before {
   height: 760px;
   z-index: -1;
   pointer-events: none;
-  background-image: radial-gradient(rgba(150, 236, 240, 0.085) 1px, transparent 1.4px);
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1.4px);
   background-size: 26px 26px;
   -webkit-mask-image: linear-gradient(to bottom, #000 10%, transparent);
           mask-image: linear-gradient(to bottom, #000 10%, transparent);
@@ -686,8 +958,8 @@ body::after {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(45% 40% at 14% 4%, rgba(0, 163, 173, 0.14), transparent 70%),
-    radial-gradient(32% 30% at 90% 0%, rgba(255, 209, 0, 0.05), transparent 70%);
+    radial-gradient(45% 40% at 14% 4%, var(--glow-1), transparent 70%),
+    radial-gradient(32% 30% at 90% 0%, var(--glow-2), transparent 70%);
 }
 
 /* shared entrances. All use `backwards` fill so hover transforms still work afterwards. */
@@ -705,6 +977,94 @@ img { display: block; }
   outline-offset: 3px;
   border-radius: 3px;
 }
+
+/* ============================================================================
+   2b. SEASONAL DECORATIONS (lightweight, GPU-composited)
+   ============================================================================ */
+.theme-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+  overflow: hidden;
+}
+.theme-stage[hidden] { display: none; }
+
+.theme-particle {
+  position: absolute;
+  top: -36px;
+  left: 0;
+  user-select: none;
+  will-change: transform, opacity;
+  animation: particleFall linear infinite;
+}
+html[data-theme="newyears"] .theme-particle,
+html[data-theme="valentines"] .theme-particle {
+  top: auto;
+  bottom: -36px;
+  animation-name: particleRise;
+}
+@keyframes particleFall {
+  0%   { transform: translate3d(0, -5vh, 0) rotate(0deg); opacity: 0; }
+  10%  { opacity: var(--p-alpha, 0.55); }
+  90%  { opacity: var(--p-alpha, 0.55); }
+  100% { transform: translate3d(var(--p-drift, 40px), 106vh, 0) rotate(var(--p-rot, 260deg)); opacity: 0; }
+}
+@keyframes particleRise {
+  0%   { transform: translate3d(0, 5vh, 0) scale(0.8); opacity: 0; }
+  15%  { opacity: var(--p-alpha, 0.6); }
+  85%  { opacity: var(--p-alpha, 0.6); }
+  100% { transform: translate3d(var(--p-drift, -30px), -106vh, 0) scale(1.15); opacity: 0; }
+}
+
+/* Halloween corner cobwebs */
+.theme-cobweb {
+   display: none;
+  position: absolute;
+  top: 0;
+  width: clamp(110px, 16vw, 190px);
+  height: clamp(110px, 16vw, 190px);
+  stroke: rgba(255, 117, 24, 0.18);
+  fill: none;
+  stroke-width: 1.2;
+  pointer-events: none;
+  z-index: 2;
+}
+.theme-cobweb.right { right: 0; transform: scaleX(-1); }
+html[data-theme="halloween"] .theme-cobweb { display: block; }
+
+/* Christmas string lights along the toolbar */
+html[data-theme="christmas"] .toolbar::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -7px;
+  height: 7px;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, #FF4455 0 2.5px, transparent 3.5px),
+    radial-gradient(circle, #FFD15C 0 2.5px, transparent 3.5px),
+    radial-gradient(circle, #5CE6B8 0 2.5px, transparent 3.5px),
+    radial-gradient(circle, #58B8FF 0 2.5px, transparent 3.5px);
+  background-size: 64px 7px;
+  background-position: 0 0, 16px 0, 32px 0, 48px 0;
+  animation: twinkleLights 2.4s ease-in-out infinite alternate;
+}
+@keyframes twinkleLights {
+  0%   { opacity: 0.55; }
+  100% { opacity: 1; }
+}
+
+.wordmark-badge {
+  display: inline-block;
+  font-style: normal;
+  font-size: 0.72em;
+  margin-left: 0.18em;
+  vertical-align: 0.06em;
+  animation: pop 0.6s var(--ease) 0.25s backwards;
+}
+.wordmark-badge:empty { display: none; }
 
 /* ============================================================================
    3. MASTHEAD + HERO
@@ -744,12 +1104,12 @@ img { display: block; }
 .wordmark .t {
   display: inline-block;
   padding-right: 0.08em;          /* keeps the italic overhang inside the clip */
-  background: linear-gradient(110deg, var(--aqua) 42%, #E8FEFF 50%, var(--aqua) 58%) 100% 0 / 260% 100%;
+  background: linear-gradient(110deg, var(--aqua) 42%, var(--shine-1) 50%, var(--aqua) 58%) 100% 0 / 260% 100%;
   -webkit-background-clip: text;
           background-clip: text;
   color: transparent;
 }
-.wordmark b.t { background-image: linear-gradient(110deg, var(--yellow) 42%, #FFF6C8 50%, var(--yellow) 58%); }
+.wordmark b.t { background-image: linear-gradient(110deg, var(--yellow) 42%, var(--shine-2) 50%, var(--yellow) 58%); }
 .wordmark.shining .t { animation: shine 1.3s ease-in-out; }
 .wordmark.shining b.t { animation-delay: 0.09s; animation-fill-mode: backwards; }
 @keyframes shine { from { background-position: 100% 0; } to { background-position: 0 0; } }
@@ -873,7 +1233,7 @@ img { display: block; }
 }
 .play:hover {
   translate: 0 -2px;
-  box-shadow: 0 10px 26px rgba(255, 209, 0, 0.26);
+  box-shadow: 0 10px 26px var(--play-glow);
 }
 .play:active { translate: 0; }
 .play svg { width: 14px; height: 14px; fill: currentColor; transition: translate 0.25s var(--ease); }
@@ -906,8 +1266,8 @@ img { display: block; }
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(to right, var(--slate) 2%, rgba(12,19,21,0.55) 34%, transparent 72%),
-    linear-gradient(to top, rgba(6,9,10,0.55), transparent 50%);
+    linear-gradient(to right, var(--slate) 2%, color-mix(in srgb, var(--slate) 55%, transparent) 34%, transparent 72%),
+    linear-gradient(to top, color-mix(in srgb, var(--ink) 55%, transparent), transparent 50%);
   pointer-events: none;
 }
 
@@ -945,7 +1305,7 @@ img { display: block; }
   padding: 12px var(--pad);
   /* solid rather than a backdrop blur: a blur behind a sticky bar has to be
      recalculated on every scroll frame, which is the classic cause of choppy scrolling */
-  background: rgba(6, 9, 10, 0.96);
+  background: var(--toolbar-bg);
   border-top: 1px solid var(--line-soft);
   border-bottom: 1px solid var(--line);
   display: flex;
@@ -967,7 +1327,7 @@ img { display: block; }
   transition: opacity 0.3s ease;
   pointer-events: none;
 }
-.toolbar.stuck { border-bottom-color: rgba(43, 220, 232, 0.18); }
+.toolbar.stuck { border-bottom-color: var(--line-strong); }
 .toolbar.stuck::after { opacity: 1; }
 
 .search {
@@ -1129,7 +1489,7 @@ main { flex: 1; padding: 22px var(--pad) 64px; }
 }
 .card:hover {
   background: var(--panel-lift);
-  border-color: rgba(43, 220, 232, 0.32);
+  border-color: var(--card-hover-border);
   translate: 0 -3px;
 }
 .card:active { translate: 0 -1px; }
@@ -1148,7 +1508,7 @@ main { flex: 1; padding: 22px var(--pad) 64px; }
   height: 400px;
   margin: -200px 0 0 -200px;
   border-radius: 50%;
-  background: radial-gradient(closest-side, var(--spot, rgba(43, 220, 232, 0.1)), transparent);
+  background: radial-gradient(closest-side, var(--spot), transparent);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.3s ease;
@@ -1163,7 +1523,7 @@ main { flex: 1; padding: 22px var(--pad) 64px; }
   flex: none;
   width: 238px;
   aspect-ratio: 16 / 9;
-  background: #0A1214;
+  background: var(--thumb-bg);
   overflow: hidden;
 }
 .thumb img {
@@ -1203,7 +1563,7 @@ main { flex: 1; padding: 22px var(--pad) 64px; }
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, transparent 25%, rgba(150, 236, 240, 0.05) 50%, transparent 75%);
+  background: linear-gradient(100deg, transparent 25%, var(--line) 50%, transparent 75%);
   transform: translateX(-100%);
   animation: sweep 1.4s linear infinite;
 }
@@ -1254,8 +1614,8 @@ main { flex: 1; padding: 22px var(--pad) 64px; }
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--aqua);
-  background: rgba(0, 163, 173, 0.12);
-  border: 1px solid rgba(0, 163, 173, 0.28);
+  background: var(--tag-bg);
+  border: 1px solid var(--tag-border);
   border-radius: 4px;
   padding: 3px 8px;
 }
@@ -1602,7 +1962,7 @@ footer {
   .hero-card { grid-template-columns: 1fr; }
   .hero-art { order: -1; aspect-ratio: 16 / 9; }
   .hero-art::after {
-    background: linear-gradient(to bottom, transparent 30%, rgba(12,19,21,0.8) 80%, var(--slate));
+    background: linear-gradient(to bottom, transparent 30%, color-mix(in srgb, var(--slate) 80%, transparent) 80%, var(--slate));
   }
   .card-link { flex-direction: column; }
   .thumb { width: 100%; }
@@ -1632,15 +1992,32 @@ footer {
     transition-delay: 0s !important;
   }
   html { scroll-behavior: auto; }
-  .thumb::before, .vault-radar, .vault-label .dot::after { display: none; }
+  .thumb::before, .vault-radar, .vault-label .dot::after, .theme-stage { display: none; }
   .sync.working::before { opacity: 1; }
 }
 </style>
 </head>
 <body>
 
+<!-- Halloween corner cobwebs (only shown when data-theme="halloween") -->
+<svg class="theme-cobweb" viewBox="0 0 120 120" aria-hidden="true">
+  <path d="M0 0 L120 0 M0 0 L112 45 M0 0 L90 90 M0 0 L45 112 M0 0 L0 120"/>
+  <path d="M28 0 Q26 14 25 20 Q18 22 10 25 Q6 26 0 28"/>
+  <path d="M58 0 Q52 24 44 44 Q28 50 18 54 Q9 56 0 58"/>
+  <path d="M92 0 Q82 38 66 66 Q44 78 30 84 Q14 90 0 92"/>
+</svg>
+<svg class="theme-cobweb right" viewBox="0 0 120 120" aria-hidden="true">
+  <path d="M0 0 L120 0 M0 0 L112 45 M0 0 L90 90 M0 0 L45 112 M0 0 L0 120"/>
+  <path d="M28 0 Q26 14 25 20 Q18 22 10 25 Q6 26 0 28"/>
+  <path d="M58 0 Q52 24 44 44 Q28 50 18 54 Q9 56 0 58"/>
+  <path d="M92 0 Q82 38 66 66 Q44 78 30 84 Q14 90 0 92"/>
+</svg>
+
+<!-- Seasonal ambient particle layer -->
+<div class="theme-stage" id="theme-stage" hidden aria-hidden="true"></div>
+
 <header class="masthead">
-  <h1 class="wordmark" id="wordmark"><span class="w"><span class="t">Optus</span></span> <span class="w"><b class="t">Games</b></span></h1>
+  <h1 class="wordmark" id="wordmark"><span class="w"><span class="t">Optus</span></span> <span class="w"><b class="t">Games</b></span><span class="wordmark-badge" id="wordmark-badge" aria-hidden="true"></span></h1>
   <p class="shelf-note" id="shelf-note"></p>
 </header>
 
@@ -1830,6 +2207,34 @@ function anim(el, frames, opts) {
   return motionOK() ? el.animate(frames, Object.assign({ easing: EASE }, opts)) : null;
 }
 
+/* ---- seasonal ambience --------------------------------------------------- */
+function renderThemeDecor() {
+  const cfg = THEME_CONFIG[ACTIVE_THEME] || THEME_CONFIG.default;
+  const badgeEl = document.getElementById("wordmark-badge");
+  if (badgeEl && cfg.badge) badgeEl.textContent = cfg.badge;
+
+  const stage = document.getElementById("theme-stage");
+  if (!stage || !cfg.particles || !cfg.particles.length || !motionOK()) return;
+
+  stage.hidden = false;
+  const frag = document.createDocumentFragment();
+  const count = 18;
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement("span");
+    p.className = "theme-particle";
+    p.textContent = cfg.particles[i % cfg.particles.length];
+    p.style.left = ((i * 97) % 100) + "%";
+    p.style.fontSize = (0.75 + (i % 4) * 0.22).toFixed(2) + "rem";
+    p.style.animationDuration = (9 + (i % 7) * 2.2).toFixed(1) + "s";
+    p.style.animationDelay = (-((i * 1.7) % 14)).toFixed(1) + "s";
+    p.style.setProperty("--p-drift", ((i % 2 === 0 ? 1 : -1) * (20 + (i % 5) * 12)) + "px");
+    p.style.setProperty("--p-rot", ((i % 2 === 0 ? 1 : -1) * (120 + (i % 4) * 60)) + "deg");
+    p.style.setProperty("--p-alpha", (0.22 + (i % 4) * 0.1).toFixed(2));
+    frag.appendChild(p);
+  }
+  stage.appendChild(frag);
+}
+
 /* Each game keeps a reference to its DOM node and a prebuilt search string, so
    filtering only toggles a class. The cards are never rebuilt, which means the
    browser never re-fetches or re-decodes a thumbnail while you type.
@@ -1940,13 +2345,14 @@ function renderHero() {
   const g = PUBLIC_GAMES.find(x => x.title === FEATURED_GAME_TITLE) || PUBLIC_GAMES[0];
   if (!g) return;
   const who = splitCreator(g.creator);
+  const cfg = THEME_CONFIG[ACTIVE_THEME] || THEME_CONFIG.default;
 
   const card = document.createElement("div");
   card.className = "hero-card";
   card.innerHTML =
     '<span class="pulse"></span><span class="pulse"></span><span class="pulse"></span>' +
     '<div class="hero-copy">' +
-      '<p class="hero-kicker"><span class="bars"><i></i><i></i><i></i><i></i></span> Playing this week</p>' +
+      '<p class="hero-kicker"><span class="bars"><i></i><i></i><i></i><i></i></span> <span class="kicker-text"></span></p>' +
       "<h2></h2><p class='lead'></p>" +
       '<p class="hero-meta"></p>' +
       '<p class="hero-updated" id="hero-updated"></p>' +
@@ -1954,6 +2360,7 @@ function renderHero() {
     "</div>" +
     '<div class="hero-art"></div>';
 
+  card.querySelector(".kicker-text").textContent = cfg.kicker || "Playing this week";
   card.querySelector("h2").textContent = g.title;
   card.querySelector(".lead").textContent = g.description || "No notes yet. Go in blind.";
   card.querySelector(".hero-meta").textContent =
@@ -2815,6 +3222,7 @@ function closeVault() {
 vaultLock.addEventListener("click", closeVault);
 
 /* ---- go ------------------------------------------------------------------ */
+renderThemeDecor();
 renderHero();
 renderNote();
 buildChips();
