@@ -1,0 +1,1968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>OPTUS: CODE ROT // THE WATER SOLUTION</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,400&family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #010203;
+      font-family: 'JetBrains Mono', monospace;
+      color: #d1d5db;
+    }
+
+    #game-canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+      z-index: 1;
+    }
+
+    #horror-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Subtle claustrophobic optical vignette & psychological lens distortion */
+    #vignette-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      background: radial-gradient(circle at center, transparent 35%, rgba(0, 0, 0, 0.82) 78%, rgba(0, 0, 0, 0.98) 100%);
+      transition: opacity 0.2s ease;
+    }
+
+    /* Subtle chromatic/blood dread edge bleed when staring at Ollie */
+    #dread-distortion {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 11;
+      opacity: 0;
+      box-shadow: inset 0 0 160px 65px rgba(15, 0, 4, 0.96), inset 0 0 40px 10px rgba(180, 15, 30, 0.28);
+      backdrop-filter: contrast(1.18) saturate(0.65);
+      transition: opacity 0.12s linear;
+    }
+
+    .serif-horror {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+    }
+  </style>
+</head>
+<body class="bg-black text-gray-200 select-none">
+
+  <!-- Crisp Native 3D Canvas -->
+  <div id="game-canvas-container">
+    <canvas id="horror-canvas"></canvas>
+  </div>
+
+  <!-- Claustrophobic Optical Overlays (No busy scanlines or arcade bars) -->
+  <div id="vignette-layer"></div>
+  <div id="dread-distortion"></div>
+
+  <!-- ULTRA-MINIMAL GAMEPLAY UI LAYER -->
+  <div id="minimal-ui" class="fixed inset-0 pointer-events-none z-20 hidden">
+    <!-- Tiny Subtle Center Interaction Dot (Only appears when looking directly at a water bottle within reach) -->
+    <div id="interact-dot" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-200 flex flex-col items-center gap-1.5">
+      <div class="w-1.5 h-1.5 rounded-full bg-white/90 shadow-[0_0_8px_rgba(255,255,255,0.9)]"></div>
+      <span class="text-[10px] tracking-[0.25em] text-white/60 uppercase">[E / Click]</span>
+    </div>
+
+    <!-- Transient Lower-Center Lore Fade (Appears only for 3.5s on bottle collection or haunting whisper) -->
+    <div id="transient-lore" class="fixed bottom-12 left-1/2 -translate-x-1/2 max-w-xl w-full px-6 text-center opacity-0 transition-opacity duration-700">
+      <div id="lore-count" class="text-xs tracking-[0.35em] text-[#FDDA24]/80 uppercase mb-1"></div>
+      <p id="lore-sentence" class="serif-horror italic text-xl md:text-2xl text-gray-200/90 tracking-wide drop-shadow-[0_2px_12px_rgba(0,0,0,1)]"></p>
+    </div>
+
+    <!-- Minimal Ending Prompt (Only shown after all 8 bottles are collected) -->
+    <div id="ending-banner" class="fixed top-6 left-1/2 -translate-x-1/2 hidden items-center gap-4 bg-black/60 border border-[#FDDA24]/40 backdrop-blur-md px-5 py-2 rounded-full pointer-events-auto">
+      <span class="text-xs tracking-[0.2em] text-[#FDDA24] uppercase">Optus Nike Kicks Equipped</span>
+      <span class="text-white/30">•</span>
+      <button id="btn-dance-toggle" class="text-xs tracking-widest text-cyan-300 hover:text-white uppercase transition">[Space] Dance With Ollie</button>
+      <span class="text-white/30">•</span>
+      <button id="btn-room-toggle" class="text-xs tracking-widest text-gray-300 hover:text-white uppercase transition">[V] Switch Stash / Showroom</button>
+    </div>
+
+    <!-- Mobile Touch Fallback (Hidden on Desktop) -->
+    <div id="touch-controls" class="fixed bottom-4 left-4 grid grid-cols-3 gap-1 bg-black/50 p-1.5 rounded border border-white/10 pointer-events-auto md:hidden">
+      <button data-move="turnLeft" class="w-9 h-9 bg-white/5 active:bg-white/20 rounded text-xs">⟲</button>
+      <button data-move="forward" class="w-9 h-9 bg-white/5 active:bg-white/20 rounded text-xs">▲</button>
+      <button data-move="turnRight" class="w-9 h-9 bg-white/5 active:bg-white/20 rounded text-xs">⟳</button>
+      <button data-move="left" class="w-9 h-9 bg-white/5 active:bg-white/20 rounded text-xs">◄</button>
+      <button data-move="backward" class="w-9 h-9 bg-white/5 active:bg-white/20 rounded text-xs">▼</button>
+      <button data-move="right" class="w-9 h-9 bg-white/5 active:bg-white/20 rounded text-xs">►</button>
+    </div>
+  </div>
+
+  <!-- STARK P.T.-STYLE TITLE SCREEN -->
+  <div id="title-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-[#020304] p-6">
+    <div class="max-w-lg w-full border border-white/10 bg-black/80 p-8 md:p-10 shadow-2xl">
+      <div class="text-[10px] tracking-[0.35em] text-[#00A3AD] uppercase mb-2">Optus Flagship // 03:14 AM</div>
+      <h1 class="serif-horror text-4xl md:text-5xl text-white font-semibold tracking-wide mb-4">
+        CODE ROT
+      </h1>
+      <p class="text-xs text-gray-400 leading-relaxed mb-6">
+        Seven years of un-refactored telemetry code have decayed inside the store's servers. The mascot, <span class="text-[#FDDA24]">Ollie</span>, has stretched into the dark between the pillars, hoarding half-drunken employee water bottles to cool his rotting memory heap.
+      </p>
+
+      <div class="border-t border-b border-white/10 py-4 my-6 space-y-2 text-[11px] text-gray-400">
+        <div class="flex justify-between"><span>Move / Sprint</span><span class="text-gray-200">WASD / SHIFT</span></div>
+        <div class="flex justify-between"><span>Flashlight</span><span class="text-gray-200">F</span></div>
+        <div class="flex justify-between"><span>Collect Water Bottle</span><span class="text-gray-200">E or Left Click</span></div>
+        <div class="flex justify-between"><span>Bottle Count & Signal</span><span class="text-gray-200">Check Phone in Hand</span></div>
+        <div class="flex justify-between text-gray-600 pt-2"><span>Debug Shortcuts (In-Game)</span><span>[1] 7/8 Bottles • [2] Stash Ending</span></div>
+      </div>
+
+      <button id="btn-start-game" class="w-full py-3 bg-white/95 hover:bg-[#FDDA24] text-black text-xs font-bold tracking-[0.25em] uppercase transition">
+        Step Inside
+      </button>
+    </div>
+  </div>
+
+  <!-- STARK DEATH SCREEN -->
+  <div id="gameover-screen" class="fixed inset-0 z-50 hidden items-center justify-center bg-black p-6">
+    <div class="max-w-md w-full text-center space-y-6">
+      <p class="serif-horror italic text-3xl text-red-500/90 tracking-wide">
+        0x00000000 // DEREFERENCED
+      </p>
+      <p class="text-xs text-gray-500 leading-relaxed">
+        You stared into the unallocated space behind his eyes for too long. He poured what remained of you into a lukewarm 600ml bottle.
+      </p>
+      <div class="flex justify-center gap-4 pt-2">
+        <button id="btn-retry-continue" class="px-6 py-2.5 border border-white/20 hover:border-white text-xs tracking-[0.2em] uppercase text-white transition">
+          Wake Up (Keep Bottles)
+        </button>
+        <button id="btn-retry-fresh" class="px-6 py-2.5 border border-white/10 hover:border-red-500/50 text-xs tracking-[0.2em] uppercase text-gray-500 hover:text-red-300 transition">
+          Reset (0/8)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /***************************************************************************
+     * OPTUS: CODE ROT // PSYCHOLOGICAL HORROR OVERHAUL (P.T. / SLENDER EDITION)
+     ***************************************************************************/
+
+    const LORE_SENTENCES = [
+      "\"We never deleted the 2014 customer queue daemon; last night I heard it breathing inside Wall Server 4.\"",
+      "\"Sarah left a half-drunk water bottle on Desk 3. Something tall and yellow was unscrewing the cap in the dark.\"",
+      "\"If an employee stands still without an active pointer reference, the Garbage Collector deallocates their lungs.\"",
+      "\"His arms are dangling pointers—black wires reaching for memory addresses that no longer exist.\"",
+      "\"Pure water doesn't conduct trace human memory. He needs the lukewarm backwash left on retail counters.\"",
+      "\"Do not stare when he leans out from behind the pillars. The heap leak spreads through the optic nerve.\"",
+      "\"Beneath the showroom tiles lies his Underground Stash. One bottle remains in the dark.\"",
+      "\"All 8 bottles secured. The Water Solution is halted—Optus Nike Kicks compiled. Descend the center stairwell.\""
+    ];
+
+    // --- GLOBAL STATE ---
+    const state = {
+      started: false,
+      gameOver: false,
+      endingUnlocked: false,
+      inUndergroundStash: false,
+      flashlightOn: true,
+      isDancing: false,
+
+      bottlesCollected: 0,
+      sanity: 100,
+      stamina: 100,
+
+      // Player physics & smooth flashlight inertia
+      playerPos: new THREE.Vector3(0, 1.72, 22),
+      yaw: 0,
+      pitch: 0,
+      lightYaw: 0,
+      lightPitch: 0,
+      turnAccumulator: 0,
+      lastTurnEventTime: 0,
+      walkTime: 0,
+
+      // Ollie Psychological Stalking AI
+      // Modes: 'PEEKING', 'WEEPING_ANGEL', 'DEAD_SILENCE_BEHIND', 'HIDDEN', 'HAPPY_DANCE'
+      ollieMode: 'PEEKING',
+      olliePos: new THREE.Vector3(-8.8, 0, 12),
+      olliePeekLean: 0.48,       // Radian lean around pillar
+      olliePeekSide: 1,
+      ollieSeenTimer: 0,
+      ollieModeTimer: 0,
+      ollieDistance: 25,
+      ollieInView: false,
+      headSnapAngle: 0,
+      nextHeadSnapTime: 0,
+      deadSilenceActive: false,
+
+      keys: {
+        KeyW: false, KeyA: false, KeyS: false, KeyD: false,
+        ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false,
+        ShiftLeft: false, ShiftRight: false
+      },
+      touchMove: {
+        forward: false, backward: false, left: false, right: false,
+        turnLeft: false, turnRight: false
+      }
+    };
+
+    // --- TRANSIENT MINIMAL LORE DISPLAY ---
+    let loreFadeTimeout = null;
+    function showMinimalLore(countText, sentenceText, duration = 4200) {
+      const box = document.getElementById('transient-lore');
+      document.getElementById('lore-count').textContent = countText;
+      document.getElementById('lore-sentence').textContent = sentenceText;
+      box.style.opacity = '1';
+      clearTimeout(loreFadeTimeout);
+      loreFadeTimeout = setTimeout(() => {
+        box.style.opacity = '0';
+      }, duration);
+    }
+
+    // --- PROCEDURAL PSYCHOLOGICAL AUDIO ENGINE ---
+    class PsychologicalAudio {
+      constructor() {
+        this.ctx = null;
+        this.master = null;
+        this.roomHumGain = null;
+        this.tinnitusGain = null;
+        this.staticGain = null;
+        this.lastHeartbeat = 0;
+        this.lastFootstep = 0;
+        this.lastStalkStep = 0;
+        this.lastDripTime = 0;
+        this.lastStarterClick = 0;
+        this.lastDanceBeat = 0;
+        this.beatStep = 0;
+      }
+
+      init() {
+        if (this.ctx) {
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+          return;
+        }
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioCtx();
+
+        this.master = this.ctx.createGain();
+        this.master.gain.value = 0.65;
+        this.master.connect(this.ctx.destination);
+
+        // 1. Oppressive Fluorescent / Server Room 55Hz Sub-Hum
+        this.roomHumGain = this.ctx.createGain();
+        this.roomHumGain.gain.value = 0.14;
+        this.roomHumGain.connect(this.master);
+
+        const hum1 = this.ctx.createOscillator();
+        hum1.type = 'sawtooth';
+        hum1.frequency.value = 50;
+        const hum2 = this.ctx.createOscillator();
+        hum2.type = 'sine';
+        hum2.frequency.value = 100;
+
+        const humFilter = this.ctx.createBiquadFilter();
+        humFilter.type = 'lowpass';
+        humFilter.frequency.value = 115;
+
+        hum1.connect(humFilter);
+        hum2.connect(humFilter);
+        humFilter.connect(this.roomHumGain);
+        hum1.start();
+        hum2.start();
+
+        // 2. High-pitched Tinnitus Ring when staring at Ollie
+        this.tinnitusGain = this.ctx.createGain();
+        this.tinnitusGain.gain.value = 0.0;
+        this.tinnitusGain.connect(this.master);
+
+        const tinOsc = this.ctx.createOscillator();
+        tinOsc.type = 'sine';
+        tinOsc.frequency.value = 6400;
+        tinOsc.connect(this.tinnitusGain);
+        tinOsc.start();
+
+        // 3. Low-level Geiger / Electromagnetic Interference Crackle
+        const bufSize = this.ctx.sampleRate * 2;
+        const noiseBuf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+        const out = noiseBuf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) {
+          out[i] = (Math.random() * 2 - 1) * (Math.random() < 0.08 ? 1.0 : 0.15);
+        }
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = noiseBuf;
+        noise.loop = true;
+
+        const band = this.ctx.createBiquadFilter();
+        band.type = 'bandpass';
+        band.frequency.value = 1200;
+        band.Q.value = 2.0;
+
+        this.staticGain = this.ctx.createGain();
+        this.staticGain.gain.value = 0.0;
+        noise.connect(band);
+        band.connect(this.staticGain);
+        this.staticGain.connect(this.master);
+        noise.start();
+      }
+
+      update(now, dt) {
+        if (!this.ctx) return;
+
+        if (state.endingUnlocked) {
+          this.tinnitusGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+          this.staticGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+          this.roomHumGain.gain.setTargetAtTime(0.02, this.ctx.currentTime, 0.2);
+          if (now - this.lastDanceBeat > 235) {
+            this.lastDanceBeat = now;
+            this.playDanceSynthStep(this.beatStep++);
+          }
+          return;
+        }
+
+        // Dead Silence Vacuum Effect before a Turn-Around Scare
+        const targetHum = state.deadSilenceActive ? 0.0001 : 0.14;
+        this.roomHumGain.gain.setTargetAtTime(targetHum, this.ctx.currentTime, 0.06);
+
+        const dread = Math.max(0, (100 - state.sanity) / 100);
+        const prox = Math.max(0, 1 - state.ollieDistance / 22);
+
+        this.tinnitusGain.gain.setTargetAtTime(
+          state.ollieInView ? Math.min(0.09, dread * 0.11 + 0.015) : dread * 0.03,
+          this.ctx.currentTime,
+          0.12
+        );
+        this.staticGain.gain.setTargetAtTime(
+          state.ollieInView ? Math.min(0.28, prox * 0.3 + dread * 0.2) : prox * 0.04,
+          this.ctx.currentTime,
+          0.08
+        );
+
+        // Muffled Sub-Bass Heartbeat
+        const hbInterval = Math.max(310, 920 - dread * 550 - prox * 250);
+        if ((dread > 0.12 || prox > 0.35) && now - this.lastHeartbeat > hbInterval) {
+          this.lastHeartbeat = now;
+          this.playHeartbeat(0.18 + dread * 0.45);
+        }
+      }
+
+      playHeartbeat(vol) {
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(55, t);
+        osc.frequency.exponentialRampToValueAtTime(26, t + 0.18);
+        g.gain.setValueAtTime(vol, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.21);
+        osc.connect(g);
+        g.connect(this.master);
+        osc.start(t);
+        osc.stop(t + 0.22);
+      }
+
+      playNeckSnap() {
+        // Wet cartilage/bone crack when Ollie's head snaps to a 45-degree angle
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(320, t);
+        osc.frequency.exponentialRampToValueAtTime(48, t + 0.055);
+        g.gain.setValueAtTime(0.32, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+        osc.connect(g);
+        g.connect(this.master);
+        osc.start(t);
+        osc.stop(t + 0.065);
+      }
+
+      playDeepSubImpact() {
+        // Suffocating sub-bass drop when Ollie appears directly behind you after dead silence
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(92, t);
+        osc.frequency.exponentialRampToValueAtTime(22, t + 0.85);
+        g.gain.setValueAtTime(0.55, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+        osc.connect(g);
+        g.connect(this.master);
+        osc.start(t);
+        osc.stop(t + 0.92);
+      }
+
+      playStalkFootstep(dist) {
+        // Wet, dragging step in the dark behind the player
+        if (!this.ctx) return;
+        const vol = Math.max(0.02, Math.min(0.35, (1 - dist / 24) * 0.35));
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(110, t);
+        osc.frequency.exponentialRampToValueAtTime(34, t + 0.09);
+
+        const lp = this.ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 240;
+
+        g.gain.setValueAtTime(vol, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+        osc.connect(lp);
+        lp.connect(g);
+        g.connect(this.master);
+        osc.start(t);
+        osc.stop(t + 0.12);
+      }
+
+      playPhoneVibration() {
+        // Haunted display phone buzzing against a table in the dark
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        [0, 0.22].forEach((offset) => {
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(138, t + offset);
+          const lp = this.ctx.createBiquadFilter();
+          lp.type = 'lowpass';
+          lp.frequency.value = 290;
+          g.gain.setValueAtTime(0.11, t + offset);
+          g.gain.exponentialRampToValueAtTime(0.001, t + offset + 0.14);
+          osc.connect(lp);
+          lp.connect(g);
+          g.connect(this.master);
+          osc.start(t + offset);
+          osc.stop(t + offset + 0.15);
+        });
+      }
+
+      playWaterDrip(dist) {
+        // Subtle acoustic cue from the nearest uncollected water bottle
+        if (!this.ctx || dist > 18) return;
+        const vol = Math.max(0.01, (1 - dist / 18) * 0.14);
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(780, t);
+        osc.frequency.exponentialRampToValueAtTime(1320, t + 0.045);
+        g.gain.setValueAtTime(vol, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.055);
+        osc.connect(g);
+        g.connect(this.master);
+        osc.start(t);
+        osc.stop(t + 0.06);
+      }
+
+      playFluorescentClick(dist) {
+        // Subtle metallic ballast starter click & 100Hz arc buzz when a nearby ceiling tube sputters
+        if (!this.ctx || dist > 18) return;
+        const vol = Math.max(0.008, (1 - dist / 18) * 0.09);
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(1450, t);
+        osc.frequency.exponentialRampToValueAtTime(120, t + 0.028);
+        g.gain.setValueAtTime(vol, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.032);
+        osc.connect(g);
+        g.connect(this.master);
+        osc.start(t);
+        osc.stop(t + 0.035);
+      }
+
+      playPlayerStep(isKicks = false) {
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = isKicks ? 'triangle' : 'sine';
+        osc.frequency.setValueAtTime(isKicks ? 140 : 75, t);
+        osc.frequency.exponentialRampToValueAtTime(28, t + 0.065);
+        g.gain.setValueAtTime(0.07, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.075);
+        osc.connect(g);
+        g.connect(this.master);
+        osc.start(t);
+        osc.stop(t + 0.08);
+      }
+
+      playBottlePickup() {
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(392, t);
+        osc.frequency.exponentialRampToValueAtTime(587.33, t + 0.35);
+        g.gain.setValueAtTime(0.14, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+        osc.connect(g);
+        g.connect(this.master);
+        osc.start(t);
+        osc.stop(t + 0.42);
+      }
+
+      playDanceSynthStep(step) {
+        if (!this.ctx) return;
+        const t = this.ctx.currentTime;
+        if (step % 2 === 0) {
+          const kick = this.ctx.createOscillator();
+          const kg = this.ctx.createGain();
+          kick.type = 'sine';
+          kick.frequency.setValueAtTime(130, t);
+          kick.frequency.exponentialRampToValueAtTime(36, t + 0.14);
+          kg.gain.setValueAtTime(0.28, t);
+          kg.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+          kick.connect(kg);
+          kg.connect(this.master);
+          kick.start(t);
+          kick.stop(t + 0.17);
+        }
+        const notes = [130.81, 164.81, 196.00, 246.94, 261.63, 246.94, 196.00, 164.81];
+        const synth = this.ctx.createOscillator();
+        const sg = this.ctx.createGain();
+        synth.type = 'sawtooth';
+        synth.frequency.setValueAtTime(notes[step % notes.length] * (state.isDancing ? 2 : 1), t);
+        const lp = this.ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 900;
+        sg.gain.setValueAtTime(0.08, t);
+        sg.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        synth.connect(lp);
+        lp.connect(sg);
+        sg.connect(this.master);
+        synth.start(t);
+        synth.stop(t + 0.19);
+      }
+    }
+
+    const audio = new PsychologicalAudio();
+
+    // --- CRISP NATIVE THREE.JS SCENE & LIGHTING ---
+    const canvas = document.getElementById('horror-canvas');
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.18;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x020406);
+    scene.fog = new THREE.FogExp2(0x020406, 0.062);
+
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.08, 85);
+    camera.rotation.order = 'YXZ';
+    scene.add(camera);
+
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / Math.max(1, window.innerHeight);
+      camera.updateProjectionMatrix();
+    });
+
+    // Subtle cold nocturnal ambient light so silhouettes of walls and pillars remain readable
+    const ambientLight = new THREE.AmbientLight(0x101c26, 0.34);
+    scene.add(ambientLight);
+
+    // Dual-Layer Realistic Flashlight Rig (Moves with smooth hand inertia)
+    const flashlightRig = new THREE.Group();
+    scene.add(flashlightRig);
+
+    // 1. Wide, bright intense core beam for clear navigation
+    const coreBeam = new THREE.SpotLight(0xf4f9ff, 4.8, 36, Math.PI / 5.8, 0.45, 1.5);
+    coreBeam.position.set(0.2, -0.15, 0);
+    coreBeam.target.position.set(0, -0.04, -10);
+    flashlightRig.add(coreBeam);
+    flashlightRig.add(coreBeam.target);
+
+    // 2. Generous peripheral penumbra spill so corridors & corners are legible
+    const outerSpill = new THREE.SpotLight(0x88b8d6, 1.45, 22, Math.PI / 2.5, 0.85, 1.6);
+    outerSpill.position.set(0.2, -0.15, 0);
+    outerSpill.target.position.set(0, -0.04, -10);
+    flashlightRig.add(outerSpill);
+    flashlightRig.add(outerSpill.target);
+
+    // 3. Soft close-range phone screen / bounce fill around player
+    const playerBounceLight = new THREE.PointLight(0x487a96, 0.55, 6.5, 2.0);
+    playerBounceLight.position.set(0, 0.1, 0);
+    flashlightRig.add(playerBounceLight);
+
+    // Ending Party Lights
+    const partyLights = [];
+    [0x00A3AD, 0xFDDA24, 0x00e5ff, 0xffaa00].forEach((col, i) => {
+      const pl = new THREE.PointLight(col, 0, 42);
+      pl.position.set(i % 2 === 0 ? -10 : 10, 4.2, i < 2 ? -10 : 10);
+      scene.add(pl);
+      partyLights.push(pl);
+    });
+
+    // --- DIEGETIC 3D SMARTPHONE & OPTUS NIKE KICKS ---
+    const phoneCanvas = document.createElement('canvas');
+    phoneCanvas.width = 256;
+    phoneCanvas.height = 512;
+    const phoneCtx = phoneCanvas.getContext('2d');
+    const phoneTex = new THREE.CanvasTexture(phoneCanvas);
+
+    const phoneGroup = new THREE.Group();
+    phoneGroup.position.set(0.23, -0.19, -0.36);
+    phoneGroup.rotation.set(0.08, -0.22, 0.03);
+    flashlightRig.add(phoneGroup);
+
+    const phoneChassis = new THREE.Mesh(
+      new THREE.BoxGeometry(0.11, 0.22, 0.012),
+      new THREE.MeshStandardMaterial({ color: 0x0a0c0e, roughness: 0.2, metalness: 0.8 })
+    );
+    phoneGroup.add(phoneChassis);
+
+    const phoneScreenMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.102, 0.208),
+      new THREE.MeshBasicMaterial({ map: phoneTex })
+    );
+    phoneScreenMesh.position.z = 0.0065;
+    phoneGroup.add(phoneScreenMesh);
+
+    // 3D Optus Nike Kicks Rig (Visible when unlocked)
+    const kicksRig = new THREE.Group();
+    kicksRig.visible = false;
+    camera.add(kicksRig);
+
+    function createNikeKick(isLeft) {
+      const g = new THREE.Group();
+      const upper = new THREE.Mesh(
+        new THREE.BoxGeometry(0.14, 0.13, 0.31),
+        new THREE.MeshStandardMaterial({ color: 0xFDDA24, roughness: 0.3 })
+      );
+      const sole = new THREE.Mesh(
+        new THREE.BoxGeometry(0.155, 0.04, 0.33),
+        new THREE.MeshBasicMaterial({ color: 0x00A3AD })
+      );
+      sole.position.y = -0.075;
+      const swoosh = new THREE.Mesh(
+        new THREE.BoxGeometry(0.16, 0.03, 0.19),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+      );
+      swoosh.rotation.x = 0.22;
+      g.add(upper, sole, swoosh);
+      g.position.set(isLeft ? -0.17 : 0.17, -0.44, -0.52);
+      return g;
+    }
+    const leftKick = createNikeKick(true);
+    const rightKick = createNikeKick(false);
+    kicksRig.add(leftKick, rightKick);
+
+    function updateDiegeticPhoneScreen(now) {
+      phoneCtx.fillStyle = '#030608';
+      phoneCtx.fillRect(0, 0, 256, 512);
+
+      // Subtle minimal header
+      phoneCtx.fillStyle = '#556672';
+      phoneCtx.font = '18px monospace';
+      phoneCtx.fillText('03:14', 20, 34);
+      phoneCtx.fillText(state.endingUnlocked ? '5G+' : 'NO SVC', 165, 34);
+
+      // Diegetic Bottle Counter (Clean, large typography)
+      phoneCtx.fillStyle = '#8899a6';
+      phoneCtx.font = '16px monospace';
+      phoneCtx.fillText('WATER BOTTLES', 24, 110);
+
+      phoneCtx.fillStyle = state.endingUnlocked ? '#00A3AD' : '#FDDA24';
+      phoneCtx.font = 'bold 76px monospace';
+      phoneCtx.fillText(`${state.bottlesCollected}/8`, 24, 190);
+
+      // Seismograph / Interference line
+      const danger = state.endingUnlocked ? 0 : Math.max(0, 1 - state.ollieDistance / 20);
+      phoneCtx.strokeStyle = danger > 0.55 ? '#ff2238' : '#00A3AD';
+      phoneCtx.lineWidth = 3;
+      phoneCtx.beginPath();
+      for (let x = 20; x <= 236; x += 6) {
+        const y = 310 + (Math.random() - 0.5) * (4 + danger * 95);
+        if (x === 20) phoneCtx.moveTo(x, y);
+        else phoneCtx.lineTo(x, y);
+      }
+      phoneCtx.stroke();
+
+      // Subtle bottom status
+      phoneCtx.fillStyle = danger > 0.6 ? '#ff2238' : '#4b5563';
+      phoneCtx.font = '17px monospace';
+      if (state.endingUnlocked) {
+        phoneCtx.fillStyle = '#FDDA24';
+        phoneCtx.fillText('STASH OPEN [CENTER]', 24, 440);
+      } else if (state.deadSilenceActive) {
+        phoneCtx.fillStyle = '#ff2238';
+        phoneCtx.fillText('DON\'T TURN AROUND', 24, 440);
+      } else if (danger > 0.55) {
+        phoneCtx.fillText('SIGNAL CORRUPTED', 24, 440);
+      } else {
+        phoneCtx.fillText('FLASHLIGHT: ACTIVE', 24, 440);
+      }
+
+      phoneTex.needsUpdate = true;
+    }
+
+    // --- HIGH-CONTRAST DAMP ARCHITECTURAL TEXTURES ---
+    function createDampTileTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#090c10';
+      ctx.fillRect(0, 0, 512, 512);
+      ctx.strokeStyle = '#040608';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(0, 0, 256, 256);
+      ctx.strokeRect(256, 0, 256, 256);
+      ctx.strokeRect(0, 256, 256, 256);
+      ctx.strokeRect(256, 256, 256, 256);
+
+      // Subtle damp water stains
+      for (let i = 0; i < 40; i++) {
+        const grad = ctx.createRadialGradient(
+          Math.random() * 512, Math.random() * 512, 2,
+          Math.random() * 512, Math.random() * 512, 60
+        );
+        grad.addColorStop(0, 'rgba(0, 20, 28, 0.25)');
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 512, 512);
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(24, 24);
+      return tex;
+    }
+
+    function createStoreWallTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#07090c';
+      ctx.fillRect(0, 0, 512, 512);
+      // Subtle dark teal architectural wainscoting
+      ctx.fillStyle = '#041f24';
+      ctx.fillRect(0, 380, 512, 132);
+      ctx.fillStyle = '#3d3408';
+      ctx.fillRect(0, 376, 512, 4);
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(14, 1);
+      return tex;
+    }
+
+    function createSignBoard(topText, bottomText, corrupted = false) {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+      const tex = new THREE.CanvasTexture(c);
+      const draw = (t1, t2, isRot) => {
+        ctx.fillStyle = isRot ? '#0f0305' : '#031d21';
+        ctx.fillRect(0, 0, 512, 256);
+        ctx.strokeStyle = isRot ? '#550a14' : '#00A3AD';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(12, 12, 488, 232);
+        ctx.fillStyle = isRot ? '#b91c1c' : '#FDDA24';
+        ctx.font = 'bold 54px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(t1, 256, 118);
+        ctx.fillStyle = isRot ? '#7f1d1d' : '#a3e635';
+        ctx.fillStyle = '#d1d5db';
+        ctx.font = '24px monospace';
+        ctx.fillText(t2, 256, 175);
+        tex.needsUpdate = true;
+      };
+      draw(topText, bottomText, corrupted);
+      return { tex, draw };
+    }
+
+    // --- BUILD THE CLAUSTROPHOBIC OPTUS FLAGSHIP STORE ---
+    const storeGroup = new THREE.Group();
+    scene.add(storeGroup);
+    const colliders = [];
+    const pillarSpots = [];     // Coordinates where Ollie can peek around corners
+    const hauntedPhones = [];   // Display phones that randomly ring in the dark
+    const mutatingSigns = [];   // Signs that change when outside camera frustum
+    const fluorescentFixtures = []; // Overhead flickering ceiling lights
+    let centerStairwellGlow = null;
+
+    function addCollider(x, z, w, d) {
+      colliders.push({
+        minX: x - w / 2 - 0.45,
+        maxX: x + w / 2 + 0.45,
+        minZ: z - d / 2 - 0.45,
+        maxZ: z + d / 2 + 0.45
+      });
+    }
+
+    function buildRealisticOptusStore() {
+      const floorMat = new THREE.MeshStandardMaterial({
+        map: createDampTileTexture(),
+        roughness: 0.22,
+        metalness: 0.35
+      });
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(64, 64), floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      storeGroup.add(floor);
+
+      // Low Acoustic Drop Ceiling (3.9m high so 3.8m Slender-Ollie nearly scrapes it!)
+      const ceiling = new THREE.Mesh(
+        new THREE.PlaneGeometry(64, 64),
+        new THREE.MeshStandardMaterial({ color: 0x030406, roughness: 0.9 })
+      );
+      ceiling.rotation.x = Math.PI / 2;
+      ceiling.position.y = 3.95;
+      storeGroup.add(ceiling);
+
+      const wallMat = new THREE.MeshStandardMaterial({
+        map: createStoreWallTexture(),
+        roughness: 0.65,
+        metalness: 0.15
+      });
+
+      const walls = [
+        { x: 0, z: -29, w: 58, d: 1 },
+        { x: 0, z: 29, w: 58, d: 1 },
+        { x: -29, z: 0, w: 1, d: 58 },
+        { x: 29, z: 0, w: 1, d: 58 },
+        // Claustrophobic corridors & Server Backroom partitions
+        { x: -13, z: -11, w: 15, d: 0.7 },
+        { x: 13, z: -11, w: 15, d: 0.7 },
+        { x: -17, z: 9, w: 0.7, d: 18 },
+        { x: 17, z: 9, w: 0.7, d: 18 }
+      ];
+
+      walls.forEach((w) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w.w, 4.0, w.d), wallMat);
+        m.position.set(w.x, 2.0, w.z);
+        storeGroup.add(m);
+        addCollider(w.x, w.z, w.w, w.d);
+      });
+
+      // Structural Columns (Ideal for Ollie's 45-degree Corner Peeking!)
+      const coords = [
+        [-8.5, 13], [8.5, 13],
+        [-8.5, 1],  [8.5, 1],
+        [-8.5, -17], [8.5, -17],
+        [0, -7]
+      ];
+      const colMat = new THREE.MeshStandardMaterial({ color: 0x080b0f, roughness: 0.5 });
+
+      coords.forEach(([px, pz], idx) => {
+        const col = new THREE.Mesh(new THREE.BoxGeometry(1.6, 4.0, 1.6), colMat);
+        col.position.set(px, 2.0, pz);
+        storeGroup.add(col);
+        addCollider(px, pz, 1.6, 1.6);
+        pillarSpots.push(new THREE.Vector3(px, 0, pz));
+
+        const signData = createSignBoard('OPTUS', 'IT STARTS WITH YES', false);
+        const signMesh = new THREE.Mesh(
+          new THREE.PlaneGeometry(1.35, 0.68),
+          new THREE.MeshBasicMaterial({ map: signData.tex })
+        );
+        signMesh.position.set(px, 2.35, pz + 0.81);
+        storeGroup.add(signMesh);
+
+        mutatingSigns.push({
+          mesh: signMesh,
+          signData,
+          isCorrupted: false,
+          normal1: 'OPTUS',
+          normal2: 'IT STARTS WITH YES',
+          rot1: ['HE IS THIRSTY', 'DON\'T BLINK', 'NULL POINTER', 'BEHIND YOU', '0xDEAD'][idx % 5],
+          rot2: ['MY SKIN IS BUFFERING', 'CHECK THE CORNERS', 'UNCOLLECTED SOUL', 'TURN AROUND SLOWLY', 'DRINK THE SOLUTION'][idx % 5]
+        });
+      });
+
+      // Showroom Display Benches with Haunted Phones that Ring in the Dark
+      const benchCoords = [
+        [-4.5, 16], [4.5, 16],
+        [-4.5, 6],  [4.5, 6],
+        [-22, 2],   [22, 2],
+        [-21, -20], [0, -22], [21, -20]
+      ];
+      const benchMat = new THREE.MeshStandardMaterial({ color: 0x10141a, roughness: 0.35 });
+
+      benchCoords.forEach(([bx, bz]) => {
+        const bench = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.92, 1.3), benchMat);
+        bench.position.set(bx, 0.46, bz);
+        storeGroup.add(bench);
+        addCollider(bx, bz, 3.2, 1.3);
+
+        // Add haunted display phones on each bench
+        for (let offset = -1.0; offset <= 1.0; offset += 1.0) {
+          const pMat = new THREE.MeshBasicMaterial({ color: 0x050709 });
+          const pMesh = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, 0.28), pMat);
+          pMesh.position.set(bx + offset, 0.935, bz);
+          storeGroup.add(pMesh);
+
+          const pLight = new THREE.PointLight(0x99e6ff, 0, 3.2);
+          pLight.position.set(bx + offset, 1.15, bz);
+          storeGroup.add(pLight);
+
+          hauntedPhones.push({
+            mesh: pMesh,
+          mat: pMat,
+          light: pLight,
+          pos: new THREE.Vector3(bx + offset, 0.94, bz),
+          ringTimer: 0
+        });
+      }
+
+      // Faint dying Optus Teal LED under-glow beneath each display bench for spatial orientation
+      const underStrip = new THREE.Mesh(
+        new THREE.BoxGeometry(3.0, 0.03, 1.15),
+        new THREE.MeshBasicMaterial({ color: 0x005f66 })
+      );
+      underStrip.position.set(bx, 0.04, bz);
+      storeGroup.add(underStrip);
+    });
+
+    // Build 12 Overhead Flickering Fluorescent Light Fixtures across aisles, intersections, and backrooms
+    const fixtureCoords = [
+      { x: 0, z: 21, mode: 'STEADY_BUZZ' },       // Entrance Foyer
+      { x: -7.5, z: 15, mode: 'RAPID_SPUTTER' },  // West Showroom Aisle
+      { x: 7.5, z: 15, mode: 'STEADY_BUZZ' },     // East Showroom Aisle
+      { x: 0, z: 10, mode: 'RAPID_SPUTTER' },     // Center Stairwell Hub
+      { x: -11, z: 4, mode: 'STEADY_BUZZ' },      // West Pillar Corridor
+      { x: 11, z: 4, mode: 'RAPID_SPUTTER' },     // East Pillar Corridor
+      { x: -23, z: 2, mode: 'STEADY_BUZZ' },      // Outer West Tech Bay
+      { x: 23, z: 2, mode: 'RAPID_SPUTTER' },     // Outer East Tech Bay
+      { x: 0, z: -4, mode: 'STEADY_BUZZ' },       // Central Mid-Store Crossing
+      { x: -16, z: -16, mode: 'RAPID_SPUTTER' },  // North-West Server Backroom
+      { x: 16, z: -16, mode: 'RAPID_SPUTTER' },   // North-East Server Backroom
+      { x: 0, z: -20, mode: 'STEADY_BUZZ' }       // Deep Server Core
+    ];
+
+    const housingGeo = new THREE.BoxGeometry(2.2, 0.08, 0.48);
+    const housingMat = new THREE.MeshStandardMaterial({ color: 0x161b22, roughness: 0.4, metalness: 0.6 });
+    const tubeGeo = new THREE.BoxGeometry(2.05, 0.035, 0.11);
+
+    fixtureCoords.forEach((fc, idx) => {
+      const fGroup = new THREE.Group();
+      fGroup.position.set(fc.x, 3.9, fc.z);
+
+      const housing = new THREE.Mesh(housingGeo, housingMat);
+      fGroup.add(housing);
+
+      const tubeMat = new THREE.MeshBasicMaterial({ color: 0xd8f3ff });
+      const tube1 = new THREE.Mesh(tubeGeo, tubeMat);
+      tube1.position.set(0, -0.04, -0.11);
+      const tube2 = new THREE.Mesh(tubeGeo, tubeMat);
+      tube2.position.set(0, -0.04, 0.11);
+      fGroup.add(tube1, tube2);
+
+      // Pool of overhead light illuminating the floor tiles, benches, and walls
+      const pLight = new THREE.PointLight(0xcceeff, 1.15, 16.5, 1.75);
+      pLight.position.set(0, -0.25, 0);
+      fGroup.add(pLight);
+
+      storeGroup.add(fGroup);
+
+      fluorescentFixtures.push({
+        id: idx,
+        pos: new THREE.Vector3(fc.x, 3.65, fc.z),
+        tubeMat,
+        light: pLight,
+        state: fc.mode,
+        timer: Math.random() * 2.5,
+        baseIntensity: 1.05 + (idx % 3) * 0.15,
+        phase: idx * 1.37
+      });
+    });
+
+    // Add Glowing Green Emergency EXIT Signs at corridor ends & perimeter doors for landmark orientation
+    const exitCoords = [
+      { x: 0, z: 28.4, rotY: Math.PI },
+      { x: 0, z: -28.4, rotY: 0 },
+      { x: -28.4, z: 0, rotY: Math.PI / 2 },
+      { x: 28.4, z: 0, rotY: -Math.PI / 2 }
+    ];
+
+    const exitCanvas = document.createElement('canvas');
+    exitCanvas.width = 256;
+    exitCanvas.height = 128;
+    const eCtx = exitCanvas.getContext('2d');
+    eCtx.fillStyle = '#04381a';
+    eCtx.fillRect(0, 0, 256, 128);
+    eCtx.strokeStyle = '#34d399';
+    eCtx.lineWidth = 8;
+    eCtx.strokeRect(8, 8, 240, 112);
+    eCtx.fillStyle = '#ecfdf5';
+    eCtx.font = 'bold 64px sans-serif';
+    eCtx.textAlign = 'center';
+    eCtx.fillText('EXIT', 128, 86);
+    const exitTex = new THREE.CanvasTexture(exitCanvas);
+
+    exitCoords.forEach((ec) => {
+      const sign = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.95, 0.45),
+        new THREE.MeshBasicMaterial({ map: exitTex })
+      );
+      sign.position.set(ec.x, 3.25, ec.z);
+      sign.rotation.y = ec.rotY;
+      storeGroup.add(sign);
+
+      const exitGlow = new THREE.PointLight(0x10b981, 0.55, 7.5, 2.0);
+      exitGlow.position.set(ec.x * 0.96, 3.1, ec.z * 0.96);
+      storeGroup.add(exitGlow);
+    });
+
+    // Center Portal Pad (Opens into the Underground Stash once all 8 bottles are collected)
+    centerStairwellGlow = new THREE.Mesh(
+        new THREE.RingGeometry(0.9, 1.35, 32),
+        new THREE.MeshBasicMaterial({ color: 0xFDDA24, side: THREE.DoubleSide, visible: false })
+      );
+      centerStairwellGlow.rotation.x = -Math.PI / 2;
+      centerStairwellGlow.position.set(0, 0.02, 11);
+      storeGroup.add(centerStairwellGlow);
+    }
+
+    buildRealisticOptusStore();
+
+    // --- OLLIE'S UNDERGROUND STASH (680+ HALF-DRUNKEN WATER BOTTLES) ---
+    const STASH_Y = -30;
+    const stashGroup = new THREE.Group();
+    stashGroup.position.set(0, STASH_Y, 0);
+    scene.add(stashGroup);
+
+    const STASH_BOTTLE_COUNT = 680;
+    function buildUndergroundStash() {
+      const floor = new THREE.Mesh(
+        new THREE.PlaneGeometry(36, 36),
+        new THREE.MeshStandardMaterial({ color: 0x061318, roughness: 0.25, metalness: 0.4 })
+      );
+      floor.rotation.x = -Math.PI / 2;
+      stashGroup.add(floor);
+
+      const vLight1 = new THREE.PointLight(0xFDDA24, 2.4, 34);
+      vLight1.position.set(0, 5.0, 0);
+      stashGroup.add(vLight1);
+
+      const vLight2 = new THREE.PointLight(0x00A3AD, 2.2, 30);
+      vLight2.position.set(-9, 4.0, -9);
+      stashGroup.add(vLight2);
+
+      const vLight3 = new THREE.PointLight(0x00A3AD, 2.2, 30);
+      vLight3.position.set(9, 4.0, 9);
+      stashGroup.add(vLight3);
+
+      const shellGeo = new THREE.CylinderGeometry(0.085, 0.085, 0.34, 8);
+      const shellMat = new THREE.MeshStandardMaterial({ color: 0xcceeff, transparent: true, opacity: 0.48, roughness: 0.1 });
+      const waterGeo = new THREE.CylinderGeometry(0.078, 0.078, 0.15, 8);
+      const waterMat = new THREE.MeshBasicMaterial({ color: 0x00d8ff, transparent: true, opacity: 0.85 });
+      const capGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.05, 6);
+      const capMat = new THREE.MeshBasicMaterial({ color: 0xFDDA24 });
+
+      const shells = new THREE.InstancedMesh(shellGeo, shellMat, STASH_BOTTLE_COUNT);
+      const waters = new THREE.InstancedMesh(waterGeo, waterMat, STASH_BOTTLE_COUNT);
+      const caps = new THREE.InstancedMesh(capGeo, capMat, STASH_BOTTLE_COUNT);
+
+      const dummy = new THREE.Object3D();
+      for (let i = 0; i < STASH_BOTTLE_COUNT; i++) {
+        const ring = 5.5 + (i % 13) * 0.85;
+        const angle = (i * 0.27) % (Math.PI * 2);
+        const tier = Math.floor(i / 150);
+        const bx = Math.cos(angle) * ring + (Math.random() - 0.5) * 0.35;
+        const bz = Math.sin(angle) * ring + (Math.random() - 0.5) * 0.35;
+        const by = tier * 0.6 + 0.17;
+
+        dummy.position.set(bx, STASH_Y + by, bz);
+        dummy.rotation.set(0, angle, 0);
+        dummy.updateMatrix();
+        shells.setMatrixAt(i, dummy.matrix);
+
+        dummy.position.set(bx, STASH_Y + by - 0.08, bz);
+        dummy.updateMatrix();
+        waters.setMatrixAt(i, dummy.matrix);
+
+        dummy.position.set(bx, STASH_Y + by + 0.18, bz);
+        dummy.updateMatrix();
+        caps.setMatrixAt(i, dummy.matrix);
+      }
+      scene.add(shells, waters, caps);
+    }
+    buildUndergroundStash();
+
+    // --- 8 HALF-DRUNKEN WATER BOTTLES ---
+    const bottleLocations = [
+      { x: 0, z: 16 },
+      { x: -4.5, z: 6 },
+      { x: 4.5, z: 6 },
+      { x: -22, z: 2 },
+      { x: 22, z: 2 },
+      { x: -21, z: -20 },
+      { x: 21, z: -20 },
+      { x: 0, z: -22 }
+    ];
+    const bottles = [];
+
+    function spawnBottles() {
+      bottleLocations.forEach((loc, idx) => {
+        const g = new THREE.Group();
+        g.position.set(loc.x, 1.12, loc.z);
+
+        const plastic = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.095, 0.095, 0.38, 14),
+          new THREE.MeshStandardMaterial({ color: 0xe0f7ff, transparent: true, opacity: 0.5, roughness: 0.08, metalness: 0.2 })
+        );
+        const water = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.088, 0.088, 0.17, 14),
+          new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.78 })
+        );
+        water.position.y = -0.09;
+
+        const cap = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.042, 0.042, 0.05, 10),
+          new THREE.MeshStandardMaterial({ color: 0x00A3AD, roughness: 0.3 })
+        );
+        cap.position.y = 0.21;
+
+        // Very faint specular condensation glint light
+        const glint = new THREE.PointLight(0x88e5ff, 0.35, 2.2);
+        glint.position.y = 0.1;
+
+        g.add(plastic, water, cap, glint);
+        scene.add(g);
+
+        bottles.push({
+          id: idx,
+          group: g,
+          collected: false,
+          pos: new THREE.Vector3(loc.x, 1.12, loc.z)
+        });
+      });
+    }
+    spawnBottles();
+
+    // --- NIGHTMARISH 3.8-METER SLENDER-OLLIE RIG (OLLIE + SLENDERMAN HYBRID) ---
+    const ollieRoot = new THREE.Group();
+    scene.add(ollieRoot);
+
+    const olliePivot = new THREE.Group(); // Used for 45-degree corner peeking lean!
+    ollieRoot.add(olliePivot);
+
+    let ollieHead, ollieBodyMat, ollieArmL, ollieArmR, ollieLegL, ollieLegR;
+
+    function createDecayedOllieSkinTexture() {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+      // Pale, sickly bruised ochre yellow
+      ctx.fillStyle = '#9e821b';
+      ctx.fillRect(0, 0, 256, 256);
+      // Dark organic rot mottling and veins
+      for (let i = 0; i < 90; i++) {
+        ctx.fillStyle = Math.random() > 0.5 ? 'rgba(20, 14, 0, 0.35)' : 'rgba(65, 45, 5, 0.3)';
+        ctx.beginPath();
+        ctx.arc(Math.random() * 256, Math.random() * 256, 4 + Math.random() * 22, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return new THREE.CanvasTexture(c);
+    }
+
+    function buildNightmareSlenderOllie() {
+      const blackLimbMat = new THREE.MeshStandardMaterial({
+        color: 0x050507,
+        roughness: 0.85,
+        metalness: 0.1
+      });
+
+      // Stilt-like Slenderman Black Legs (2.4m tall)
+      ollieLegL = new THREE.Group();
+      ollieLegL.position.set(-0.21, 2.35, 0);
+      const legM1 = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.03, 2.35, 10), blackLimbMat);
+      legM1.position.y = -1.17;
+      ollieLegL.add(legM1);
+      olliePivot.add(ollieLegL);
+
+      ollieLegR = new THREE.Group();
+      ollieLegR.position.set(0.21, 2.35, 0);
+      const legM2 = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.03, 2.35, 10), blackLimbMat);
+      legM2.position.y = -1.17;
+      ollieLegR.add(legM2);
+      olliePivot.add(ollieLegR);
+
+      // Gaunt, Elongated Yellow Ollie Droplet Head/Torso brushing the 3.9m ceiling
+      ollieHead = new THREE.Group();
+      ollieHead.position.set(0, 2.95, 0);
+      olliePivot.add(ollieHead);
+
+      ollieBodyMat = new THREE.MeshStandardMaterial({
+        map: createDecayedOllieSkinTexture(),
+        roughness: 0.55,
+        metalness: 0.05
+      });
+
+      const dropletTorso = new THREE.Mesh(new THREE.SphereGeometry(0.58, 22, 18), ollieBodyMat);
+      dropletTorso.scale.set(0.92, 1.28, 0.78);
+      ollieHead.add(dropletTorso);
+
+      // Ollie's signature top-left tuft/horn
+      const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.42, 12), ollieBodyMat);
+      tuft.position.set(-0.38, 0.62, 0);
+      tuft.rotation.z = 0.62;
+      ollieHead.add(tuft);
+
+      // Deeply Recessed Pale-White Visor Cavity
+      const visorCavity = new THREE.Mesh(
+        new THREE.SphereGeometry(0.43, 18, 14),
+        new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.75 })
+      );
+      visorCavity.scale.set(1.02, 0.68, 0.45);
+      visorCavity.position.set(0, 0.14, 0.31);
+      ollieHead.add(visorCavity);
+
+      // Hollow Abyssal Black Eye Sockets with tiny wet specular pinpoint
+      const socketMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+      const glintMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.0, metalness: 1.0 });
+
+      [-0.16, 0.16].forEach((ex) => {
+        const socket = new THREE.Mesh(new THREE.SphereGeometry(0.088, 12, 12), socketMat);
+        socket.scale.set(0.95, 1.25, 0.6);
+        socket.position.set(ex, 0.15, 0.47);
+
+        // Tiny wet reflection dot that catches the player's flashlight beam in the dark
+        const wetSpec = new THREE.Mesh(new THREE.SphereGeometry(0.014, 6, 6), glintMat);
+        wetSpec.position.set(0.015, 0.02, 0.055);
+        socket.add(wetSpec);
+        ollieHead.add(socket);
+      });
+
+      // Multi-jointed Spindly Black Arms hanging past his knees with long twitching fingers
+      function buildSpindlyArm(side) {
+        const armGroup = new THREE.Group();
+        armGroup.position.set(side * 0.52, 0.05, 0);
+
+        const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.032, 1.25, 8), blackLimbMat);
+        upper.position.y = -0.6;
+        upper.rotation.z = side * 0.12;
+        armGroup.add(upper);
+
+        const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.018, 1.35, 8), blackLimbMat);
+        forearm.position.set(side * 0.14, -1.82, 0.08);
+        forearm.rotation.x = -0.12;
+        armGroup.add(forearm);
+
+        // Long spidery fingers
+        for (let f = -1; f <= 1; f++) {
+          const finger = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.003, 0.38, 5), blackLimbMat);
+          finger.position.set(side * 0.14 + f * 0.03, -2.62, 0.16 + Math.abs(f) * 0.02);
+          finger.rotation.x = 0.25;
+          armGroup.add(finger);
+        }
+        return armGroup;
+      }
+
+      ollieArmL = buildSpindlyArm(-1);
+      ollieArmR = buildSpindlyArm(1);
+      ollieHead.add(ollieArmL, ollieArmR);
+    }
+
+    buildNightmareSlenderOllie();
+
+    // --- PSYCHOLOGICAL STALKING & CORNER-PEEKING AI ---
+    const frustum = new THREE.Frustum();
+    const projScreenMatrix = new THREE.Matrix4();
+
+    function isPointInPlayerCone(worldPt, maxAngle = 0.58) {
+      const toPt = new THREE.Vector3().subVectors(worldPt, camera.position);
+      const dist = toPt.length();
+      toPt.normalize();
+      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+      const angle = forward.angleTo(toPt);
+      return { inBeam: angle < maxAngle && dist < 26, angle, dist };
+    }
+
+    function spawnOllieCornerPeek() {
+      if (state.endingUnlocked) return;
+      // Pick a pillar 9m to 22m away from the player
+      const candidates = pillarSpots.filter((p) => {
+        const d = Math.hypot(p.x - state.playerPos.x, p.z - state.playerPos.z);
+        return d > 7.5 && d < 24;
+      });
+      const pillar = candidates.length > 0
+        ? candidates[Math.floor(Math.random() * candidates.length)]
+        : pillarSpots[0];
+
+      // Position Ollie just behind the pillar relative to player, leaning out at 42 degrees
+      const toPlayer = new THREE.Vector2(state.playerPos.x - pillar.x, state.playerPos.z - pillar.z).normalize();
+      const perp = new THREE.Vector2(-toPlayer.y, toPlayer.x);
+      state.olliePeekSide = Math.random() < 0.5 ? 1 : -1;
+
+      state.olliePos.set(
+        pillar.x - toPlayer.x * 0.65 + perp.x * state.olliePeekSide * 0.72,
+        0,
+        pillar.z - toPlayer.y * 0.65 + perp.y * state.olliePeekSide * 0.72
+      );
+      state.olliePeekLean = state.olliePeekSide * 0.46;
+      state.ollieSeenTimer = 0;
+      state.ollieMode = 'PEEKING';
+      state.ollieModeTimer = 0;
+      ollieRoot.visible = true;
+      ollieRoot.position.copy(state.olliePos);
+    }
+
+    function spawnOllieWeepingAngel() {
+      if (state.endingUnlocked) return;
+      const angle = state.yaw + Math.PI + (Math.random() - 0.5) * 0.9;
+      const dist = 11 + Math.random() * 6;
+      state.olliePos.set(
+        Math.max(-26, Math.min(26, state.playerPos.x - Math.sin(angle) * dist)),
+        0,
+        Math.max(-26, Math.min(26, state.playerPos.z - Math.cos(angle) * dist))
+      );
+      state.olliePeekLean = 0;
+      state.ollieMode = 'WEEPING_ANGEL';
+      state.ollieModeTimer = 0;
+      ollieRoot.visible = true;
+      ollieRoot.position.copy(state.olliePos);
+    }
+
+    function triggerDeadSilenceAmbush() {
+      if (state.endingUnlocked || state.deadSilenceActive) return;
+      state.deadSilenceActive = true;
+      state.turnAccumulator = 0;
+      state.ollieMode = 'DEAD_SILENCE_BEHIND';
+      state.ollieModeTimer = 0;
+
+      // Place Ollie silently 4.5 meters directly behind the player's back
+      const behindAngle = state.yaw + Math.PI;
+      state.olliePos.set(
+        Math.max(-27, Math.min(27, state.playerPos.x - Math.sin(behindAngle) * 4.6)),
+        0,
+        Math.max(-27, Math.min(27, state.playerPos.z - Math.cos(behindAngle) * 4.6))
+      );
+      state.olliePeekLean = 0;
+      ollieRoot.visible = true;
+      ollieRoot.position.copy(state.olliePos);
+    }
+
+    // --- BOTTLE COLLECTION & STASH ENDING ---
+    function collectBottle(b) {
+      if (b.collected) return;
+      b.collected = true;
+      b.group.visible = false;
+      state.bottlesCollected++;
+      state.sanity = Math.min(100, state.sanity + 25);
+      audio.playBottlePickup();
+
+      const sentence = LORE_SENTENCES[Math.min(state.bottlesCollected - 1, LORE_SENTENCES.length - 1)];
+      showMinimalLore(`${state.bottlesCollected} / 8`, sentence, 4500);
+
+      if (state.bottlesCollected >= 8) {
+        unlockNikeKicksAndStashEnding();
+      } else {
+        // Alternate between Corner Peeking and Weeping Angel pursuit
+        if (state.bottlesCollected % 2 === 1) {
+          spawnOllieCornerPeek();
+        } else {
+          spawnOllieWeepingAngel();
+        }
+      }
+    }
+
+    function unlockNikeKicksAndStashEnding() {
+      state.endingUnlocked = true;
+      state.deadSilenceActive = false;
+      state.sanity = 100;
+      state.isDancing = true;
+      state.ollieMode = 'HAPPY_DANCE';
+
+      document.getElementById('dread-distortion').style.opacity = '0';
+      document.getElementById('ending-banner').classList.remove('hidden');
+      document.getElementById('ending-banner').classList.add('flex');
+      kicksRig.visible = true;
+      centerStairwellGlow.visible = true;
+
+      // Warm Golden & Optus Teal Illumination
+      scene.fog.density = 0.015;
+      scene.background.setHex(0x041820);
+      ambientLight.intensity = 1.4;
+      ambientLight.color.setHex(0xffffff);
+      partyLights.forEach((pl) => (pl.intensity = 2.5));
+
+      // Cure Ollie's Code Rot into Friendly Golden Yellow Mascot
+      ollieBodyMat.map = null;
+      ollieBodyMat.color.setHex(0xFDDA24);
+      ollieBodyMat.needsUpdate = true;
+      olliePivot.rotation.z = 0;
+      ollieHead.rotation.z = 0;
+      ollieRoot.scale.set(0.82, 0.82, 0.82);
+
+      // Transport straight into Ollie's Underground Stash of 680+ Half-Drunk Water Bottles
+      toggleStashRoom(true);
+    }
+
+    function toggleStashRoom(toStash) {
+      state.inUndergroundStash = toStash;
+      if (toStash) {
+        state.playerPos.set(0, STASH_Y + 1.72, 4.6);
+        state.yaw = 0;
+        state.pitch = 0;
+        state.olliePos.set(0, STASH_Y, 0);
+        ollieRoot.position.copy(state.olliePos);
+        ollieRoot.visible = true;
+        showMinimalLore("UNDERGROUND STASH", "\"680 half-drunk water bottles glistening beneath the showroom. Press [SPACE] to dance with Ollie.\"", 4500);
+      } else {
+        state.playerPos.set(0, 1.72, 15);
+        state.olliePos.set(0, 0, 9);
+        ollieRoot.position.copy(state.olliePos);
+        ollieRoot.visible = true;
+      }
+    }
+
+    // --- INPUTS & HIDDEN DEBUG SHORTCUTS ([1] and [2]) ---
+    document.addEventListener('keydown', (e) => {
+      if (e.code in state.keys) state.keys[e.code] = true;
+
+      if (!state.started) return;
+
+      if (e.code === 'KeyF') {
+        state.flashlightOn = !state.flashlightOn;
+        coreBeam.intensity = state.flashlightOn ? 4.8 : 0;
+        outerSpill.intensity = state.flashlightOn ? 1.45 : 0;
+        audio.playPlayerStep(true);
+      }
+
+      if (e.code === 'KeyE') {
+        tryCollectLookedAtBottle();
+      }
+
+      if (e.code === 'Space' && state.endingUnlocked) {
+        e.preventDefault();
+        state.isDancing = !state.isDancing;
+      }
+
+      if (e.code === 'KeyV' && state.endingUnlocked) {
+        toggleStashRoom(!state.inUndergroundStash);
+      }
+
+      // Discreet Keyboard Debug Hotkey [1]: Skip to 7/8 Bottles & place player near the 8th
+      if (e.code === 'Digit1' && !state.endingUnlocked) {
+        audio.init();
+        for (let i = 0; i < 7; i++) {
+          if (!bottles[i].collected) {
+            bottles[i].collected = true;
+            bottles[i].group.visible = false;
+          }
+        }
+        state.bottlesCollected = 7;
+        state.playerPos.set(0, 1.72, -18.2);
+        state.yaw = 0;
+        showMinimalLore("7 / 8", "\"One bottle remains directly ahead on the Server Room table.\"", 4000);
+      }
+
+      // Discreet Keyboard Debug Hotkey [2]: Instant Underground Stash & Optus Nike Kicks Ending
+      if (e.code === 'Digit2') {
+        audio.init();
+        bottles.forEach((b) => {
+          b.collected = true;
+          b.group.visible = false;
+        });
+        state.bottlesCollected = 8;
+        unlockNikeKicksAndStashEnding();
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      if (e.code in state.keys) state.keys[e.code] = false;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!state.started || state.gameOver) return;
+      if (document.pointerLockElement === canvas) {
+        const sens = 0.0021;
+        state.yaw -= e.movementX * sens;
+        state.pitch = Math.max(-1.25, Math.min(1.25, state.pitch - e.movementY * sens));
+        state.turnAccumulator += Math.abs(e.movementX * sens);
+      }
+    });
+
+    canvas.addEventListener('click', () => {
+      if (!state.started || state.gameOver) return;
+      audio.init();
+      if (document.pointerLockElement !== canvas && window.innerWidth > 768) {
+        canvas.requestPointerLock?.();
+      }
+      tryCollectLookedAtBottle();
+    });
+
+    function getInteractableBottle() {
+      if (state.endingUnlocked) return null;
+      for (const b of bottles) {
+        if (!b.collected) {
+          const dist = Math.hypot(state.playerPos.x - b.pos.x, state.playerPos.z - b.pos.z);
+          if (dist < 3.4) {
+            const check = isPointInPlayerCone(b.pos, 0.55);
+            if (check.inBeam || dist < 1.8) return b;
+          }
+        }
+      }
+      return null;
+    }
+
+    function tryCollectLookedAtBottle() {
+      const b = getInteractableBottle();
+      if (b) collectBottle(b);
+    }
+
+    // Touch controls
+    document.querySelectorAll('#touch-controls button').forEach((btn) => {
+      const dir = btn.getAttribute('data-move');
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); audio.init(); state.touchMove[dir] = true; });
+      btn.addEventListener('touchend', (e) => { e.preventDefault(); state.touchMove[dir] = false; });
+      btn.addEventListener('mousedown', () => { audio.init(); state.touchMove[dir] = true; });
+      btn.addEventListener('mouseup', () => { state.touchMove[dir] = false; });
+    });
+
+    // Title & Game Over buttons
+    document.getElementById('btn-start-game').addEventListener('click', () => {
+      audio.init();
+      document.getElementById('title-screen').classList.add('hidden');
+      document.getElementById('minimal-ui').classList.remove('hidden');
+      state.started = true;
+      state.lightYaw = state.yaw;
+      state.lightPitch = state.pitch;
+      spawnOllieCornerPeek();
+      showMinimalLore("03:14 AM", "\"Find the 8 half-drunken water bottles before he finishes the solution.\"", 4500);
+      canvas.requestPointerLock?.();
+    });
+
+    document.getElementById('btn-dance-toggle').addEventListener('click', () => {
+      state.isDancing = !state.isDancing;
+    });
+
+    document.getElementById('btn-room-toggle').addEventListener('click', () => {
+      toggleStashRoom(!state.inUndergroundStash);
+    });
+
+    document.getElementById('btn-retry-continue').addEventListener('click', () => {
+      state.gameOver = false;
+      state.sanity = 100;
+      state.deadSilenceActive = false;
+      state.playerPos.set(0, 1.72, 22);
+      spawnOllieCornerPeek();
+      document.getElementById('gameover-screen').classList.add('hidden');
+      document.getElementById('gameover-screen').classList.remove('flex');
+      canvas.requestPointerLock?.();
+    });
+
+    document.getElementById('btn-retry-fresh').addEventListener('click', () => {
+      state.gameOver = false;
+      state.sanity = 100;
+      state.bottlesCollected = 0;
+      state.deadSilenceActive = false;
+      bottles.forEach((b) => { b.collected = false; b.group.visible = true; });
+      state.playerPos.set(0, 1.72, 22);
+      spawnOllieCornerPeek();
+      document.getElementById('gameover-screen').classList.add('hidden');
+      document.getElementById('gameover-screen').classList.remove('flex');
+      canvas.requestPointerLock?.();
+    });
+
+    function canMoveTo(nx, nz) {
+      if (state.inUndergroundStash) return Math.abs(nx) < 16.5 && Math.abs(nz) < 16.5;
+      if (Math.abs(nx) > 27.8 || Math.abs(nz) > 27.8) return false;
+      for (const c of colliders) {
+        if (nx > c.minX && nx < c.maxX && nz > c.minZ && nz < c.maxZ) return false;
+      }
+      return true;
+    }
+
+    // --- MAIN HORROR SIMULATION LOOP ---
+    let lastTime = performance.now();
+
+    function animate(now = performance.now()) {
+      requestAnimationFrame(animate);
+      const dt = Math.min(0.1, (now - lastTime) / 1000);
+      lastTime = now;
+
+      if (!state.started || state.gameOver) {
+        renderer.render(scene, camera);
+        return;
+      }
+
+      // 1. Player Rotation & Smooth Flashlight Inertia
+      const turnSpeed = 1.9 * dt;
+      if (state.keys.ArrowLeft || state.touchMove.turnLeft) state.yaw += turnSpeed;
+      if (state.keys.ArrowRight || state.touchMove.turnRight) state.yaw -= turnSpeed;
+
+      const fx = -Math.sin(state.yaw);
+      const fz = -Math.cos(state.yaw);
+      const rx = Math.cos(state.yaw);
+      const rz = -Math.sin(state.yaw);
+
+      let mf = 0, mr = 0;
+      if (state.keys.KeyW || state.keys.ArrowUp || state.touchMove.forward) mf += 1;
+      if (state.keys.KeyS || state.keys.ArrowDown || state.touchMove.backward) mf -= 1;
+      if (state.keys.KeyD || state.touchMove.right) mr += 1;
+      if (state.keys.KeyA || state.touchMove.left) mr -= 1;
+
+      const moving = mf !== 0 || mr !== 0;
+      const sprinting = state.keys.ShiftLeft || state.keys.ShiftRight;
+
+      let speed = state.endingUnlocked ? 13.5 : 4.2;
+      if (!state.endingUnlocked && sprinting && state.stamina > 5 && moving) {
+        speed = 6.8;
+        state.stamina = Math.max(0, state.stamina - 22 * dt);
+      } else {
+        state.stamina = Math.min(100, state.stamina + 15 * dt);
+      }
+
+      if (moving) {
+        const len = Math.hypot(mf, mr) || 1;
+        const vx = ((fx * mf + rx * mr) / len) * speed * dt;
+        const vz = ((fz * mf + rz * mr) / len) * speed * dt;
+        if (canMoveTo(state.playerPos.x + vx, state.playerPos.z)) state.playerPos.x += vx;
+        if (canMoveTo(state.playerPos.x, state.playerPos.z + vz)) state.playerPos.z += vz;
+
+        state.walkTime += dt * (state.endingUnlocked ? 15 : 7.5);
+        if (now - audio.lastFootstep > (state.endingUnlocked ? 195 : 470)) {
+          audio.lastFootstep = now;
+          audio.playPlayerStep(state.endingUnlocked);
+        }
+      }
+
+      // Check if stepping into the glowing center stairwell portal in the showroom
+      if (state.endingUnlocked && !state.inUndergroundStash) {
+        if (Math.hypot(state.playerPos.x, state.playerPos.z - 11) < 1.35) {
+          toggleStashRoom(true);
+        }
+      }
+
+      const baseY = state.inUndergroundStash ? STASH_Y + 1.72 : 1.72;
+      const bobY = moving ? Math.sin(state.walkTime) * 0.042 : Math.sin(now * 0.0018) * 0.008;
+      const danceY = (state.endingUnlocked && state.isDancing) ? Math.abs(Math.sin(now * 0.011)) * 0.28 : 0;
+
+      camera.position.set(state.playerPos.x, baseY + bobY + danceY, state.playerPos.z);
+      camera.rotation.y = state.yaw;
+      camera.rotation.x = state.pitch;
+
+      // Realistic lagging hand-held flashlight sway
+      state.lightYaw += (state.yaw - state.lightYaw) * Math.min(1, dt * 11.5);
+      state.lightPitch += (state.pitch - state.lightPitch) * Math.min(1, dt * 11.5);
+      flashlightRig.position.copy(camera.position);
+      flashlightRig.rotation.set(state.lightPitch, state.lightYaw, 0, 'YXZ');
+
+      // Animate 3D Nike Kicks when equipped
+      if (state.endingUnlocked) {
+        const kp = now * 0.012;
+        leftKick.position.y = -0.42 + Math.max(0, Math.sin(kp)) * 0.14;
+        rightKick.position.y = -0.42 + Math.max(0, Math.sin(kp + Math.PI)) * 0.14;
+      }
+
+      // 2. Minimal Center Dot & Spatial Water Bottle Drip Audio Cue
+      const targetBottle = getInteractableBottle();
+      document.getElementById('interact-dot').style.opacity = targetBottle ? '1' : '0';
+
+      let closestBottleDist = 999;
+      bottles.forEach((b) => {
+        if (!b.collected) {
+          const d = Math.hypot(state.playerPos.x - b.pos.x, state.playerPos.z - b.pos.z);
+          if (d < closestBottleDist) closestBottleDist = d;
+        }
+      });
+      if (!state.endingUnlocked && now - audio.lastDripTime > 3400) {
+        audio.lastDripTime = now;
+        audio.playWaterDrip(closestBottleDist);
+      }
+
+      // 3. Haunted Display Phones Randomly Vibrating & Lighting Up in the Dark
+      if (!state.endingUnlocked) {
+        hauntedPhones.forEach((hp) => {
+          if (hp.ringTimer > 0) {
+            hp.ringTimer -= dt;
+            hp.mesh.position.x += Math.sin(now * 0.09) * 0.003;
+            if (hp.ringTimer <= 0) {
+              hp.light.intensity = 0;
+              hp.mat.color.setHex(0x050709);
+            }
+          } else if (Math.random() < 0.0004) {
+            const d = Math.hypot(state.playerPos.x - hp.pos.x, state.playerPos.z - hp.pos.z);
+            if (d < 16 && d > 3.5) {
+              hp.ringTimer = 2.6;
+              hp.light.intensity = 1.4;
+              hp.mat.color.setHex(0x99e6ff);
+              audio.playPhoneVibration();
+            }
+          }
+        });
+      }
+
+      // 4. Mutate Store Signs When Outside Camera Frustum
+      projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+      frustum.setFromProjectionMatrix(projScreenMatrix);
+      mutatingSigns.forEach((ms) => {
+        if (state.endingUnlocked) return;
+        const inFrustum = frustum.containsPoint(ms.mesh.position);
+        if (!inFrustum && Math.random() < 0.015) {
+          const wantRot = state.ollieDistance < 19 || state.sanity < 75;
+          if (wantRot !== ms.isCorrupted) {
+            ms.isCorrupted = wantRot;
+            ms.signData.draw(
+              wantRot ? ms.rot1 : ms.normal1,
+              wantRot ? ms.rot2 : ms.normal2,
+              wantRot
+            );
+          }
+        }
+      });
+
+      // 4B. Update Flickering Overhead Fluorescent Ceiling Fixtures
+      fluorescentFixtures.forEach((fx) => {
+        if (state.endingUnlocked) {
+          fx.light.intensity = 1.35;
+          fx.light.color.setHex(0xe0f7ff);
+          fx.tubeMat.color.setHex(0xe0f7ff);
+          return;
+        }
+
+        // During Dead-Silence Ambush, drop ceiling tubes to a barely-alive ember glow
+        if (state.deadSilenceActive) {
+          fx.light.intensity = 0.08;
+          fx.light.color.setHex(0x551118);
+          fx.tubeMat.color.setHex(0x3a0b10);
+          return;
+        }
+
+        const distToOllie = ollieRoot.visible
+          ? Math.hypot(fx.pos.x - state.olliePos.x, fx.pos.z - state.olliePos.z)
+          : 999;
+        const distToPlayer = Math.hypot(fx.pos.x - state.playerPos.x, fx.pos.z - state.playerPos.z);
+
+        fx.timer -= dt;
+        if (fx.timer <= 0) {
+          // State transitions weighted by whether Ollie is lurking near this light
+          const r = Math.random();
+          if (distToOllie < 9.5) {
+            fx.state = r < 0.65 ? 'OLLIE_DRAIN' : 'RAPID_SPUTTER';
+            fx.timer = 0.25 + Math.random() * 0.7;
+          } else if (r < 0.52) {
+            fx.state = 'STEADY_BUZZ';
+            fx.timer = 1.8 + Math.random() * 3.8;
+          } else if (r < 0.80) {
+            fx.state = 'RAPID_SPUTTER';
+            fx.timer = 0.35 + Math.random() * 0.95;
+            if (now - audio.lastStarterClick > 900 && distToPlayer < 15) {
+              audio.lastStarterClick = now;
+              audio.playFluorescentClick(distToPlayer);
+            }
+          } else if (r < 0.92) {
+            fx.state = 'BRIGHT_SURGE';
+            fx.timer = 0.15 + Math.random() * 0.35;
+          } else {
+            fx.state = 'BLACKOUT';
+            fx.timer = 0.25 + Math.random() * 0.65;
+          }
+        }
+
+        let targetIntensity = fx.baseIntensity;
+        let tubeHex = 0xd8f3ff;
+        let lightHex = 0xcceeff;
+
+        if (fx.state === 'STEADY_BUZZ') {
+          // Subtle 50Hz mains hum ripple
+          targetIntensity = fx.baseIntensity * (0.92 + Math.sin(now * 0.06 + fx.phase) * 0.08);
+        } else if (fx.state === 'RAPID_SPUTTER') {
+          const on = Math.sin(now * 0.085 + fx.phase * 3.1) > -0.15 && Math.random() > 0.28;
+          targetIntensity = on ? fx.baseIntensity * (0.45 + Math.random() * 0.75) : 0.06;
+          tubeHex = on ? 0xbbe6ff : 0x1c2b36;
+          lightHex = 0x99d6ff;
+        } else if (fx.state === 'BRIGHT_SURGE') {
+          targetIntensity = fx.baseIntensity * 1.45;
+          tubeHex = 0xffffff;
+          lightHex = 0xe8f8ff;
+        } else if (fx.state === 'BLACKOUT') {
+          // Keep warm dying cathode ends faintly visible
+          targetIntensity = 0.07;
+          tubeHex = 0x222930;
+          lightHex = 0x3b4d5e;
+        } else if (fx.state === 'OLLIE_DRAIN') {
+          // Sickly amber / corrupted teal sputter when Slender-Ollie stands beneath the fixture
+          const pulse = Math.random() > 0.35;
+          targetIntensity = pulse ? fx.baseIntensity * 0.78 : 0.08;
+          tubeHex = pulse ? 0xd4a017 : 0x1f1605;
+          lightHex = 0xc28e16;
+        }
+
+        fx.light.intensity = targetIntensity;
+        fx.light.color.setHex(lightHex);
+        fx.tubeMat.color.setHex(tubeHex);
+      });
+
+      // 5. LANKY SLENDER-OLLIE AI & UNNATURAL ANIMATIONS
+      ollieRoot.lookAt(state.playerPos.x, ollieRoot.position.y, state.playerPos.z);
+      state.ollieDistance = Math.hypot(state.playerPos.x - state.olliePos.x, state.playerPos.z - state.olliePos.z);
+
+      if (state.endingUnlocked) {
+        // Joyful Ending Dance in the Underground Stash
+        const beat = now * 0.011;
+        ollieHead.position.y = 2.85 + Math.abs(Math.sin(beat)) * 0.32;
+        ollieHead.rotation.z = Math.sin(beat * 0.5) * 0.25;
+        ollieArmL.rotation.z = -1.1 + Math.sin(beat) * 0.85;
+        ollieArmR.rotation.z = 1.1 - Math.sin(beat + Math.PI) * 0.85;
+      } else {
+        // Violent 45-degree Neck Snap Twitch
+        if (now > state.nextHeadSnapTime) {
+          state.nextHeadSnapTime = now + 2200 + Math.random() * 4500;
+          state.headSnapAngle = (Math.random() < 0.5 ? -1 : 1) * (0.55 + Math.random() * 0.3);
+          if (state.ollieDistance < 18 && ollieRoot.visible) audio.playNeckSnap();
+        } else {
+          state.headSnapAngle *= Math.pow(0.25, dt);
+        }
+        ollieHead.rotation.z = state.headSnapAngle;
+        ollieHead.position.y = 2.95 + Math.sin(now * 0.0025) * 0.04; // Slow shuddering heave
+
+        const headWorldPos = new THREE.Vector3(state.olliePos.x, 2.75, state.olliePos.z);
+        const coneCheck = isPointInPlayerCone(headWorldPos, 0.48);
+        state.ollieInView = ollieRoot.visible && coneCheck.inBeam;
+        state.ollieModeTimer += dt;
+
+        // Trigger Dead Silence Ambush periodically
+        if (!state.deadSilenceActive && state.ollieModeTimer > 15 && Math.random() < 0.004) {
+          triggerDeadSilenceAmbush();
+        }
+
+        if (state.ollieMode === 'PEEKING') {
+          // Leaning 45 degrees out from behind a pillar watching the player
+          olliePivot.rotation.z += (state.olliePeekLean - olliePivot.rotation.z) * Math.min(1, dt * 8);
+
+          if (state.ollieInView && state.flashlightOn) {
+            state.ollieSeenTimer += dt;
+            // After 0.42s of flashlight contact, he silently pulls back behind the pillar and vanishes!
+            if (state.ollieSeenTimer > 0.42) {
+              state.olliePeekLean = 0;
+              if (Math.abs(olliePivot.rotation.z) < 0.06) {
+                ollieRoot.visible = false;
+                state.ollieMode = 'HIDDEN';
+                state.ollieModeTimer = 0;
+              }
+            }
+          } else if (state.ollieModeTimer > 14) {
+            spawnOllieWeepingAngel();
+          }
+        } else if (state.ollieMode === 'WEEPING_ANGEL') {
+          olliePivot.rotation.z = 0;
+          if (!state.ollieInView) {
+            // Creeps closer in the dark when you are NOT looking at him
+            const creepSpeed = (2.3 + state.bottlesCollected * 0.22) * dt;
+            const dx = state.playerPos.x - state.olliePos.x;
+            const dz = state.playerPos.z - state.olliePos.z;
+            const len = Math.hypot(dx, dz) || 1;
+            if (len > 1.7) {
+              state.olliePos.x += (dx / len) * creepSpeed;
+              state.olliePos.z += (dz / len) * creepSpeed;
+              ollieRoot.position.copy(state.olliePos);
+            }
+            if (now - audio.lastStalkStep > 560 && state.ollieDistance < 19) {
+              audio.lastStalkStep = now;
+              audio.playStalkFootstep(state.ollieDistance);
+            }
+          } else {
+            // Freezes dead-still mid-stride the millisecond your flashlight hits him!
+            ollieArmL.rotation.x = -0.35;
+            ollieArmR.rotation.x = 0.25;
+          }
+
+          if (state.ollieModeTimer > 16) {
+            spawnOllieCornerPeek();
+          }
+        } else if (state.ollieMode === 'DEAD_SILENCE_BEHIND') {
+          // Suffocating dead silence until the player turns around to face him
+          if (state.ollieInView || state.ollieModeTimer > 5.5) {
+            audio.playDeepSubImpact();
+            // Snap flashlight off for 0.35s while he vanishes
+            coreBeam.intensity = 0;
+            outerSpill.intensity = 0;
+            state.sanity = Math.max(12, state.sanity - 26);
+            setTimeout(() => {
+              state.deadSilenceActive = false;
+              ollieRoot.visible = false;
+              state.ollieMode = 'HIDDEN';
+              state.ollieModeTimer = 0;
+              if (state.flashlightOn) {
+                coreBeam.intensity = 4.8;
+                outerSpill.intensity = 1.45;
+              }
+            }, 340);
+          }
+        } else if (state.ollieMode === 'HIDDEN') {
+          if (state.ollieModeTimer > 4.2) {
+            if (Math.random() < 0.6) spawnOllieCornerPeek();
+            else spawnOllieWeepingAngel();
+          }
+        }
+
+        // Psychological Sanity / Creeping FOV Zoom & Vignette Darkening when staring at Ollie
+        if (state.ollieInView) {
+          const drain = (24 - Math.min(22, state.ollieDistance)) * 1.45;
+          state.sanity = Math.max(0, state.sanity - drain * dt);
+          // Creeping claustrophobic FOV zoom
+          camera.fov += (55 - camera.fov) * Math.min(1, dt * 3.5);
+          camera.updateProjectionMatrix();
+
+          if (state.flashlightOn && state.ollieDistance < 11) {
+            coreBeam.intensity = Math.random() < 0.22 ? 0.55 : 4.8;
+          }
+        } else {
+          state.sanity = Math.min(100, state.sanity + 8.5 * dt);
+          camera.fov += (70 - camera.fov) * Math.min(1, dt * 4.0);
+          camera.updateProjectionMatrix();
+          if (state.flashlightOn && !state.deadSilenceActive) coreBeam.intensity = 4.8;
+        }
+
+        if (ollieRoot.visible && state.ollieDistance < 1.55) {
+          state.sanity = Math.max(0, state.sanity - 75 * dt);
+        }
+
+        const dreadRatio = Math.max(0, (100 - state.sanity) / 100);
+        document.getElementById('dread-distortion').style.opacity = dreadRatio.toFixed(2);
+
+        if (state.sanity <= 0) {
+          state.gameOver = true;
+          document.exitPointerLock?.();
+          document.getElementById('gameover-screen').classList.remove('hidden');
+          document.getElementById('gameover-screen').classList.add('flex');
+        }
+      }
+
+      updateDiegeticPhoneScreen(now);
+      audio.update(now, dt);
+      renderer.render(scene, camera);
+    }
+
+    window.onload = function () {
+      animate();
+    };
+  </script>
+</body>
+</html>
