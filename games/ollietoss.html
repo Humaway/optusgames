@@ -1,0 +1,2122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ollie Toss: Optus Store Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --optus-teal: #00A3AD;
+            --optus-teal-dark: #007A82;
+            --optus-yellow: #FDDA24;
+            --optus-gold: #FFA800;
+            --optus-navy: #002B49;
+        }
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background-color: #002B49;
+            touch-action: none;
+        }
+        #canvas-container {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        /* UI Overlay styling */
+        .hud-layer {
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .pointer-auto {
+            pointer-events: auto;
+        }
+        .glass-panel {
+            background: rgba(0, 43, 73, 0.82);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+        }
+        .optus-btn {
+            transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .optus-btn:hover {
+            transform: translateY(-2px) scale(1.03);
+        }
+        .optus-btn:active {
+            transform: translateY(1px) scale(0.97);
+        }
+        .lvl-btn.active {
+            background: #FDDA24;
+            color: #002B49;
+            border-color: #FFFFFF;
+            box-shadow: 0 0 16px rgba(253, 218, 36, 0.65);
+            font-weight: 800;
+        }
+        /* Floating Speech / Score Popups */
+        @keyframes floatUpFade {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, 10px) scale(0.7);
+            }
+            20% {
+                opacity: 1;
+                transform: translate(-50%, -8px) scale(1.08);
+            }
+            80% {
+                opacity: 1;
+                transform: translate(-50%, -34px) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -55px) scale(0.9);
+            }
+        }
+        .floating-popup {
+            position: absolute;
+            pointer-events: none;
+            z-index: 30;
+            animation: floatUpFade 1.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            white-space: nowrap;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        .streak-fire {
+            animation: pulseGlow 1.2s infinite ease-in-out;
+        }
+        /* Swipe tutorial hand animation */
+        @keyframes swipeHintAnim {
+            0% { transform: translateY(24px) scale(0.95); opacity: 0; }
+            25% { transform: translateY(20px) scale(1); opacity: 1; }
+            75% { transform: translateY(-48px) scale(1.05); opacity: 1; }
+            100% { transform: translateY(-65px) scale(0.9); opacity: 0; }
+        }
+        .swipe-hand {
+            animation: swipeHintAnim 1.8s infinite cubic-bezier(0.4, 0, 0.2, 1);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Three.js Scene Container -->
+    <div id="canvas-container"></div>
+
+    <!-- Floating Dynamic Feedback Container -->
+    <div id="popup-container" class="absolute inset-0 pointer-events-none overflow-hidden z-20"></div>
+
+    <!-- HUD Overlay -->
+    <div class="hud-layer p-2.5 sm:p-4">
+        
+        <!-- Top Bar: Brand Header, Score, Wind HUD, and Controls -->
+        <div class="w-full max-w-6xl mx-auto flex flex-col gap-2">
+            
+            <!-- Main Row -->
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                
+                <!-- Brand + Ollie Icon Badge -->
+                <div class="glass-panel pointer-auto rounded-2xl px-3 py-2 flex items-center gap-2.5 border-l-4 border-l-[#FDDA24]">
+                    <!-- SVG Vector Icon of Ollie the Optus Mascot -->
+                    <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-[#00A3AD] to-[#002B49] p-1 flex items-center justify-center shadow-inner relative shrink-0">
+                        <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow">
+                            <defs>
+                                <radialGradient id="ollieGrad" cx="38%" cy="30%" r="65%">
+                                    <stop offset="0%" stop-color="#FFF066"/>
+                                    <stop offset="45%" stop-color="#FFD100"/>
+                                    <stop offset="100%" stop-color="#F29600"/>
+                                </radialGradient>
+                            </defs>
+                            <!-- Stick Legs -->
+                            <path d="M43 78 L43 94 L33 95" stroke="#111" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                            <path d="M56 78 L56 94 L66 95" stroke="#111" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                            <!-- Left Arm on hip -->
+                            <path d="M23 58 L10 68 L22 73" stroke="#111" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                            <!-- Right Waving Arm -->
+                            <path d="M77 56 Q91 58 90 40 L95 38" stroke="#111" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                            <!-- Golden Body with signature top-left tuft -->
+                            <path d="M30 22 C28 16, 42 12, 54 13 C75 14, 84 32, 82 52 C80 71, 64 82, 46 81 C26 80, 16 64, 19 45 C21 34, 33 27, 30 22 Z" fill="url(#ollieGrad)"/>
+                            <!-- White Inset Faceplate -->
+                            <path d="M34 45 C34 26, 70 24, 72 42 C72 47, 68 49, 53 50 C38 51, 34 49, 34 45 Z" fill="#FFFFFF" stroke="#E5A93C" stroke-width="2"/>
+                            <!-- Cute Dot Eyes -->
+                            <circle cx="44" cy="41" r="3.8" fill="#111111"/>
+                            <circle cx="62" cy="39.5" r="3.8" fill="#111111"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="bg-[#FDDA24] text-[#002B49] text-[10px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">YES</span>
+                            <h1 class="text-white font-black text-sm sm:text-base tracking-tight leading-none">OLLIE TOSS</h1>
+                        </div>
+                        <p id="level-title-label" class="text-[#00E5F5] text-xs font-semibold mt-0.5">Lvl 1: Counter Warm-Up</p>
+                    </div>
+                </div>
+
+                <!-- Center Wind Indicator HUD -->
+                <div class="glass-panel pointer-auto rounded-2xl px-3.5 py-1.5 flex items-center gap-3 border border-[#00A3AD]/50 shadow-lg">
+                    <div class="flex flex-col items-center">
+                        <span class="text-[10px] uppercase tracking-widest text-cyan-200 font-bold">Store Wind</span>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <!-- Animated Wind Arrow -->
+                            <div id="wind-arrow-box" class="w-7 h-7 rounded-full bg-[#002B49] border border-cyan-400/40 flex items-center justify-center transition-transform duration-300">
+                                <svg id="wind-arrow-svg" class="w-4 h-4 text-[#FDDA24] transition-transform duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    <polyline points="12 5 19 12 12 19"></polyline>
+                                </svg>
+                            </div>
+                            <div class="text-left">
+                                <div id="wind-speed-text" class="text-white font-black text-sm sm:text-base leading-none tabular-nums">0.0 m/s</div>
+                                <div id="wind-desc-text" class="text-[10px] text-cyan-300 font-semibold leading-tight">Calm AC</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Score, Streak & Utility Buttons -->
+                <div class="flex items-center gap-2">
+                    <!-- Score & Streak Pill -->
+                    <div class="glass-panel pointer-auto rounded-2xl px-3 py-1.5 flex items-center gap-3">
+                        <div class="text-center">
+                            <div class="text-[10px] uppercase text-gray-300 font-bold tracking-wider">Score</div>
+                            <div id="score-val" class="text-[#FDDA24] font-black text-lg sm:text-xl leading-none tabular-nums">0</div>
+                        </div>
+                        <div class="h-6 w-[1px] bg-white/15"></div>
+                        <div class="text-center">
+                            <div class="text-[10px] uppercase text-gray-300 font-bold tracking-wider">Streak</div>
+                            <div class="flex items-center justify-center gap-0.5">
+                                <span id="streak-val" class="text-white font-black text-lg sm:text-xl leading-none tabular-nums">0</span>
+                                <span id="streak-icon" class="text-sm streak-fire opacity-40">🔥</span>
+                            </div>
+                        </div>
+                        <div class="h-6 w-[1px] bg-white/15 hidden sm:block"></div>
+                        <div class="text-center hidden sm:block">
+                            <div class="text-[10px] uppercase text-gray-300 font-bold tracking-wider">Best</div>
+                            <div id="best-val" class="text-cyan-300 font-black text-lg sm:text-xl leading-none tabular-nums">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons: Camera, Sound, Reset -->
+                    <div class="flex items-center gap-1.5 pointer-auto">
+                        <button id="btn-cam" title="Toggle Camera Follow" class="optus-btn glass-panel w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-cyan-300 hover:text-white border border-cyan-400/30">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                        </button>
+                        <button id="btn-audio" title="Mute / Unmute Audio" class="optus-btn glass-panel w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-[#FDDA24] hover:text-white border border-yellow-400/30">
+                            <svg id="icon-sound-on" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                            </svg>
+                            <svg id="icon-sound-off" class="w-5 h-5 hidden text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
+                            </svg>
+                        </button>
+                        <button id="btn-reset" title="Respawn Ollie" class="optus-btn glass-panel w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center text-white hover:text-[#FDDA24] border border-white/20">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Second Row: Quick Level Select & Level Goal Progress -->
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <!-- Level Select Pills -->
+                <div class="glass-panel pointer-auto rounded-xl p-1 flex items-center gap-1 overflow-x-auto max-w-full">
+                    <span class="text-[10px] uppercase font-extrabold text-cyan-200 px-2 hidden sm:inline">Level Select:</span>
+                    <button data-level="1" class="lvl-btn optus-btn active text-xs px-2.5 py-1 rounded-lg text-white bg-white/10 border border-transparent transition">1. Warm-Up</button>
+                    <button data-level="2" class="lvl-btn optus-btn text-xs px-2.5 py-1 rounded-lg text-white bg-white/10 border border-transparent transition">2. AC Breeze</button>
+                    <button data-level="3" class="lvl-btn optus-btn text-xs px-2.5 py-1 rounded-lg text-white bg-white/10 border border-transparent transition">3. 5G Sign</button>
+                    <button data-level="4" class="lvl-btn optus-btn text-xs px-2.5 py-1 rounded-lg text-white bg-white/10 border border-transparent transition">4. SubHub Mover</button>
+                    <button data-level="5" class="lvl-btn optus-btn text-xs px-2.5 py-1 rounded-lg text-white bg-white/10 border border-transparent transition">5. Peak Hour</button>
+                </div>
+
+                <!-- Level Progress Dots (3 Baskets to Advance) -->
+                <div class="glass-panel pointer-auto rounded-xl px-3 py-1 flex items-center gap-2">
+                    <span class="text-[11px] text-gray-200 font-semibold">Level Goal:</span>
+                    <div id="goal-dots" class="flex items-center gap-1.5">
+                        <span class="w-3 h-3 rounded-full bg-white/20 border border-white/40 transition-all"></span>
+                        <span class="w-3 h-3 rounded-full bg-white/20 border border-white/40 transition-all"></span>
+                        <span class="w-3 h-3 rounded-full bg-white/20 border border-white/40 transition-all"></span>
+                    </div>
+                    <span id="goal-text" class="text-[11px] text-[#FDDA24] font-bold ml-1">0/3</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Level Up Notification Banner (Hidden by default) -->
+        <div id="level-banner" class="pointer-events-none self-center my-auto transition-all duration-500 opacity-0 scale-75 hidden">
+            <div class="glass-panel border-2 border-[#FDDA24] rounded-3xl px-8 py-5 text-center shadow-2xl">
+                <div class="inline-block bg-[#FDDA24] text-[#002B49] font-black text-xs px-3 py-1 rounded-full uppercase tracking-widest mb-2">Optus YES!</div>
+                <h2 id="banner-title" class="text-2xl sm:text-4xl font-black text-white drop-shadow">LEVEL CLEARED!</h2>
+                <p id="banner-sub" class="text-cyan-200 font-semibold text-sm sm:text-base mt-1">Advancing to next challenge...</p>
+            </div>
+        </div>
+
+        <!-- Bottom Bar: Interactive Aim Power Readout & Swipe Instructions -->
+        <div class="w-full max-w-xl mx-auto flex flex-col items-center gap-2 mb-1">
+            <!-- Live Drag Aim Readout Pill -->
+            <div id="aim-readout" class="glass-panel rounded-full px-4 py-1 text-xs font-bold text-[#FDDA24] opacity-0 transition-opacity duration-150 flex items-center gap-3 border border-[#FDDA24]/40">
+                <span id="aim-power-label">Power: 75%</span>
+                <span>•</span>
+                <span id="aim-angle-label">Angle: 0°</span>
+            </div>
+
+            <!-- Onboarding Swipe Hint -->
+            <div id="swipe-hint" class="flex flex-col items-center pointer-events-none">
+                <div class="swipe-hand text-2xl sm:text-3xl filter drop-shadow-md">👆</div>
+                <div class="glass-panel rounded-full px-4 py-1.5 text-[11px] sm:text-xs text-white font-semibold border border-cyan-400/30 shadow-md">
+                    <span class="text-[#FDDA24] font-extrabold">Swipe / Flick Upward</span> on Ollie to toss into the <span class="text-cyan-300 font-bold">YES Basket</span>!
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /********************************************************************
+         * 1. SYNTHESIZED WEB AUDIO API SOUND ENGINE
+         * Generates upbeat chimes, whooshes, rim clinks, obstacle bonks,
+         * and fan hum without external audio assets.
+         ********************************************************************/
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) {
+                        this.ctx = new AudioCtx();
+                    }
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            toggleMute() {
+                this.muted = !this.muted;
+                return this.muted;
+            }
+
+            // Upward flick whoosh + Ollie cute squeak
+            playThrow(powerRatio = 0.7) {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                // Whoosh noise filter
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.exponentialRampToValueAtTime(580 + powerRatio * 240, now + 0.18);
+
+                gain.gain.setValueAtTime(0.01, now);
+                gain.gain.linearRampToValueAtTime(0.16, now + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.23);
+            }
+
+            // Bounce off floor, wall, or rim
+            playBounce(type = 'floor', intensity = 0.6) {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                const vol = Math.min(0.25, Math.max(0.04, intensity * 0.22));
+
+                if (type === 'rim') {
+                    // Metallic / plastic bin rim clink
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(520, now);
+                    osc.frequency.exponentialRampToValueAtTime(260, now + 0.12);
+                } else if (type === 'obstacle') {
+                    // Comical boing
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(160, now);
+                    osc.frequency.exponentialRampToValueAtTime(340, now + 0.08);
+                    osc.frequency.exponentialRampToValueAtTime(190, now + 0.22);
+                } else {
+                    // Soft thud on wood floor
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(140, now);
+                    osc.frequency.exponentialRampToValueAtTime(48, now + 0.14);
+                }
+
+                gain.gain.setValueAtTime(vol, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + (type === 'obstacle' ? 0.24 : 0.15));
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            }
+
+            // Upbeat "YES!" Score Chime
+            playScore(isSwish = false) {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                const notes = isSwish ? [523.25, 659.25, 783.99, 1046.5, 1318.5] : [523.25, 659.25, 783.99, 1046.5];
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.075);
+
+                    gain.gain.setValueAtTime(0.001, now + idx * 0.075);
+                    gain.gain.linearRampToValueAtTime(0.18, now + idx * 0.075 + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.075 + 0.38);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + idx * 0.075);
+                    osc.stop(now + idx * 0.075 + 0.4);
+                });
+            }
+
+            // Level Up Fanfare
+            playLevelUp() {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                const chord = [440, 554.37, 659.25, 880, 1108.73];
+                chord.forEach((freq, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + i * 0.06);
+                    gain.gain.setValueAtTime(0.14, now + i * 0.06);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.65);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + i * 0.06);
+                    osc.stop(now + i * 0.06 + 0.7);
+                });
+            }
+        }
+
+        const sound = new SoundEngine();
+
+        /********************************************************************
+         * 2. LEVEL DEFINITIONS & GAME STATE
+         ********************************************************************/
+        const LEVELS = {
+            1: {
+                id: 1,
+                name: "Counter Warm-Up",
+                basketZ: -11.5,
+                windMin: 0,
+                windMax: 0,
+                hasStaticSign: false,
+                hasMovingBarrier: false,
+                movingBasket: false
+            },
+            2: {
+                id: 2,
+                name: "Store AC Breeze",
+                basketZ: -14.8,
+                windMin: 1.4,
+                windMax: 3.2,
+                hasStaticSign: false,
+                hasMovingBarrier: false,
+                movingBasket: false
+            },
+            3: {
+                id: 3,
+                name: "Promo Sign Blockade",
+                basketZ: -17.8,
+                windMin: 2.0,
+                windMax: 4.2,
+                hasStaticSign: true,
+                hasMovingBarrier: false,
+                movingBasket: false
+            },
+            4: {
+                id: 4,
+                name: "SubHub Mover",
+                basketZ: -20.5,
+                windMin: 2.8,
+                windMax: 5.2,
+                hasStaticSign: false,
+                hasMovingBarrier: true,
+                movingBasket: false
+            },
+            5: {
+                id: 5,
+                name: "Peak Hour Master",
+                basketZ: -23.2,
+                windMin: 3.6,
+                windMax: 6.5,
+                hasStaticSign: false,
+                hasMovingBarrier: true,
+                movingBasket: true
+            }
+        };
+
+        const state = {
+            currentLevel: 1,
+            score: 0,
+            streak: 0,
+            bestScore: 0,
+            levelGoals: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+            windSpeed: 0, // signed m/s: negative = blowing Left (-X), positive = blowing Right (+X)
+            phase: 'IDLE', // 'IDLE', 'AIMING', 'FLYING', 'SCORED', 'MISSED'
+            phaseTimer: 0,
+            touchedRim: false,
+            hitObstacle: false,
+            cameraFollow: true,
+            // Ollie physics
+            pos: new THREE.Vector3(0, 2.25, 0),
+            vel: new THREE.Vector3(0, 0, 0),
+            angVel: new THREE.Vector3(0, 0, 0),
+            startPos: new THREE.Vector3(0, 2.25, 0),
+            // Basket dynamic position
+            basketPos: new THREE.Vector3(0, 0, -11.5),
+            basketRadius: 1.08,
+            basketHeight: 2.25,
+            // Obstacles
+            signPos: new THREE.Vector3(0, 0, -10.5),
+            moverPos: new THREE.Vector3(0, 2.8, -13.0)
+        };
+
+        /********************************************************************
+         * 3. PROCEDURAL CANVAS TEXTURES (NO EXTERNAL IMAGE URLS)
+         ********************************************************************/
+        function createTimberFloorTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#C89B6E';
+            ctx.fillRect(0, 0, 512, 512);
+
+            const planks = 8;
+            const plankW = 512 / planks;
+            for (let i = 0; i < planks; i++) {
+                const shade = (i % 2 === 0) ? '#CFA377' : '#C19263';
+                ctx.fillStyle = shade;
+                ctx.fillRect(i * plankW, 0, plankW - 2, 512);
+
+                // Wood grain streaks
+                ctx.strokeStyle = 'rgba(110, 68, 32, 0.16)';
+                ctx.lineWidth = 2;
+                for (let g = 0; g < 12; g++) {
+                    ctx.beginPath();
+                    const gx = i * plankW + Math.random() * plankW;
+                    ctx.moveTo(gx, 0);
+                    ctx.bezierCurveTo(gx + 6, 170, gx - 6, 340, gx, 512);
+                    ctx.stroke();
+                }
+
+                // Plank seam
+                ctx.fillStyle = '#8F5E34';
+                ctx.fillRect((i + 1) * plankW - 2, 0, 2, 512);
+            }
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(8, 12);
+            return tex;
+        }
+
+        function createOptusBannerTexture(mainText, subText, bgHex, accentHex, textHex = '#FFFFFF') {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+
+            // Background
+            ctx.fillStyle = bgHex;
+            ctx.fillRect(0, 0, 512, 256);
+
+            // Decorative diagonal accent stripe
+            ctx.fillStyle = accentHex;
+            ctx.beginPath();
+            ctx.moveTo(390, 0);
+            ctx.lineTo(512, 0);
+            ctx.lineTo(512, 256);
+            ctx.lineTo(310, 256);
+            ctx.closePath();
+            ctx.fill();
+
+            // Main Text
+            ctx.fillStyle = textHex;
+            ctx.font = '900 74px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(mainText, 36, 105);
+
+            // Sub Text
+            ctx.fillStyle = (bgHex === '#FDDA24') ? '#002B49' : '#FDDA24';
+            ctx.font = '800 34px Inter, sans-serif';
+            ctx.fillText(subText, 38, 180);
+
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createYesBasketTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+
+            // Teal base with subtle mesh pattern
+            ctx.fillStyle = '#00A3AD';
+            ctx.fillRect(0, 0, 512, 256);
+
+            ctx.strokeStyle = 'rgba(0, 43, 73, 0.22)';
+            ctx.lineWidth = 3;
+            for (let x = 0; x < 512; x += 24) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 64, 256); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(x + 64, 0); ctx.lineTo(x, 256); ctx.stroke();
+            }
+
+            // Top & bottom yellow trim stripes
+            ctx.fillStyle = '#FDDA24';
+            ctx.fillRect(0, 0, 512, 24);
+            ctx.fillRect(0, 232, 512, 24);
+
+            // Front & Back "YES" badge circles
+            [128, 384].forEach(cx => {
+                ctx.fillStyle = '#FDDA24';
+                ctx.beginPath();
+                ctx.roundRect ? ctx.roundRect(cx - 70, 68, 140, 120, 24) : ctx.fillRect(cx - 70, 68, 140, 120);
+                ctx.fill();
+
+                ctx.fillStyle = '#002B49';
+                ctx.font = '900 54px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('YES', cx, 118);
+
+                ctx.fillStyle = '#00A3AD';
+                ctx.font = '800 20px Inter, sans-serif';
+                ctx.fillText('OPTUS', cx, 160);
+            });
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            return tex;
+        }
+
+        /********************************************************************
+         * 4. THREE.JS SCENE, CAMERA & LIGHTING SETUP
+         ********************************************************************/
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x002B49);
+        scene.fog = new THREE.FogExp2(0x002B49, 0.014);
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 120);
+        const baseCamPos = new THREE.Vector3(0, 5.1, 6.8);
+        const baseCamLook = new THREE.Vector3(0, 2.1, -12);
+        camera.position.copy(baseCamPos);
+        camera.lookAt(baseCamLook);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xFFFDF5, 0.72);
+        scene.add(ambientLight);
+
+        const mainDirLight = new THREE.DirectionalLight(0xFFFFFF, 0.85);
+        mainDirLight.position.set(10, 22, 12);
+        mainDirLight.castShadow = true;
+        mainDirLight.shadow.mapSize.width = 2048;
+        mainDirLight.shadow.mapSize.height = 2048;
+        mainDirLight.shadow.camera.near = 2;
+        mainDirLight.shadow.camera.far = 55;
+        const d = 22;
+        mainDirLight.shadow.camera.left = -d;
+        mainDirLight.shadow.camera.right = d;
+        mainDirLight.shadow.camera.top = d;
+        mainDirLight.shadow.camera.bottom = -d;
+        mainDirLight.shadow.bias = -0.0005;
+        scene.add(mainDirLight);
+
+        const tealFillLight = new THREE.PointLight(0x00A3AD, 0.55, 35);
+        tealFillLight.position.set(-10, 8, -14);
+        scene.add(tealFillLight);
+
+        const yellowFillLight = new THREE.PointLight(0xFDDA24, 0.45, 35);
+        yellowFillLight.position.set(10, 8, -14);
+        scene.add(yellowFillLight);
+
+        /********************************************************************
+         * 5. BUILD 3D OPTUS STORE ENVIRONMENT
+         ********************************************************************/
+        const storeGroup = new THREE.Group();
+        scene.add(storeGroup);
+
+        // Timber Floor
+        const floorGeo = new THREE.PlaneGeometry(36, 48);
+        const floorMat = new THREE.MeshStandardMaterial({
+            map: createTimberFloorTexture(),
+            roughness: 0.45,
+            metalness: 0.05
+        });
+        const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+        floorMesh.rotation.x = -Math.PI / 2;
+        floorMesh.position.set(0, 0, -14);
+        floorMesh.receiveShadow = true;
+        storeGroup.add(floorMesh);
+
+        // Glowing Teal Floor Lane Carpet Strip
+        const laneGeo = new THREE.PlaneGeometry(5.6, 30);
+        const laneMat = new THREE.MeshStandardMaterial({
+            color: 0x007A82,
+            roughness: 0.8
+        });
+        const laneMesh = new THREE.Mesh(laneGeo, laneMat);
+        laneMesh.rotation.x = -Math.PI / 2;
+        laneMesh.position.set(0, 0.01, -13);
+        laneMesh.receiveShadow = true;
+        storeGroup.add(laneMesh);
+
+        // Yellow border stripes along the lane
+        [-2.85, 2.85].forEach(lx => {
+            const stripe = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.14, 30),
+                new THREE.MeshBasicMaterial({ color: 0xFDDA24 })
+            );
+            stripe.rotation.x = -Math.PI / 2;
+            stripe.position.set(lx, 0.015, -13);
+            storeGroup.add(stripe);
+        });
+
+        // Back Retail Wall (Deep Navy & Teal feature wall)
+        const backWall = new THREE.Mesh(
+            new THREE.BoxGeometry(36, 16, 1),
+            new THREE.MeshStandardMaterial({ color: 0xF5F8FA, roughness: 0.6 })
+        );
+        backWall.position.set(0, 8, -28.5);
+        backWall.receiveShadow = true;
+        storeGroup.add(backWall);
+
+        // Teal Feature Center Panel on Back Wall
+        const featurePanel = new THREE.Mesh(
+            new THREE.BoxGeometry(14, 11, 0.3),
+            new THREE.MeshStandardMaterial({ color: 0x002B49, roughness: 0.4 })
+        );
+        featurePanel.position.set(0, 6.8, -27.9);
+        storeGroup.add(featurePanel);
+
+        // Glowing "OPTUS YES" Hero Wall Sign
+        const heroBannerTex = createOptusBannerTexture('OPTUS', 'SAY YES TO 5G', '#00A3AD', '#FDDA24', '#FFFFFF');
+        const heroSign = new THREE.Mesh(
+            new THREE.PlaneGeometry(10.5, 5.2),
+            new THREE.MeshBasicMaterial({ map: heroBannerTex })
+        );
+        heroSign.position.set(0, 7.6, -27.7);
+        storeGroup.add(heroSign);
+
+        // Side Walls (Clean White Showroom Walls)
+        [-18, 18].forEach((wx, idx) => {
+            const sWall = new THREE.Mesh(
+                new THREE.BoxGeometry(1, 16, 48),
+                new THREE.MeshStandardMaterial({ color: 0xF0F4F8, roughness: 0.7 })
+            );
+            sWall.position.set(wx, 8, -14);
+            storeGroup.add(sWall);
+
+            // Side Wall Promo Banners
+            const bTex = idx === 0
+                ? createOptusBannerTexture('5G FAST', 'SUPERFAST NETWORK', '#FDDA24', '#00A3AD', '#002B49')
+                : createOptusBannerTexture('SUBHUB', 'ALL YOUR SUBS IN ONE', '#002B49', '#00A3AD', '#FFFFFF');
+            const sideBanner = new THREE.Mesh(
+                new THREE.PlaneGeometry(8, 4),
+                new THREE.MeshBasicMaterial({ map: bTex })
+            );
+            sideBanner.position.set(wx > 0 ? wx - 0.55 : wx + 0.55, 7.2, -15);
+            sideBanner.rotation.y = wx > 0 ? -Math.PI / 2 : Math.PI / 2;
+            storeGroup.add(sideBanner);
+        });
+
+        // Side Retail Display Tables with Mini 3D Phones
+        [-9.5, 9.5].forEach(tx => {
+            [-9, -18].forEach(tz => {
+                const tableGroup = new THREE.Group();
+                tableGroup.position.set(tx, 0, tz);
+
+                // White base pedestal
+                const base = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.6, 1.8, 5.2),
+                    new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.3 })
+                );
+                base.position.y = 0.9;
+                base.castShadow = true;
+                base.receiveShadow = true;
+                tableGroup.add(base);
+
+                // Timber tabletop
+                const top = new THREE.Mesh(
+                    new THREE.BoxGeometry(3.0, 0.2, 5.6),
+                    new THREE.MeshStandardMaterial({ color: 0xD7A97C, roughness: 0.4 })
+                );
+                top.position.y = 1.9;
+                top.castShadow = true;
+                tableGroup.add(top);
+
+                // Mini phones on display stands
+                for (let p = -1.6; p <= 1.6; p += 1.6) {
+                    const phone = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.32, 0.55, 0.05),
+                        new THREE.MeshBasicMaterial({ color: 0x00E5F5 })
+                    );
+                    phone.position.set(tx > 0 ? -0.5 : 0.5, 2.25, p);
+                    phone.rotation.y = tx > 0 ? -0.4 : 0.4;
+                    phone.rotation.x = -0.3;
+                    tableGroup.add(phone);
+                }
+
+                storeGroup.add(tableGroup);
+            });
+        });
+
+        // Foreground Launch Desk where Ollie stands
+        const launchDeskGroup = new THREE.Group();
+        const deskBase = new THREE.Mesh(
+            new THREE.BoxGeometry(5.2, 1.45, 2.5),
+            new THREE.MeshStandardMaterial({ color: 0x002B49, roughness: 0.5 })
+        );
+        deskBase.position.set(0, 0.725, 0);
+        deskBase.receiveShadow = true;
+        launchDeskGroup.add(deskBase);
+
+        const deskTop = new THREE.Mesh(
+            new THREE.BoxGeometry(5.6, 0.18, 2.8),
+            new THREE.MeshStandardMaterial({ color: 0xDEB386, roughness: 0.35 })
+        );
+        deskTop.position.set(0, 1.5, 0);
+        deskTop.receiveShadow = true;
+        launchDeskGroup.add(deskTop);
+
+        // Teal Launch Mat on Desk
+        const launchMat = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.95, 0.95, 0.04, 32),
+            new THREE.MeshStandardMaterial({ color: 0x00A3AD, roughness: 0.6 })
+        );
+        launchMat.position.set(0, 1.60, 0);
+        launchMat.receiveShadow = true;
+        launchDeskGroup.add(launchMat);
+
+        const launchRing = new THREE.Mesh(
+            new THREE.RingGeometry(0.82, 0.93, 32),
+            new THREE.MeshBasicMaterial({ color: 0xFDDA24, side: THREE.DoubleSide })
+        );
+        launchRing.rotation.x = -Math.PI / 2;
+        launchRing.position.set(0, 1.625, 0);
+        launchDeskGroup.add(launchRing);
+
+        storeGroup.add(launchDeskGroup);
+
+        /********************************************************************
+         * 6. BUILD 3D OLLIE THE OPTUS MASCOT
+         * Faithful to the reference image:
+         * - Bright golden-yellow rounded body (#FFD100 / #FFA800)
+         * - Cute small pointed tuft/horn on the top-left of his head
+         * - White rounded-arch inset faceplate on the front with two black eyes
+         * - Thin black stick-figure arms and legs
+         ********************************************************************/
+        function createOllieMascot() {
+            const ollieRoot = new THREE.Group();
+
+            // Inner pivot group for body breathing/tumbling
+            const bodyPivot = new THREE.Group();
+            ollieRoot.add(bodyPivot);
+
+            // Golden Yellow Material
+            const yellowMat = new THREE.MeshStandardMaterial({
+                color: 0xFFD100,
+                emissive: 0xFF9900,
+                emissiveIntensity: 0.14,
+                roughness: 0.28,
+                metalness: 0.05
+            });
+
+            // Main Round/Slightly Oval Hooded Body
+            const torsoGeo = new THREE.SphereGeometry(0.56, 36, 36);
+            torsoGeo.scale(1.06, 0.98, 0.92);
+            const torsoMesh = new THREE.Mesh(torsoGeo, yellowMat);
+            torsoMesh.castShadow = true;
+            bodyPivot.add(torsoMesh);
+
+            // Signature Small Pointed Tuft on the Top-Left of Ollie's Head
+            const tuftGeo = new THREE.ConeGeometry(0.22, 0.36, 24);
+            const tuftMesh = new THREE.Mesh(tuftGeo, yellowMat);
+            tuftMesh.position.set(-0.34, 0.44, 0.02);
+            tuftMesh.rotation.z = 0.68; // Tilted outward to top-left like his cowlick/hood peak
+            tuftMesh.scale.set(1.1, 1.0, 0.75);
+            tuftMesh.castShadow = true;
+            bodyPivot.add(tuftMesh);
+
+            // Dynamic Faceplate Canvas Texture (allows blinking & flight expressions!)
+            const faceCanvas = document.createElement('canvas');
+            faceCanvas.width = 256;
+            faceCanvas.height = 256;
+            const faceCtx = faceCanvas.getContext('2d');
+            const faceTex = new THREE.CanvasTexture(faceCanvas);
+
+            function drawOllieFace(expression = 'normal') {
+                faceCtx.clearRect(0, 0, 256, 256);
+
+                // Warm golden background around faceplate
+                faceCtx.fillStyle = '#FFD100';
+                faceCtx.fillRect(0, 0, 256, 256);
+
+                // Subtle orange hood inner rim shadow
+                faceCtx.fillStyle = '#E89B00';
+                faceCtx.beginPath();
+                faceCtx.moveTo(28, 148);
+                faceCtx.bezierCurveTo(26, 42, 230, 36, 228, 142);
+                faceCtx.bezierCurveTo(228, 165, 28, 170, 28, 148);
+                faceCtx.fill();
+
+                // Crisp White Rounded-Arch Inset Faceplate
+                faceCtx.fillStyle = '#FFFFFF';
+                faceCtx.beginPath();
+                faceCtx.moveTo(34, 152);
+                faceCtx.bezierCurveTo(32, 54, 224, 48, 222, 146);
+                faceCtx.bezierCurveTo(222, 166, 34, 170, 34, 152);
+                faceCtx.fill();
+
+                // Eyes based on expression
+                faceCtx.fillStyle = '#111111';
+                faceCtx.strokeStyle = '#111111';
+                faceCtx.lineWidth = 8;
+                faceCtx.lineCap = 'round';
+
+                if (expression === 'blink') {
+                    // Cute curved blink lines
+                    faceCtx.beginPath(); faceCtx.moveTo(72, 118); faceCtx.lineTo(98, 118); faceCtx.stroke();
+                    faceCtx.beginPath(); faceCtx.moveTo(156, 112); faceCtx.lineTo(182, 112); faceCtx.stroke();
+                } else if (expression === 'fly') {
+                    // Excited wide eyes O_O
+                    faceCtx.beginPath(); faceCtx.arc(85, 116, 15, 0, Math.PI * 2); faceCtx.fill();
+                    faceCtx.beginPath(); faceCtx.arc(170, 110, 15, 0, Math.PI * 2); faceCtx.fill();
+                    faceCtx.fillStyle = '#FFFFFF';
+                    faceCtx.beginPath(); faceCtx.arc(89, 111, 5, 0, Math.PI * 2); faceCtx.fill();
+                    faceCtx.beginPath(); faceCtx.arc(174, 105, 5, 0, Math.PI * 2); faceCtx.fill();
+                } else if (expression === 'happy') {
+                    // Happy ^ ^ arcs
+                    faceCtx.beginPath(); faceCtx.arc(85, 122, 14, Math.PI, 0, false); faceCtx.stroke();
+                    faceCtx.beginPath(); faceCtx.arc(170, 116, 14, Math.PI, 0, false); faceCtx.stroke();
+                } else if (expression === 'oof') {
+                    // > < bonk eyes
+                    faceCtx.beginPath();
+                    faceCtx.moveTo(72, 106); faceCtx.lineTo(95, 118); faceCtx.lineTo(72, 130);
+                    faceCtx.moveTo(182, 100); faceCtx.lineTo(159, 112); faceCtx.lineTo(182, 124);
+                    faceCtx.stroke();
+                } else {
+                    // Classic cute black dot eyes (slightly tilted like reference image)
+                    faceCtx.beginPath();
+                    faceCtx.arc(85, 118, 12.5, 0, Math.PI * 2);
+                    faceCtx.fill();
+                    faceCtx.beginPath();
+                    faceCtx.arc(170, 112, 12.5, 0, Math.PI * 2);
+                    faceCtx.fill();
+                }
+
+                faceTex.needsUpdate = true;
+            }
+            drawOllieFace('normal');
+
+            // Front Faceplate Curved Patch mapped onto the front of Ollie's body
+            const faceGeo = new THREE.SphereGeometry(0.566, 32, 32, -Math.PI * 0.35, Math.PI * 0.7, Math.PI * 0.18, Math.PI * 0.45);
+            faceGeo.scale(1.06, 0.98, 0.92);
+            const faceMat = new THREE.MeshStandardMaterial({
+                map: faceTex,
+                roughness: 0.25,
+                metalness: 0.0
+            });
+            const faceMesh = new THREE.Mesh(faceGeo, faceMat);
+            // SphereGeometry default phi=0 is along +X; rotate -90 deg around Y so patch faces +Z (towards camera)
+            faceMesh.rotation.y = -Math.PI / 2;
+            bodyPivot.add(faceMesh);
+
+            // Black Stick-Figure Limbs Material
+            const stickMat = new THREE.MeshStandardMaterial({
+                color: 0x111111,
+                roughness: 0.4
+            });
+
+            // Left Arm (bent on hip in idle, flails in flight)
+            const leftArmGroup = new THREE.Group();
+            leftArmGroup.position.set(-0.54, -0.05, 0);
+            const upperLArm = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.30, 12), stickMat);
+            upperLArm.position.set(-0.1, -0.08, 0);
+            upperLArm.rotation.z = -0.9;
+            leftArmGroup.add(upperLArm);
+
+            const lowerLArm = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.24, 12), stickMat);
+            lowerLArm.position.set(-0.12, -0.22, 0.04);
+            lowerLArm.rotation.z = 0.85;
+            leftArmGroup.add(lowerLArm);
+
+            const leftHand = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 12), stickMat);
+            leftHand.position.set(-0.04, -0.28, 0.06);
+            leftArmGroup.add(leftHand);
+            bodyPivot.add(leftArmGroup);
+
+            // Right Arm (raised waving in idle, flails in flight)
+            const rightArmGroup = new THREE.Group();
+            rightArmGroup.position.set(0.54, -0.02, 0);
+            const upperRArm = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.32, 12), stickMat);
+            upperRArm.position.set(0.14, 0.04, 0);
+            upperRArm.rotation.z = -1.25;
+            rightArmGroup.add(upperRArm);
+
+            const lowerRArm = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.28, 12), stickMat);
+            lowerRArm.position.set(0.28, 0.20, 0);
+            lowerRArm.rotation.z = -0.2;
+            rightArmGroup.add(lowerRArm);
+
+            const rightHand = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12), stickMat);
+            rightHand.scale.set(1.3, 0.8, 0.8);
+            rightHand.position.set(0.35, 0.34, 0);
+            rightArmGroup.add(rightHand);
+            bodyPivot.add(rightArmGroup);
+
+            // Left Stick Leg & Foot
+            const leftLegGroup = new THREE.Group();
+            leftLegGroup.position.set(-0.15, -0.50, 0);
+            const lLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.32, 12), stickMat);
+            lLeg.position.y = -0.14;
+            leftLegGroup.add(lLeg);
+            const lFoot = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.055, 0.11), stickMat);
+            lFoot.position.set(-0.04, -0.29, 0.03);
+            leftLegGroup.add(lFoot);
+            bodyPivot.add(leftLegGroup);
+
+            // Right Stick Leg & Foot
+            const rightLegGroup = new THREE.Group();
+            rightLegGroup.position.set(0.15, -0.50, 0);
+            const rLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.32, 12), stickMat);
+            rLeg.position.y = -0.14;
+            rightLegGroup.add(rLeg);
+            const rFoot = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.055, 0.11), stickMat);
+            rFoot.position.set(0.04, -0.29, 0.03);
+            rightLegGroup.add(rFoot);
+            bodyPivot.add(rightLegGroup);
+
+            ollieRoot.userData = {
+                bodyPivot,
+                leftArmGroup,
+                rightArmGroup,
+                leftLegGroup,
+                rightLegGroup,
+                drawOllieFace
+            };
+
+            return ollieRoot;
+        }
+
+        const ollie = createOllieMascot();
+        scene.add(ollie);
+
+        /********************************************************************
+         * 7. BUILD TARGET "YES" BASKET, FANS & OBSTACLES
+         ********************************************************************/
+        function createTargetBasket() {
+            const group = new THREE.Group();
+            const r = state.basketRadius;
+            const h = state.basketHeight;
+
+            // Open Cylinder Wall with Optus "YES" Texture
+            const cylGeo = new THREE.CylinderGeometry(r, r * 0.84, h, 36, 1, true);
+            const cylMat = new THREE.MeshStandardMaterial({
+                map: createYesBasketTexture(),
+                side: THREE.DoubleSide,
+                roughness: 0.35,
+                metalness: 0.1
+            });
+            const cylMesh = new THREE.Mesh(cylGeo, cylMat);
+            cylMesh.position.y = h / 2;
+            cylMesh.castShadow = true;
+            cylMesh.receiveShadow = true;
+            group.add(cylMesh);
+
+            // Inner Dark Bottom Base
+            const botGeo = new THREE.CylinderGeometry(r * 0.83, r * 0.83, 0.1, 32);
+            const botMat = new THREE.MeshStandardMaterial({ color: 0x002B49, roughness: 0.7 });
+            const botMesh = new THREE.Mesh(botGeo, botMat);
+            botMesh.position.y = 0.06;
+            botMesh.receiveShadow = true;
+            group.add(botMesh);
+
+            // Distinct Yellow Top Rim Torus
+            const rimGeo = new THREE.TorusGeometry(r, 0.085, 16, 48);
+            const rimMat = new THREE.MeshStandardMaterial({
+                color: 0xFDDA24,
+                roughness: 0.25,
+                metalness: 0.15
+            });
+            const rimMesh = new THREE.Mesh(rimGeo, rimMat);
+            rimMesh.rotation.x = Math.PI / 2;
+            rimMesh.position.y = h;
+            rimMesh.castShadow = true;
+            group.add(rimMesh);
+
+            // Floor Glow Target Ring under basket
+            const floorGlow = new THREE.Mesh(
+                new THREE.RingGeometry(r * 0.92, r * 1.18, 36),
+                new THREE.MeshBasicMaterial({ color: 0x00E5F5, side: THREE.DoubleSide, transparent: true, opacity: 0.55 })
+            );
+            floorGlow.rotation.x = -Math.PI / 2;
+            floorGlow.position.y = 0.02;
+            group.add(floorGlow);
+
+            return group;
+        }
+
+        const basketGroup = createTargetBasket();
+        scene.add(basketGroup);
+
+        // Build 3D Electric Pedestal Fans (Left & Right of Store Lane)
+        function createElectricFan() {
+            const fanGroup = new THREE.Group();
+
+            const metalMat = new THREE.MeshStandardMaterial({ color: 0xDCE4EC, metalness: 0.6, roughness: 0.3 });
+            const tealMat = new THREE.MeshStandardMaterial({ color: 0x00A3AD, roughness: 0.3 });
+            const yellowMat = new THREE.MeshStandardMaterial({ color: 0xFDDA24, roughness: 0.3 });
+
+            // Base & Pole
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.85, 0.15, 24), tealMat);
+            base.position.y = 0.08;
+            base.castShadow = true;
+            fanGroup.add(base);
+
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 2.7, 16), metalMat);
+            pole.position.y = 1.4;
+            pole.castShadow = true;
+            fanGroup.add(pole);
+
+            // Fan Head Housing
+            const headGroup = new THREE.Group();
+            headGroup.position.y = 2.75;
+            fanGroup.add(headGroup);
+
+            const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.55, 20), tealMat);
+            motor.rotation.z = Math.PI / 2;
+            headGroup.add(motor);
+
+            // Cage Rings
+            const outerCage = new THREE.Mesh(new THREE.TorusGeometry(1.05, 0.05, 12, 32), metalMat);
+            outerCage.rotation.y = Math.PI / 2;
+            outerCage.position.x = 0.25;
+            headGroup.add(outerCage);
+
+            const innerCage = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.025, 10, 24), metalMat);
+            innerCage.rotation.y = Math.PI / 2;
+            innerCage.position.x = 0.28;
+            headGroup.add(innerCage);
+
+            // Spinning Rotor + 4 Blades
+            const rotorGroup = new THREE.Group();
+            rotorGroup.position.x = 0.22;
+            headGroup.add(rotorGroup);
+
+            const hub = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), yellowMat);
+            rotorGroup.add(hub);
+
+            for (let b = 0; b < 4; b++) {
+                const bladePivot = new THREE.Group();
+                bladePivot.rotation.x = (b * Math.PI) / 2;
+                const blade = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.04, 0.82, 0.28),
+                    yellowMat
+                );
+                blade.position.y = 0.48;
+                blade.rotation.y = 0.35; // Pitched blade
+                bladePivot.add(blade);
+                rotorGroup.add(bladePivot);
+            }
+
+            fanGroup.userData = { rotorGroup };
+            return fanGroup;
+        }
+
+        const leftFan = createElectricFan();
+        leftFan.position.set(-5.2, 0, -9.5);
+        scene.add(leftFan);
+
+        const rightFan = createElectricFan();
+        rightFan.position.set(5.2, 0, -9.5);
+        rightFan.rotation.y = Math.PI; // Faces Left (-X)
+        scene.add(rightFan);
+
+        // Animated 3D Wind Stream Lines blowing across the store
+        const windParticlesGroup = new THREE.Group();
+        scene.add(windParticlesGroup);
+        const windStreaks = [];
+        for (let i = 0; i < 28; i++) {
+            const len = 0.9 + Math.random() * 1.4;
+            const geo = new THREE.BoxGeometry(len, 0.035, 0.035);
+            const mat = new THREE.MeshBasicMaterial({
+                color: i % 3 === 0 ? 0xFDDA24 : 0x7CEEFF,
+                transparent: true,
+                opacity: 0.45
+            });
+            const streak = new THREE.Mesh(geo, mat);
+            streak.position.set(
+                (Math.random() - 0.5) * 10,
+                1.0 + Math.random() * 3.8,
+                -3 - Math.random() * 16
+            );
+            windParticlesGroup.add(streak);
+            windStreaks.push({ mesh: streak, speedOffset: 0.75 + Math.random() * 0.5 });
+        }
+
+        // Level 3 Static Obstacle: Tall "Optus 5G" Promotional Cutout Stand
+        function createPromoSignObstacle() {
+            const group = new THREE.Group();
+            // Heavy Base
+            const base = new THREE.Mesh(
+                new THREE.BoxGeometry(1.9, 0.18, 0.9),
+                new THREE.MeshStandardMaterial({ color: 0x002B49, roughness: 0.5 })
+            );
+            base.position.y = 0.09;
+            base.castShadow = true;
+            group.add(base);
+
+            // Tall Sign Board
+            const signTex = createOptusBannerTexture('5G', 'HYPER SPEED', '#FDDA24', '#00A3AD', '#002B49');
+            const board = new THREE.Mesh(
+                new THREE.BoxGeometry(1.65, 2.75, 0.16),
+                new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.3 })
+            );
+            board.position.y = 1.55;
+            board.castShadow = true;
+            group.add(board);
+
+            return group;
+        }
+        const promoSignObstacle = createPromoSignObstacle();
+        scene.add(promoSignObstacle);
+
+        // Level 4 & 5 Moving Obstacle: Hovering "Optus SubHub" Drone Display Barrier
+        function createMovingBarrierObstacle() {
+            const group = new THREE.Group();
+            const tex = createOptusBannerTexture('SUBHUB', '5G HOVER SIGN', '#00A3AD', '#FDDA24', '#FFFFFF');
+            const panel = new THREE.Mesh(
+                new THREE.BoxGeometry(2.3, 1.35, 0.22),
+                new THREE.MeshStandardMaterial({ map: tex, roughness: 0.25 })
+            );
+            panel.castShadow = true;
+            group.add(panel);
+
+            // Gold Frame
+            const frame = new THREE.Mesh(
+                new THREE.BoxGeometry(2.42, 1.47, 0.18),
+                new THREE.MeshStandardMaterial({ color: 0xFDDA24, roughness: 0.3 })
+            );
+            group.add(frame);
+
+            // Drone Propellers on Left & Right Top Corners
+            [-1.1, 1.1].forEach(dx => {
+                const rotorMount = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.08, 0.08, 0.35, 12),
+                    new THREE.MeshStandardMaterial({ color: 0x002B49 })
+                );
+                rotorMount.position.set(dx, 0.85, 0);
+                group.add(rotorMount);
+
+                const ring = new THREE.Mesh(
+                    new THREE.TorusGeometry(0.32, 0.035, 8, 24),
+                    new THREE.MeshBasicMaterial({ color: 0x00E5F5 })
+                );
+                ring.rotation.x = Math.PI / 2;
+                ring.position.set(dx, 1.02, 0);
+                group.add(ring);
+            });
+
+            return group;
+        }
+        const movingBarrier = createMovingBarrierObstacle();
+        scene.add(movingBarrier);
+
+        /********************************************************************
+         * 8. AIM TRAJECTORY ARC & CONFETTI SYSTEM
+         ********************************************************************/
+        const aimDotsGroup = new THREE.Group();
+        scene.add(aimDotsGroup);
+        const AIM_DOT_COUNT = 20;
+        const aimDots = [];
+        for (let i = 0; i < AIM_DOT_COUNT; i++) {
+            const t = i / AIM_DOT_COUNT;
+            const dot = new THREE.Mesh(
+                new THREE.SphereGeometry(0.11 * (1 - t * 0.55), 10, 10),
+                new THREE.MeshBasicMaterial({
+                    color: i < 8 ? 0xFDDA24 : 0x00E5F5,
+                    transparent: true,
+                    opacity: 0.9 - t * 0.65
+                })
+            );
+            dot.visible = false;
+            aimDotsGroup.add(dot);
+            aimDots.push(dot);
+        }
+
+        // Landing Target Ring Preview on Floor
+        const aimFloorRing = new THREE.Mesh(
+            new THREE.RingGeometry(0.35, 0.5, 24),
+            new THREE.MeshBasicMaterial({ color: 0xFDDA24, side: THREE.DoubleSide, transparent: true, opacity: 0.75 })
+        );
+        aimFloorRing.rotation.x = -Math.PI / 2;
+        aimFloorRing.visible = false;
+        scene.add(aimFloorRing);
+
+        // Flight Trail Ribbon Dots behind Ollie
+        const trailDots = [];
+        for (let i = 0; i < 14; i++) {
+            const td = new THREE.Mesh(
+                new THREE.SphereGeometry(0.12 * (1 - i / 15), 8, 8),
+                new THREE.MeshBasicMaterial({
+                    color: i % 2 === 0 ? 0xFDDA24 : 0x00A3AD,
+                    transparent: true,
+                    opacity: 0.55 * (1 - i / 14)
+                })
+            );
+            td.visible = false;
+            scene.add(td);
+            trailDots.push(td);
+        }
+        const trailHistory = [];
+
+        // 3D Confetti Particles on Basket Score
+        const confettiParticles = [];
+        const confettiGroup = new THREE.Group();
+        scene.add(confettiGroup);
+
+        function spawnConfettiBurst(origin) {
+            const colors = [0xFDDA24, 0x00A3AD, 0xFFFFFF, 0x00E5F5, 0xFFA800];
+            for (let i = 0; i < 65; i++) {
+                const mat = new THREE.MeshBasicMaterial({
+                    color: colors[i % colors.length],
+                    side: THREE.DoubleSide
+                });
+                const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.11), mat);
+                mesh.position.copy(origin);
+                mesh.position.y += 1.6;
+                confettiGroup.add(mesh);
+
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2.0 + Math.random() * 5.5;
+                confettiParticles.push({
+                    mesh,
+                    vel: new THREE.Vector3(
+                        Math.cos(angle) * speed,
+                        4.5 + Math.random() * 6.5,
+                        Math.sin(angle) * speed
+                    ),
+                    rotVel: new THREE.Vector3(
+                        (Math.random() - 0.5) * 12,
+                        (Math.random() - 0.5) * 12,
+                        (Math.random() - 0.5) * 12
+                    ),
+                    life: 1.8
+                });
+            }
+        }
+
+        /********************************************************************
+         * 9. HUD & FLOATING SPEECH BUBBLE HELPERS
+         ********************************************************************/
+        const popupContainer = document.getElementById('popup-container');
+
+        function spawnFloatingPopup(worldPos, text, styleType = 'score') {
+            const projected = worldPos.clone().project(camera);
+            const x = (projected.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-projected.y * 0.5 + 0.5) * window.innerHeight;
+
+            const el = document.createElement('div');
+            el.className = 'floating-popup px-3.5 py-1.5 rounded-2xl font-black text-sm sm:text-base shadow-xl border-2';
+            el.style.left = `${Math.min(window.innerWidth - 80, Math.max(80, x))}px`;
+            el.style.top = `${Math.min(window.innerHeight - 80, Math.max(80, y))}px`;
+
+            if (styleType === 'score') {
+                el.style.background = '#FDDA24';
+                el.style.color = '#002B49';
+                el.style.borderColor = '#FFFFFF';
+            } else if (styleType === 'swish') {
+                el.style.background = '#00A3AD';
+                el.style.color = '#FFFFFF';
+                el.style.borderColor = '#FDDA24';
+            } else {
+                el.style.background = 'rgba(0, 43, 73, 0.92)';
+                el.style.color = '#FDDA24';
+                el.style.borderColor = '#00A3AD';
+            }
+
+            el.textContent = text;
+            popupContainer.appendChild(el);
+            setTimeout(() => el.remove(), 1400);
+        }
+
+        function updateHUD() {
+            const lvl = LEVELS[state.currentLevel];
+            document.getElementById('level-title-label').textContent = `Lvl ${lvl.id}: ${lvl.name}`;
+            document.getElementById('score-val').textContent = state.score;
+            document.getElementById('streak-val').textContent = state.streak;
+            document.getElementById('best-val').textContent = state.bestScore;
+
+            const streakIcon = document.getElementById('streak-icon');
+            streakIcon.style.opacity = state.streak > 0 ? '1' : '0.35';
+
+            // Update Level Select active button
+            document.querySelectorAll('.lvl-btn').forEach(btn => {
+                const btnLvl = parseInt(btn.getAttribute('data-level'), 10);
+                btn.classList.toggle('active', btnLvl === state.currentLevel);
+            });
+
+            // Update Goal Dots (3 baskets per level)
+            const progress = Math.min(3, state.levelGoals[state.currentLevel] || 0);
+            document.getElementById('goal-text').textContent = `${progress}/3`;
+            const dots = document.getElementById('goal-dots').children;
+            for (let i = 0; i < 3; i++) {
+                if (i < progress) {
+                    dots[i].className = 'w-3 h-3 rounded-full bg-[#FDDA24] border border-white shadow-[0_0_8px_#FDDA24] transition-all';
+                } else {
+                    dots[i].className = 'w-3 h-3 rounded-full bg-white/20 border border-white/40 transition-all';
+                }
+            }
+
+            // Update Wind HUD
+            const absWind = Math.abs(state.windSpeed);
+            document.getElementById('wind-speed-text').textContent = `${absWind.toFixed(1)} m/s`;
+            const arrowSvg = document.getElementById('wind-arrow-svg');
+            const descText = document.getElementById('wind-desc-text');
+
+            if (absWind < 0.05) {
+                arrowSvg.style.opacity = '0.35';
+                arrowSvg.style.transform = 'rotate(-90deg)';
+                descText.textContent = 'Calm AC';
+            } else {
+                arrowSvg.style.opacity = '1';
+                // Positive wind pushes Right (0 deg), Negative wind pushes Left (180 deg)
+                arrowSvg.style.transform = state.windSpeed > 0 ? 'rotate(0deg)' : 'rotate(180deg)';
+                const dirWord = state.windSpeed > 0 ? 'Right →' : '← Left';
+                if (absWind < 2.5) descText.textContent = `Breeze ${dirWord}`;
+                else if (absWind < 4.5) descText.textContent = `Strong ${dirWord}`;
+                else descText.textContent = `Max Gust ${dirWord}`;
+            }
+        }
+
+        /********************************************************************
+         * 10. LEVEL CONFIGURATION & RESPAWN LOGIC
+         ********************************************************************/
+        function randomizeWindForLevel() {
+            const lvl = LEVELS[state.currentLevel];
+            if (lvl.windMax === 0) {
+                state.windSpeed = 0;
+            } else {
+                const mag = lvl.windMin + Math.random() * (lvl.windMax - lvl.windMin);
+                const dir = Math.random() < 0.5 ? -1 : 1;
+                state.windSpeed = parseFloat((mag * dir).toFixed(1));
+            }
+
+            // Position & show fans based on wind
+            const fanZ = lvl.basketZ * 0.58;
+            leftFan.position.z = fanZ;
+            rightFan.position.z = fanZ;
+
+            if (state.windSpeed === 0) {
+                leftFan.visible = false;
+                rightFan.visible = false;
+                windParticlesGroup.visible = false;
+            } else if (state.windSpeed > 0) {
+                // Wind blowing Right (+X) -> Left fan is active blowing right
+                leftFan.visible = true;
+                rightFan.visible = (state.currentLevel === 5);
+                windParticlesGroup.visible = true;
+            } else {
+                // Wind blowing Left (-X) -> Right fan is active blowing left
+                leftFan.visible = (state.currentLevel === 5);
+                rightFan.visible = true;
+                windParticlesGroup.visible = true;
+            }
+
+            updateHUD();
+        }
+
+        function resetThrow() {
+            state.phase = 'IDLE';
+            state.phaseTimer = 0;
+            state.touchedRim = false;
+            state.hitObstacle = false;
+
+            state.pos.copy(state.startPos);
+            state.vel.set(0, 0, 0);
+            state.angVel.set(0, 0, 0);
+
+            ollie.position.copy(state.pos);
+            ollie.rotation.set(0, Math.PI, 0); // Face the basket (-Z) while waving back or we can face camera!
+            // Let's have Ollie face the camera slightly angled so you see his cute face and wave!
+            ollie.rotation.set(0, 0, 0);
+            ollie.userData.bodyPivot.rotation.set(0, 0, 0);
+            ollie.userData.drawOllieFace('normal');
+
+            trailHistory.length = 0;
+            trailDots.forEach(d => d.visible = false);
+            aimDots.forEach(d => d.visible = false);
+            aimFloorRing.visible = false;
+
+            randomizeWindForLevel();
+        }
+
+        function setLevel(lvlNum) {
+            state.currentLevel = lvlNum;
+            const lvl = LEVELS[lvlNum];
+
+            // Position Basket
+            state.basketPos.set(0, 0, lvl.basketZ);
+            basketGroup.position.copy(state.basketPos);
+
+            // Configure Obstacles
+            promoSignObstacle.visible = lvl.hasStaticSign;
+            state.signPos.set(0, 0, lvl.basketZ + 6.2);
+            promoSignObstacle.position.copy(state.signPos);
+
+            movingBarrier.visible = lvl.hasMovingBarrier;
+            state.moverPos.set(0, 2.75, lvl.basketZ + 6.6);
+            movingBarrier.position.copy(state.moverPos);
+
+            resetThrow();
+            updateHUD();
+        }
+
+        function showLevelBanner(title, subtitle) {
+            const banner = document.getElementById('level-banner');
+            document.getElementById('banner-title').textContent = title;
+            document.getElementById('banner-sub').textContent = subtitle;
+            banner.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                banner.classList.remove('opacity-0', 'scale-75');
+                banner.classList.add('opacity-100', 'scale-100');
+            });
+            setTimeout(() => {
+                banner.classList.remove('opacity-100', 'scale-100');
+                banner.classList.add('opacity-0', 'scale-75');
+                setTimeout(() => banner.classList.add('hidden'), 500);
+            }, 2100);
+        }
+
+        /********************************************************************
+         * 11. SWIPE / FLICK TO TOSS INPUT & DYNAMIC TRAJECTORY AIMING
+         ********************************************************************/
+        const dragState = {
+            active: false,
+            startX: 0,
+            startY: 0,
+            currX: 0,
+            currY: 0,
+            startTime: 0
+        };
+
+        const GRAVITY = -18.0;
+        const WIND_ACCEL_FACTOR = 0.92; // Lateral acceleration per m/s of wind
+
+        // Convert screen swipe vector (dx, dy) into a 3D launch velocity vector
+        function computeLaunchVelocity(dx, dy) {
+            // Upward swipe means dy < 0
+            const upwardPx = Math.max(20, -dy);
+            const maxSwipePx = Math.min(window.innerHeight * 0.42, 300);
+            const powerRatio = Math.min(1.22, Math.max(0.35, upwardPx / maxSwipePx));
+
+            // Base distance to basket in current level
+            const distZ = Math.abs(state.basketPos.z - state.startPos.z);
+
+            // Calculate ideal flight time & velocities so ~78% power reaches the basket depth
+            const flightTime = 0.88 + (distZ / 24.0) * 0.52;
+            const targetZ = -(distZ * (powerRatio / 0.78));
+
+            const vz = targetZ / flightTime;
+            // High arc vy so Ollie clears the counter and drops nicely into the top of the basket
+            const vy = (1.6 - 0.5 * GRAVITY * flightTime * flightTime) / flightTime * (0.72 + powerRatio * 0.34);
+
+            // Horizontal angle control from dx
+            const maxHorizPx = Math.min(window.innerWidth * 0.4, 240);
+            const horizRatio = Math.max(-1.2, Math.min(1.2, dx / maxHorizPx));
+            const vx = horizRatio * (6.5 + distZ * 0.22);
+
+            return {
+                vel: new THREE.Vector3(vx, vy, vz),
+                powerPct: Math.round((powerRatio / 1.15) * 100),
+                angleDeg: Math.round(horizRatio * 35)
+            };
+        }
+
+        function updateAimPreview() {
+            const dx = dragState.currX - dragState.startX;
+            const dy = dragState.currY - dragState.startY;
+
+            // Only show aim arc when dragging upward
+            if (dy >= -12) {
+                aimDots.forEach(d => d.visible = false);
+                aimFloorRing.visible = false;
+                document.getElementById('aim-readout').style.opacity = '0';
+                return;
+            }
+
+            const { vel, powerPct, angleDeg } = computeLaunchVelocity(dx, dy);
+
+            // Show live Aim Readout pill
+            const readout = document.getElementById('aim-readout');
+            readout.style.opacity = '1';
+            document.getElementById('aim-power-label').textContent = `Power: ${Math.min(100, powerPct)}%`;
+            const dirLabel = angleDeg === 0 ? 'Center' : (angleDeg > 0 ? `${angleDeg}° Right` : `${Math.abs(angleDeg)}° Left`);
+            document.getElementById('aim-angle-label').textContent = `Aim: ${dirLabel}`;
+
+            // Simulate trajectory dots (showing initial aim + subtle 35% wind hint so player still gauges wind!)
+            for (let i = 0; i < AIM_DOT_COUNT; i++) {
+                const t = (i + 1) * 0.058;
+                const px = state.startPos.x + vel.x * t + 0.5 * (state.windSpeed * WIND_ACCEL_FACTOR * 0.35) * t * t;
+                const py = state.startPos.y + vel.y * t + 0.5 * GRAVITY * t * t;
+                const pz = state.startPos.z + vel.z * t;
+
+                if (py < 0.1) {
+                    aimDots[i].visible = false;
+                } else {
+                    aimDots[i].position.set(px, py, pz);
+                    aimDots[i].visible = true;
+                }
+            }
+
+            // Show floor ring at approximate aim depth
+            const estTime = Math.max(0.4, (-vel.y - Math.sqrt(Math.max(0, vel.y * vel.y - 2 * GRAVITY * (state.startPos.y - state.basketHeight)))) / GRAVITY);
+            const ringX = state.startPos.x + vel.x * estTime;
+            const ringZ = state.startPos.z + vel.z * estTime;
+            aimFloorRing.position.set(ringX, 1.9, ringZ);
+            aimFloorRing.visible = true;
+
+            // Tilt Ollie slightly as player pulls aim
+            ollie.rotation.y = -dx * 0.004;
+            ollie.rotation.x = Math.min(0.35, -dy * 0.002);
+        }
+
+        function onPointerDown(clientX, clientY) {
+            if (state.phase !== 'IDLE') return;
+            sound.init();
+
+            dragState.active = true;
+            dragState.startX = clientX;
+            dragState.startY = clientY;
+            dragState.currX = clientX;
+            dragState.currY = clientY;
+            dragState.startTime = performance.now();
+            state.phase = 'AIMING';
+        }
+
+        function onPointerMove(clientX, clientY) {
+            if (!dragState.active || state.phase !== 'AIMING') return;
+            dragState.currX = clientX;
+            dragState.currY = clientY;
+            updateAimPreview();
+        }
+
+        function onPointerUp() {
+            if (!dragState.active || state.phase !== 'AIMING') return;
+            dragState.active = false;
+            document.getElementById('aim-readout').style.opacity = '0';
+            aimDots.forEach(d => d.visible = false);
+            aimFloorRing.visible = false;
+
+            const dx = dragState.currX - dragState.startX;
+            const dy = dragState.currY - dragState.startY;
+
+            // Require an upward swipe of at least 18px to launch
+            if (dy < -18) {
+                const { vel, powerPct } = computeLaunchVelocity(dx, dy);
+                state.vel.copy(vel);
+                state.angVel.set(
+                    -7.5 - Math.random() * 3.5,
+                    (Math.random() - 0.5) * 4.0,
+                    -dx * 0.03
+                );
+                state.phase = 'FLYING';
+                state.phaseTimer = 0;
+                ollie.userData.drawOllieFace('fly');
+                sound.playThrow(powerPct / 100);
+
+                // Hide swipe onboarding hint after first throw
+                const hint = document.getElementById('swipe-hint');
+                if (hint) hint.style.opacity = '0.25';
+            } else {
+                state.phase = 'IDLE';
+                ollie.rotation.set(0, 0, 0);
+            }
+        }
+
+        // Mouse & Touch Event Listeners on Canvas Container
+        container.addEventListener('mousedown', e => onPointerDown(e.clientX, e.clientY));
+        window.addEventListener('mousemove', e => onPointerMove(e.clientX, e.clientY));
+        window.addEventListener('mouseup', () => onPointerUp());
+
+        container.addEventListener('touchstart', e => {
+            if (e.touches.length > 0) {
+                onPointerDown(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchmove', e => {
+            if (e.touches.length > 0) {
+                onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchend', () => onPointerUp());
+
+        /********************************************************************
+         * 12. UI BUTTON EVENT LISTENERS
+         ********************************************************************/
+        document.querySelectorAll('.lvl-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const lvl = parseInt(btn.getAttribute('data-level'), 10);
+                setLevel(lvl);
+            });
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            resetThrow();
+        });
+
+        document.getElementById('btn-audio').addEventListener('click', () => {
+            const isMuted = sound.toggleMute();
+            document.getElementById('icon-sound-on').classList.toggle('hidden', isMuted);
+            document.getElementById('icon-sound-off').classList.toggle('hidden', !isMuted);
+        });
+
+        document.getElementById('btn-cam').addEventListener('click', () => {
+            state.cameraFollow = !state.cameraFollow;
+            const btn = document.getElementById('btn-cam');
+            btn.style.borderColor = state.cameraFollow ? 'rgba(34,211,238,0.4)' : 'rgba(255,255,255,0.15)';
+            spawnFloatingPopup(state.pos, state.cameraFollow ? 'Camera: Dynamic Follow' : 'Camera: Fixed View', 'info');
+        });
+
+        /********************************************************************
+         * 13. PHYSICS, COLLISIONS & SCORING SIMULATION
+         ********************************************************************/
+        const OLLIE_RADIUS = 0.56;
+
+        function handleScoreSuccess() {
+            if (state.phase === 'SCORED') return;
+            state.phase = 'SCORED';
+            state.phaseTimer = 0;
+
+            const isSwish = !state.touchedRim && !state.hitObstacle;
+            const points = isSwish ? 2 : 1;
+            state.score += points;
+            state.streak += 1;
+            if (state.score > state.bestScore) state.bestScore = state.score;
+
+            state.levelGoals[state.currentLevel] = (state.levelGoals[state.currentLevel] || 0) + 1;
+
+            ollie.userData.drawOllieFace('happy');
+            sound.playScore(isSwish);
+            spawnConfettiBurst(state.basketPos);
+
+            const msg = isSwish ? `+2 SWISH YES! 🔥` : `+1 OPTUS YES!`;
+            spawnFloatingPopup(state.basketPos.clone().add(new THREE.Vector3(0, 2.5, 0)), msg, isSwish ? 'swish' : 'score');
+
+            updateHUD();
+
+            // Check if player just reached 3 baskets in this level to advance!
+            if (state.levelGoals[state.currentLevel] === 3 && state.currentLevel < 5) {
+                const nextLvl = state.currentLevel + 1;
+                setTimeout(() => {
+                    sound.playLevelUp();
+                    showLevelBanner(`LEVEL ${state.currentLevel} COMPLETE!`, `Next Up: Level ${nextLvl} — ${LEVELS[nextLvl].name}`);
+                }, 450);
+
+                setTimeout(() => {
+                    setLevel(nextLvl);
+                }, 2300);
+            } else if (state.levelGoals[state.currentLevel] === 3 && state.currentLevel === 5) {
+                setTimeout(() => {
+                    sound.playLevelUp();
+                    showLevelBanner(`OPTUS STORE CHAMPION! 🏆`, `You conquered Peak Hour Master! Keep the streak alive!`);
+                }, 450);
+            }
+        }
+
+        function stepPhysics(dt) {
+            const lvl = LEVELS[state.currentLevel];
+            const prevPos = state.pos.clone();
+
+            // 1. Apply Gravity & Lateral Wind Acceleration (while airborne above basket rim)
+            state.vel.y += GRAVITY * dt;
+            if (state.pos.y > 0.7 && state.phase === 'FLYING') {
+                state.vel.x += state.windSpeed * WIND_ACCEL_FACTOR * dt;
+            }
+
+            // Integrate Position
+            state.pos.addScaledVector(state.vel, dt);
+
+            // Rotate Ollie during flight
+            ollie.rotation.x += state.angVel.x * dt;
+            ollie.rotation.y += state.angVel.y * dt;
+            ollie.rotation.z += state.angVel.z * dt;
+
+            // Flail Ollie's stick limbs comically during flight
+            const fTime = performance.now() * 0.018;
+            ollie.userData.leftArmGroup.rotation.z = Math.sin(fTime) * 0.9;
+            ollie.userData.rightArmGroup.rotation.z = Math.cos(fTime * 1.1) * 0.9;
+            ollie.userData.leftLegGroup.rotation.x = Math.sin(fTime * 1.3) * 0.7;
+            ollie.userData.rightLegGroup.rotation.x = -Math.sin(fTime * 1.3) * 0.7;
+
+            // 2. Floor Collision
+            if (state.pos.y < OLLIE_RADIUS) {
+                state.pos.y = OLLIE_RADIUS;
+                if (state.vel.y < -1.2) {
+                    sound.playBounce('floor', Math.abs(state.vel.y) / 12);
+                    if (state.phase === 'FLYING' && state.pos.z < -4) {
+                        const missQuotes = ['Almost!', 'So close!', 'Watch the wind!', 'Oof!'];
+                        spawnFloatingPopup(state.pos, missQuotes[Math.floor(Math.random() * missQuotes.length)], 'info');
+                        state.phase = 'MISSED';
+                        state.streak = 0;
+                        updateHUD();
+                    }
+                }
+                state.vel.y = -state.vel.y * 0.48;
+                state.vel.x *= 0.78;
+                state.vel.z *= 0.78;
+                state.angVel.multiplyScalar(0.75);
+            }
+
+            // 3. Back Wall & Side Wall Collisions
+            if (state.pos.z < -27.2) {
+                state.pos.z = -27.2;
+                state.vel.z = -state.vel.z * 0.55;
+                sound.playBounce('floor', 0.6);
+            }
+            if (Math.abs(state.pos.x) > 12.0) {
+                state.pos.x = Math.sign(state.pos.x) * 12.0;
+                state.vel.x = -state.vel.x * 0.55;
+            }
+
+            // 4. Level 3 Static Promo Sign Obstacle Collision
+            if (lvl.hasStaticSign) {
+                const halfW = 0.88 + OLLIE_RADIUS * 0.75;
+                const signTop = 2.95 + OLLIE_RADIUS * 0.65;
+                const signZ = state.signPos.z;
+                if (
+                    Math.abs(state.pos.z - signZ) < 0.55 &&
+                    Math.abs(state.pos.x - state.signPos.x) < halfW &&
+                    state.pos.y < signTop
+                ) {
+                    // Bounce back off the promo sign
+                    state.pos.z = prevPos.z;
+                    state.vel.z = Math.abs(state.vel.z) * 0.65 + 2.2;
+                    state.vel.y = Math.max(state.vel.y, 3.0);
+                    state.vel.x += (Math.random() - 0.5) * 4;
+                    if (!state.hitObstacle) {
+                        state.hitObstacle = true;
+                        ollie.userData.drawOllieFace('oof');
+                        sound.playBounce('obstacle', 0.9);
+                        spawnFloatingPopup(state.pos, 'Blocked by 5G Sign!', 'info');
+                    }
+                }
+            }
+
+            // 5. Level 4 & 5 Moving SubHub Barrier Collision
+            if (lvl.hasMovingBarrier) {
+                const halfW = 1.25 + OLLIE_RADIUS * 0.75;
+                const halfH = 0.78 + OLLIE_RADIUS * 0.7;
+                if (
+                    Math.abs(state.pos.z - state.moverPos.z) < 0.58 &&
+                    Math.abs(state.pos.x - state.moverPos.x) < halfW &&
+                    Math.abs(state.pos.y - state.moverPos.y) < halfH
+                ) {
+                    state.pos.z = prevPos.z;
+                    state.vel.z = Math.abs(state.vel.z) * 0.65 + 2.5;
+                    state.vel.y = 3.5;
+                    if (!state.hitObstacle) {
+                        state.hitObstacle = true;
+                        ollie.userData.drawOllieFace('oof');
+                        sound.playBounce('obstacle', 0.9);
+                        spawnFloatingPopup(state.pos, 'SubHub Drone Block!', 'info');
+                    }
+                }
+            }
+
+            // 6. Target Basket Rim & Cylinder Wall Collision + Scoring Detection
+            const dxB = state.pos.x - state.basketPos.x;
+            const dzB = state.pos.z - state.basketPos.z;
+            const distB = Math.sqrt(dxB * dxB + dzB * dzB);
+            const rRim = state.basketRadius;
+            const hRim = state.basketHeight;
+
+            // Top Rim Torus Collision
+            const distToRimTube = Math.sqrt(Math.pow(distB - rRim, 2) + Math.pow(state.pos.y - hRim, 2));
+            const rimCollisionRadius = 0.09 + OLLIE_RADIUS * 0.65;
+            if (distToRimTube < rimCollisionRadius && distB > 0.001) {
+                // Normal vector from rim torus centerline to Ollie
+                const rimPointX = state.basketPos.x + (dxB / distB) * rRim;
+                const rimPointZ = state.basketPos.z + (dzB / distB) * rRim;
+                const nx = state.pos.x - rimPointX;
+                const ny = state.pos.y - hRim;
+                const nz = state.pos.z - rimPointZ;
+                const nLen = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+                const unx = nx / nLen, uny = ny / nLen, unz = nz / nLen;
+
+                // Push Ollie outside rim tube
+                const overlap = rimCollisionRadius - distToRimTube;
+                state.pos.x += unx * overlap;
+                state.pos.y += uny * overlap;
+                state.pos.z += unz * overlap;
+
+                // Reflect velocity
+                const dot = state.vel.x * unx + state.vel.y * uny + state.vel.z * unz;
+                if (dot < 0) {
+                    state.vel.x = (state.vel.x - 1.55 * dot * unx) * 0.72;
+                    state.vel.y = (state.vel.y - 1.55 * dot * uny) * 0.72;
+                    state.vel.z = (state.vel.z - 1.55 * dot * unz) * 0.72;
+                    if (!state.touchedRim) {
+                        state.touchedRim = true;
+                        sound.playBounce('rim', 0.85);
+                        spawnFloatingPopup(state.pos, 'Rim Bounce!', 'info');
+                    }
+                }
+            }
+
+            // Cylinder Side Wall & Inner Basket Capture
+            if (state.pos.y < hRim - 0.08) {
+                const prevDx = prevPos.x - state.basketPos.x;
+                const prevDz = prevPos.z - state.basketPos.z;
+                const prevDist = Math.sqrt(prevDx * prevDx + prevDz * prevDz);
+
+                // If Ollie entered from the top opening and is inside the basket
+                if (distB < rRim - 0.15) {
+                    // Keep Ollie inside the cylinder wall
+                    const maxInnerR = rRim * 0.62;
+                    if (distB > maxInnerR && distB > 0.001) {
+                        state.pos.x = state.basketPos.x + (dxB / distB) * maxInnerR;
+                        state.pos.z = state.basketPos.z + (dzB / distB) * maxInnerR;
+                        state.vel.x *= -0.4;
+                        state.vel.z *= -0.4;
+                    }
+                    // Score when Ollie drops inside the basket below the upper third
+                    if (state.pos.y < hRim * 0.72 && state.phase === 'FLYING') {
+                        handleScoreSuccess();
+                    }
+                } else if (distB < rRim + OLLIE_RADIUS * 0.75 && prevDist >= rRim - 0.1) {
+                    // Hit outside of basket cylinder wall -> bounce outward
+                    const outR = rRim + OLLIE_RADIUS * 0.75;
+                    const ux = dxB / (distB || 1);
+                    const uz = dzB / (distB || 1);
+                    state.pos.x = state.basketPos.x + ux * outR;
+                    state.pos.z = state.basketPos.z + uz * outR;
+                    state.vel.x = ux * Math.abs(state.vel.z) * 0.5;
+                    state.vel.z = uz * Math.abs(state.vel.z) * 0.5;
+                    sound.playBounce('rim', 0.6);
+                }
+            }
+
+            // Keep scored Ollie riding inside the moving basket
+            if (state.phase === 'SCORED') {
+                state.pos.x = THREE.MathUtils.lerp(state.pos.x, state.basketPos.x, 0.2);
+                state.pos.z = THREE.MathUtils.lerp(state.pos.z, state.basketPos.z, 0.2);
+            }
+
+            ollie.position.copy(state.pos);
+
+            // Update Flight Trail Ribbon Dots
+            trailHistory.unshift(state.pos.clone());
+            if (trailHistory.length > trailDots.length) trailHistory.pop();
+            for (let i = 0; i < trailDots.length; i++) {
+                if (i < trailHistory.length && state.phase === 'FLYING') {
+                    trailDots[i].position.copy(trailHistory[i]);
+                    trailDots[i].visible = true;
+                } else {
+                    trailDots[i].visible = false;
+                }
+            }
+
+            // Auto-reset timer after score or miss
+            state.phaseTimer += dt;
+            if (state.phase === 'SCORED' && state.phaseTimer > 1.35) {
+                resetThrow();
+            } else if (state.phase === 'MISSED' && state.phaseTimer > 1.25) {
+                resetThrow();
+            } else if (state.phase === 'FLYING' && state.phaseTimer > 3.6) {
+                state.streak = 0;
+                updateHUD();
+                resetThrow();
+            }
+        }
+
+        /********************************************************************
+         * 14. MAIN ANIMATION LOOP & IDLE / ENVIRONMENT ANIMATIONS
+         ********************************************************************/
+        const clock = new THREE.Clock();
+        let blinkTimer = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(0.033, clock.getDelta());
+            const elapsed = clock.getElapsedTime();
+            const lvl = LEVELS[state.currentLevel];
+
+            // 1. Animate Ollie Idle Breathing & Waving on Launch Counter
+            if (state.phase === 'IDLE' || state.phase === 'AIMING') {
+                const { bodyPivot, leftArmGroup, rightArmGroup, leftLegGroup, rightLegGroup, drawOllieFace } = ollie.userData;
+                bodyPivot.position.y = Math.sin(elapsed * 3.4) * 0.04;
+                bodyPivot.rotation.z = Math.sin(elapsed * 1.7) * 0.035;
+
+                // Right arm cute wave
+                rightArmGroup.rotation.z = Math.sin(elapsed * 6.5) * 0.28;
+                leftArmGroup.rotation.z = 0;
+                leftLegGroup.rotation.x = 0;
+                rightLegGroup.rotation.x = 0;
+
+                // Periodic cute eye blink
+                blinkTimer += dt;
+                if (blinkTimer > 3.2) {
+                    drawOllieFace('blink');
+                    if (blinkTimer > 3.36) {
+                        drawOllieFace('normal');
+                        blinkTimer = 0;
+                    }
+                }
+            } else {
+                stepPhysics(dt);
+            }
+
+            // 2. Animate Level 4 & 5 Moving SubHub Barrier
+            if (lvl.hasMovingBarrier) {
+                const speed = state.currentLevel === 5 ? 2.1 : 1.55;
+                state.moverPos.x = Math.sin(elapsed * speed) * 2.85;
+                state.moverPos.y = 2.75 + Math.sin(elapsed * 3.5) * 0.15;
+                movingBarrier.position.copy(state.moverPos);
+            }
+
+            // 3. Animate Level 5 Moving Basket
+            if (lvl.movingBasket) {
+                state.basketPos.x = Math.sin(elapsed * 1.25) * 2.35;
+                basketGroup.position.copy(state.basketPos);
+            }
+
+            // 4. Spin Electric Fan Blades & Drift Wind Stream Particles
+            const absWind = Math.abs(state.windSpeed);
+            if (absWind > 0) {
+                const spinRate = (4 + absWind * 3.2) * dt;
+                if (leftFan.visible) leftFan.userData.rotorGroup.rotation.x += spinRate;
+                if (rightFan.visible) rightFan.userData.rotorGroup.rotation.x += spinRate;
+
+                const windDir = Math.sign(state.windSpeed);
+                windStreaks.forEach(ws => {
+                    ws.mesh.position.x += state.windSpeed * ws.speedOffset * 2.2 * dt;
+                    if (windDir > 0 && ws.mesh.position.x > 6.5) {
+                        ws.mesh.position.x = -6.5;
+                        ws.mesh.position.z = -3 - Math.random() * (Math.abs(state.basketPos.z) - 2);
+                    } else if (windDir < 0 && ws.mesh.position.x < -6.5) {
+                        ws.mesh.position.x = 6.5;
+                        ws.mesh.position.z = -3 - Math.random() * (Math.abs(state.basketPos.z) - 2);
+                    }
+                });
+            }
+
+            // 5. Update 3D Confetti Particles
+            for (let i = confettiParticles.length - 1; i >= 0; i--) {
+                const p = confettiParticles[i];
+                p.life -= dt;
+                if (p.life <= 0) {
+                    confettiGroup.remove(p.mesh);
+                    confettiParticles.splice(i, 1);
+                    continue;
+                }
+                p.vel.y -= 12.0 * dt;
+                p.mesh.position.addScaledVector(p.vel, dt);
+                p.mesh.rotation.x += p.rotVel.x * dt;
+                p.mesh.rotation.y += p.rotVel.y * dt;
+                p.mesh.rotation.z += p.rotVel.z * dt;
+            }
+
+            // 6. Smooth Dynamic Camera Follow
+            const targetCamPos = baseCamPos.clone();
+            const targetLook = new THREE.Vector3(0, 2.2, state.basketPos.z * 0.68);
+
+            if (state.cameraFollow && (state.phase === 'FLYING' || state.phase === 'SCORED')) {
+                const followProgress = Math.min(1, Math.abs(state.pos.z) / Math.abs(state.basketPos.z));
+                targetCamPos.z = baseCamPos.z - followProgress * 3.2;
+                targetCamPos.y = baseCamPos.y + followProgress * 0.9;
+                targetCamPos.x = state.pos.x * 0.35;
+                targetLook.x = state.pos.x * 0.5;
+                targetLook.y = Math.max(1.5, state.pos.y * 0.65);
+                targetLook.z = state.basketPos.z * 0.85;
+            }
+
+            camera.position.lerp(targetCamPos, 0.08);
+            camera.lookAt(targetLook);
+
+            renderer.render(scene, camera);
+        }
+
+        // Responsive Window Resize Handler
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            // Adjust FOV slightly on portrait mobile screens so the counter & side fans stay in frame
+            camera.fov = (window.innerWidth < 640) ? 60 : 50;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        window.onload = function () {
+            camera.fov = (window.innerWidth < 640) ? 60 : 50;
+            camera.updateProjectionMatrix();
+            setLevel(1);
+            animate();
+        };
+    </script>
+</body>
+</html>
