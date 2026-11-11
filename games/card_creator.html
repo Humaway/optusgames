@@ -1,0 +1,3992 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Custom Trading Card Studio — Print & Design Creator</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts for Rich Card Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Chakra+Petch:ital,wght@0,400;0,600;0,700;1,400&family=Cinzel:wght@500;700;800&family=Comic+Neue:wght@400;700&family=Inter:wght@400;500;600;700&family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Orbitron:wght@500;700;800&family=Oswald:wght@400;600;700&family=Playfair+Display:ital,wght@0,500;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Press+Start+2P&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom scrollbars and studio backdrop */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.4);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(100, 116, 139, 0.5);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.8);
+    }
+
+    .studio-grid-bg {
+      background-color: #0b1120;
+      background-image: 
+        radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 24px 24px, 96px 96px, 96px 96px;
+    }
+
+    /* Interactive Canvas Cursor */
+    #cardCanvas {
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: box-shadow 0.25s ease;
+    }
+
+    /* Range slider styling */
+    input[type="range"] {
+      accent-color: #14b8a6;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col selection:bg-teal-500 selection:text-white">
+
+  <!-- Top Header Bar -->
+  <header class="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-md sticky top-0 z-30">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      <!-- Brand Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-teal-500/20 border border-teal-400/30">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="4" y="2" width="16" height="20" rx="2.5" />
+            <path d="M8 6h8M8 14h8M8 17h5" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-bold tracking-tight text-white">CardForge Studio</h1>
+            <span class="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-300 border border-teal-500/30">Print Ready 300 DPI</span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Custom Trading Card Builder with Interactive Art Manipulation & Safe/Cut Zone Export</p>
+        </div>
+      </div>
+
+      <!-- Quick Mode Toggles & Primary Export Actions -->
+      <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+        <!-- Light / Dark Card Theme Pill -->
+        <div class="inline-flex rounded-xl bg-slate-800/90 p-1 border border-slate-700/70">
+          <button id="btnThemeLight" type="button" onclick="setCardTheme('light')" class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all bg-white text-slate-900 shadow">
+            <svg class="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"/></svg>
+            Light Card
+          </button>
+          <button id="btnThemeDark" type="button" onclick="setCardTheme('dark')" class="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-300 hover:text-white">
+            <svg class="w-3.5 h-3.5 text-sky-400" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+            Dark Card
+          </button>
+        </div>
+
+        <!-- Full Art Toggle Button -->
+        <button id="btnFullArtHeader" type="button" onclick="toggleFullArt()" class="px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 flex items-center gap-2 transition-all">
+          <span id="fullArtDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+          <span>Full Art Mode</span>
+        </button>
+
+        <!-- Export Clean PNG -->
+        <button type="button" onclick="exportCardPNG(false)" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-600/80 flex items-center gap-2 transition-all shadow-sm">
+          <svg class="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+          </svg>
+          <span>Export Clean Card</span>
+        </button>
+
+        <!-- Export with Safe Zone (Red) & Cut Zone (Green) -->
+        <button type="button" onclick="exportCardPNG(true)" class="px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white shadow-lg shadow-teal-500/20 flex items-center gap-2 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          <span>Export w/ Safe (Red) & Cut (Green) Zones</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace Container -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-0 lg:gap-6 p-3 sm:p-6">
+    
+    <!-- LEFT COLUMN: Live Interactive Card Preview & Quick Bar (7 cols on lg) -->
+    <section class="lg:col-span-7 flex flex-col rounded-2xl studio-grid-bg border border-slate-800/90 overflow-hidden shadow-2xl relative min-h-[620px]">
+      
+      <!-- Top Canvas Toolbar -->
+      <div class="px-4 py-3 bg-slate-900/80 border-b border-slate-800/80 backdrop-blur-md flex flex-wrap items-center justify-between gap-2 z-10">
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Safe Zone (Red) Toggle -->
+          <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/90 border border-slate-700/80 cursor-pointer hover:border-red-500/50 transition-colors">
+            <input id="chkSafeZone" type="checkbox" onchange="updateGuideState()" class="rounded text-red-500 focus:ring-0 w-3.5 h-3.5 accent-red-500" />
+            <span class="w-2.5 h-2.5 rounded-sm border-2 border-red-500 inline-block"></span>
+            <span class="text-xs font-medium text-slate-200">Safe Zone <span class="text-red-400 font-semibold">(Red)</span></span>
+          </label>
+
+          <!-- Cut Zone (Green) Toggle -->
+          <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/90 border border-slate-700/80 cursor-pointer hover:border-green-500/50 transition-colors">
+            <input id="chkCutZone" type="checkbox" onchange="updateGuideState()" class="rounded text-green-500 focus:ring-0 w-3.5 h-3.5 accent-green-500" />
+            <span class="w-2.5 h-2.5 rounded-sm border-2 border-green-500 inline-block"></span>
+            <span class="text-xs font-medium text-slate-200">Cut Zone <span class="text-green-400 font-semibold">(Green)</span></span>
+          </label>
+
+          <!-- Bleed / Print Sheet View Toggle -->
+          <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/90 border border-slate-700/80 cursor-pointer hover:border-teal-500/50 transition-colors">
+            <input id="chkPrintSheetView" type="checkbox" onchange="updateGuideState()" class="rounded text-teal-500 focus:ring-0 w-3.5 h-3.5 accent-teal-500" />
+            <span class="text-xs font-medium text-slate-200">Print Sheet Bleed View</span>
+          </label>
+        </div>
+
+        <div class="flex items-center gap-2 text-xs text-slate-400">
+          <span id="artDragHint" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800/70 text-slate-300 border border-slate-700/60">
+            <svg class="w-3.5 h-3.5 text-teal-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11"/></svg>
+            <span id="artDragHintText">Drag active layer to move • Scroll to zoom</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Center Canvas Viewport -->
+      <div id="canvasDropZone" class="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-hidden">
+        <!-- Active Tool Mode Floating Banner (Eyedropper / Touch-Up Brush) -->
+        <div id="activeToolBanner" class="hidden absolute top-3 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-slate-900/95 border border-teal-400/60 shadow-2xl flex items-center gap-3 text-xs font-semibold text-white backdrop-blur-md">
+          <span id="activeToolDot" class="w-2.5 h-2.5 rounded-full bg-teal-400 animate-ping"></span>
+          <span id="activeToolLabel">Eyedropper Active: Click anywhere on the card to sample color</span>
+          <span id="eyedropperLiveSwatch" class="w-4 h-4 rounded border border-white/60 inline-block bg-white"></span>
+          <button type="button" onclick="setEditorTool('move')" class="ml-1 px-2.5 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-600 text-[11px]">
+            Done (Esc)
+          </button>
+        </div>
+
+        <!-- Drop Overlay when dragging a file over the card -->
+        <div id="dropOverlay" class="pointer-events-none opacity-0 transition-opacity duration-200 absolute inset-4 rounded-2xl border-2 border-dashed border-teal-400 bg-slate-900/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center gap-2">
+          <svg class="w-12 h-12 text-teal-400 animate-bounce" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <p class="text-base font-bold text-white">Drop Image(s) to Add Art Layers</p>
+          <p class="text-xs text-slate-300">Supports PNG, JPG, WEBP, SVG (Multi-file Layering Supported)</p>
+        </div>
+
+        <!-- High-Res Procedural Card Canvas -->
+        <div class="relative flex items-center justify-center w-full h-full">
+          <canvas id="cardCanvas" width="1650" height="2250" class="max-h-[68vh] lg:max-h-[72vh] w-auto max-w-full rounded-xl shadow-[0_25px_70px_-15px_rgba(0,0,0,0.85)] cursor-grab active:cursor-grabbing"></canvas>
+        </div>
+      </div>
+
+      <!-- Bottom Quick-Controls Bar under Canvas -->
+      <div class="px-4 py-3 bg-slate-900/90 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-slate-400 font-medium">Quick Presets:</span>
+          <button type="button" onclick="loadSamplePreset('blank')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">Blank Reference Template</button>
+          <button type="button" onclick="loadSamplePreset('retailHero')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 transition">Sample: Floor Manager</button>
+          <button type="button" onclick="loadSamplePreset('cyberforklift')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition">Sample: Full Art Legend</button>
+        </div>
+        <div class="flex items-center gap-3 text-slate-400">
+          <span>Output: <strong class="text-slate-200">1650 × 2250 px</strong></span>
+          <span>•</span>
+          <button type="button" onclick="exportJSONPreset()" class="text-teal-400 hover:underline font-medium">Save JSON</button>
+          <label class="text-teal-400 hover:underline font-medium cursor-pointer">
+            Load JSON
+            <input type="file" id="jsonFileInput" accept=".json" class="hidden" onchange="importJSONPreset(event)" />
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT COLUMN: Tabbed Customization Inspector (5 cols on lg) -->
+    <aside class="lg:col-span-5 flex flex-col bg-slate-900/90 border border-slate-800/90 rounded-2xl overflow-hidden shadow-2xl mt-6 lg:mt-0 max-h-[86vh]">
+      
+      <!-- Inspector Navigation Tabs -->
+      <div class="grid grid-cols-4 border-b border-slate-800 bg-slate-950/60 p-1.5 gap-1">
+        <button type="button" id="tabBtn-art" onclick="switchTab('art')" class="tab-btn py-2.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-teal-500/20 text-teal-300 border border-teal-500/40">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <span>1. Art & Badge</span>
+        </button>
+        <button type="button" id="tabBtn-stats" onclick="switchTab('stats')" class="tab-btn py-2.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-slate-400 hover:text-slate-200 border border-transparent">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          <span>2. Title & Stats</span>
+        </button>
+        <button type="button" id="tabBtn-style" onclick="switchTab('style')" class="tab-btn py-2.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-slate-400 hover:text-slate-200 border border-transparent">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+          <span>3. Fonts & Style</span>
+        </button>
+        <button type="button" id="tabBtn-export" onclick="switchTab('export')" class="tab-btn py-2.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-slate-400 hover:text-slate-200 border border-transparent">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+          <span>4. Print & Export</span>
+        </button>
+      </div>
+
+      <!-- Scrollable Tab Panels -->
+      <div class="flex-1 overflow-y-auto p-5 space-y-6">
+
+        <!-- ==================== TAB 1: MULTI-LAYER ART STUDIO & BADGE ==================== -->
+        <div id="tabPanel-art" class="space-y-5">
+          
+          <!-- 1. MULTI-LAYER ARTWORK STACK MANAGER -->
+          <div class="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4 space-y-3.5">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-teal-400"></span>
+                  Artwork Layers Stack
+                </h2>
+                <p class="text-[11px] text-slate-400">Combine & layer multiple images, subjects, and backgrounds</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="lblLayerCount" class="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 text-teal-300 border border-slate-700">0 Layers</span>
+                <button id="btnRemoveArt" type="button" onclick="clearArtwork()" class="hidden text-xs text-rose-400 hover:text-rose-300 font-semibold">
+                  Clear All
+                </button>
+              </div>
+            </div>
+
+            <!-- Add Layer Upload Button -->
+            <div class="flex flex-col sm:flex-row gap-2">
+              <label class="flex-1 flex items-center justify-center gap-2.5 px-4 py-3 rounded-xl border-2 border-dashed border-teal-500/50 hover:border-teal-400 bg-slate-900/70 hover:bg-slate-800/80 cursor-pointer transition-all text-center shadow-sm">
+                <svg class="w-5 h-5 text-teal-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                </svg>
+                <div class="text-left">
+                  <span class="block text-xs font-bold text-white">+ Add Image Layer(s)</span>
+                  <span class="block text-[10px] text-slate-400">Select 1 or more images, or drop onto card</span>
+                </div>
+                <input id="artFileInput" type="file" accept="image/*" multiple class="hidden" onchange="handleArtUpload(event)" />
+              </label>
+            </div>
+
+            <!-- Built-in Sample Layers for Instant Compositing & Cutout Testing -->
+            <div class="space-y-1.5 pt-1">
+              <span class="block text-[11px] text-slate-400 font-medium">Add Built-in Layer Elements (Stackable):</span>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                <button type="button" onclick="loadBuiltInArt('nebula', true)" class="px-2 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-900 hover:bg-slate-700 text-sky-300 border border-slate-700/80 transition">+ BG: Cosmic</button>
+                <button type="button" onclick="loadBuiltInArt('mecha', true)" class="px-2 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-900 hover:bg-slate-700 text-teal-300 border border-slate-700/80 transition">+ Mecha Crest</button>
+                <button type="button" onclick="loadBuiltInArt('cashier', true)" class="px-2 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-900 hover:bg-slate-700 text-amber-300 border border-slate-700/80 transition">+ Register</button>
+                <button type="button" onclick="loadBuiltInArt('mascotCutout', true)" class="px-2 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-900 hover:bg-slate-700 text-emerald-300 border border-slate-700/80 transition">+ Bot (w/ BG)</button>
+              </div>
+            </div>
+
+            <!-- Layer Stack List Container -->
+            <div id="layerStackList" class="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+              <!-- Populated dynamically by renderLayerStackUI() -->
+            </div>
+          </div>
+
+          <!-- 2. ART BACKGROUND COLOUR & EYEDROPPER STUDIO -->
+          <div class="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4 space-y-3.5">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                  Art Area Background & Eyedropper
+                </h3>
+                <p class="text-[11px] text-slate-400">Set custom backdrop color or sample from any image pixel</p>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <!-- Color Picker & Hex Input -->
+              <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-xl p-1.5">
+                <input id="clrArtBoxQuick" type="color" value="#eff1f5" oninput="setArtBoxColor(this.value)" class="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0 p-0" />
+                <input id="inpArtBoxHex" type="text" value="#EFF1F5" maxlength="7" onchange="setArtBoxColor(this.value)" class="w-20 bg-transparent text-xs font-mono font-bold text-white focus:outline-none uppercase" />
+              </div>
+
+              <!-- Interactive Canvas Eyedropper Button -->
+              <button type="button" id="btnEyedropperBg" onclick="activateEyedropper('bg')" class="flex-1 py-2 px-3 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                </svg>
+                <span>Eyedropper (Pick on Card)</span>
+              </button>
+
+              <!-- Native Screen Eyedropper (if browser supports EyeDropper API) -->
+              <button type="button" id="btnNativeEyedropper" onclick="pickNativeScreenColor('bg')" title="Sample color anywhere on screen" class="hidden py-2 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition">
+                Screen
+              </button>
+            </div>
+
+            <!-- Quick Art BG Swatches -->
+            <div class="flex items-center justify-between gap-1.5 pt-0.5">
+              <span class="text-[11px] text-slate-400">Swatches:</span>
+              <div class="flex flex-wrap items-center gap-1.5">
+                <button type="button" onclick="setArtBoxColor('#eff1f5')" class="w-6 h-6 rounded-md bg-[#eff1f5] border border-slate-500 hover:scale-110 transition" title="Classic Light #eff1f5"></button>
+                <button type="button" onclick="setArtBoxColor('#ffffff')" class="w-6 h-6 rounded-md bg-[#ffffff] border border-slate-500 hover:scale-110 transition" title="Pure White"></button>
+                <button type="button" onclick="setArtBoxColor('#0f172a')" class="w-6 h-6 rounded-md bg-[#0f172a] border border-slate-500 hover:scale-110 transition" title="Obsidian Dark"></button>
+                <button type="button" onclick="setArtBoxColor('#1e293b')" class="w-6 h-6 rounded-md bg-[#1e293b] border border-slate-500 hover:scale-110 transition" title="Slate Studio"></button>
+                <button type="button" onclick="setArtBoxColor('#00a3ad')" class="w-6 h-6 rounded-md bg-[#00a3ad] border border-slate-500 hover:scale-110 transition" title="Optus Teal"></button>
+                <button type="button" onclick="setArtBoxColor('#fdb913')" class="w-6 h-6 rounded-md bg-[#fdb913] border border-slate-500 hover:scale-110 transition" title="Radiant Gold"></button>
+                <button type="button" onclick="setArtBoxColor('#4c1d95')" class="w-6 h-6 rounded-md bg-[#4c1d95] border border-slate-500 hover:scale-110 transition" title="Mythic Violet"></button>
+                <button type="button" onclick="setArtBoxColor('#881337')" class="w-6 h-6 rounded-md bg-[#881337] border border-slate-500 hover:scale-110 transition" title="Crimson Arena"></button>
+              </div>
+            </div>
+
+            <!-- Radial Vignette Backdrop Toggle -->
+            <div class="pt-2 border-t border-slate-700/60 flex items-center justify-between">
+              <label for="chkArtBgGradient" class="text-xs text-slate-300 cursor-pointer">Add Radial Studio Vignette to Art Backdrop</label>
+              <input id="chkArtBgGradient" type="checkbox" onchange="syncStateFromUI()" class="rounded text-teal-500 w-4 h-4 accent-teal-500 cursor-pointer" />
+            </div>
+
+            <!-- Art Box Height (Card Ratio) & ART Placeholder -->
+            <div class="pt-2 border-t border-slate-700/60 space-y-2.5">
+              <div>
+                <div class="flex justify-between items-center text-xs mb-1">
+                  <span class="text-slate-200 font-semibold">Art Box Height (Card Ratio)</span>
+                  <div class="flex items-center gap-2">
+                    <span id="lblArtBoxHeight" class="text-teal-300 font-mono">46% (880px)</span>
+                    <button type="button" onclick="resetArtBoxHeight()" class="text-[10px] text-slate-400 hover:text-teal-300 underline">Reset</button>
+                  </div>
+                </div>
+                <input id="rngArtBoxHeight" type="range" min="680" max="1020" value="880" oninput="syncStateFromUI()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+              </div>
+
+              <div class="flex items-center justify-between">
+                <label for="chkShowArtPlaceholder" class="text-xs text-slate-300 cursor-pointer">Show "ART" text when no layers are visible</label>
+                <input id="chkShowArtPlaceholder" type="checkbox" checked onchange="syncStateFromUI()" class="rounded text-teal-500 w-4 h-4 accent-teal-500 cursor-pointer" />
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. ACTIVE LAYER TRANSFORM, ALIGN & BLEND -->
+          <div id="activeLayerTransformCard" class="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4 space-y-3.5">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-teal-400"></span>
+                <span>Selected Layer: Transform & Blend</span>
+              </h3>
+              <span id="lblActiveLayerName" class="text-[11px] font-semibold text-teal-300 truncate max-w-[160px]">No Layer Selected</span>
+            </div>
+
+            <!-- Quick Alignment Buttons -->
+            <div class="grid grid-cols-6 gap-1.5">
+              <button type="button" onclick="alignArt('center')" class="px-2 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-[11px] font-semibold text-slate-200 border border-slate-700 transition">Center</button>
+              <button type="button" onclick="alignArt('cover')" class="px-2 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-[11px] font-semibold text-slate-200 border border-slate-700 transition">Fill</button>
+              <button type="button" onclick="alignArt('fit')" class="px-2 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-[11px] font-semibold text-slate-200 border border-slate-700 transition">Fit</button>
+              <button type="button" onclick="alignArt('flip')" class="px-2 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-[11px] font-semibold text-slate-200 border border-slate-700 transition">Flip H</button>
+              <button type="button" onclick="alignArt('flipV')" class="px-2 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-[11px] font-semibold text-slate-200 border border-slate-700 transition">Flip V</button>
+              <button type="button" onclick="alignArt('reset')" class="px-2 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-[11px] font-semibold text-amber-300 border border-slate-700 transition">Reset</button>
+            </div>
+
+            <!-- Sliders for Zoom, X, Y, Rotation -->
+            <div class="space-y-2.5 pt-1">
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-slate-300 font-medium">Zoom / Scale</span>
+                  <span id="lblArtScale" class="text-teal-300 font-mono">100%</span>
+                </div>
+                <input id="rngArtScale" type="range" min="10" max="400" value="100" oninput="onArtSliderChange()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <div class="flex justify-between text-xs mb-1">
+                    <span class="text-slate-300 font-medium">Horizontal (X)</span>
+                    <span id="lblArtX" class="text-teal-300 font-mono">0 px</span>
+                  </div>
+                  <input id="rngArtX" type="range" min="-900" max="900" value="0" oninput="onArtSliderChange()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+                </div>
+                <div>
+                  <div class="flex justify-between text-xs mb-1">
+                    <span class="text-slate-300 font-medium">Vertical (Y)</span>
+                    <span id="lblArtY" class="text-teal-300 font-mono">0 px</span>
+                  </div>
+                  <input id="rngArtY" type="range" min="-1200" max="1200" value="0" oninput="onArtSliderChange()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <div class="flex justify-between text-xs mb-1">
+                    <span class="text-slate-300 font-medium">Rotation</span>
+                    <span id="lblArtRot" class="text-teal-300 font-mono">0°</span>
+                  </div>
+                  <input id="rngArtRot" type="range" min="-180" max="180" value="0" oninput="onArtSliderChange()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+                </div>
+                <div>
+                  <div class="flex justify-between text-xs mb-1">
+                    <span class="text-slate-300 font-medium">Layer Opacity</span>
+                    <span id="lblLayerOpacity" class="text-teal-300 font-mono">100%</span>
+                  </div>
+                  <input id="rngLayerOpacity" type="range" min="0" max="100" value="100" oninput="onArtSliderChange()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+                </div>
+              </div>
+
+              <div class="pt-1">
+                <label class="block text-[11px] text-slate-400 mb-1">Layer Blend Mode</label>
+                <select id="selLayerBlend" onchange="onArtSliderChange()" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-teal-400">
+                  <option value="source-over">Normal (Standard Composite)</option>
+                  <option value="multiply">Multiply (Darken / Ink)</option>
+                  <option value="screen">Screen (Glow / Lighten)</option>
+                  <option value="overlay">Overlay (High Contrast Blend)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. SUBJECT EXTRACTION / BACKGROUND REMOVAL STUDIO (PER LAYER) -->
+          <div class="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4 space-y-3.5">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  Subject Cutout & Background Removal
+                </h3>
+                <p class="text-[11px] text-slate-400">Isolate subjects from backgrounds & touch up with brush</p>
+              </div>
+              <button type="button" onclick="resetActiveLayerCutout()" class="text-[11px] text-rose-400 hover:text-rose-300 font-semibold">
+                Reset Cutout
+              </button>
+            </div>
+
+            <!-- 1-Click Auto Cutout & Color Key Eyedropper -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button type="button" onclick="runAutoSubjectCutout()" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-teal-500/25 to-emerald-500/25 hover:from-teal-500/35 hover:to-emerald-500/35 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm">
+                <span>✨ 1-Click Auto Remove BG</span>
+              </button>
+
+              <button type="button" id="btnEyedropperCutout" onclick="activateEyedropper('cutout')" class="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center justify-center gap-2 transition">
+                <span id="cutoutKeyColorSwatch" class="w-3.5 h-3.5 rounded-full border border-white/60 bg-white inline-block"></span>
+                <span>Pick BG Color to Remove</span>
+              </button>
+            </div>
+
+            <!-- Removal Algorithm Mode, Tolerance & Softness -->
+            <div class="space-y-2.5 pt-1">
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Background Detection Mode</label>
+                <select id="selCutoutMode" onchange="onCutoutParamsChange()" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-teal-400">
+                  <option value="flood">Contiguous Flood-Fill (Outside-In — Protects Inner Subject)</option>
+                  <option value="global">Global Chroma Key (Removes Color Everywhere in Layer)</option>
+                </select>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <div class="flex justify-between text-xs mb-1">
+                    <span class="text-slate-300 font-medium">Color Tolerance</span>
+                    <span id="lblCutoutTolerance" class="text-teal-300 font-mono">32</span>
+                  </div>
+                  <input id="rngCutoutTolerance" type="range" min="2" max="120" value="32" oninput="onCutoutParamsChange()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+                </div>
+                <div>
+                  <div class="flex justify-between text-xs mb-1">
+                    <span class="text-slate-300 font-medium">Edge Defringe / Soft</span>
+                    <span id="lblCutoutSoftness" class="text-teal-300 font-mono">3 px</span>
+                  </div>
+                  <input id="rngCutoutSoftness" type="range" min="0" max="20" value="3" oninput="onCutoutParamsChange()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Interactive Manual Erase / Restore Mask Brush -->
+            <div class="pt-2.5 border-t border-slate-700/60 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-300">Manual Touch-Up Brush (Paint on Card)</span>
+                <span class="text-[10px] text-slate-400">Refine subject mask</span>
+              </div>
+
+              <div class="grid grid-cols-3 gap-1.5">
+                <button type="button" id="btnToolMove" onclick="setEditorTool('move')" class="py-1.5 px-2 rounded-lg text-[11px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40 transition">
+                  ✋ Move Layer
+                </button>
+                <button type="button" id="btnToolErase" onclick="setEditorTool('brush-erase')" class="py-1.5 px-2 rounded-lg text-[11px] font-bold bg-slate-900 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+                  🧹 Erase BG
+                </button>
+                <button type="button" id="btnToolRestore" onclick="setEditorTool('brush-restore')" class="py-1.5 px-2 rounded-lg text-[11px] font-bold bg-slate-900 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+                  🖌️ Restore
+                </button>
+              </div>
+
+              <div id="brushSettingsBox" class="hidden pt-1">
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-slate-300 font-medium">Brush Size</span>
+                  <span id="lblBrushSize" class="text-teal-300 font-mono">45 px</span>
+                </div>
+                <input id="rngBrushSize" type="range" min="8" max="160" value="45" oninput="updateBrushSettingsUI()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. EDGE BLURRING / FEATHERING, DROP SHADOW & FILTERS (PER LAYER) -->
+          <div class="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4 space-y-3.5">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                  Edge Blur / Feather & Layer FX
+                </h3>
+                <p class="text-[11px] text-slate-400">Soften image borders, add subject drop shadows & filters</p>
+              </div>
+              <button type="button" onclick="resetActiveLayerEffects()" class="text-[11px] text-slate-400 hover:text-teal-300 underline">
+                Reset FX
+              </button>
+            </div>
+
+            <!-- Edge Feather / Blur Radius & Shape Mode -->
+            <div class="space-y-2.5">
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-slate-200 font-semibold">Edge Blur / Feather Radius</span>
+                  <span id="lblEdgeFeather" class="text-teal-300 font-mono">0%</span>
+                </div>
+                <input id="rngEdgeFeather" type="range" min="0" max="100" value="0" oninput="onLayerEffectsChange()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+              </div>
+
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Edge Feather Shape</label>
+                <select id="selFeatherMode" onchange="onLayerEffectsChange()" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-teal-400">
+                  <option value="rect">Rectangular Border Feather (Smoothly fades 4 outer edges)</option>
+                  <option value="radial">Radial / Oval Vignette Feather (Soft circular spotlight fade)</option>
+                  <option value="alpha">Silhouette / Cutout Edge Feather (Softens extracted subject border)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Subject / Layer Drop Shadow -->
+            <div class="pt-2.5 border-t border-slate-700/60 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <label for="chkLayerShadow" class="text-xs font-semibold text-slate-200 cursor-pointer">Enable Layer / Subject Drop Shadow</label>
+                <input id="chkLayerShadow" type="checkbox" onchange="onLayerEffectsChange()" class="w-4 h-4 rounded accent-teal-500 cursor-pointer" />
+              </div>
+
+              <div id="layerShadowControls" class="grid grid-cols-3 gap-2 items-center hidden">
+                <div>
+                  <span class="block text-[10px] text-slate-400 mb-0.5">Shadow Blur</span>
+                  <input id="rngShadowBlur" type="range" min="0" max="80" value="24" oninput="onLayerEffectsChange()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+                </div>
+                <div>
+                  <span class="block text-[10px] text-slate-400 mb-0.5">Shadow Offset Y</span>
+                  <input id="rngShadowY" type="range" min="-50" max="50" value="12" oninput="onLayerEffectsChange()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+                </div>
+                <div>
+                  <span class="block text-[10px] text-slate-400 mb-0.5">Shadow Color</span>
+                  <input id="clrShadowColor" type="color" value="#000000" oninput="onLayerEffectsChange()" class="w-full h-7 rounded bg-slate-900 border border-slate-700 cursor-pointer p-0.5" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Layer Image Filters (Gaussian Blur, Brightness, Contrast, Saturation) -->
+            <div class="pt-2.5 border-t border-slate-700/60 grid grid-cols-2 gap-3">
+              <div>
+                <div class="flex justify-between text-[11px] mb-1">
+                  <span class="text-slate-300">Image Blur</span>
+                  <span id="lblFilterBlur" class="text-teal-300 font-mono">0 px</span>
+                </div>
+                <input id="rngFilterBlur" type="range" min="0" max="30" value="0" oninput="onLayerEffectsChange()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+              </div>
+              <div>
+                <div class="flex justify-between text-[11px] mb-1">
+                  <span class="text-slate-300">Brightness</span>
+                  <span id="lblFilterBright" class="text-teal-300 font-mono">100%</span>
+                </div>
+                <input id="rngFilterBright" type="range" min="40" max="160" value="100" oninput="onLayerEffectsChange()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+              </div>
+              <div>
+                <div class="flex justify-between text-[11px] mb-1">
+                  <span class="text-slate-300">Contrast</span>
+                  <span id="lblFilterContrast" class="text-teal-300 font-mono">100%</span>
+                </div>
+                <input id="rngFilterContrast" type="range" min="40" max="160" value="100" oninput="onLayerEffectsChange()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+              </div>
+              <div>
+                <div class="flex justify-between text-[11px] mb-1">
+                  <span class="text-slate-300">Saturation</span>
+                  <span id="lblFilterSat" class="text-teal-300 font-mono">100%</span>
+                </div>
+                <input id="rngFilterSat" type="range" min="0" max="200" value="100" oninput="onLayerEffectsChange()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Full Art Mode & Scrim Settings -->
+          <div class="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-bold text-white">Full Art Mode</h3>
+                <p class="text-[11px] text-slate-400">Expands artwork across the entire card behind stats & borders</p>
+              </div>
+              <input id="chkFullArt" type="checkbox" onchange="toggleFullArt(this.checked)" class="w-5 h-5 rounded accent-teal-500 cursor-pointer" />
+            </div>
+
+            <div id="fullArtOptions" class="space-y-3 pt-2 border-t border-slate-700/60 hidden">
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-slate-300 font-medium">Stats & Description Readability Backdrop</span>
+                  <span id="lblScrimOpacity" class="text-teal-300 font-mono">72%</span>
+                </div>
+                <input id="rngScrimOpacity" type="range" min="0" max="95" value="72" oninput="syncStateFromUI()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+              </div>
+              <div class="flex items-center justify-between">
+                <label for="chkFullArtShowArtBox" class="text-xs text-slate-300 cursor-pointer">Keep subtle frame around Art window</label>
+                <input id="chkFullArtShowArtBox" type="checkbox" checked onchange="syncStateFromUI()" class="w-4 h-4 rounded accent-teal-500 cursor-pointer" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Top-Right Custom Emoji & Cutout Badge -->
+          <div class="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                Top-Right Emoji Badge
+              </h3>
+              <button type="button" onclick="setEmoji('')" class="text-xs text-slate-400 hover:text-white">Clear Emoji</button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+              <div>
+                <label class="block text-xs text-slate-300 mb-1 font-medium">Custom Emoji / Icon Text</label>
+                <input id="inpEmoji" type="text" value="" placeholder="Leave empty or type emoji..." maxlength="4" oninput="syncStateFromUI()" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-lg text-center text-white focus:outline-none focus:border-teal-400" />
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-slate-300 font-medium">Emoji Size</span>
+                  <span id="lblEmojiSize" class="text-teal-300 font-mono">100%</span>
+                </div>
+                <input id="rngEmojiSize" type="range" min="50" max="160" value="100" oninput="syncStateFromUI()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+              </div>
+            </div>
+
+            <!-- Quick Emoji Picker Grid -->
+            <div>
+              <span class="block text-[11px] text-slate-400 mb-1.5">Quick Pick Emoji:</span>
+              <div class="grid grid-cols-9 gap-1.5">
+                <button type="button" onclick="setEmoji('🛒')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">🛒</button>
+                <button type="button" onclick="setEmoji('📦')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">📦</button>
+                <button type="button" onclick="setEmoji('🔥')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">🔥</button>
+                <button type="button" onclick="setEmoji('⚡')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">⚡</button>
+                <button type="button" onclick="setEmoji('👑')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">👑</button>
+                <button type="button" onclick="setEmoji('💎')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">💎</button>
+                <button type="button" onclick="setEmoji('💀')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">💀</button>
+                <button type="button" onclick="setEmoji('🛡️')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">🛡️</button>
+                <button type="button" onclick="setEmoji('🌟')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">🌟</button>
+                <button type="button" onclick="setEmoji('🏷️')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">🏷️</button>
+                <button type="button" onclick="setEmoji('📞')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">📞</button>
+                <button type="button" onclick="setEmoji('🚨')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">🚨</button>
+                <button type="button" onclick="setEmoji('🤖')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">🤖</button>
+                <button type="button" onclick="setEmoji('☕')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">☕</button>
+                <button type="button" onclick="setEmoji('🏆')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">🏆</button>
+                <button type="button" onclick="setEmoji('🧠')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">🧠</button>
+                <button type="button" onclick="setEmoji('🪙')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">🪙</button>
+                <button type="button" onclick="setEmoji('🎯')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 text-base border border-slate-700/80">🎯</button>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-700/60 flex items-center justify-between">
+              <label for="chkEmojiBoxOutline" class="text-xs text-slate-300 cursor-pointer">Show rounded-square outline box inside badge</label>
+              <input id="chkEmojiBoxOutline" type="checkbox" checked onchange="syncStateFromUI()" class="w-4 h-4 rounded accent-teal-500 cursor-pointer" />
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ==================== TAB 2: TITLE, STATS, DESC & NUMBER ==================== -->
+        <div id="tabPanel-stats" class="space-y-6 hidden">
+          
+          <!-- Card Title -->
+          <div class="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4 space-y-3">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-teal-400"></span>
+              Card Title
+            </h3>
+            <div>
+              <label class="block text-xs text-slate-300 mb-1 font-medium">Title Heading</label>
+              <input id="inpTitle" type="text" value="TITLE" placeholder="Enter card title..." oninput="syncStateFromUI()" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-bold tracking-wider focus:outline-none focus:border-teal-400" />
+            </div>
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span class="text-slate-300 font-medium">Title Size Scale</span>
+                <span id="lblTitleSize" class="text-teal-300 font-mono">100%</span>
+              </div>
+              <input id="rngTitleSize" type="range" min="60" max="140" value="100" oninput="syncStateFromUI()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+            </div>
+          </div>
+
+          <!-- Card Rarity System (Common, Uncommon, Rare, Epic, Legendary) -->
+          <div class="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4 space-y-3.5">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                  Card Rarity Tier
+                </h3>
+                <p class="text-[11px] text-slate-400">Select rarity badge tier, style, and placement</p>
+              </div>
+              <label class="inline-flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
+                <input id="chkShowRarity" type="checkbox" checked onchange="syncStateFromUI()" class="w-4 h-4 rounded accent-teal-500 cursor-pointer" />
+                <span>Show Rarity</span>
+              </label>
+            </div>
+
+            <!-- 5 Rarity Tier Selector Buttons -->
+            <div class="grid grid-cols-5 gap-1.5">
+              <button type="button" id="btnRarity-Common" onclick="setRarity('Common')" class="rarity-btn px-2 py-2 rounded-xl border text-[11px] font-bold flex flex-col items-center gap-1 transition-all">
+                <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                <span>Common</span>
+              </button>
+              <button type="button" id="btnRarity-Uncommon" onclick="setRarity('Uncommon')" class="rarity-btn px-2 py-2 rounded-xl border text-[11px] font-bold flex flex-col items-center gap-1 transition-all">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                <span>Uncommon</span>
+              </button>
+              <button type="button" id="btnRarity-Rare" onclick="setRarity('Rare')" class="rarity-btn px-2 py-2 rounded-xl border text-[11px] font-bold flex flex-col items-center gap-1 transition-all">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#00A3AD]"></span>
+                <span>Rare</span>
+              </button>
+              <button type="button" id="btnRarity-Epic" onclick="setRarity('Epic')" class="rarity-btn px-2 py-2 rounded-xl border text-[11px] font-bold flex flex-col items-center gap-1 transition-all">
+                <span class="w-2.5 h-2.5 rounded-full bg-violet-500"></span>
+                <span>Epic</span>
+              </button>
+              <button type="button" id="btnRarity-Legendary" onclick="setRarity('Legendary')" class="rarity-btn px-2 py-2 rounded-xl border text-[11px] font-bold flex flex-col items-center gap-1 transition-all">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#FDB913]"></span>
+                <span>Legendary</span>
+              </button>
+            </div>
+
+            <!-- Rarity Display Style & Placement -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Rarity Display Style</label>
+                <select id="selRarityStyle" onchange="syncStateFromUI()" class="w-full px-2.5 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-teal-400">
+                  <option value="badge" selected>Badge Pill + Gem Icon</option>
+                  <option value="minimal">Minimal Text + Gem Icon</option>
+                  <option value="fullAccent">Full Rarity Accent (Brackets & Pill)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Rarity Placement</label>
+                <select id="selRarityPos" onchange="syncStateFromUI()" class="w-full px-2.5 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-teal-400">
+                  <option value="bottomLeft" selected>Bottom-Left (Opposite Card #)</option>
+                  <option value="belowTitle">Centered Below Title</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5 Stat Rows (Sellability, Reliability, CX Agro, Store Morale, Lore/Aura) -->
+          <div class="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4 space-y-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-bold text-white">Card Attributes & Numbers</h3>
+                <p class="text-[11px] text-slate-400">Enter numbers, scores, or tiers in the right column</p>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button type="button" onclick="randomizeStats()" class="px-2.5 py-1 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/30 text-xs font-semibold transition">
+                  🎲 Randomize
+                </button>
+                <button type="button" onclick="clearStats()" class="px-2.5 py-1 rounded-lg bg-slate-700/70 hover:bg-slate-700 text-slate-300 text-xs font-medium transition">
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <div class="space-y-2.5">
+              <!-- Row 1: SELLABILITY -->
+              <div class="grid grid-cols-12 gap-2 items-center">
+                <div class="col-span-7">
+                  <input id="inpStatLabel0" type="text" value="SELLABILITY" oninput="syncStateFromUI()" class="w-full px-3 py-2 rounded-lg bg-slate-900/90 border border-slate-700/80 text-xs font-bold tracking-wider text-slate-200 uppercase focus:outline-none focus:border-teal-400" />
+                </div>
+                <div class="col-span-5">
+                  <input id="inpStatVal0" type="text" value="" placeholder="e.g. 95" oninput="syncStateFromUI()" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-teal-500/40 text-sm font-bold text-center text-teal-300 placeholder-slate-500 focus:outline-none focus:border-teal-400" />
+                </div>
+              </div>
+
+              <!-- Row 2: RELIABILITY -->
+              <div class="grid grid-cols-12 gap-2 items-center">
+                <div class="col-span-7">
+                  <input id="inpStatLabel1" type="text" value="RELIABILITY" oninput="syncStateFromUI()" class="w-full px-3 py-2 rounded-lg bg-slate-900/90 border border-slate-700/80 text-xs font-bold tracking-wider text-slate-200 uppercase focus:outline-none focus:border-teal-400" />
+                </div>
+                <div class="col-span-5">
+                  <input id="inpStatVal1" type="text" value="" placeholder="e.g. 88" oninput="syncStateFromUI()" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-teal-500/40 text-sm font-bold text-center text-teal-300 placeholder-slate-500 focus:outline-none focus:border-teal-400" />
+                </div>
+              </div>
+
+              <!-- Row 3: CX AGRO -->
+              <div class="grid grid-cols-12 gap-2 items-center">
+                <div class="col-span-7">
+                  <input id="inpStatLabel2" type="text" value="CX AGRO" oninput="syncStateFromUI()" class="w-full px-3 py-2 rounded-lg bg-slate-900/90 border border-slate-700/80 text-xs font-bold tracking-wider text-slate-200 uppercase focus:outline-none focus:border-teal-400" />
+                </div>
+                <div class="col-span-5">
+                  <input id="inpStatVal2" type="text" value="" placeholder="e.g. 12" oninput="syncStateFromUI()" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-teal-500/40 text-sm font-bold text-center text-teal-300 placeholder-slate-500 focus:outline-none focus:border-teal-400" />
+                </div>
+              </div>
+
+              <!-- Row 4: STORE MORALE -->
+              <div class="grid grid-cols-12 gap-2 items-center">
+                <div class="col-span-7">
+                  <input id="inpStatLabel3" type="text" value="STORE MORALE" oninput="syncStateFromUI()" class="w-full px-3 py-2 rounded-lg bg-slate-900/90 border border-slate-700/80 text-xs font-bold tracking-wider text-slate-200 uppercase focus:outline-none focus:border-teal-400" />
+                </div>
+                <div class="col-span-5">
+                  <input id="inpStatVal3" type="text" value="" placeholder="e.g. +100" oninput="syncStateFromUI()" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-teal-500/40 text-sm font-bold text-center text-teal-300 placeholder-slate-500 focus:outline-none focus:border-teal-400" />
+                </div>
+              </div>
+
+              <!-- Row 5: LORE/AURA -->
+              <div class="grid grid-cols-12 gap-2 items-center">
+                <div class="col-span-7">
+                  <input id="inpStatLabel4" type="text" value="LORE/AURA" oninput="syncStateFromUI()" class="w-full px-3 py-2 rounded-lg bg-slate-900/90 border border-slate-700/80 text-xs font-bold tracking-wider text-slate-200 uppercase focus:outline-none focus:border-teal-400" />
+                </div>
+                <div class="col-span-5">
+                  <input id="inpStatVal4" type="text" value="" placeholder="e.g. 999" oninput="syncStateFromUI()" class="w-full px-3 py-2 rounded-lg bg-slate-900 border border-teal-500/40 text-sm font-bold text-center text-teal-300 placeholder-slate-500 focus:outline-none focus:border-teal-400" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Description & Card Number -->
+          <div class="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                Description & Card Number
+              </h3>
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-teal-500/15 text-teal-300 border border-teal-500/30">Auto-Wrap & Auto-Fit</span>
+            </div>
+
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <label class="text-xs text-slate-300 font-medium">Card Description (DESC.)</label>
+                <button type="button" onclick="document.getElementById('inpDesc').value='DESC.'; syncStateFromUI();" class="text-[11px] text-slate-400 hover:text-teal-300">Reset to "DESC."</button>
+              </div>
+              <textarea id="inpDesc" rows="3" placeholder="Enter card flavor text or description (automatically wraps & scales to fit)..." oninput="syncStateFromUI()" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-teal-400 resize-y">DESC.</textarea>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-slate-300 font-medium">Desc. Size</span>
+                  <span id="lblDescSize" class="text-teal-300 font-mono">100%</span>
+                </div>
+                <input id="rngDescSize" type="range" min="45" max="150" value="100" oninput="syncStateFromUI()" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer" />
+              </div>
+
+              <div>
+                <label class="block text-xs text-slate-300 mb-1 font-medium">Desc. Alignment</label>
+                <div class="grid grid-cols-3 gap-1 bg-slate-900 p-1 rounded-xl border border-slate-700">
+                  <button type="button" id="btnDescAlign-left" onclick="setDescAlign('left')" class="py-1 rounded-lg text-[11px] font-semibold text-slate-400 hover:text-white transition">Left</button>
+                  <button type="button" id="btnDescAlign-center" onclick="setDescAlign('center')" class="py-1 rounded-lg text-[11px] font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/40 transition">Center</button>
+                  <button type="button" id="btnDescAlign-right" onclick="setDescAlign('right')" class="py-1 rounded-lg text-[11px] font-semibold text-slate-400 hover:text-white transition">Right</button>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs text-slate-300 mb-1 font-medium">Card Number</label>
+                <input id="inpCardNumber" type="text" value="1/107" placeholder="1/107" oninput="syncStateFromUI()" class="w-full px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-sm font-semibold text-white text-right focus:outline-none focus:border-teal-400" />
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ==================== TAB 3: FONTS & VISUAL THEME ==================== -->
+        <div id="tabPanel-style" class="space-y-6 hidden">
+          
+          <!-- Font Family Selector -->
+          <div class="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4 space-y-4">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-teal-400"></span>
+              Typography & Fonts
+            </h3>
+
+            <!-- Quick Font Presets -->
+            <div>
+              <label class="block text-xs text-slate-300 mb-2 font-medium">Select Global Card Font</label>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" onclick="applyGlobalFont('Montserrat')" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-left transition">
+                  <span class="block text-xs font-bold text-white" style="font-family: 'Montserrat', sans-serif;">Montserrat (Original)</span>
+                  <span class="text-[10px] text-slate-400">Exact Reference Match</span>
+                </button>
+                <button type="button" onclick="applyGlobalFont('Plus Jakarta Sans')" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-left transition">
+                  <span class="block text-xs font-bold text-white" style="font-family: 'Plus Jakarta Sans', sans-serif;">Jakarta Geometric</span>
+                  <span class="text-[10px] text-slate-400">Clean Modern Sans</span>
+                </button>
+                <button type="button" onclick="applyGlobalFont('Orbitron')" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-left transition">
+                  <span class="block text-xs font-bold text-white" style="font-family: 'Orbitron', sans-serif;">Orbitron Sci-Fi</span>
+                  <span class="text-[10px] text-slate-400">Cyber & Mecha TCG</span>
+                </button>
+                <button type="button" onclick="applyGlobalFont('Chakra Petch')" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-left transition">
+                  <span class="block text-xs font-bold text-white" style="font-family: 'Chakra Petch', sans-serif;">Chakra Petch</span>
+                  <span class="text-[10px] text-slate-400">Tactical Angular</span>
+                </button>
+                <button type="button" onclick="applyGlobalFont('Cinzel')" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-left transition">
+                  <span class="block text-xs font-bold text-white" style="font-family: 'Cinzel', serif;">Cinzel Mythic</span>
+                  <span class="text-[10px] text-slate-400">Fantasy & Lore</span>
+                </button>
+                <button type="button" onclick="applyGlobalFont('Rajdhani')" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-left transition">
+                  <span class="block text-xs font-bold text-white" style="font-family: 'Rajdhani', sans-serif;">Rajdhani Pro</span>
+                  <span class="text-[10px] text-slate-400">Sport & Action</span>
+                </button>
+                <button type="button" onclick="applyGlobalFont('Bebas Neue')" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-left transition">
+                  <span class="block text-sm font-bold text-white tracking-wider" style="font-family: 'Bebas Neue', sans-serif;">Bebas Neue Poster</span>
+                  <span class="text-[10px] text-slate-400">High Impact Display</span>
+                </button>
+                <button type="button" onclick="applyGlobalFont('Press Start 2P')" class="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-700 border border-slate-700 text-left transition">
+                  <span class="block text-[10px] font-bold text-white" style="font-family: 'Press Start 2P', monospace;">Press Start 8-Bit</span>
+                  <span class="text-[10px] text-slate-400">Retro Arcade</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Granular Section Font Selectors -->
+            <div class="pt-3 border-t border-slate-700/60 space-y-3">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label class="block text-[11px] text-slate-400 mb-1">Title Font</label>
+                  <select id="selFontTitle" onchange="syncStateFromUI()" class="w-full px-2.5 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white">
+                    <option value="Montserrat" selected>Montserrat</option>
+                    <option value="Plus Jakarta Sans">Plus Jakarta Sans</option>
+                    <option value="Orbitron">Orbitron</option>
+                    <option value="Chakra Petch">Chakra Petch</option>
+                    <option value="Cinzel">Cinzel</option>
+                    <option value="Rajdhani">Rajdhani</option>
+                    <option value="Bebas Neue">Bebas Neue</option>
+                    <option value="Oswald">Oswald</option>
+                    <option value="Playfair Display">Playfair Display</option>
+                    <option value="Press Start 2P">Press Start 2P</option>
+                    <option value="Comic Neue">Comic Neue</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[11px] text-slate-400 mb-1">Stats Table Font</label>
+                  <select id="selFontStats" onchange="syncStateFromUI()" class="w-full px-2.5 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white">
+                    <option value="Montserrat" selected>Montserrat</option>
+                    <option value="Plus Jakarta Sans">Plus Jakarta Sans</option>
+                    <option value="Orbitron">Orbitron</option>
+                    <option value="Chakra Petch">Chakra Petch</option>
+                    <option value="Cinzel">Cinzel</option>
+                    <option value="Rajdhani">Rajdhani</option>
+                    <option value="Bebas Neue">Bebas Neue</option>
+                    <option value="Oswald">Oswald</option>
+                    <option value="Playfair Display">Playfair Display</option>
+                    <option value="Press Start 2P">Press Start 2P</option>
+                    <option value="Comic Neue">Comic Neue</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[11px] text-slate-400 mb-1">Description Font</label>
+                  <select id="selFontDesc" onchange="syncStateFromUI()" class="w-full px-2.5 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white">
+                    <option value="Montserrat" selected>Montserrat</option>
+                    <option value="Plus Jakarta Sans">Plus Jakarta Sans</option>
+                    <option value="Orbitron">Orbitron</option>
+                    <option value="Chakra Petch">Chakra Petch</option>
+                    <option value="Cinzel">Cinzel</option>
+                    <option value="Rajdhani">Rajdhani</option>
+                    <option value="Bebas Neue">Bebas Neue</option>
+                    <option value="Oswald">Oswald</option>
+                    <option value="Playfair Display">Playfair Display</option>
+                    <option value="Press Start 2P">Press Start 2P</option>
+                    <option value="Comic Neue">Comic Neue</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Theme & Custom Colors -->
+          <div class="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                Light / Dark Version & Colors
+              </h3>
+              <button type="button" onclick="setCardTheme(cardState.theme)" class="text-xs text-teal-400 hover:underline">Reset Theme Colors</button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+              <button type="button" onclick="setCardTheme('light')" class="p-3 rounded-xl border border-slate-700 bg-white text-slate-900 font-bold text-xs flex items-center justify-center gap-2 shadow-sm hover: ring-2 ring-teal-500">
+                <span class="w-3 h-3 rounded-full bg-slate-900 border border-slate-400"></span>
+                Light Version (Classic)
+              </button>
+              <button type="button" onclick="setCardTheme('dark')" class="p-3 rounded-xl border border-slate-700 bg-slate-950 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm hover:ring-2 ring-teal-500">
+                <span class="w-3 h-3 rounded-full bg-teal-400"></span>
+                Dark Version (Obsidian)
+              </button>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Card Surface</label>
+                <input id="clrCardBg" type="color" value="#ffffff" oninput="syncColorsFromUI()" class="w-full h-9 rounded-lg bg-slate-900 border border-slate-700 cursor-pointer p-1" />
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Outer Border & Text</label>
+                <input id="clrPrimary" type="color" value="#182538" oninput="syncColorsFromUI()" class="w-full h-9 rounded-lg bg-slate-900 border border-slate-700 cursor-pointer p-1" />
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Inner Border & Pill</label>
+                <input id="clrAccentTeal" type="color" value="#0f8b92" oninput="syncColorsFromUI()" class="w-full h-9 rounded-lg bg-slate-900 border border-slate-700 cursor-pointer p-1" />
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Corner Brackets</label>
+                <input id="clrCornerGold" type="color" value="#f5b82e" oninput="syncColorsFromUI()" class="w-full h-9 rounded-lg bg-slate-900 border border-slate-700 cursor-pointer p-1" />
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Art Box Backdrop</label>
+                <input id="clrArtBox" type="color" value="#eff1f5" oninput="syncColorsFromUI()" class="w-full h-9 rounded-lg bg-slate-900 border border-slate-700 cursor-pointer p-1" />
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ==================== TAB 4: PRINT GUIDES & HIGH-RES EXPORT ==================== -->
+        <div id="tabPanel-export" class="space-y-6 hidden">
+          
+          <div class="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4 space-y-4">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              Safe Zone (Red) & Cut Zone (Green) Guides
+            </h3>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Matches the standard print specification template:
+              <strong class="text-green-400">Cut Zone (Green)</strong> marks the outer trim boundary where the card is cut, and
+              <strong class="text-red-400">Safe Zone (Red)</strong> marks the inner margin protecting borders and text.
+            </p>
+
+            <div class="space-y-2.5 pt-1">
+              <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-700/80 cursor-pointer">
+                <span class="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
+                  <span class="w-3.5 h-3.5 rounded-sm border-2 border-red-500 inline-block"></span>
+                  Show Safe Zone Guide (Red Line)
+                </span>
+                <input id="chkSafeZoneTab" type="checkbox" onchange="document.getElementById('chkSafeZone').checked = this.checked; updateGuideState();" class="w-4 h-4 rounded accent-red-500" />
+              </label>
+
+              <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-700/80 cursor-pointer">
+                <span class="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
+                  <span class="w-3.5 h-3.5 rounded-sm border-2 border-green-500 inline-block"></span>
+                  Show Cut Zone Guide (Green Line)
+                </span>
+                <input id="chkCutZoneTab" type="checkbox" onchange="document.getElementById('chkCutZone').checked = this.checked; updateGuideState();" class="w-4 h-4 rounded accent-green-500" />
+              </label>
+
+              <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-700/80 cursor-pointer">
+                <span class="flex items-center gap-2.5 text-xs font-semibold text-slate-200">
+                  Show Zone Legend Labels on Export
+                </span>
+                <input id="chkGuideLabels" type="checkbox" onchange="syncStateFromUI()" class="w-4 h-4 rounded accent-teal-500" />
+              </label>
+            </div>
+          </div>
+
+          <!-- Export Buttons -->
+          <div class="bg-slate-800/50 border border-slate-700/80 rounded-xl p-4 space-y-3">
+            <h3 class="text-sm font-bold text-white">High-Resolution PNG Download (1650 × 2250 px)</h3>
+
+            <button type="button" onclick="exportCardPNG(true)" class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-teal-500/20 flex items-center justify-center gap-2 transition">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              <span>Download High-Res Card WITH Safe (Red) & Cut (Green) Zones</span>
+            </button>
+
+            <button type="button" onclick="exportCardPNG(false, false)" class="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-700 text-slate-100 border border-slate-600 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition">
+              <svg class="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              <span>Download Clean Die-Cut Rounded Card (No Guides)</span>
+            </button>
+
+            <button type="button" onclick="exportCardPNG(false, true)" class="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-700 text-slate-300 border border-slate-700 font-semibold text-xs flex items-center justify-center gap-2 transition">
+              <span>Download Print-Ready Full Bleed Sheet (No Guide Lines)</span>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+    </aside>
+  </main>
+
+  <!-- Toast Status Notification -->
+  <div id="toastNotification" class="fixed bottom-5 right-5 z-50 pointer-events-none opacity-0 translate-y-2 transition-all duration-300 bg-slate-900/95 border border-teal-500/50 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-semibold">
+    <span class="w-2.5 h-2.5 rounded-full bg-teal-400 animate-ping"></span>
+    <span id="toastText">Card exported!</span>
+  </div>
+
+  <!-- Application Script -->
+  <script>
+    /*************************************************************************
+     * 1. CARD GEOMETRY & HIGH-RESOLUTION CONSTANTS (1650 x 2250 px @ 300 DPI)
+     *************************************************************************/
+    const CANVAS_W = 1650;
+    const CANVAS_H = 2250;
+
+    // Cut Zone (Green) — physical trimmed card size: 1500 x 2100 px centered in the 1650 x 2250 bleed sheet
+    const CUT_RECT = {
+      x: 75,
+      y: 75,
+      w: 1500,
+      h: 2100,
+      r: 84 // Die-cut corner radius when viewing/exporting trimmed card
+    };
+
+    // Safe Zone (Red) — inset 65px inside the Cut Zone
+    const SAFE_RECT = {
+      x: 140,
+      y: 140,
+      w: 1370,
+      h: 1970
+    };
+
+    // Outer Navy Border & Inner Teal Border (aligned neatly with Safe Zone)
+    const OUTER_BORDER = {
+      x: 146,
+      y: 146,
+      w: 1358,
+      h: 1958,
+      r: 72,
+      lineWidth: 12
+    };
+
+    const INNER_BORDER = {
+      x: 174,
+      y: 174,
+      w: 1302,
+      h: 1902,
+      r: 52,
+      lineWidth: 11
+    };
+
+    // Default Larger Art Area Box inside the top half of the card (~46.3% of inner height)
+    const DEFAULT_ART_BOX_HEIGHT = 880;
+    const ART_BOX = {
+      x: 198,
+      y: 198,
+      w: 1254,
+      h: DEFAULT_ART_BOX_HEIGHT,
+      r: 36
+    };
+
+    // Rarity Tier Visual Definitions
+    const RARITY_TIERS = {
+      Common: {
+        name: 'COMMON',
+        color: '#64748b',
+        darkColor: '#94a3b8',
+        bgLight: 'rgba(100, 116, 139, 0.13)',
+        bgDark: 'rgba(148, 163, 184, 0.16)',
+        border: '#64748b',
+        symbol: '●'
+      },
+      Uncommon: {
+        name: 'UNCOMMON',
+        color: '#059669',
+        darkColor: '#10b981',
+        bgLight: 'rgba(16, 185, 129, 0.14)',
+        bgDark: 'rgba(16, 185, 129, 0.18)',
+        border: '#10b981',
+        symbol: '◆'
+      },
+      Rare: {
+        name: 'RARE',
+        color: '#00A3AD',
+        darkColor: '#22d3ee',
+        bgLight: 'rgba(0, 163, 173, 0.15)',
+        bgDark: 'rgba(0, 163, 173, 0.22)',
+        border: '#00A3AD',
+        symbol: '★'
+      },
+      Epic: {
+        name: 'EPIC',
+        color: '#7c3aed',
+        darkColor: '#a78bfa',
+        bgLight: 'rgba(124, 58, 237, 0.14)',
+        bgDark: 'rgba(139, 92, 246, 0.22)',
+        border: '#8b5cf6',
+        symbol: '✦'
+      },
+      Legendary: {
+        name: 'LEGENDARY',
+        color: '#d97706',
+        darkColor: '#FDB913',
+        bgLight: 'rgba(253, 185, 19, 0.20)',
+        bgDark: 'rgba(253, 185, 19, 0.22)',
+        border: '#FDB913',
+        symbol: '❖'
+      }
+    };
+
+    // Top-Right Emoji Cutout Badge inside Art Area
+    const BADGE_TAB = {
+      x: 1126,
+      y: 194,
+      w: 330,
+      h: 196,
+      bottomLeftRadius: 56
+    };
+
+    // Rounded Square Outline inside Top-Right Cutout Badge
+    const EMOJI_SQUARE = {
+      x: 1230,
+      y: 232,
+      w: 136,
+      h: 122,
+      r: 26
+    };
+
+    /*************************************************************************
+     * 2. APPLICATION STATE
+     *************************************************************************/
+    const THEME_PRESETS = {
+      light: {
+        cardBg: '#ffffff',
+        primary: '#182538',
+        accentTeal: '#0f8b92',
+        cornerGold: '#f5b82e',
+        artBoxBg: '#eff1f5',
+        rowLine: '#94a3b8',
+        emojiSquareStroke: '#9ca3af',
+        scrimColor: '255, 255, 255'
+      },
+      dark: {
+        cardBg: '#0f172a',
+        primary: '#f1f5f9',
+        accentTeal: '#14b8a6',
+        cornerGold: '#fbbf24',
+        artBoxBg: '#1e293b',
+        rowLine: '#334155',
+        emojiSquareStroke: '#64748b',
+        scrimColor: '15, 23, 42'
+      }
+    };
+
+    const cardState = {
+      theme: 'light',
+      colors: { ...THEME_PRESETS.light },
+      fullArt: false,
+      scrimOpacity: 0.72,
+      fullArtShowArtBox: true,
+      showArtPlaceholder: true,
+      artBoxHeight: DEFAULT_ART_BOX_HEIGHT,
+      artBgGradient: false,
+
+      // Multi-Layer Artwork Stack
+      artLayers: [],
+      activeLayerId: null,
+
+      // Interactive Canvas Tool State ('move' | 'eyedropper-bg' | 'eyedropper-cutout' | 'brush-erase' | 'brush-restore')
+      editorTool: 'move',
+      brushSize: 45,
+      hoverCanvasPt: null,
+
+      // Emoji Badge
+      emoji: '',
+      emojiSizeScale: 1.0,
+      showEmojiBoxOutline: true,
+
+      // Rarity System
+      showRarity: true,
+      rarity: 'Common',
+      rarityStyle: 'badge', // 'badge' | 'minimal' | 'fullAccent'
+      rarityPosition: 'bottomLeft', // 'bottomLeft' | 'belowTitle'
+
+      // Typography & Content
+      title: 'TITLE',
+      titleSizeScale: 1.0,
+      stats: [
+        { label: 'SELLABILITY', value: '' },
+        { label: 'RELIABILITY', value: '' },
+        { label: 'CX AGRO', value: '' },
+        { label: 'STORE MORALE', value: '' },
+        { label: 'LORE/AURA', value: '' }
+      ],
+      desc: 'DESC.',
+      descSizeScale: 1.0,
+      descAlign: 'center',
+      cardNumber: '1/107',
+
+      // Fonts
+      fontTitle: 'Montserrat',
+      fontStats: 'Montserrat',
+      fontDesc: 'Montserrat',
+
+      // Print Guides
+      showSafeZone: false,
+      showCutZone: false,
+      printSheetView: false,
+      showGuideLabels: false
+    };
+
+    const canvas = document.getElementById('cardCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Show native EyeDropper button if browser supports it
+    if (typeof window !== 'undefined' && 'EyeDropper' in window) {
+      const nativeBtn = document.getElementById('btnNativeEyedropper');
+      if (nativeBtn) nativeBtn.classList.remove('hidden');
+    }
+
+    /*************************************************************************
+     * 2B. MULTI-LAYER IMAGE PROCESSING, CUTOUT & EDGE FEATHER ENGINE
+     *************************************************************************/
+    let layerIdCounter = 1;
+
+    function getActiveLayer() {
+      if (!cardState.artLayers.length) return null;
+      return cardState.artLayers.find(l => l.id === cardState.activeLayerId) || cardState.artLayers[cardState.artLayers.length - 1];
+    }
+
+    /**
+     * Creates a new Layer object from an HTMLImageElement
+     */
+    function createArtLayer(img, name = 'Layer') {
+      // Scale source processing canvas to a reasonable max dimension (e.g. 1200px) for fast real-time cutout & feathering
+      const maxDim = 1200;
+      let w = img.naturalWidth || img.width || 800;
+      let h = img.naturalHeight || img.height || 600;
+      if (w > maxDim || h > maxDim) {
+        const r = Math.min(maxDim / w, maxDim / h);
+        w = Math.max(1, Math.round(w * r));
+        h = Math.max(1, Math.round(h * r));
+      }
+
+      const origCanvas = document.createElement('canvas');
+      origCanvas.width = w;
+      origCanvas.height = h;
+      const oCtx = origCanvas.getContext('2d');
+      oCtx.drawImage(img, 0, 0, w, h);
+      const originalImageData = oCtx.getImageData(0, 0, w, h);
+
+      const processedCanvas = document.createElement('canvas');
+      processedCanvas.width = w;
+      processedCanvas.height = h;
+
+      // Thumbnail data URL for layer stack list
+      const thumbCanvas = document.createElement('canvas');
+      thumbCanvas.width = 72;
+      thumbCanvas.height = 72;
+      const tCtx = thumbCanvas.getContext('2d');
+      const tr = Math.max(72 / w, 72 / h);
+      tCtx.drawImage(origCanvas, (72 - w * tr) / 2, (72 - h * tr) / 2, w * tr, h * tr);
+
+      const layer = {
+        id: 'layer_' + (layerIdCounter++),
+        name: name || `Layer ${cardState.artLayers.length + 1}`,
+        visible: true,
+        locked: false,
+        width: w,
+        height: h,
+        origCanvas,
+        originalImageData,
+        processedCanvas,
+        thumbUrl: thumbCanvas.toDataURL(),
+
+        // Transform & Blend
+        x: 0,
+        y: 0,
+        scale: cardState.fullArt ? 2.1 : 1.0,
+        rotation: 0,
+        flipH: false,
+        flipV: false,
+        opacity: 1.0,
+        blendMode: 'source-over',
+
+        // Subject Cutout / Background Removal state
+        cutoutActive: false,
+        cutoutMode: 'flood', // 'flood' | 'global'
+        cutoutColors: [],    // Array of [r, g, b]
+        cutoutTolerance: 32,
+        cutoutSoftness: 3,
+        autoMask: new Uint8ClampedArray(w * h).fill(255),
+        // userBrushMask: 0 = no override, -1 (erased) to +1 (restored), stored as Int16 (-255..255)
+        userBrushMask: new Int16Array(w * h).fill(0),
+        hasBrushEdits: false,
+
+        // Edge Blur / Feather & Layer FX
+        edgeFeather: 0,        // 0..100
+        featherMode: 'rect',   // 'rect' | 'radial' | 'alpha'
+        shadowEnabled: false,
+        shadowBlur: 24,
+        shadowY: 12,
+        shadowColor: '#000000',
+        filterBlur: 0,
+        filterBright: 100,
+        filterContrast: 100,
+        filterSat: 100
+      };
+
+      rebuildLayerProcessedCanvas(layer);
+      return layer;
+    }
+
+    /**
+     * Computes the Auto / Chroma-Key Alpha Mask for a layer based on its `cutoutColors`, `cutoutMode`, and `cutoutTolerance`
+     */
+    function computeLayerAutoMask(layer) {
+      const w = layer.width;
+      const h = layer.height;
+      const data = layer.originalImageData.data;
+      const mask = layer.autoMask;
+
+      if (!layer.cutoutActive || !layer.cutoutColors || layer.cutoutColors.length === 0) {
+        mask.fill(255);
+        return;
+      }
+
+      const tol = layer.cutoutTolerance;
+      const softRange = Math.max(8, layer.cutoutSoftness * 6);
+      const tolSq = (tol * 1.8) * (tol * 1.8);
+      const outerTolSq = ((tol + softRange) * 1.8) * ((tol + softRange) * 1.8);
+      const colors = layer.cutoutColors;
+
+      function minColorDistSq(idx) {
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        let best = 1e9;
+        for (let c = 0; c < colors.length; c++) {
+          const dr = r - colors[c][0];
+          const dg = g - colors[c][1];
+          const db = b - colors[c][2];
+          // Weighted perceptual RGB distance
+          const dSq = dr * dr * 0.3 + dg * dg * 0.59 + db * db * 0.11;
+          if (dSq < best) best = dSq;
+        }
+        return best * 3.0;
+      }
+
+      if (layer.cutoutMode === 'global') {
+        for (let i = 0; i < w * h; i++) {
+          const dSq = minColorDistSq(i * 4);
+          if (dSq <= tolSq) {
+            mask[i] = 0;
+          } else if (dSq < outerTolSq) {
+            const t = (Math.sqrt(dSq) - Math.sqrt(tolSq)) / (Math.sqrt(outerTolSq) - Math.sqrt(tolSq));
+            mask[i] = Math.round(Math.max(0, Math.min(255, t * 255)));
+          } else {
+            mask[i] = 255;
+          }
+        }
+      } else {
+        // Contiguous Outside-In Flood Fill from all 4 image edges
+        mask.fill(255);
+        const visited = new Uint8Array(w * h);
+        const queue = new Int32Array(w * h);
+        let head = 0;
+        let tail = 0;
+
+        const trySeed = (x, y) => {
+          const idx = y * w + x;
+          if (visited[idx]) return;
+          if (minColorDistSq(idx * 4) <= outerTolSq) {
+            visited[idx] = 1;
+            queue[tail++] = idx;
+          }
+        };
+
+        for (let x = 0; x < w; x++) {
+          trySeed(x, 0);
+          trySeed(x, h - 1);
+        }
+        for (let y = 0; y < h; y++) {
+          trySeed(0, y);
+          trySeed(w - 1, y);
+        }
+
+        while (head < tail) {
+          const curr = queue[head++];
+          const dSq = minColorDistSq(curr * 4);
+
+          if (dSq <= tolSq) {
+            mask[curr] = 0;
+          } else {
+            const t = (Math.sqrt(dSq) - Math.sqrt(tolSq)) / Math.max(1, Math.sqrt(outerTolSq) - Math.sqrt(tolSq));
+            mask[curr] = Math.round(Math.max(0, Math.min(255, t * 255)));
+            // Don't expand flood fill past soft transition fringe
+            continue;
+          }
+
+          const cx = curr % w;
+          const cy = (curr - cx) / w;
+
+          if (cx > 0) {
+            const n = curr - 1;
+            if (!visited[n] && minColorDistSq(n * 4) <= outerTolSq) { visited[n] = 1; queue[tail++] = n; }
+          }
+          if (cx < w - 1) {
+            const n = curr + 1;
+            if (!visited[n] && minColorDistSq(n * 4) <= outerTolSq) { visited[n] = 1; queue[tail++] = n; }
+          }
+          if (cy > 0) {
+            const n = curr - w;
+            if (!visited[n] && minColorDistSq(n * 4) <= outerTolSq) { visited[n] = 1; queue[tail++] = n; }
+          }
+          if (cy < h - 1) {
+            const n = curr + w;
+            if (!visited[n] && minColorDistSq(n * 4) <= outerTolSq) { visited[n] = 1; queue[tail++] = n; }
+          }
+        }
+      }
+    }
+
+    /**
+     * Fast 1D separable box blur on an alpha channel array for smooth cutout defringing / silhouette feathering
+     */
+    function blurAlphaChannel(alphaArr, w, h, radius) {
+      const r = Math.max(1, Math.min(60, Math.round(radius)));
+      const temp = new Float32Array(w * h);
+      const winSize = r * 2 + 1;
+
+      // Horizontal pass
+      for (let y = 0; y < h; y++) {
+        let sum = 0;
+        const rowOffset = y * w;
+        for (let i = -r; i <= r; i++) {
+          const x = Math.max(0, Math.min(w - 1, i));
+          sum += alphaArr[rowOffset + x];
+        }
+        for (let x = 0; x < w; x++) {
+          temp[rowOffset + x] = sum / winSize;
+          const leftX = Math.max(0, x - r);
+          const rightX = Math.min(w - 1, x + r + 1);
+          sum += alphaArr[rowOffset + rightX] - alphaArr[rowOffset + leftX];
+        }
+      }
+
+      // Vertical pass
+      for (let x = 0; x < w; x++) {
+        let sum = 0;
+        for (let i = -r; i <= r; i++) {
+          const y = Math.max(0, Math.min(h - 1, i));
+          sum += temp[y * w + x];
+        }
+        for (let y = 0; y < h; y++) {
+          alphaArr[y * w + x] = Math.round(sum / winSize);
+          const topY = Math.max(0, y - r);
+          const botY = Math.min(h - 1, y + r + 1);
+          sum += temp[botY * w + x] - temp[topY * w + x];
+        }
+      }
+    }
+
+    /**
+     * Rebuilds `layer.processedCanvas` combining:
+     * 1. Original image pixels
+     * 2. Auto/Chroma Cutout Mask + Manual User Erase/Restore Brush Mask
+     * 3. Cutout Edge Defringe / Softness
+     * 4. Edge Blur / Feathering (Rectangular, Radial Vignette, or Alpha Silhouette)
+     */
+    function rebuildLayerProcessedCanvas(layer) {
+      if (!layer) return;
+      const w = layer.width;
+      const h = layer.height;
+      const pCtx = layer.processedCanvas.getContext('2d');
+      const srcData = layer.originalImageData.data;
+      const outImgData = pCtx.createImageData(w, h);
+      const dst = outImgData.data;
+
+      const workingAlpha = new Uint8ClampedArray(w * h);
+      const autoMask = layer.autoMask;
+      const brushMask = layer.userBrushMask;
+
+      for (let i = 0; i < w * h; i++) {
+        const origA = srcData[i * 4 + 3];
+        let a = Math.min(origA, autoMask[i]);
+        const bEdit = brushMask[i];
+        if (bEdit !== 0) {
+          a = Math.max(0, Math.min(255, a + bEdit));
+        }
+        workingAlpha[i] = a;
+      }
+
+      // Apply cutout softness / silhouette alpha feathering if active
+      const silhouetteBlurRadius =
+        (layer.cutoutActive ? Math.floor(layer.cutoutSoftness / 2) : 0) +
+        (layer.edgeFeather > 0 && layer.featherMode === 'alpha' ? Math.round((layer.edgeFeather / 100) * 35) : 0);
+
+      if (silhouetteBlurRadius > 0) {
+        blurAlphaChannel(workingAlpha, w, h, silhouetteBlurRadius);
+        if (layer.cutoutActive && layer.cutoutSoftness > 0) {
+          // Slight inward erosion / defringe to remove background halos
+          for (let i = 0; i < w * h; i++) {
+            const v = workingAlpha[i];
+            workingAlpha[i] = v < 90 ? Math.max(0, (v - 30) * 1.4) : v;
+          }
+        }
+      }
+
+      // Apply Rectangular or Radial Edge Feathering
+      const featherPct = layer.edgeFeather / 100;
+      if (featherPct > 0 && (layer.featherMode === 'rect' || layer.featherMode === 'radial')) {
+        if (layer.featherMode === 'rect') {
+          const fx = Math.max(2, w * 0.46 * featherPct);
+          const fy = Math.max(2, h * 0.46 * featherPct);
+          for (let y = 0; y < h; y++) {
+            const dy = Math.min(y, h - 1 - y);
+            const ty = dy >= fy ? 1.0 : dy / fy;
+            const sy = ty * ty * (3 - 2 * ty); // smoothstep
+            const rowOffset = y * w;
+            for (let x = 0; x < w; x++) {
+              const dx = Math.min(x, w - 1 - x);
+              const tx = dx >= fx ? 1.0 : dx / fx;
+              const sx = tx * tx * (3 - 2 * tx);
+              workingAlpha[rowOffset + x] = Math.round(workingAlpha[rowOffset + x] * sx * sy);
+            }
+          }
+        } else if (layer.featherMode === 'radial') {
+          const cx = w / 2;
+          const cy = h / 2;
+          const rx = Math.max(1, w / 2);
+          const ry = Math.max(1, h / 2);
+          const innerR = Math.max(0.05, 1.0 - featherPct * 0.92);
+          for (let y = 0; y < h; y++) {
+            const ny = (y - cy) / ry;
+            const rowOffset = y * w;
+            for (let x = 0; x < w; x++) {
+              const nx = (x - cx) / rx;
+              const dist = Math.sqrt(nx * nx + ny * ny);
+              let factor = 1.0;
+              if (dist >= 1.0) {
+                factor = 0.0;
+              } else if (dist > innerR) {
+                const t = 1.0 - (dist - innerR) / (1.0 - innerR);
+                factor = t * t * (3 - 2 * t);
+              }
+              workingAlpha[rowOffset + x] = Math.round(workingAlpha[rowOffset + x] * factor);
+            }
+          }
+        }
+      }
+
+      // Write final RGB + Alpha into processedCanvas
+      for (let i = 0; i < w * h; i++) {
+        const p = i * 4;
+        dst[p] = srcData[p];
+        dst[p + 1] = srcData[p + 1];
+        dst[p + 2] = srcData[p + 2];
+        dst[p + 3] = workingAlpha[i];
+      }
+
+      pCtx.putImageData(outImgData, 0, 0);
+    }
+
+    /*************************************************************************
+     * 3. HELPER GEOMETRY FUNCTIONS FOR CANVAS
+     *************************************************************************/
+    function roundRectPath(ctx, x, y, w, h, r) {
+      const radius = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.arcTo(x + w, y, x + w, y + h, radius);
+      ctx.arcTo(x + w, y + h, x, y + h, radius);
+      ctx.arcTo(x, y + h, x, y, radius);
+      ctx.arcTo(x, y, x + w, y, radius);
+      ctx.closePath();
+    }
+
+    /**
+     * Draws text with custom letter spacing centered or left/right aligned
+     */
+    function drawTrackedText(ctx, text, x, y, letterSpacing, align = 'center') {
+      if (!text) return;
+      const chars = Array.from(text);
+      let totalWidth = 0;
+      const widths = chars.map(ch => {
+        const w = ctx.measureText(ch).width;
+        totalWidth += w;
+        return w;
+      });
+      totalWidth += letterSpacing * Math.max(0, chars.length - 1);
+
+      let currentX = x;
+      if (align === 'center') currentX = x - totalWidth / 2;
+      else if (align === 'right') currentX = x - totalWidth;
+
+      ctx.save();
+      ctx.textAlign = 'left';
+      for (let i = 0; i < chars.length; i++) {
+        ctx.fillText(chars[i], currentX, y);
+        currentX += widths[i] + letterSpacing;
+      }
+      ctx.restore();
+    }
+
+    /**
+     * Computes dynamic vertical coordinates based on the current Art Box Height
+     * so Title, 5-row Stat Table, Description, and Footer always fit harmoniously.
+     */
+    function getLayoutMetrics() {
+      const artH = cardState.artBoxHeight || DEFAULT_ART_BOX_HEIGHT;
+      const artBox = {
+        x: ART_BOX.x,
+        y: ART_BOX.y,
+        w: ART_BOX.w,
+        h: artH,
+        r: ART_BOX.r
+      };
+      const artBottom = artBox.y + artBox.h;
+      const belowTitleRarity = cardState.showRarity && cardState.rarityPosition === 'belowTitle';
+
+      const titleY = artBottom + 64;
+      const subTitleRarityY = titleY + 52;
+      const topDividerY = artBottom + (belowTitleRarity ? 150 : 114);
+
+      // Dynamically adjust stat row height so 5 rows + description fit cleanly inside the Safe Zone
+      const rowHeight = Math.round(Math.max(70, Math.min(94, 92 - (artH - 740) * 0.065)));
+      const rowStartY = topDividerY + 12;
+      const bottomDividerY = rowStartY + 5 * rowHeight + 12;
+
+      const footerCenterY = 2022;
+      const descTopY = bottomDividerY + 18;
+      const descBottomY = footerCenterY - 42;
+
+      return {
+        artBox,
+        artBottom,
+        titleY,
+        subTitleRarityY,
+        topDividerY,
+        rowStartY,
+        rowHeight,
+        bottomDividerY,
+        descTopY,
+        descBottomY,
+        footerCenterY
+      };
+    }
+
+    /**
+     * Breaks a single ultra-long unbroken word into chunks that fit within maxWidth
+     */
+    function breakLongWord(ctx, word, maxWidth, letterSpacing) {
+      const chunks = [];
+      let current = '';
+      for (const ch of Array.from(word)) {
+        const next = current + ch;
+        const w = ctx.measureText(next).width + Math.max(0, next.length - 1) * letterSpacing;
+        if (w > maxWidth && current.length > 0) {
+          chunks.push(current);
+          current = ch;
+        } else {
+          current = next;
+        }
+      }
+      if (current) chunks.push(current);
+      return chunks;
+    }
+
+    /**
+     * Computes wrapped lines for a given text, font context, maxWidth, and letterSpacing
+     */
+    function computeWrappedLines(ctx, text, maxWidth, letterSpacing = 0) {
+      const rawParagraphs = (text || '').split(/\r?\n/);
+      const lines = [];
+
+      for (const para of rawParagraphs) {
+        if (para.trim() === '') {
+          lines.push('');
+          continue;
+        }
+        const words = para.split(/\s+/);
+        let currentLine = '';
+
+        for (let i = 0; i < words.length; i++) {
+          const word = words[i];
+          const wordWidth = ctx.measureText(word).width + Math.max(0, word.length - 1) * letterSpacing;
+
+          // If a single unbroken word exceeds maxWidth, split it safely
+          if (wordWidth > maxWidth) {
+            if (currentLine) {
+              lines.push(currentLine);
+              currentLine = '';
+            }
+            const subChunks = breakLongWord(ctx, word, maxWidth, letterSpacing);
+            for (let c = 0; c < subChunks.length - 1; c++) {
+              lines.push(subChunks[c]);
+            }
+            currentLine = subChunks[subChunks.length - 1] || '';
+            continue;
+          }
+
+          const testLine = currentLine ? currentLine + ' ' + word : word;
+          const testWidth = ctx.measureText(testLine).width + Math.max(0, testLine.length - 1) * letterSpacing;
+
+          if (testWidth > maxWidth && currentLine) {
+            lines.push(currentLine);
+            currentLine = word;
+          } else {
+            currentLine = testLine;
+          }
+        }
+        if (currentLine) {
+          lines.push(currentLine);
+        }
+      }
+      return lines;
+    }
+
+    /**
+     * Draws multi-line auto-wrapped and auto-fitted text inside the Description box
+     */
+    function drawAutoFitWrappedDescription(ctx, text, boxLeft, boxRight, boxTop, boxBottom, preferredPx, fontName, letterSpacing, align) {
+      const maxWidth = boxRight - boxLeft;
+      const maxHeight = Math.max(60, boxBottom - boxTop);
+      const centerX = (boxLeft + boxRight) / 2;
+      const centerY = (boxTop + boxBottom) / 2;
+
+      let fontSize = preferredPx;
+      const minFontSize = 22;
+      let lines = [];
+      let lineHeight = fontSize * 1.28;
+      let effectiveTracking = letterSpacing;
+
+      // Iteratively scale down if wrapped lines exceed the vertical description box height
+      while (fontSize >= minFontSize) {
+        ctx.font = `400 ${fontSize}px "${fontName}", sans-serif`;
+        lineHeight = fontSize * 1.28;
+        effectiveTracking = letterSpacing * (fontSize / preferredPx);
+        lines = computeWrappedLines(ctx, text, maxWidth, effectiveTracking);
+
+        if (lines.length * lineHeight <= maxHeight || fontSize === minFontSize) {
+          break;
+        }
+        fontSize -= 2;
+      }
+
+      const totalHeight = lines.length * lineHeight;
+      let startY = centerY - totalHeight / 2 + lineHeight / 2;
+
+      let anchorX = centerX;
+      if (align === 'left') anchorX = boxLeft;
+      else if (align === 'right') anchorX = boxRight;
+
+      for (const line of lines) {
+        if (effectiveTracking > 0.5) {
+          drawTrackedText(ctx, line, anchorX, startY, effectiveTracking, align);
+        } else {
+          ctx.textAlign = align;
+          ctx.fillText(line, anchorX, startY);
+        }
+        startY += lineHeight;
+      }
+    }
+
+    /*************************************************************************
+     * 4. CORE PROCEDURAL CARD RENDERING ENGINE
+     *************************************************************************/
+    function renderCard(options = {}) {
+      const forceGuides = options.forceGuides || false;
+      const forceBleedSheet = options.forceBleedSheet || false;
+
+      const showSafe = forceGuides || cardState.showSafeZone;
+      const showCut = forceGuides || cardState.showCutZone;
+      const isSheetMode = forceBleedSheet || forceGuides || cardState.printSheetView || showSafe || showCut;
+
+      const layout = getLayoutMetrics();
+      const activeArtBox = layout.artBox;
+
+      ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+      ctx.save();
+
+      // 1. Clip or Fill Card Base
+      if (isSheetMode) {
+        // Full Rectangular Bleed Sheet
+        ctx.fillStyle = cardState.colors.cardBg;
+        ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+      } else {
+        // Die-Cut Rounded Physical Card View
+        roundRectPath(ctx, CUT_RECT.x, CUT_RECT.y, CUT_RECT.w, CUT_RECT.h, CUT_RECT.r);
+        ctx.clip();
+        ctx.fillStyle = cardState.colors.cardBg;
+        ctx.fillRect(CUT_RECT.x, CUT_RECT.y, CUT_RECT.w, CUT_RECT.h);
+      }
+
+      // 2. FULL ART MODE BACKGROUND RENDER
+      const visibleLayers = cardState.artLayers.filter(l => l.visible);
+      if (cardState.fullArt) {
+        if (visibleLayers.length > 0) {
+          drawAllArtLayersInRegion(ctx, { x: 0, y: 0, w: CANVAS_W, h: CANVAS_H }, activeArtBox);
+        } else {
+          // Subtle gradient backdrop if Full Art is toggled on before uploading an image
+          const grad = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H);
+          grad.addColorStop(0, cardState.colors.artBoxBg);
+          grad.addColorStop(1, cardState.colors.cardBg);
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+        }
+
+        // Optional Art Box subtle glass frame in Full Art mode
+        if (cardState.fullArtShowArtBox) {
+          ctx.save();
+          roundRectPath(ctx, activeArtBox.x, activeArtBox.y, activeArtBox.w, activeArtBox.h, activeArtBox.r);
+          ctx.strokeStyle = getActiveAccentColor('teal');
+          ctx.lineWidth = 4;
+          ctx.globalAlpha = 0.45;
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Readability Backdrop (Scrim) behind Title, Stats, and Description
+        if (cardState.scrimOpacity > 0) {
+          ctx.save();
+          const scrimX = INNER_BORDER.x + 14;
+          const scrimY = activeArtBox.y + activeArtBox.h + 10;
+          const scrimW = INNER_BORDER.w - 28;
+          const scrimH = (INNER_BORDER.y + INNER_BORDER.h) - scrimY - 14;
+          roundRectPath(ctx, scrimX, scrimY, scrimW, scrimH, 38);
+          ctx.fillStyle = `rgba(${cardState.colors.scrimColor}, ${cardState.scrimOpacity})`;
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+
+      // 3. STANDARD MODE ART BOX RENDER (WITH OPTIONAL RADIAL VIGNETTE & MULTI-LAYER STACK)
+      if (!cardState.fullArt) {
+        ctx.save();
+        roundRectPath(ctx, activeArtBox.x, activeArtBox.y, activeArtBox.w, activeArtBox.h, activeArtBox.r);
+        ctx.fillStyle = cardState.colors.artBoxBg;
+        ctx.fill();
+
+        if (cardState.artBgGradient) {
+          const cx = activeArtBox.x + activeArtBox.w / 2;
+          const cy = activeArtBox.y + activeArtBox.h / 2;
+          const rGrad = ctx.createRadialGradient(cx, cy, activeArtBox.w * 0.12, cx, cy, activeArtBox.w * 0.75);
+          rGrad.addColorStop(0, 'rgba(255,255,255,0.22)');
+          rGrad.addColorStop(0.6, 'rgba(0,0,0,0)');
+          rGrad.addColorStop(1, 'rgba(0,0,0,0.38)');
+          ctx.fillStyle = rGrad;
+          ctx.fill();
+        }
+
+        ctx.clip();
+
+        if (visibleLayers.length > 0) {
+          drawAllArtLayersInRegion(ctx, activeArtBox, activeArtBox);
+        }
+        ctx.restore();
+      }
+
+      // 4. "ART" Placeholder Text (when no image layers are visible and placeholder is enabled)
+      if (visibleLayers.length === 0 && cardState.showArtPlaceholder) {
+        ctx.save();
+        ctx.font = `300 188px "${cardState.fontTitle}", sans-serif`;
+        ctx.fillStyle = cardState.colors.primary;
+        ctx.textBaseline = 'middle';
+        drawTrackedText(
+          ctx,
+          'ART',
+          activeArtBox.x + activeArtBox.w / 2,
+          activeArtBox.y + activeArtBox.h / 2 + 12,
+          12,
+          'center'
+        );
+        ctx.restore();
+      }
+
+      // 5. YELLOW/GOLD (OR RARITY ACCENT) CORNER BRACKETS INSIDE ART AREA
+      drawArtCornerBrackets(ctx, activeArtBox);
+
+      // 6. TOP-RIGHT EMOJI CUTOUT TAB & ROUNDED SQUARE BOX
+      drawTopRightEmojiBadge(ctx);
+
+      // 7. BOTTOM-CENTER TEAL (OR RARITY ACCENT) PILL ON EDGE OF ART BOX
+      drawCenterTealPill(ctx, activeArtBox);
+
+      // 8. DOUBLE ROUNDED CARD BORDERS (Outer Primary & Inner Teal)
+      // Outer Border
+      ctx.save();
+      roundRectPath(ctx, OUTER_BORDER.x, OUTER_BORDER.y, OUTER_BORDER.w, OUTER_BORDER.h, OUTER_BORDER.r);
+      ctx.lineWidth = OUTER_BORDER.lineWidth;
+      ctx.strokeStyle = cardState.colors.primary;
+      ctx.stroke();
+      ctx.restore();
+
+      // Inner Teal Border
+      ctx.save();
+      roundRectPath(ctx, INNER_BORDER.x, INNER_BORDER.y, INNER_BORDER.w, INNER_BORDER.h, INNER_BORDER.r);
+      ctx.lineWidth = INNER_BORDER.lineWidth;
+      ctx.strokeStyle = getActiveAccentColor('teal');
+      ctx.stroke();
+      ctx.restore();
+
+      // 9. TITLE, HORIZONTAL DIVIDERS & 5-ROW STATS TABLE
+      drawTitleAndStatsTable(ctx, layout);
+
+      // 10. DESCRIPTION (AUTO-WRAPPING), RARITY BADGE & CARD NUMBER (1/107)
+      drawDescriptionAndNumber(ctx, layout);
+
+      ctx.restore(); // Remove card clip so print guides draw cleanly on top
+
+      // 11. SAFE ZONE (RED) & CUT ZONE (GREEN) OVERLAY GUIDES
+      if (showCut || showSafe) {
+        drawPrintGuides(ctx, showCut, showSafe);
+      }
+
+      // 12. INTERACTIVE BRUSH CURSOR RING (Shown only on live preview when Erase/Restore brush is active)
+      if (!options.isExport && (cardState.editorTool === 'brush-erase' || cardState.editorTool === 'brush-restore') && cardState.hoverCanvasPt) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cardState.hoverCanvasPt.x, cardState.hoverCanvasPt.y, cardState.brushSize, 0, Math.PI * 2);
+        ctx.strokeStyle = cardState.editorTool === 'brush-erase' ? '#f43f5e' : '#10b981';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(cardState.hoverCanvasPt.x, cardState.hoverCanvasPt.y, cardState.brushSize, 0, Math.PI * 2);
+        ctx.fillStyle = cardState.editorTool === 'brush-erase' ? 'rgba(244, 63, 94, 0.18)' : 'rgba(16, 185, 129, 0.18)';
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    /**
+     * Returns either the default theme color or the Rarity tier color when Full Rarity Accent is active
+     */
+    function getActiveAccentColor(slot) {
+      if (cardState.showRarity && cardState.rarityStyle === 'fullAccent') {
+        const tier = RARITY_TIERS[cardState.rarity] || RARITY_TIERS.Common;
+        return cardState.theme === 'dark' ? tier.darkColor : tier.border;
+      }
+      return slot === 'gold' ? cardState.colors.cornerGold : cardState.colors.accentTeal;
+    }
+
+    /**
+     * Renders all visible layers in bottom-to-top stack order with per-layer pan, zoom, rotation, flip, blend mode, drop shadow, and filters
+     */
+    function drawAllArtLayersInRegion(ctx, clipBounds, referenceBox) {
+      for (let i = 0; i < cardState.artLayers.length; i++) {
+        const layer = cardState.artLayers[i];
+        if (!layer.visible || !layer.processedCanvas) continue;
+
+        ctx.save();
+        ctx.globalAlpha = layer.opacity;
+        ctx.globalCompositeOperation = layer.blendMode || 'source-over';
+
+        // Per-layer CSS Filters (Gaussian Blur, Brightness, Contrast, Saturation)
+        const filters = [];
+        if (layer.filterBlur > 0) filters.push(`blur(${layer.filterBlur}px)`);
+        if (layer.filterBright !== 100) filters.push(`brightness(${layer.filterBright}%)`);
+        if (layer.filterContrast !== 100) filters.push(`contrast(${layer.filterContrast}%)`);
+        if (layer.filterSat !== 100) filters.push(`saturate(${layer.filterSat}%)`);
+        if (filters.length > 0) {
+          ctx.filter = filters.join(' ');
+        }
+
+        // Per-layer Drop Shadow
+        if (layer.shadowEnabled) {
+          ctx.shadowColor = layer.shadowColor || 'rgba(0,0,0,0.75)';
+          ctx.shadowBlur = layer.shadowBlur;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = layer.shadowY;
+        }
+
+        const centerX = referenceBox.x + referenceBox.w / 2 + layer.x;
+        const centerY = referenceBox.y + referenceBox.h / 2 + layer.y;
+
+        ctx.translate(centerX, centerY);
+        ctx.rotate((layer.rotation * Math.PI) / 180);
+        ctx.scale(
+          layer.flipH ? -layer.scale : layer.scale,
+          layer.flipV ? -layer.scale : layer.scale
+        );
+
+        const baseRatio = Math.max(referenceBox.w / layer.width, referenceBox.h / layer.height);
+        const drawW = layer.width * baseRatio;
+        const drawH = layer.height * baseRatio;
+
+        ctx.drawImage(layer.processedCanvas, -drawW / 2, -drawH / 2, drawW, drawH);
+        ctx.restore();
+      }
+    }
+
+    /**
+     * Maps a point `(cx, cy)` on the 1650x2250 card canvas into local pixel coordinates `(px, py)` of the given `layer`
+     */
+    function mapCardCanvasPointToLayerPixel(cx, cy, layer) {
+      if (!layer) return null;
+      const referenceBox = getLayoutMetrics().artBox;
+      const centerX = referenceBox.x + referenceBox.w / 2 + layer.x;
+      const centerY = referenceBox.y + referenceBox.h / 2 + layer.y;
+
+      const dx = cx - centerX;
+      const dy = cy - centerY;
+      const rad = (-layer.rotation * Math.PI) / 180;
+      const rx = dx * Math.cos(rad) - dy * Math.sin(rad);
+      const ry = dx * Math.sin(rad) + dy * Math.cos(rad);
+
+      const sx = layer.flipH ? -layer.scale : layer.scale;
+      const sy = layer.flipV ? -layer.scale : layer.scale;
+      const ux = rx / (sx || 1);
+      const uy = ry / (sy || 1);
+
+      const baseRatio = Math.max(referenceBox.w / layer.width, referenceBox.h / layer.height);
+      const drawW = layer.width * baseRatio;
+      const drawH = layer.height * baseRatio;
+
+      const px = (ux + drawW / 2) / baseRatio;
+      const py = (uy + drawH / 2) / baseRatio;
+      return { px, py, baseRatio: baseRatio * layer.scale };
+    }
+
+    /**
+     * Draws the signature Yellow/Gold curved L-brackets inside the top-left and bottom-right of the Art Box
+     */
+    function drawArtCornerBrackets(ctx, artBox) {
+      ctx.save();
+      ctx.strokeStyle = getActiveAccentColor('gold');
+      ctx.lineWidth = 15;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      const inset = 22;
+      const cornerR = 32;
+      const armLen = 96;
+
+      // Top-Left Bracket
+      const tlX = artBox.x + inset;
+      const tlY = artBox.y + inset;
+      ctx.beginPath();
+      ctx.moveTo(tlX, tlY + armLen);
+      ctx.lineTo(tlX, tlY + cornerR);
+      ctx.arcTo(tlX, tlY, tlX + cornerR, tlY, cornerR);
+      ctx.lineTo(tlX + armLen, tlY);
+      ctx.stroke();
+
+      // Bottom-Right Bracket
+      const brX = artBox.x + artBox.w - inset;
+      const brY = artBox.y + artBox.h - inset;
+      ctx.beginPath();
+      ctx.moveTo(brX - armLen, brY);
+      ctx.lineTo(brX - cornerR, brY);
+      ctx.arcTo(brX, brY, brX, brY - cornerR, cornerR);
+      ctx.lineTo(brX, brY - armLen);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    /**
+     * Draws the Top-Right white/dark cutout badge with drop shadow, rounded square outline, and Custom Emoji
+     */
+    function drawTopRightEmojiBadge(ctx) {
+      ctx.save();
+
+      // Clip to the Art Box rounded rectangle so the badge's top-right edge merges seamlessly with the card interior
+      roundRectPath(
+        ctx,
+        INNER_BORDER.x + 5,
+        INNER_BORDER.y + 5,
+        INNER_BORDER.w - 10,
+        INNER_BORDER.h - 10,
+        INNER_BORDER.r - 5
+      );
+      ctx.clip();
+
+      // Draw Cutout Tab Path (rounded bottom-left corner)
+      const bx = BADGE_TAB.x;
+      const by = BADGE_TAB.y;
+      const bw = BADGE_TAB.w;
+      const bh = BADGE_TAB.h;
+      const br = BADGE_TAB.bottomLeftRadius;
+
+      ctx.save();
+      ctx.shadowColor = cardState.theme === 'light' ? 'rgba(15, 23, 42, 0.14)' : 'rgba(0, 0, 0, 0.55)';
+      ctx.shadowBlur = 18;
+      ctx.shadowOffsetX = -2;
+      ctx.shadowOffsetY = 8;
+
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(bx + bw, by);
+      ctx.lineTo(bx + bw, by + bh);
+      ctx.lineTo(bx + br, by + bh);
+      ctx.arcTo(bx, by + bh, bx, by + bh - br, br);
+      ctx.closePath();
+
+      ctx.fillStyle = cardState.colors.cardBg;
+      ctx.fill();
+      ctx.restore();
+
+      // Rounded-Square Outline inside the Badge
+      if (cardState.showEmojiBoxOutline) {
+        ctx.save();
+        roundRectPath(ctx, EMOJI_SQUARE.x, EMOJI_SQUARE.y, EMOJI_SQUARE.w, EMOJI_SQUARE.h, EMOJI_SQUARE.r);
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = cardState.colors.emojiSquareStroke;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Custom Emoji inside the Rounded Square
+      if (cardState.emoji && cardState.emoji.trim() !== '') {
+        ctx.save();
+        const fontSize = Math.round(78 * cardState.emojiSizeScale);
+        ctx.font = `${fontSize}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "${cardState.fontTitle}", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = cardState.colors.primary;
+        ctx.fillText(
+          cardState.emoji.trim(),
+          EMOJI_SQUARE.x + EMOJI_SQUARE.w / 2,
+          EMOJI_SQUARE.y + EMOJI_SQUARE.h / 2 + 4
+        );
+        ctx.restore();
+      }
+
+      ctx.restore();
+    }
+
+    /**
+     * Draws the horizontal Teal pill bar centered at the bottom edge of the Art Box
+     */
+    function drawCenterTealPill(ctx, artBox) {
+      ctx.save();
+      const pillW = 456;
+      const pillH = 16;
+      const pillX = CANVAS_W / 2 - pillW / 2;
+      const pillY = artBox.y + artBox.h - pillH;
+
+      ctx.beginPath();
+      ctx.moveTo(pillX, pillY + pillH);
+      ctx.lineTo(pillX + 10, pillY);
+      ctx.lineTo(pillX + pillW - 10, pillY);
+      ctx.lineTo(pillX + pillW, pillY + pillH);
+      ctx.closePath();
+
+      ctx.fillStyle = getActiveAccentColor('teal');
+      ctx.fill();
+      ctx.restore();
+    }
+
+    /**
+     * Draws the Card Rarity indicator (Badge Pill or Minimal Gem + Text)
+     */
+    function drawRarityIndicator(ctx, x, y, align = 'left') {
+      if (!cardState.showRarity) return;
+      const tier = RARITY_TIERS[cardState.rarity] || RARITY_TIERS.Common;
+      const isDark = cardState.theme === 'dark';
+      const textColor = isDark ? tier.darkColor : tier.color;
+      const bgFill = isDark ? tier.bgDark : tier.bgLight;
+      const labelText = `${tier.symbol} ${tier.name}`;
+
+      ctx.save();
+      ctx.font = `700 28px "${cardState.fontStats}", sans-serif`;
+      ctx.textBaseline = 'middle';
+
+      const charSpacing = 4;
+      const chars = Array.from(labelText);
+      let textW = 0;
+      chars.forEach(ch => { textW += ctx.measureText(ch).width; });
+      textW += charSpacing * Math.max(0, chars.length - 1);
+
+      if (cardState.rarityStyle === 'minimal') {
+        ctx.fillStyle = textColor;
+        drawTrackedText(ctx, labelText, x, y, charSpacing, align);
+      } else {
+        // Badge Pill or Full Rarity Accent Pill
+        const padX = 24;
+        const pillH = 48;
+        const pillW = textW + padX * 2;
+        let pillX = x;
+        if (align === 'center') pillX = x - pillW / 2;
+        else if (align === 'right') pillX = x - pillW;
+        const pillY = y - pillH / 2;
+
+        roundRectPath(ctx, pillX, pillY, pillW, pillH, 24);
+        ctx.fillStyle = bgFill;
+        ctx.fill();
+
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = tier.border;
+        ctx.stroke();
+
+        ctx.fillStyle = textColor;
+        drawTrackedText(ctx, labelText, pillX + pillW / 2, y + 1, charSpacing, 'center');
+      }
+      ctx.restore();
+    }
+
+    /**
+     * Draws the bold TITLE, top/bottom horizontal dividers, vertical divider, and 5 Stat rows
+     */
+    function drawTitleAndStatsTable(ctx, layout) {
+      const lineLeft = 248;
+      const lineRight = 1402;
+
+      // 1. TITLE
+      ctx.save();
+      const baseTitlePx = Math.round(82 * cardState.titleSizeScale);
+      ctx.font = `800 ${baseTitlePx}px "${cardState.fontTitle}", sans-serif`;
+      ctx.fillStyle = cardState.colors.primary;
+      ctx.textBaseline = 'middle';
+      drawTrackedText(
+        ctx,
+        (cardState.title || '').toUpperCase(),
+        CANVAS_W / 2 + 4,
+        layout.titleY,
+        14 * cardState.titleSizeScale,
+        'center'
+      );
+      ctx.restore();
+
+      // Optional Rarity centered right below Title
+      if (cardState.showRarity && cardState.rarityPosition === 'belowTitle') {
+        drawRarityIndicator(ctx, CANVAS_W / 2, layout.subTitleRarityY, 'center');
+      }
+
+      // 2. Top Dark Horizontal Divider Line
+      const topDividerY = layout.topDividerY;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(lineLeft, topDividerY);
+      ctx.lineTo(lineRight, topDividerY);
+      ctx.lineWidth = 4.5;
+      ctx.strokeStyle = cardState.colors.primary;
+      ctx.stroke();
+      ctx.restore();
+
+      // 3. Five Stat Rows
+      const rowStartY = layout.rowStartY;
+      const rowHeight = layout.rowHeight;
+      const splitX = 1084; // Vertical divider X (~64% across table)
+      const labelCenterX = lineLeft + (splitX - lineLeft) / 2;
+      const valueCenterX = splitX + (lineRight - splitX) / 2;
+      const statFontPx = Math.round(Math.min(50, rowHeight * 0.56));
+
+      for (let i = 0; i < 5; i++) {
+        const rowTop = rowStartY + i * rowHeight;
+        const rowCenterY = rowTop + rowHeight / 2;
+        const rowBottom = rowTop + rowHeight;
+
+        // Stat Label (Left Column)
+        ctx.save();
+        ctx.font = `500 ${statFontPx}px "${cardState.fontStats}", sans-serif`;
+        ctx.fillStyle = cardState.colors.primary;
+        ctx.textBaseline = 'middle';
+        drawTrackedText(
+          ctx,
+          (cardState.stats[i].label || '').toUpperCase(),
+          labelCenterX,
+          rowCenterY + 2,
+          6,
+          'center'
+        );
+        ctx.restore();
+
+        // Stat Number / Value (Right Column)
+        if (cardState.stats[i].value && cardState.stats[i].value.trim() !== '') {
+          ctx.save();
+          ctx.font = `700 ${statFontPx + 2}px "${cardState.fontStats}", sans-serif`;
+          ctx.fillStyle = cardState.colors.primary;
+          ctx.textBaseline = 'middle';
+          drawTrackedText(
+            ctx,
+            cardState.stats[i].value.trim(),
+            valueCenterX,
+            rowCenterY + 2,
+            3,
+            'center'
+          );
+          ctx.restore();
+        }
+
+        // Thin Grey Horizontal Row Separator (for rows 0..3)
+        if (i < 4) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(lineLeft, rowBottom);
+          ctx.lineTo(lineRight, rowBottom);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = cardState.colors.rowLine;
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      // 4. Vertical Divider Line between Labels and Numbers
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(splitX, rowStartY + 6);
+      ctx.lineTo(splitX, rowStartY + 5 * rowHeight - 6);
+      ctx.lineWidth = 4.5;
+      ctx.strokeStyle = cardState.colors.primary;
+      ctx.stroke();
+      ctx.restore();
+
+      // 5. Bottom Dark Horizontal Divider Line
+      const bottomDividerY = layout.bottomDividerY;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(lineLeft, bottomDividerY);
+      ctx.lineTo(lineRight, bottomDividerY);
+      ctx.lineWidth = 4.5;
+      ctx.strokeStyle = cardState.colors.primary;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    /**
+     * Draws the Auto-Wrapping Description (DESC.), Bottom-Left Rarity Badge, and Bottom-Right Card Number (1/107)
+     */
+    function drawDescriptionAndNumber(ctx, layout) {
+      // 1. Auto-Wrapping & Auto-Fitting Description Text
+      const descText = cardState.desc || '';
+      if (descText.trim() !== '') {
+        ctx.save();
+        const isDefaultPlaceholder = descText.trim().toUpperCase() === 'DESC.';
+        const preferredPx = isDefaultPlaceholder
+          ? Math.round(96 * cardState.descSizeScale)
+          : Math.round(42 * cardState.descSizeScale);
+
+        ctx.fillStyle = cardState.colors.primary;
+        ctx.textBaseline = 'middle';
+
+        const boxLeft = 252;
+        const boxRight = 1398;
+        const tracking = isDefaultPlaceholder ? 12 * cardState.descSizeScale : 1.2;
+
+        if (isDefaultPlaceholder) {
+          ctx.font = `300 ${preferredPx}px "${cardState.fontDesc}", sans-serif`;
+          drawTrackedText(
+            ctx,
+            descText.trim(),
+            CANVAS_W / 2,
+            (layout.descTopY + layout.descBottomY) / 2,
+            tracking,
+            cardState.descAlign || 'center'
+          );
+        } else {
+          drawAutoFitWrappedDescription(
+            ctx,
+            descText,
+            boxLeft,
+            boxRight,
+            layout.descTopY,
+            layout.descBottomY,
+            preferredPx,
+            cardState.fontDesc,
+            tracking,
+            cardState.descAlign || 'center'
+          );
+        }
+        ctx.restore();
+      }
+
+      // 2. Bottom-Left Rarity Indicator (aligned with Card Number on bottom-right)
+      if (cardState.showRarity && cardState.rarityPosition === 'bottomLeft') {
+        drawRarityIndicator(ctx, 248, layout.footerCenterY, 'left');
+      }
+
+      // 3. Bottom-Right Card Number (e.g., 1/107)
+      if (cardState.cardNumber && cardState.cardNumber.trim() !== '') {
+        ctx.save();
+        ctx.font = `500 38px "${cardState.fontStats}", sans-serif`;
+        ctx.fillStyle = cardState.colors.primary;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(cardState.cardNumber.trim(), 1422, layout.footerCenterY + 2);
+        ctx.restore();
+      }
+    }
+
+    /**
+     * Draws the Cut Zone (Green) and Safe Zone (Red) print guide rectangles matching Reference Image 2
+     */
+    function drawPrintGuides(ctx, showCut, showSafe) {
+      ctx.save();
+
+      // Cut Zone — Outer Green Rectangle (#4caf50 / #22c55e)
+      if (showCut) {
+        ctx.strokeStyle = '#4caf50';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(CUT_RECT.x, CUT_RECT.y, CUT_RECT.w, CUT_RECT.h);
+
+        if (cardState.showGuideLabels) {
+          ctx.fillStyle = '#4caf50';
+          ctx.font = 'bold 24px Inter, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText('CUT ZONE (GREEN)', CUT_RECT.x + 12, CUT_RECT.y - 14);
+        }
+      }
+
+      // Safe Zone — Inner Red Rectangle (#e53935 / #ef4444)
+      if (showSafe) {
+        ctx.strokeStyle = '#e53935';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(SAFE_RECT.x, SAFE_RECT.y, SAFE_RECT.w, SAFE_RECT.h);
+
+        if (cardState.showGuideLabels) {
+          ctx.fillStyle = '#e53935';
+          ctx.font = 'bold 24px Inter, sans-serif';
+          ctx.textAlign = 'right';
+          ctx.fillText('SAFE ZONE (RED)', SAFE_RECT.x + SAFE_RECT.w - 12, SAFE_RECT.y - 14);
+        }
+      }
+
+      ctx.restore();
+    }
+
+    /*************************************************************************
+     * 5. INTERACTIVE ARTWORK PAN, ZOOM, EYEDROPPER & TOUCH-UP BRUSH ON CANVAS
+     *************************************************************************/
+    let isDraggingArt = false;
+    let isPaintingBrush = false;
+    let dragStartPointer = { x: 0, y: 0 };
+    let dragStartArtOffset = { x: 0, y: 0 };
+
+    function getCanvasScaleRatio() {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        rect,
+        scaleX: CANVAS_W / rect.width,
+        scaleY: CANVAS_H / rect.height
+      };
+    }
+
+    function getPointerCardCoords(e) {
+      const { rect, scaleX, scaleY } = getCanvasScaleRatio();
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+      };
+    }
+
+    function rgbToHex(r, g, b) {
+      return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+    }
+
+    /**
+     * Samples the RGB pixel at card canvas coordinates `(cx, cy)`
+     */
+    function sampleCanvasColorAt(cx, cy) {
+      const ix = Math.max(0, Math.min(CANVAS_W - 1, Math.round(cx)));
+      const iy = Math.max(0, Math.min(CANVAS_H - 1, Math.round(cy)));
+      const pixel = ctx.getImageData(ix, iy, 1, 1).data;
+      return { r: pixel[0], g: pixel[1], b: pixel[2], hex: rgbToHex(pixel[0], pixel[1], pixel[2]) };
+    }
+
+    /**
+     * Applies an Erase or Restore brush dab on the active layer's `userBrushMask`
+     */
+    function applyTouchUpBrushAt(cx, cy) {
+      const layer = getActiveLayer();
+      if (!layer || layer.locked) return;
+      const mapped = mapCardCanvasPointToLayerPixel(cx, cy, layer);
+      if (!mapped) return;
+
+      const { px, py, baseRatio } = mapped;
+      const radiusInLayer = Math.max(2, cardState.brushSize / Math.max(0.15, Math.abs(baseRatio)));
+      const rSq = radiusInLayer * radiusInLayer;
+
+      const minX = Math.max(0, Math.floor(px - radiusInLayer));
+      const maxX = Math.min(layer.width - 1, Math.ceil(px + radiusInLayer));
+      const minY = Math.max(0, Math.floor(py - radiusInLayer));
+      const maxY = Math.min(layer.height - 1, Math.ceil(py + radiusInLayer));
+
+      const isErase = cardState.editorTool === 'brush-erase';
+      const w = layer.width;
+      const bMask = layer.userBrushMask;
+      let modified = false;
+
+      for (let y = minY; y <= maxY; y++) {
+        const dy = y - py;
+        const rowOff = y * w;
+        for (let x = minX; x <= maxX; x++) {
+          const dx = x - px;
+          const dSq = dx * dx + dy * dy;
+          if (dSq <= rSq) {
+            const dist = Math.sqrt(dSq) / radiusInLayer;
+            const falloff = 1.0 - dist * dist; // Soft radial falloff
+            const delta = Math.round(255 * falloff);
+            const idx = rowOff + x;
+            bMask[idx] = isErase
+              ? Math.max(-255, bMask[idx] - delta)
+              : Math.min(255, bMask[idx] + delta);
+            modified = true;
+          }
+        }
+      }
+
+      if (modified) {
+        layer.hasBrushEdits = true;
+        rebuildLayerProcessedCanvas(layer);
+        renderCard();
+      }
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      const pt = getPointerCardCoords(e);
+
+      // 1. Eyedropper Mode (Art Background Color or Subject Cutout Color Key)
+      if (cardState.editorTool === 'eyedropper-bg') {
+        const sampled = sampleCanvasColorAt(pt.x, pt.y);
+        setArtBoxColor(sampled.hex);
+        setEditorTool('move');
+        showToast(`Sampled Art Background Color: ${sampled.hex.toUpperCase()}`);
+        return;
+      }
+
+      if (cardState.editorTool === 'eyedropper-cutout') {
+        const layer = getActiveLayer();
+        if (layer) {
+          // Sample directly from the active layer's original pixels if inside layer bounds, else canvas
+          const mapped = mapCardCanvasPointToLayerPixel(pt.x, pt.y, layer);
+          let r = 255, g = 255, b = 255;
+          if (mapped && mapped.px >= 0 && mapped.px < layer.width && mapped.py >= 0 && mapped.py < layer.height) {
+            const idx = (Math.floor(mapped.py) * layer.width + Math.floor(mapped.px)) * 4;
+            r = layer.originalImageData.data[idx];
+            g = layer.originalImageData.data[idx + 1];
+            b = layer.originalImageData.data[idx + 2];
+          } else {
+            const s = sampleCanvasColorAt(pt.x, pt.y);
+            r = s.r; g = s.g; b = s.b;
+          }
+          const hex = rgbToHex(r, g, b);
+          document.getElementById('cutoutKeyColorSwatch').style.backgroundColor = hex;
+          layer.cutoutActive = true;
+          layer.cutoutColors = [[r, g, b]];
+          computeLayerAutoMask(layer);
+          rebuildLayerProcessedCanvas(layer);
+          renderCard();
+          showToast(`Removed background color ${hex.toUpperCase()} on "${layer.name}"!`);
+        }
+        setEditorTool('move');
+        return;
+      }
+
+      // 2. Manual Touch-Up Brush Mode (Erase / Restore)
+      if (cardState.editorTool === 'brush-erase' || cardState.editorTool === 'brush-restore') {
+        isPaintingBrush = true;
+        canvas.setPointerCapture(e.pointerId);
+        cardState.hoverCanvasPt = pt;
+        applyTouchUpBrushAt(pt.x, pt.y);
+        return;
+      }
+
+      // 3. Default Move / Pan Active Layer Mode
+      const activeLayer = getActiveLayer();
+      if (!activeLayer || activeLayer.locked) return;
+      isDraggingArt = true;
+      canvas.setPointerCapture(e.pointerId);
+      dragStartPointer = { x: e.clientX, y: e.clientY };
+      dragStartArtOffset = { x: activeLayer.x, y: activeLayer.y };
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      const pt = getPointerCardCoords(e);
+
+      // Live swatch preview during Eyedropper hover
+      if (cardState.editorTool === 'eyedropper-bg' || cardState.editorTool === 'eyedropper-cutout') {
+        const sampled = sampleCanvasColorAt(pt.x, pt.y);
+        const swatch = document.getElementById('eyedropperLiveSwatch');
+        if (swatch) swatch.style.backgroundColor = sampled.hex;
+        return;
+      }
+
+      // Live Brush Cursor & Painting
+      if (cardState.editorTool === 'brush-erase' || cardState.editorTool === 'brush-restore') {
+        cardState.hoverCanvasPt = pt;
+        if (isPaintingBrush) {
+          applyTouchUpBrushAt(pt.x, pt.y);
+        } else {
+          renderCard();
+        }
+        return;
+      }
+
+      if (!isDraggingArt) return;
+      const activeLayer = getActiveLayer();
+      if (!activeLayer || activeLayer.locked) return;
+
+      const { scaleX, scaleY } = getCanvasScaleRatio();
+      const dx = (e.clientX - dragStartPointer.x) * scaleX;
+      const dy = (e.clientY - dragStartPointer.y) * scaleY;
+
+      activeLayer.x = Math.round(dragStartArtOffset.x + dx);
+      activeLayer.y = Math.round(dragStartArtOffset.y + dy);
+
+      updateArtSlidersUI();
+      renderCard();
+    });
+
+    canvas.addEventListener('pointerup', (e) => {
+      if (isDraggingArt) {
+        isDraggingArt = false;
+        canvas.releasePointerCapture(e.pointerId);
+      }
+      if (isPaintingBrush) {
+        isPaintingBrush = false;
+        canvas.releasePointerCapture(e.pointerId);
+      }
+    });
+
+    canvas.addEventListener('pointerleave', () => {
+      if (cardState.hoverCanvasPt) {
+        cardState.hoverCanvasPt = null;
+        renderCard();
+      }
+    });
+
+    // Escape key exits Eyedropper or Brush tool back to Move mode
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && cardState.editorTool !== 'move') {
+        setEditorTool('move');
+      }
+    });
+
+    // Mouse Wheel Zoom on Active Layer
+    canvas.addEventListener('wheel', (e) => {
+      const activeLayer = getActiveLayer();
+      if (!activeLayer || activeLayer.locked) return;
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 0.06 : -0.06;
+      activeLayer.scale = Math.min(4.0, Math.max(0.10, +(activeLayer.scale + zoomFactor).toFixed(2)));
+      updateArtSlidersUI();
+      renderCard();
+    }, { passive: false });
+
+    // Drag and Drop Artwork File(s) onto Card Viewport (Multi-file Layering)
+    const dropZone = document.getElementById('canvasDropZone');
+    const dropOverlay = document.getElementById('dropOverlay');
+
+    ['dragenter', 'dragover'].forEach(evtName => {
+      dropZone.addEventListener(evtName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropOverlay.classList.remove('opacity-0');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(evtName => {
+      dropZone.addEventListener(evtName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropOverlay.classList.add('opacity-0');
+      });
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) {
+        Array.from(files).forEach(f => loadArtFromFile(f));
+      }
+    });
+
+    /*************************************************************************
+     * 6. UI CONTROLS, MULTI-LAYER STACK & IMAGE EDITING SYNCHRONIZATION
+     *************************************************************************/
+    function switchTab(tabId) {
+      const tabs = ['art', 'stats', 'style', 'export'];
+      tabs.forEach(t => {
+        const panel = document.getElementById(`tabPanel-${t}`);
+        const btn = document.getElementById(`tabBtn-${t}`);
+        if (t === tabId) {
+          panel.classList.remove('hidden');
+          btn.className = 'tab-btn py-2.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all bg-teal-500/20 text-teal-300 border border-teal-500/40';
+        } else {
+          panel.classList.add('hidden');
+          btn.className = 'tab-btn py-2.5 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all text-slate-400 hover:text-slate-200 border border-transparent';
+        }
+      });
+    }
+
+    function handleArtUpload(event) {
+      const files = event.target.files;
+      if (files && files.length > 0) {
+        Array.from(files).forEach(file => loadArtFromFile(file));
+        event.target.value = '';
+      }
+    }
+
+    function loadArtFromFile(file) {
+      if (!file.type.startsWith('image/')) {
+        showToast('Please select a valid image file.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const cleanName = file.name.replace(/\.[^/.]+$/, '').slice(0, 22) || `Layer ${cardState.artLayers.length + 1}`;
+          const newLayer = createArtLayer(img, cleanName);
+          cardState.artLayers.push(newLayer);
+          cardState.activeLayerId = newLayer.id;
+          document.getElementById('btnRemoveArt').classList.remove('hidden');
+          renderLayerStackUI();
+          syncLayerInspectorUI();
+          renderCard();
+          showToast(`Added layer "${cleanName}"!`);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearArtwork() {
+      cardState.artLayers = [];
+      cardState.activeLayerId = null;
+      document.getElementById('artFileInput').value = '';
+      document.getElementById('btnRemoveArt').classList.add('hidden');
+      setEditorTool('move');
+      renderLayerStackUI();
+      syncLayerInspectorUI();
+      renderCard();
+      showToast('All artwork layers cleared.');
+    }
+
+    /**
+     * Renders the visual Multi-Layer Stack list with thumbnails, visibility, lock, reorder, duplicate & delete
+     */
+    function renderLayerStackUI() {
+      const container = document.getElementById('layerStackList');
+      const countBadge = document.getElementById('lblLayerCount');
+      const removeAllBtn = document.getElementById('btnRemoveArt');
+
+      const count = cardState.artLayers.length;
+      if (countBadge) countBadge.textContent = `${count} ${count === 1 ? 'Layer' : 'Layers'}`;
+      if (removeAllBtn) {
+        if (count > 0) removeAllBtn.classList.remove('hidden');
+        else removeAllBtn.classList.add('hidden');
+      }
+
+      if (!container) return;
+      if (count === 0) {
+        container.innerHTML = `
+          <div class="text-center py-3 px-3 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] text-slate-400">
+            No artwork layers yet. Upload images above or click a Built-in Layer button to start compositing!
+          </div>`;
+        return;
+      }
+
+      // Show top-most layer first in the visual stack list (reverse index order)
+      let html = '';
+      for (let i = count - 1; i >= 0; i--) {
+        const l = cardState.artLayers[i];
+        const isActive = l.id === (getActiveLayer()?.id);
+        const rowCls = isActive
+          ? 'bg-teal-500/15 border-teal-400/70 text-white'
+          : 'bg-slate-900/80 border-slate-700/80 text-slate-300 hover:border-slate-600';
+
+        const badges = [];
+        if (l.cutoutActive || l.hasBrushEdits) badges.push('Cutout');
+        if (l.edgeFeather > 0) badges.push('Feathered');
+        if (l.shadowEnabled) badges.push('Shadow');
+
+        html += `
+          <div onclick="selectArtLayer('${l.id}')" class="flex items-center justify-between gap-2 p-2 rounded-xl border ${rowCls} cursor-pointer transition-all">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <img src="${l.thumbUrl}" alt="" class="w-9 h-9 rounded-lg object-cover bg-slate-800 border border-slate-600 shrink-0" />
+              <div class="min-w-0">
+                <div class="text-xs font-bold truncate flex items-center gap-1.5">
+                  <span>${l.name}</span>
+                  ${i === count - 1 ? '<span class="text-[9px] uppercase px-1.5 py-0.2 rounded bg-slate-800 text-teal-300 border border-slate-700">Top</span>' : ''}
+                </div>
+                <div class="text-[10px] text-slate-400 truncate">
+                  Scale ${Math.round(l.scale * 100)}% • Opacity ${Math.round(l.opacity * 100)}% ${badges.length ? '• ' + badges.join(', ') : ''}
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
+              <button type="button" onclick="toggleLayerVisible('${l.id}')" title="Toggle Visibility" class="p-1.5 rounded-lg hover:bg-slate-700/80 ${l.visible ? 'text-teal-300' : 'text-slate-600'}">
+                ${l.visible ? '👁️' : '🚫'}
+              </button>
+              <button type="button" onclick="toggleLayerLock('${l.id}')" title="Lock / Unlock Layer" class="p-1.5 rounded-lg hover:bg-slate-700/80 ${l.locked ? 'text-amber-400' : 'text-slate-500'}">
+                ${l.locked ? '🔒' : '🔓'}
+              </button>
+              <button type="button" onclick="moveLayerOrder('${l.id}', 1)" title="Move Layer Up (Forward)" class="p-1 rounded-lg hover:bg-slate-700/80 text-slate-300 text-xs font-bold" ${i === count - 1 ? 'disabled style="opacity:0.3"' : ''}>↑</button>
+              <button type="button" onclick="moveLayerOrder('${l.id}', -1)" title="Move Layer Down (Backward)" class="p-1 rounded-lg hover:bg-slate-700/80 text-slate-300 text-xs font-bold" ${i === 0 ? 'disabled style="opacity:0.3"' : ''}>↓</button>
+              <button type="button" onclick="duplicateArtLayer('${l.id}')" title="Duplicate Layer" class="p-1 rounded-lg hover:bg-slate-700/80 text-slate-300 text-xs">⧉</button>
+              <button type="button" onclick="deleteArtLayer('${l.id}')" title="Delete Layer" class="p-1 rounded-lg hover:bg-rose-500/20 text-rose-400 text-xs font-bold">✕</button>
+            </div>
+          </div>
+        `;
+      }
+      container.innerHTML = html;
+    }
+
+    function selectArtLayer(layerId) {
+      cardState.activeLayerId = layerId;
+      renderLayerStackUI();
+      syncLayerInspectorUI();
+      renderCard();
+    }
+
+    function toggleLayerVisible(layerId) {
+      const l = cardState.artLayers.find(x => x.id === layerId);
+      if (!l) return;
+      l.visible = !l.visible;
+      renderLayerStackUI();
+      renderCard();
+    }
+
+    function toggleLayerLock(layerId) {
+      const l = cardState.artLayers.find(x => x.id === layerId);
+      if (!l) return;
+      l.locked = !l.locked;
+      renderLayerStackUI();
+      showToast(l.locked ? `Locked "${l.name}"` : `Unlocked "${l.name}"`);
+    }
+
+    function moveLayerOrder(layerId, dir) {
+      const idx = cardState.artLayers.findIndex(x => x.id === layerId);
+      if (idx === -1) return;
+      const targetIdx = idx + dir;
+      if (targetIdx < 0 || targetIdx >= cardState.artLayers.length) return;
+      const temp = cardState.artLayers[idx];
+      cardState.artLayers[idx] = cardState.artLayers[targetIdx];
+      cardState.artLayers[targetIdx] = temp;
+      renderLayerStackUI();
+      renderCard();
+    }
+
+    function duplicateArtLayer(layerId) {
+      const src = cardState.artLayers.find(x => x.id === layerId);
+      if (!src) return;
+      const clone = createArtLayer(src.origCanvas, src.name + ' Copy');
+      clone.x = src.x + 35;
+      clone.y = src.y + 35;
+      clone.scale = src.scale;
+      clone.rotation = src.rotation;
+      clone.flipH = src.flipH;
+      clone.flipV = src.flipV;
+      clone.opacity = src.opacity;
+      clone.blendMode = src.blendMode;
+      clone.cutoutActive = src.cutoutActive;
+      clone.cutoutMode = src.cutoutMode;
+      clone.cutoutColors = src.cutoutColors.map(c => [...c]);
+      clone.cutoutTolerance = src.cutoutTolerance;
+      clone.cutoutSoftness = src.cutoutSoftness;
+      clone.autoMask.set(src.autoMask);
+      clone.userBrushMask.set(src.userBrushMask);
+      clone.hasBrushEdits = src.hasBrushEdits;
+      clone.edgeFeather = src.edgeFeather;
+      clone.featherMode = src.featherMode;
+      clone.shadowEnabled = src.shadowEnabled;
+      clone.shadowBlur = src.shadowBlur;
+      clone.shadowY = src.shadowY;
+      clone.shadowColor = src.shadowColor;
+      clone.filterBlur = src.filterBlur;
+      clone.filterBright = src.filterBright;
+      clone.filterContrast = src.filterContrast;
+      clone.filterSat = src.filterSat;
+      rebuildLayerProcessedCanvas(clone);
+
+      cardState.artLayers.push(clone);
+      cardState.activeLayerId = clone.id;
+      renderLayerStackUI();
+      syncLayerInspectorUI();
+      renderCard();
+      showToast(`Duplicated "${src.name}"`);
+    }
+
+    function deleteArtLayer(layerId) {
+      const idx = cardState.artLayers.findIndex(x => x.id === layerId);
+      if (idx === -1) return;
+      const removed = cardState.artLayers.splice(idx, 1)[0];
+      if (cardState.activeLayerId === layerId) {
+        cardState.activeLayerId = cardState.artLayers[cardState.artLayers.length - 1]?.id || null;
+      }
+      renderLayerStackUI();
+      syncLayerInspectorUI();
+      renderCard();
+      showToast(`Deleted layer "${removed.name}"`);
+    }
+
+    /**
+     * Synchronizes all per-layer inspector sliders (transform, cutout, feather, filters) to the currently selected layer
+     */
+    function syncLayerInspectorUI() {
+      const layer = getActiveLayer();
+      const nameLbl = document.getElementById('lblActiveLayerName');
+      if (!layer) {
+        if (nameLbl) nameLbl.textContent = 'No Layer Selected';
+        return;
+      }
+      if (nameLbl) nameLbl.textContent = layer.name;
+
+      updateArtSlidersUI();
+
+      // Cutout controls
+      document.getElementById('selCutoutMode').value = layer.cutoutMode || 'flood';
+      document.getElementById('rngCutoutTolerance').value = layer.cutoutTolerance;
+      document.getElementById('lblCutoutTolerance').textContent = layer.cutoutTolerance;
+      document.getElementById('rngCutoutSoftness').value = layer.cutoutSoftness;
+      document.getElementById('lblCutoutSoftness').textContent = `${layer.cutoutSoftness} px`;
+      if (layer.cutoutColors && layer.cutoutColors.length > 0) {
+        const c = layer.cutoutColors[0];
+        document.getElementById('cutoutKeyColorSwatch').style.backgroundColor = rgbToHex(c[0], c[1], c[2]);
+      }
+
+      // Edge Feather & FX controls
+      document.getElementById('rngEdgeFeather').value = layer.edgeFeather;
+      document.getElementById('lblEdgeFeather').textContent = `${layer.edgeFeather}%`;
+      document.getElementById('selFeatherMode').value = layer.featherMode || 'rect';
+
+      document.getElementById('chkLayerShadow').checked = !!layer.shadowEnabled;
+      const shadowBox = document.getElementById('layerShadowControls');
+      if (layer.shadowEnabled) shadowBox.classList.remove('hidden');
+      else shadowBox.classList.add('hidden');
+      document.getElementById('rngShadowBlur').value = layer.shadowBlur;
+      document.getElementById('rngShadowY').value = layer.shadowY;
+      document.getElementById('clrShadowColor').value = layer.shadowColor || '#000000';
+
+      document.getElementById('rngFilterBlur').value = layer.filterBlur;
+      document.getElementById('lblFilterBlur').textContent = `${layer.filterBlur} px`;
+      document.getElementById('rngFilterBright').value = layer.filterBright;
+      document.getElementById('lblFilterBright').textContent = `${layer.filterBright}%`;
+      document.getElementById('rngFilterContrast').value = layer.filterContrast;
+      document.getElementById('lblFilterContrast').textContent = `${layer.filterContrast}%`;
+      document.getElementById('rngFilterSat').value = layer.filterSat;
+      document.getElementById('lblFilterSat').textContent = `${layer.filterSat}%`;
+    }
+
+    function onArtSliderChange() {
+      const layer = getActiveLayer();
+      if (!layer) return;
+      layer.scale = parseInt(document.getElementById('rngArtScale').value, 10) / 100;
+      layer.x = parseInt(document.getElementById('rngArtX').value, 10);
+      layer.y = parseInt(document.getElementById('rngArtY').value, 10);
+      layer.rotation = parseInt(document.getElementById('rngArtRot').value, 10);
+      layer.opacity = parseInt(document.getElementById('rngLayerOpacity').value, 10) / 100;
+      layer.blendMode = document.getElementById('selLayerBlend').value;
+      updateArtSlidersUI();
+      renderLayerStackUI();
+      renderCard();
+    }
+
+    function updateArtSlidersUI() {
+      const layer = getActiveLayer();
+      const scaleVal = layer ? Math.round(layer.scale * 100) : 100;
+      const xVal = layer ? layer.x : 0;
+      const yVal = layer ? layer.y : 0;
+      const rotVal = layer ? layer.rotation : 0;
+      const opVal = layer ? Math.round(layer.opacity * 100) : 100;
+
+      document.getElementById('rngArtScale').value = scaleVal;
+      document.getElementById('lblArtScale').textContent = `${scaleVal}%`;
+
+      document.getElementById('rngArtX').value = xVal;
+      document.getElementById('lblArtX').textContent = `${xVal} px`;
+
+      document.getElementById('rngArtY').value = yVal;
+      document.getElementById('lblArtY').textContent = `${yVal} px`;
+
+      document.getElementById('rngArtRot').value = rotVal;
+      document.getElementById('lblArtRot').textContent = `${rotVal}°`;
+
+      const opSlider = document.getElementById('rngLayerOpacity');
+      if (opSlider) {
+        opSlider.value = opVal;
+        document.getElementById('lblLayerOpacity').textContent = `${opVal}%`;
+      }
+      const blendSel = document.getElementById('selLayerBlend');
+      if (blendSel && layer) {
+        blendSel.value = layer.blendMode || 'source-over';
+      }
+    }
+
+    function alignArt(action) {
+      const layer = getActiveLayer();
+      if (!layer || layer.locked) return;
+      if (action === 'center') {
+        layer.x = 0;
+        layer.y = 0;
+      } else if (action === 'cover') {
+        layer.x = 0;
+        layer.y = 0;
+        layer.scale = cardState.fullArt ? 2.4 : 1.05;
+      } else if (action === 'fit') {
+        const activeArtBox = getLayoutMetrics().artBox;
+        const box = cardState.fullArt ? { w: CANVAS_W, h: CANVAS_H } : activeArtBox;
+        const coverRatio = Math.max(box.w / layer.width, box.h / layer.height);
+        const fitRatio = Math.min(box.w / layer.width, box.h / layer.height);
+        layer.scale = +(fitRatio / coverRatio).toFixed(2);
+        layer.x = 0;
+        layer.y = 0;
+      } else if (action === 'flip') {
+        layer.flipH = !layer.flipH;
+      } else if (action === 'flipV') {
+        layer.flipV = !layer.flipV;
+      } else if (action === 'reset') {
+        layer.x = 0;
+        layer.y = 0;
+        layer.scale = 1.0;
+        layer.rotation = 0;
+        layer.flipH = false;
+        layer.flipV = false;
+        layer.opacity = 1.0;
+        layer.blendMode = 'source-over';
+      }
+      updateArtSlidersUI();
+      renderLayerStackUI();
+      renderCard();
+    }
+
+    /**
+     * Art Background Color & Interactive Eyedropper Functions
+     */
+    function setArtBoxColor(hexColor) {
+      if (!hexColor || !/^#[0-9A-Fa-f]{6}$/.test(hexColor.trim())) return;
+      const cleanHex = hexColor.trim().toLowerCase();
+      cardState.colors.artBoxBg = cleanHex;
+      document.getElementById('clrArtBox').value = cleanHex;
+      document.getElementById('clrArtBoxQuick').value = cleanHex;
+      document.getElementById('inpArtBoxHex').value = cleanHex.toUpperCase();
+      renderCard();
+    }
+
+    function activateEyedropper(target) {
+      if (target === 'bg') {
+        setEditorTool(cardState.editorTool === 'eyedropper-bg' ? 'move' : 'eyedropper-bg');
+      } else if (target === 'cutout') {
+        if (!getActiveLayer()) {
+          showToast('Add or select an image layer first!');
+          return;
+        }
+        setEditorTool(cardState.editorTool === 'eyedropper-cutout' ? 'move' : 'eyedropper-cutout');
+      }
+    }
+
+    async function pickNativeScreenColor(target) {
+      if (!('EyeDropper' in window)) return;
+      try {
+        const dropper = new window.EyeDropper();
+        const result = await dropper.open();
+        if (result && result.sRGBHex) {
+          if (target === 'bg') {
+            setArtBoxColor(result.sRGBHex);
+            showToast(`Picked ${result.sRGBHex.toUpperCase()}`);
+          }
+        }
+      } catch (e) {
+        // User canceled native eyedropper
+      }
+    }
+
+    function setEditorTool(toolName) {
+      cardState.editorTool = toolName;
+      cardState.hoverCanvasPt = null;
+
+      const banner = document.getElementById('activeToolBanner');
+      const bannerLabel = document.getElementById('activeToolLabel');
+      const liveSwatch = document.getElementById('eyedropperLiveSwatch');
+      const hintText = document.getElementById('artDragHintText');
+      const brushBox = document.getElementById('brushSettingsBox');
+
+      // Highlight active tool buttons
+      const btnMove = document.getElementById('btnToolMove');
+      const btnErase = document.getElementById('btnToolErase');
+      const btnRestore = document.getElementById('btnToolRestore');
+      const activeCls = 'py-1.5 px-2 rounded-lg text-[11px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/40 transition';
+      const idleCls = 'py-1.5 px-2 rounded-lg text-[11px] font-bold bg-slate-900 hover:bg-slate-700 text-slate-300 border border-slate-700 transition';
+
+      if (btnMove) btnMove.className = toolName === 'move' ? activeCls : idleCls;
+      if (btnErase) btnErase.className = toolName === 'brush-erase' ? 'py-1.5 px-2 rounded-lg text-[11px] font-bold bg-rose-500/25 text-rose-300 border border-rose-500/50 transition' : idleCls;
+      if (btnRestore) btnRestore.className = toolName === 'brush-restore' ? 'py-1.5 px-2 rounded-lg text-[11px] font-bold bg-emerald-500/25 text-emerald-300 border border-emerald-500/50 transition' : idleCls;
+
+      if (toolName === 'move') {
+        banner.classList.add('hidden');
+        canvas.style.cursor = 'grab';
+        if (hintText) hintText.textContent = 'Drag active layer to move • Scroll to zoom';
+        if (brushBox) brushBox.classList.add('hidden');
+      } else if (toolName === 'eyedropper-bg' || toolName === 'eyedropper-cutout') {
+        banner.classList.remove('hidden');
+        liveSwatch.classList.remove('hidden');
+        canvas.style.cursor = 'crosshair';
+        bannerLabel.textContent = toolName === 'eyedropper-bg'
+          ? 'Eyedropper: Click any pixel on the card to set Art Background Color'
+          : 'Cutout Eyedropper: Click the background color on the card you want to remove';
+        if (hintText) hintText.textContent = 'Click on card to sample color • Press Esc to cancel';
+      } else if (toolName === 'brush-erase' || toolName === 'brush-restore') {
+        banner.classList.remove('hidden');
+        liveSwatch.classList.add('hidden');
+        canvas.style.cursor = 'crosshair';
+        bannerLabel.textContent = toolName === 'brush-erase'
+          ? 'Erase Brush Active: Paint directly over the card to erase background areas'
+          : 'Restore Brush Active: Paint directly over the card to restore subject areas';
+        if (hintText) hintText.textContent = 'Paint on card to edit mask • Scroll to zoom';
+        if (brushBox) brushBox.classList.remove('hidden');
+      }
+
+      renderCard();
+    }
+
+    function updateBrushSettingsUI() {
+      cardState.brushSize = parseInt(document.getElementById('rngBrushSize').value, 10) || 45;
+      document.getElementById('lblBrushSize').textContent = `${cardState.brushSize} px`;
+      renderCard();
+    }
+
+    /**
+     * 1-Click Auto Subject Cutout (Samples the 4 corners & perimeter midpoints of the active layer)
+     */
+    function runAutoSubjectCutout() {
+      const layer = getActiveLayer();
+      if (!layer) {
+        showToast('Please add an image layer first!');
+        return;
+      }
+      const w = layer.width;
+      const h = layer.height;
+      const data = layer.originalImageData.data;
+
+      const sampleCoords = [
+        [2, 2], [w - 3, 2], [2, h - 3], [w - 3, h - 3],
+        [Math.floor(w / 2), 2], [2, Math.floor(h / 2)], [w - 3, Math.floor(h / 2)]
+      ];
+      const sampledColors = [];
+      sampleCoords.forEach(([sx, sy]) => {
+        const idx = (Math.max(0, sy) * w + Math.max(0, sx)) * 4;
+        if (data[idx + 3] > 20) {
+          sampledColors.push([data[idx], data[idx + 1], data[idx + 2]]);
+        }
+      });
+
+      if (sampledColors.length === 0) {
+        showToast('Layer corners are already transparent!');
+        return;
+      }
+
+      layer.cutoutActive = true;
+      layer.cutoutColors = sampledColors;
+      const c0 = sampledColors[0];
+      document.getElementById('cutoutKeyColorSwatch').style.backgroundColor = rgbToHex(c0[0], c0[1], c0[2]);
+
+      computeLayerAutoMask(layer);
+      rebuildLayerProcessedCanvas(layer);
+      renderLayerStackUI();
+      renderCard();
+      showToast(`Auto-removed background on "${layer.name}"!`);
+    }
+
+    function onCutoutParamsChange() {
+      const layer = getActiveLayer();
+      if (!layer) return;
+      layer.cutoutMode = document.getElementById('selCutoutMode').value;
+      layer.cutoutTolerance = parseInt(document.getElementById('rngCutoutTolerance').value, 10);
+      layer.cutoutSoftness = parseInt(document.getElementById('rngCutoutSoftness').value, 10);
+
+      document.getElementById('lblCutoutTolerance').textContent = layer.cutoutTolerance;
+      document.getElementById('lblCutoutSoftness').textContent = `${layer.cutoutSoftness} px`;
+
+      if (layer.cutoutActive) {
+        computeLayerAutoMask(layer);
+        rebuildLayerProcessedCanvas(layer);
+        renderCard();
+      }
+    }
+
+    function resetActiveLayerCutout() {
+      const layer = getActiveLayer();
+      if (!layer) return;
+      layer.cutoutActive = false;
+      layer.cutoutColors = [];
+      layer.autoMask.fill(255);
+      layer.userBrushMask.fill(0);
+      layer.hasBrushEdits = false;
+      setEditorTool('move');
+      rebuildLayerProcessedCanvas(layer);
+      renderLayerStackUI();
+      renderCard();
+      showToast(`Restored original uncut image for "${layer.name}".`);
+    }
+
+    /**
+     * Per-Layer Edge Blur / Feather, Drop Shadow & Image Filter Controls
+     */
+    function onLayerEffectsChange() {
+      const layer = getActiveLayer();
+      if (!layer) return;
+
+      const prevFeather = layer.edgeFeather;
+      const prevMode = layer.featherMode;
+
+      layer.edgeFeather = parseInt(document.getElementById('rngEdgeFeather').value, 10) || 0;
+      layer.featherMode = document.getElementById('selFeatherMode').value || 'rect';
+      document.getElementById('lblEdgeFeather').textContent = `${layer.edgeFeather}%`;
+
+      layer.shadowEnabled = document.getElementById('chkLayerShadow').checked;
+      const shadowBox = document.getElementById('layerShadowControls');
+      if (layer.shadowEnabled) shadowBox.classList.remove('hidden');
+      else shadowBox.classList.add('hidden');
+      layer.shadowBlur = parseInt(document.getElementById('rngShadowBlur').value, 10) || 0;
+      layer.shadowY = parseInt(document.getElementById('rngShadowY').value, 10) || 0;
+      layer.shadowColor = document.getElementById('clrShadowColor').value || '#000000';
+
+      layer.filterBlur = parseInt(document.getElementById('rngFilterBlur').value, 10) || 0;
+      layer.filterBright = parseInt(document.getElementById('rngFilterBright').value, 10) || 100;
+      layer.filterContrast = parseInt(document.getElementById('rngFilterContrast').value, 10) || 100;
+      layer.filterSat = parseInt(document.getElementById('rngFilterSat').value, 10) || 100;
+
+      document.getElementById('lblFilterBlur').textContent = `${layer.filterBlur} px`;
+      document.getElementById('lblFilterBright').textContent = `${layer.filterBright}%`;
+      document.getElementById('lblFilterContrast').textContent = `${layer.filterContrast}%`;
+      document.getElementById('lblFilterSat').textContent = `${layer.filterSat}%`;
+
+      if (prevFeather !== layer.edgeFeather || prevMode !== layer.featherMode) {
+        rebuildLayerProcessedCanvas(layer);
+      }
+      renderLayerStackUI();
+      renderCard();
+    }
+
+    function resetActiveLayerEffects() {
+      const layer = getActiveLayer();
+      if (!layer) return;
+      layer.edgeFeather = 0;
+      layer.featherMode = 'rect';
+      layer.shadowEnabled = false;
+      layer.shadowBlur = 24;
+      layer.shadowY = 12;
+      layer.shadowColor = '#000000';
+      layer.filterBlur = 0;
+      layer.filterBright = 100;
+      layer.filterContrast = 100;
+      layer.filterSat = 100;
+      rebuildLayerProcessedCanvas(layer);
+      syncLayerInspectorUI();
+      renderLayerStackUI();
+      renderCard();
+      showToast(`Reset edge feather & filters for "${layer.name}".`);
+    }
+
+    function resetArtBoxHeight() {
+      document.getElementById('rngArtBoxHeight').value = DEFAULT_ART_BOX_HEIGHT;
+      syncStateFromUI();
+    }
+
+    function setRarity(rarityTier) {
+      cardState.rarity = rarityTier;
+      updateRarityButtonsUI();
+      renderCard();
+    }
+
+    function updateRarityButtonsUI() {
+      const tiers = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'];
+      tiers.forEach(t => {
+        const btn = document.getElementById(`btnRarity-${t}`);
+        if (!btn) return;
+        if (t === cardState.rarity) {
+          btn.className = 'rarity-btn px-2 py-2 rounded-xl border border-teal-400 bg-teal-500/20 text-white text-[11px] font-bold flex flex-col items-center gap-1 shadow-sm transition-all';
+        } else {
+          btn.className = 'rarity-btn px-2 py-2 rounded-xl border border-slate-700/80 bg-slate-900/80 text-slate-400 hover:text-slate-200 text-[11px] font-bold flex flex-col items-center gap-1 transition-all';
+        }
+      });
+    }
+
+    function setDescAlign(alignVal) {
+      cardState.descAlign = alignVal;
+      ['left', 'center', 'right'].forEach(a => {
+        const btn = document.getElementById(`btnDescAlign-${a}`);
+        if (!btn) return;
+        if (a === alignVal) {
+          btn.className = 'py-1 rounded-lg text-[11px] font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/40 transition';
+        } else {
+          btn.className = 'py-1 rounded-lg text-[11px] font-semibold text-slate-400 hover:text-white transition';
+        }
+      });
+      renderCard();
+    }
+
+    function toggleFullArt(explicitVal) {
+      cardState.fullArt = typeof explicitVal === 'boolean' ? explicitVal : !cardState.fullArt;
+      document.getElementById('chkFullArt').checked = cardState.fullArt;
+
+      const dot = document.getElementById('fullArtDot');
+      const headerBtn = document.getElementById('btnFullArtHeader');
+      const optionsBox = document.getElementById('fullArtOptions');
+
+      if (cardState.fullArt) {
+        dot.className = 'w-2 h-2 rounded-full bg-teal-400 animate-pulse';
+        headerBtn.className = 'px-3.5 py-2 rounded-xl text-xs font-semibold border border-teal-500/60 bg-teal-500/20 text-teal-200 flex items-center gap-2 transition-all';
+        optionsBox.classList.remove('hidden');
+        const activeLayer = getActiveLayer();
+        if (activeLayer && activeLayer.scale < 1.5) {
+          activeLayer.scale = 2.2;
+          updateArtSlidersUI();
+        }
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-slate-500';
+        headerBtn.className = 'px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 flex items-center gap-2 transition-all';
+        optionsBox.classList.add('hidden');
+        const activeLayer = getActiveLayer();
+        if (activeLayer && activeLayer.scale > 2.0) {
+          activeLayer.scale = 1.0;
+          updateArtSlidersUI();
+        }
+      }
+      renderCard();
+    }
+
+    function setCardTheme(themeName) {
+      cardState.theme = themeName;
+      cardState.colors = { ...THEME_PRESETS[themeName] };
+
+      // Update Header Pill UI
+      const btnLight = document.getElementById('btnThemeLight');
+      const btnDark = document.getElementById('btnThemeDark');
+      if (themeName === 'light') {
+        btnLight.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all bg-white text-slate-900 shadow';
+        btnDark.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-300 hover:text-white';
+      } else {
+        btnDark.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all bg-slate-950 text-white shadow border border-slate-700';
+        btnLight.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-300 hover:text-white';
+      }
+
+      // Sync color inputs
+      document.getElementById('clrCardBg').value = cardState.colors.cardBg;
+      document.getElementById('clrPrimary').value = cardState.colors.primary;
+      document.getElementById('clrAccentTeal').value = cardState.colors.accentTeal;
+      document.getElementById('clrCornerGold').value = cardState.colors.cornerGold;
+      document.getElementById('clrArtBox').value = cardState.colors.artBoxBg;
+      const quickClr = document.getElementById('clrArtBoxQuick');
+      if (quickClr) quickClr.value = cardState.colors.artBoxBg;
+      const quickHex = document.getElementById('inpArtBoxHex');
+      if (quickHex) quickHex.value = cardState.colors.artBoxBg.toUpperCase();
+
+      renderCard();
+    }
+
+    function syncColorsFromUI() {
+      cardState.colors.cardBg = document.getElementById('clrCardBg').value;
+      cardState.colors.primary = document.getElementById('clrPrimary').value;
+      cardState.colors.accentTeal = document.getElementById('clrAccentTeal').value;
+      cardState.colors.cornerGold = document.getElementById('clrCornerGold').value;
+      cardState.colors.artBoxBg = document.getElementById('clrArtBox').value;
+      const quickClr = document.getElementById('clrArtBoxQuick');
+      if (quickClr) quickClr.value = cardState.colors.artBoxBg;
+      const quickHex = document.getElementById('inpArtBoxHex');
+      if (quickHex) quickHex.value = cardState.colors.artBoxBg.toUpperCase();
+      renderCard();
+    }
+
+    function setCardTheme(themeName) {
+      cardState.theme = themeName;
+      cardState.colors = { ...THEME_PRESETS[themeName] };
+
+      // Update Header Pill UI
+      const btnLight = document.getElementById('btnThemeLight');
+      const btnDark = document.getElementById('btnThemeDark');
+      if (themeName === 'light') {
+        btnLight.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all bg-white text-slate-900 shadow';
+        btnDark.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-300 hover:text-white';
+      } else {
+        btnDark.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all bg-slate-950 text-white shadow border border-slate-700';
+        btnLight.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all text-slate-300 hover:text-white';
+      }
+
+      // Sync color inputs
+      document.getElementById('clrCardBg').value = cardState.colors.cardBg;
+      document.getElementById('clrPrimary').value = cardState.colors.primary;
+      document.getElementById('clrAccentTeal').value = cardState.colors.accentTeal;
+      document.getElementById('clrCornerGold').value = cardState.colors.cornerGold;
+      document.getElementById('clrArtBox').value = cardState.colors.artBoxBg;
+
+      renderCard();
+    }
+
+    function syncColorsFromUI() {
+      cardState.colors.cardBg = document.getElementById('clrCardBg').value;
+      cardState.colors.primary = document.getElementById('clrPrimary').value;
+      cardState.colors.accentTeal = document.getElementById('clrAccentTeal').value;
+      cardState.colors.cornerGold = document.getElementById('clrCornerGold').value;
+      cardState.colors.artBoxBg = document.getElementById('clrArtBox').value;
+      renderCard();
+    }
+
+    function setEmoji(emojiChar) {
+      document.getElementById('inpEmoji').value = emojiChar;
+      syncStateFromUI();
+    }
+
+    function applyGlobalFont(fontName) {
+      document.getElementById('selFontTitle').value = fontName;
+      document.getElementById('selFontStats').value = fontName;
+      document.getElementById('selFontDesc').value = fontName;
+      syncStateFromUI();
+      showToast(`Font changed to ${fontName}`);
+    }
+
+    function updateGuideState() {
+      cardState.showSafeZone = document.getElementById('chkSafeZone').checked;
+      cardState.showCutZone = document.getElementById('chkCutZone').checked;
+      cardState.printSheetView = document.getElementById('chkPrintSheetView').checked;
+
+      document.getElementById('chkSafeZoneTab').checked = cardState.showSafeZone;
+      document.getElementById('chkCutZoneTab').checked = cardState.showCutZone;
+
+      renderCard();
+    }
+
+    function syncStateFromUI() {
+      cardState.showArtPlaceholder = document.getElementById('chkShowArtPlaceholder').checked;
+      const chkGrad = document.getElementById('chkArtBgGradient');
+      if (chkGrad) cardState.artBgGradient = chkGrad.checked;
+      cardState.scrimOpacity = parseInt(document.getElementById('rngScrimOpacity').value, 10) / 100;
+      document.getElementById('lblScrimOpacity').textContent = `${Math.round(cardState.scrimOpacity * 100)}%`;
+      cardState.fullArtShowArtBox = document.getElementById('chkFullArtShowArtBox').checked;
+
+      // Art Box Height ratio
+      const artBoxSlider = document.getElementById('rngArtBoxHeight');
+      if (artBoxSlider) {
+        cardState.artBoxHeight = parseInt(artBoxSlider.value, 10) || DEFAULT_ART_BOX_HEIGHT;
+        const pct = Math.round((cardState.artBoxHeight / INNER_BORDER.h) * 100);
+        document.getElementById('lblArtBoxHeight').textContent = `${pct}% (${cardState.artBoxHeight}px)`;
+      }
+
+      cardState.emoji = document.getElementById('inpEmoji').value;
+      cardState.emojiSizeScale = parseInt(document.getElementById('rngEmojiSize').value, 10) / 100;
+      document.getElementById('lblEmojiSize').textContent = `${Math.round(cardState.emojiSizeScale * 100)}%`;
+      cardState.showEmojiBoxOutline = document.getElementById('chkEmojiBoxOutline').checked;
+
+      // Rarity controls
+      const chkRarity = document.getElementById('chkShowRarity');
+      if (chkRarity) cardState.showRarity = chkRarity.checked;
+      const selStyle = document.getElementById('selRarityStyle');
+      if (selStyle) cardState.rarityStyle = selStyle.value;
+      const selPos = document.getElementById('selRarityPos');
+      if (selPos) cardState.rarityPosition = selPos.value;
+      updateRarityButtonsUI();
+
+      cardState.title = document.getElementById('inpTitle').value;
+      cardState.titleSizeScale = parseInt(document.getElementById('rngTitleSize').value, 10) / 100;
+      document.getElementById('lblTitleSize').textContent = `${Math.round(cardState.titleSizeScale * 100)}%`;
+
+      for (let i = 0; i < 5; i++) {
+        cardState.stats[i].label = document.getElementById(`inpStatLabel${i}`).value;
+        cardState.stats[i].value = document.getElementById(`inpStatVal${i}`).value;
+      }
+
+      cardState.desc = document.getElementById('inpDesc').value;
+      cardState.descSizeScale = parseInt(document.getElementById('rngDescSize').value, 10) / 100;
+      document.getElementById('lblDescSize').textContent = `${Math.round(cardState.descSizeScale * 100)}%`;
+
+      cardState.cardNumber = document.getElementById('inpCardNumber').value;
+
+      cardState.fontTitle = document.getElementById('selFontTitle').value;
+      cardState.fontStats = document.getElementById('selFontStats').value;
+      cardState.fontDesc = document.getElementById('selFontDesc').value;
+
+      cardState.showGuideLabels = document.getElementById('chkGuideLabels').checked;
+
+      renderCard();
+    }
+
+    function randomizeStats() {
+      const samplePools = [
+        ['98', '85', '10/10', '74', '92', 'S-TIER', '100'],
+        ['94', '88', '99%', '76', '100', 'A+'],
+        ['15', '82', 'MAX', '40', '99', 'LOW'],
+        ['+95', '+50', '100%', '+250', '89', 'HIGH'],
+        ['999', 'LEGEND', '5000', '∞', '850', 'MYTHIC']
+      ];
+      for (let i = 0; i < 5; i++) {
+        const pool = samplePools[i];
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        document.getElementById(`inpStatVal${i}`).value = pick;
+      }
+      syncStateFromUI();
+      showToast('Randomized stat values!');
+    }
+
+    function clearStats() {
+      for (let i = 0; i < 5; i++) {
+        document.getElementById(`inpStatVal${i}`).value = '';
+      }
+      syncStateFromUI();
+    }
+
+    /*************************************************************************
+     * 7. BUILT-IN SAMPLE VECTOR ARTWORK & SAMPLE PRESETS
+     *************************************************************************/
+    function generateBuiltInArtworkSVG(type) {
+      if (type === 'mecha') {
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900">
+          <defs>
+            <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#0f172a"/>
+              <stop offset="50%" stop-color="#1e293b"/>
+              <stop offset="100%" stop-color="#0d9488"/>
+            </linearGradient>
+            <radialGradient id="glow" cx="0.5" cy="0.45" r="0.4">
+              <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.7"/>
+              <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect width="1200" height="900" fill="url(#bg)"/>
+          <circle cx="600" cy="420" r="380" fill="url(#glow)"/>
+          <g stroke="#38bdf8" stroke-opacity="0.2" stroke-width="2">
+            <line x1="0" y1="150" x2="1200" y2="150"/><line x1="0" y1="300" x2="1200" y2="300"/>
+            <line x1="0" y1="450" x2="1200" y2="450"/><line x1="0" y1="600" x2="1200" y2="600"/>
+            <line x1="0" y1="750" x2="1200" y2="750"/>
+            <line x1="300" y1="0" x2="300" y2="900"/><line x1="600" y1="0" x2="600" y2="900"/><line x1="900" y1="0" x2="900" y2="900"/>
+          </g>
+          <!-- Stylized Mecha Crest -->
+          <polygon points="600,140 820,280 760,590 600,720 440,590 380,280" fill="#1e293b" stroke="#2dd4bf" stroke-width="10"/>
+          <polygon points="600,190 760,300 710,550 600,650 490,550 440,300" fill="#0f172a" stroke="#f5b82e" stroke-width="6"/>
+          <polygon points="480,380 600,430 720,380 690,460 600,500 510,460" fill="#2dd4bf"/>
+          <circle cx="600" cy="310" r="32" fill="#f5b82e"/>
+        </svg>`;
+      } else if (type === 'cashier') {
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900">
+          <defs>
+            <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#e0f2fe"/>
+              <stop offset="100%" stop-color="#ccfbf1"/>
+            </linearGradient>
+          </defs>
+          <rect width="1200" height="900" fill="url(#g2)"/>
+          <circle cx="600" cy="450" r="310" fill="#0f8b92" fill-opacity="0.12"/>
+          <circle cx="600" cy="450" r="230" fill="#f5b82e" fill-opacity="0.18"/>
+          <rect x="370" y="320" width="460" height="320" rx="32" fill="#182538"/>
+          <rect x="410" y="360" width="240" height="130" rx="14" fill="#2dd4bf"/>
+          <rect x="680" y="360" width="110" height="55" rx="10" fill="#f5b82e"/>
+          <rect x="680" y="435" width="110" height="55" rx="10" fill="#f8fafc"/>
+          <rect x="410" y="525" width="380" height="75" rx="12" fill="#334155"/>
+          <text x="530" y="442" font-family="Montserrat, sans-serif" font-size="54" font-weight="800" fill="#0f172a" text-anchor="middle">$999.99</text>
+        </svg>`;
+      } else if (type === 'mascotCutout') {
+        // Solid studio green-screen background so user can test 1-Click Auto Remove BG & Layering!
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 750">
+          <rect width="900" height="750" fill="#d8f3dc"/>
+          <g transform="translate(450, 390)">
+            <!-- Robot Character Subject -->
+            <rect x="-150" y="-180" width="300" height="240" rx="55" fill="#182538" stroke="#00a3ad" stroke-width="14"/>
+            <rect x="-110" y="-135" width="220" height="110" rx="26" fill="#0f172a" stroke="#2dd4bf" stroke-width="6"/>
+            <circle cx="-50" cy="-80" r="26" fill="#fdb913"/>
+            <circle cx="50" cy="-80" r="26" fill="#fdb913"/>
+            <path d="M-45,15 Q0,45 45,15" fill="none" stroke="#2dd4bf" stroke-width="10" stroke-linecap="round"/>
+            <!-- Antenna -->
+            <line x1="0" y1="-180" x2="0" y2="-255" stroke="#00a3ad" stroke-width="14" stroke-linecap="round"/>
+            <circle cx="0" cy="-270" r="28" fill="#fdb913" stroke="#182538" stroke-width="8"/>
+            <!-- Shoulders / Badge -->
+            <path d="M-190,70 C-190,140 190,140 190,70 L150,210 L-150,210 Z" fill="#00a3ad" stroke="#182538" stroke-width="12"/>
+            <polygon points="0,95 22,140 70,145 34,178 44,225 0,200 -44,225 -34,178 -70,145 -22,140" fill="#fdb913"/>
+          </g>
+        </svg>`;
+      } else {
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900">
+          <defs>
+            <linearGradient id="neb" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#1e1b4b"/>
+              <stop offset="50%" stop-color="#0f766e"/>
+              <stop offset="100%" stop-color="#090d16"/>
+            </linearGradient>
+          </defs>
+          <rect width="1200" height="900" fill="url(#neb)"/>
+          <circle cx="350" cy="300" r="240" fill="#f59e0b" fill-opacity="0.22"/>
+          <circle cx="820" cy="520" r="290" fill="#14b8a6" fill-opacity="0.28"/>
+          <polygon points="600,150 660,360 880,360 700,490 760,700 600,570 440,700 500,490 320,360 540,360" fill="#f5b82e" stroke="#ffffff" stroke-width="8"/>
+        </svg>`;
+      }
+    }
+
+    function loadBuiltInArt(type, appendAsLayer = false) {
+      const svgString = generateBuiltInArtworkSVG(type);
+      const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        if (!appendAsLayer) {
+          cardState.artLayers = [];
+        }
+        const nameMap = {
+          mecha: 'Cyber Guardian',
+          cashier: 'Apex Register',
+          nebula: 'Cosmic Aura BG',
+          mascotCutout: 'Bot Subject (Click Auto-Cutout)'
+        };
+        const newLayer = createArtLayer(img, nameMap[type] || 'Sample Layer');
+        if (type === 'mascotCutout' && cardState.artLayers.length > 0) {
+          newLayer.scale = 0.85;
+          newLayer.shadowEnabled = true;
+        }
+        cardState.artLayers.push(newLayer);
+        cardState.activeLayerId = newLayer.id;
+        document.getElementById('btnRemoveArt').classList.remove('hidden');
+        renderLayerStackUI();
+        syncLayerInspectorUI();
+        renderCard();
+        URL.revokeObjectURL(url);
+        if (appendAsLayer) {
+          showToast(`Added "${newLayer.name}" to layer stack!`);
+        }
+      };
+      img.src = url;
+    }
+
+    function loadSamplePreset(presetName) {
+      if (presetName === 'blank') {
+        setCardTheme('light');
+        toggleFullArt(false);
+        clearArtwork();
+        document.getElementById('rngArtBoxHeight').value = DEFAULT_ART_BOX_HEIGHT;
+        document.getElementById('inpEmoji').value = '';
+        document.getElementById('inpTitle').value = 'TITLE';
+        cardState.rarity = 'Common';
+        document.getElementById('chkShowRarity').checked = true;
+        document.getElementById('selRarityStyle').value = 'badge';
+        document.getElementById('selRarityPos').value = 'bottomLeft';
+        const defaultLabels = ['SELLABILITY', 'RELIABILITY', 'CX AGRO', 'STORE MORALE', 'LORE/AURA'];
+        for (let i = 0; i < 5; i++) {
+          document.getElementById(`inpStatLabel${i}`).value = defaultLabels[i];
+          document.getElementById(`inpStatVal${i}`).value = '';
+        }
+        document.getElementById('inpDesc').value = 'DESC.';
+        document.getElementById('rngDescSize').value = 100;
+        setDescAlign('center');
+        document.getElementById('inpCardNumber').value = '1/107';
+        applyGlobalFont('Montserrat');
+        syncStateFromUI();
+        showToast('Loaded Blank Reference Template');
+      } else if (presetName === 'retailHero') {
+        setCardTheme('light');
+        toggleFullArt(false);
+        loadBuiltInArt('cashier');
+        document.getElementById('rngArtBoxHeight').value = DEFAULT_ART_BOX_HEIGHT;
+        document.getElementById('inpEmoji').value = '🛒';
+        document.getElementById('inpTitle').value = 'EXPRESS REGISTER';
+        cardState.rarity = 'Rare';
+        document.getElementById('chkShowRarity').checked = true;
+        document.getElementById('selRarityStyle').value = 'badge';
+        document.getElementById('selRarityPos').value = 'bottomLeft';
+        const vals = ['96', '92', '18', '+85', '450'];
+        for (let i = 0; i < 5; i++) {
+          document.getElementById(`inpStatVal${i}`).value = vals[i];
+        }
+        document.getElementById('inpDesc').value = 'Clears a 12-person checkout queue in under 90 seconds. Immune to barcode scanner jams and receipt paper outages.';
+        document.getElementById('rngDescSize').value = 95;
+        setDescAlign('center');
+        document.getElementById('inpCardNumber').value = '14/107';
+        applyGlobalFont('Montserrat');
+        syncStateFromUI();
+        showToast('Loaded Sample Card: Express Register (Rare)');
+      } else if (presetName === 'cyberforklift') {
+        setCardTheme('dark');
+        toggleFullArt(true);
+        loadBuiltInArt('mecha');
+        document.getElementById('rngArtBoxHeight').value = 920;
+        document.getElementById('inpEmoji').value = '⚡';
+        document.getElementById('inpTitle').value = 'OMEGA PALLET JACK';
+        cardState.rarity = 'Legendary';
+        document.getElementById('chkShowRarity').checked = true;
+        document.getElementById('selRarityStyle').value = 'fullAccent';
+        document.getElementById('selRarityPos').value = 'bottomLeft';
+        const vals = ['100', '99', '05', '+999', 'S-TIER'];
+        for (let i = 0; i < 5; i++) {
+          document.getElementById(`inpStatVal${i}`).value = vals[i];
+        }
+        document.getElementById('inpDesc').value = 'Forged in the backroom warehouse depths. Effortlessly moves 4-ton mystery pallets with zero wheel squeak.';
+        document.getElementById('rngDescSize').value = 95;
+        setDescAlign('center');
+        document.getElementById('inpCardNumber').value = '107/107';
+        applyGlobalFont('Orbitron');
+        syncStateFromUI();
+        showToast('Loaded Full-Art Legendary Sample!');
+      }
+    }
+
+    /*************************************************************************
+     * 8. HIGH-RES PNG EXPORT (WITH SAFE & CUT ZONES OR CLEAN DIE-CUT)
+     *************************************************************************/
+    function exportCardPNG(withGuides = false, fullBleedClean = false) {
+      // Render at full 1650 x 2250 resolution with desired flags
+      renderCard({
+        forceGuides: withGuides,
+        forceBleedSheet: withGuides || fullBleedClean,
+        isExport: true
+      });
+
+      const cleanTitle = (cardState.title || 'card').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const suffix = withGuides ? 'with-safe-and-cut-zones' : (fullBleedClean ? 'full-bleed' : 'clean');
+      const filename = `${cleanTitle}-${suffix}.png`;
+
+      const dataURL = canvas.toDataURL('image/png', 1.0);
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = dataURL;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Restore interactive preview state
+      renderCard();
+      showToast(
+        withGuides
+          ? 'Exported High-Res PNG with Safe Zone (Red) & Cut Zone (Green)!'
+          : 'Exported Clean High-Res PNG!'
+      );
+    }
+
+    /*************************************************************************
+     * 9. SAVE & LOAD CARD JSON PRESET
+     *************************************************************************/
+    function exportJSONPreset() {
+      const serializedLayers = cardState.artLayers.map(l => ({
+        name: l.name,
+        visible: l.visible,
+        locked: l.locked,
+        x: l.x,
+        y: l.y,
+        scale: l.scale,
+        rotation: l.rotation,
+        flipH: l.flipH,
+        flipV: l.flipV,
+        opacity: l.opacity,
+        blendMode: l.blendMode,
+        cutoutActive: l.cutoutActive,
+        cutoutMode: l.cutoutMode,
+        cutoutColors: l.cutoutColors,
+        cutoutTolerance: l.cutoutTolerance,
+        cutoutSoftness: l.cutoutSoftness,
+        edgeFeather: l.edgeFeather,
+        featherMode: l.featherMode,
+        shadowEnabled: l.shadowEnabled,
+        shadowBlur: l.shadowBlur,
+        shadowY: l.shadowY,
+        shadowColor: l.shadowColor,
+        filterBlur: l.filterBlur,
+        filterBright: l.filterBright,
+        filterContrast: l.filterContrast,
+        filterSat: l.filterSat,
+        dataUrl: l.origCanvas.toDataURL('image/png')
+      }));
+
+      const exportData = {
+        ...cardState,
+        serializedLayers
+      };
+      delete exportData.artLayers;
+      delete exportData.hoverCanvasPt;
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${(cardState.title || 'custom-card').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('Saved Card JSON Preset with Layers!');
+    }
+
+    function importJSONPreset(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          const savedLayers = data.serializedLayers || [];
+          delete data.serializedLayers;
+          delete data.artLayers;
+          Object.assign(cardState, data);
+          cardState.artLayers = [];
+
+          // Update DOM inputs to match loaded state
+          document.getElementById('inpEmoji').value = cardState.emoji || '';
+          document.getElementById('inpTitle').value = cardState.title || 'TITLE';
+          for (let i = 0; i < 5; i++) {
+            if (cardState.stats?.[i]) {
+              document.getElementById(`inpStatLabel${i}`).value = cardState.stats[i].label || '';
+              document.getElementById(`inpStatVal${i}`).value = cardState.stats[i].value || '';
+            }
+          }
+          document.getElementById('inpDesc').value = cardState.desc || '';
+          document.getElementById('inpCardNumber').value = cardState.cardNumber || '1/107';
+          document.getElementById('selFontTitle').value = cardState.fontTitle || 'Montserrat';
+          document.getElementById('selFontStats').value = cardState.fontStats || 'Montserrat';
+          document.getElementById('selFontDesc').value = cardState.fontDesc || 'Montserrat';
+          if (cardState.artBoxHeight) {
+            document.getElementById('rngArtBoxHeight').value = cardState.artBoxHeight;
+          }
+          document.getElementById('chkShowRarity').checked = cardState.showRarity !== false;
+          document.getElementById('selRarityStyle').value = cardState.rarityStyle || 'badge';
+          document.getElementById('selRarityPos').value = cardState.rarityPosition || 'bottomLeft';
+          setDescAlign(cardState.descAlign || 'center');
+          updateRarityButtonsUI();
+
+          toggleFullArt(!!cardState.fullArt);
+
+          if (savedLayers.length > 0) {
+            let loadedCount = 0;
+            savedLayers.forEach(sLayer => {
+              const img = new Image();
+              img.onload = () => {
+                const l = createArtLayer(img, sLayer.name);
+                Object.assign(l, {
+                  visible: sLayer.visible !== false,
+                  locked: !!sLayer.locked,
+                  x: sLayer.x || 0,
+                  y: sLayer.y || 0,
+                  scale: sLayer.scale || 1,
+                  rotation: sLayer.rotation || 0,
+                  flipH: !!sLayer.flipH,
+                  flipV: !!sLayer.flipV,
+                  opacity: sLayer.opacity ?? 1,
+                  blendMode: sLayer.blendMode || 'source-over',
+                  cutoutActive: !!sLayer.cutoutActive,
+                  cutoutMode: sLayer.cutoutMode || 'flood',
+                  cutoutColors: sLayer.cutoutColors || [],
+                  cutoutTolerance: sLayer.cutoutTolerance ?? 32,
+                  cutoutSoftness: sLayer.cutoutSoftness ?? 3,
+                  edgeFeather: sLayer.edgeFeather || 0,
+                  featherMode: sLayer.featherMode || 'rect',
+                  shadowEnabled: !!sLayer.shadowEnabled,
+                  shadowBlur: sLayer.shadowBlur ?? 24,
+                  shadowY: sLayer.shadowY ?? 12,
+                  shadowColor: sLayer.shadowColor || '#000000',
+                  filterBlur: sLayer.filterBlur || 0,
+                  filterBright: sLayer.filterBright ?? 100,
+                  filterContrast: sLayer.filterContrast ?? 100,
+                  filterSat: sLayer.filterSat ?? 100
+                });
+                if (l.cutoutActive) computeLayerAutoMask(l);
+                rebuildLayerProcessedCanvas(l);
+                cardState.artLayers.push(l);
+                cardState.activeLayerId = l.id;
+                loadedCount++;
+                if (loadedCount === savedLayers.length) {
+                  renderLayerStackUI();
+                  syncLayerInspectorUI();
+                  renderCard();
+                }
+              };
+              img.src = sLayer.dataUrl;
+            });
+          } else {
+            renderLayerStackUI();
+            syncLayerInspectorUI();
+            renderCard();
+          }
+          showToast('Loaded Card Preset!');
+        } catch (err) {
+          showToast('Could not parse JSON preset.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toastNotification');
+      const text = document.getElementById('toastText');
+      text.textContent = message;
+      toast.classList.remove('opacity-0', 'translate-y-2');
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+      }, 2800);
+    }
+
+    // Initialize on load and re-render once web fonts finish loading
+    window.onload = () => {
+      renderLayerStackUI();
+      syncStateFromUI();
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => {
+          renderCard();
+        });
+      }
+    };
+  </script>
+</body>
+</html>
